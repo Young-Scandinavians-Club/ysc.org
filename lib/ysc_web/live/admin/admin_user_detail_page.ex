@@ -99,7 +99,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               class="w-24 h-24 rounded-full shrink-0"
             />
             <details class="group pt-2">
-              <summary class="list-none cursor-pointer flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-800 select-none transition-colors [&::-webkit-details-marker]:hidden">
+              <summary class="list-none cursor-pointer flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 select-none transition-colors [&::-webkit-details-marker]:hidden type-eyebrow">
                 View Account Activity
                 <.icon
                   name="hero-chevron-down"
@@ -219,7 +219,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           >
             <!-- Personal Information -->
             <div class="space-y-4">
-              <h3 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+              <h3 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
                 Personal Information
               </h3>
               <div class="relative">
@@ -256,7 +256,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
             <!-- Contact Information -->
             <div class="space-y-4">
-              <h3 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+              <h3 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
                 Contact Information
               </h3>
               <div class="relative">
@@ -287,7 +287,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
             <!-- Account Settings -->
             <div class="space-y-4">
-              <h3 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+              <h3 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
                 Account Settings
               </h3>
               <.input
@@ -355,7 +355,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
             <!-- Address Information -->
             <div class="space-y-4">
-              <h3 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+              <h3 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
                 Address Information
               </h3>
               <.inputs_for :let={address_form} field={@form[:billing_address]}>
@@ -390,7 +390,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         </div>
 
         <div :if={@live_action == :orders} class="max-w-full py-8 px-2">
-          <h2 class="text-xl font-semibold text-zinc-800 mb-4">Ticket Orders</h2>
+          <h2 class="text-xl text-zinc-800 mb-4 type-subhead">Ticket Orders</h2>
           <.admin_table_skeleton
             :if={is_nil(@ticket_orders_meta)}
             rows={6}
@@ -485,7 +485,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         </div>
 
         <div :if={@live_action == :bookings} class="max-w-full py-8 px-2">
-          <h2 class="text-xl font-semibold text-zinc-800 mb-4">Bookings</h2>
+          <h2 class="text-xl text-zinc-800 mb-4 type-subhead">Bookings</h2>
           <.admin_table_skeleton :if={is_nil(@bookings_meta)} rows={6} columns={6} />
           <div
             :if={show_bookings_table?(@bookings_meta)}
@@ -652,7 +652,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </p>
 
               <div class="rounded-lg border border-zinc-200 p-4 bg-white">
-                <h3 class="text-sm font-semibold text-zinc-800 mb-3">
+                <h3 class="text-sm text-zinc-800 mb-3 type-subhead">
                   Grant new benefit
                 </h3>
                 <.form
@@ -675,7 +675,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
               <div class="overflow-x-auto rounded-lg border border-zinc-200">
                 <table class="min-w-full text-sm">
-                  <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
+                  <thead class="bg-zinc-50 text-left text-xs text-zinc-600 type-eyebrow">
                     <tr>
                       <th class="px-4 py-3">Status</th>
                       <th class="px-4 py-3">Benefit</th>
@@ -872,7 +872,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               id="admin-application-rejection-notes"
               class="pt-6 border-t border-zinc-200"
             >
-              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+              <h3 class="text-sm text-zinc-400 mb-3 type-eyebrow">
                 Rejection notes
               </h3>
               <div class="space-y-4">
@@ -918,7 +918,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               :if={@primary_user != nil}
               class="border border-zinc-200 rounded-lg p-6"
             >
-              <h3 class="text-lg font-semibold text-zinc-800 mb-1">
+              <h3 class="text-lg text-zinc-800 mb-1 type-subhead">
                 Membership via Primary Account
               </h3>
               <p class="text-sm text-zinc-500 mb-4">
@@ -955,7 +955,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               :if={@has_lifetime_membership}
               class="bg-blue-50 border border-blue-200 rounded-lg p-4"
             >
-              <h3 class="text-lg font-semibold text-blue-900 mb-3">
+              <h3 class="text-lg text-blue-900 mb-3 type-subhead">
                 Lifetime Membership
               </h3>
               <div class="space-y-2 text-sm text-blue-800">
@@ -997,7 +997,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 </p>
               </div>
               <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-                <h3 class="text-lg font-semibold text-zinc-800 mb-2">
+                <h3 class="text-lg text-zinc-800 mb-2 type-subhead">
                   Create membership (paid elsewhere)
                 </h3>
                 <p class="text-sm text-zinc-600 mb-4">
@@ -1037,7 +1037,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                       />
                     </div>
                     <div class="ml-3">
-                      <h3 class="text-sm font-medium text-amber-800">
+                      <h3 class="text-sm text-amber-800 type-subhead">
                         Downgrade Scheduled
                       </h3>
                       <p class="mt-1 text-sm text-amber-700">
@@ -1055,7 +1055,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               <% end %>
 
               <div>
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Current Membership
                 </h3>
                 <div class="space-y-2 text-sm text-zinc-800">
@@ -1149,7 +1149,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
 
               <div class="border-t border-zinc-200 pt-6">
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Change Membership Type
                 </h3>
                 <p class="text-sm text-zinc-600 mb-4">
@@ -1178,7 +1178,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
 
               <div class="border-t border-zinc-200 pt-6">
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Override Membership Length
                 </h3>
                 <p class="text-sm text-zinc-600 mb-4">
@@ -1219,7 +1219,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 id="cancel-refund-membership-section"
                 class="border-t border-zinc-200 pt-6"
               >
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Cancel &amp; Refund Membership
                 </h3>
                 <p class="text-sm text-zinc-600 mb-4">
@@ -1264,7 +1264,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
 
               <div class="border-t border-zinc-200 pt-6">
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Payment History
                 </h3>
 
@@ -1282,19 +1282,19 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <table class="min-w-full divide-y divide-zinc-200">
                     <thead class="bg-zinc-50">
                       <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Date
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Amount
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Status
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Invoice ID
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Payment Method
                         </th>
                       </tr>
@@ -1347,7 +1347,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
 
             <div class="border-t border-zinc-200 pt-6">
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+              <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                 Lifetime Membership Management
               </h3>
               <p class="text-sm text-zinc-600 mb-4">
@@ -1403,7 +1403,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <div class="border border-zinc-200 rounded-lg p-6">
                   <div class="flex justify-between items-start mb-4">
                     <div>
-                      <h3 class="text-lg font-semibold text-zinc-900">
+                      <h3 class="text-lg text-zinc-900 type-subhead">
                         Account ending in ••••{bank_account.account_number_last_4}
                       </h3>
                       <p class="text-sm text-zinc-600 mt-1">
@@ -1439,7 +1439,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   >
                     <div class="grid grid-cols-2 gap-4">
                       <div>
-                        <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
+                        <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                           Routing Number
                         </p>
                         <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm">
@@ -1447,7 +1447,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         </p>
                       </div>
                       <div>
-                        <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
+                        <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                           Account Number
                         </p>
                         <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm">
@@ -1479,7 +1479,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           >
             <summary class="list-none cursor-pointer px-6 py-4 flex items-center justify-between gap-4 select-none transition-colors hover:bg-zinc-50 [&::-webkit-details-marker]:hidden">
               <div>
-                <h2 class="text-lg font-semibold text-zinc-800">
+                <h2 class="text-lg text-zinc-800 type-subhead">
                   Notification preferences
                 </h2>
                 <p class="text-sm text-zinc-500 mt-1">
@@ -1504,19 +1504,19 @@ defmodule YscWeb.AdminUserDetailsLive do
                       <tr>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                         >
                           Category
                         </th>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
                         >
                           Email
                         </th>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
                         >
                           SMS
                         </th>
@@ -1711,7 +1711,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 end
               }
             >
-              <h2 class="text-xl font-semibold text-zinc-800 mb-4">
+              <h2 class="text-xl text-zinc-800 mb-4 type-subhead">
                 Sent notifications
               </h2>
               <div class="w-full">
@@ -1735,16 +1735,16 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <table class="min-w-full divide-y divide-zinc-200">
                     <thead class="bg-zinc-50">
                       <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Sent
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Type
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Template
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Recipient
                         </th>
                       </tr>
@@ -1859,7 +1859,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   class="flex-1 min-h-0 overflow-y-auto p-6 space-y-6"
                 >
                   <div>
-                    <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">
+                    <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                       Message
                     </p>
                     <div class="bg-zinc-50 rounded-lg border border-zinc-200 overflow-hidden">
@@ -1900,7 +1900,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     @selected_notification.params &&
                       map_size(@selected_notification.params) > 0
                   }>
-                    <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">
+                    <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                       Parameters
                     </p>
                     <div class="bg-zinc-50 rounded-lg p-4 border border-zinc-200">
@@ -1917,7 +1917,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           <div class="space-y-6">
             <%!-- Associated Users (unified for both primary and sub-account views) --%>
             <div class="border border-zinc-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-zinc-800 mb-1">
+              <h3 class="text-lg text-zinc-800 mb-1 type-subhead">
                 Associated Users
               </h3>
               <p class="text-sm text-zinc-500 mb-4">
@@ -2015,7 +2015,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 :if={@can_manage_family && @pending_invites != []}
                 class="mt-6 pt-6 border-t border-zinc-200"
               >
-                <h4 class="text-sm font-semibold text-zinc-800 mb-3">
+                <h4 class="text-sm text-zinc-800 mb-3 type-subhead">
                   Pending invites
                 </h4>
                 <div class="space-y-2">
@@ -2055,7 +2055,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 :if={@can_manage_family}
                 class="mt-6 pt-6 border-t border-zinc-200"
               >
-                <h4 class="text-sm font-semibold text-zinc-800 mb-3">
+                <h4 class="text-sm text-zinc-800 mb-3 type-subhead">
                   Add user to membership
                 </h4>
                 <p class="text-xs text-zinc-500 mb-3">
@@ -2161,7 +2161,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               :if={length(@family_members) > 0}
               class="border border-zinc-200 rounded-lg p-6"
             >
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+              <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                 Family Members ({length(@family_members)})
               </h3>
               <div class="space-y-3">
@@ -2212,10 +2212,10 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :logs} class="max-w-full py-8 px-2">
           <div class="flex flex-col gap-6">
-            <h2 class="text-xl font-semibold text-zinc-800">User Notes</h2>
+            <h2 class="text-xl text-zinc-800 type-subhead">User Notes</h2>
 
             <div class="bg-white border border-zinc-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">Add Note</h3>
+              <h3 class="text-lg text-zinc-800 mb-4 type-subhead">Add Note</h3>
               <.simple_form
                 for={@note_form}
                 phx-change="validate_note"
@@ -2247,7 +2247,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               id="admin-user-notes-timeline"
               class="bg-white border border-zinc-200 rounded-lg p-6"
             >
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">Timeline</h3>
+              <h3 class="text-lg text-zinc-800 mb-4 type-subhead">Timeline</h3>
               <div :if={length(@user_notes) == 0} class="text-center py-12">
                 <p class="text-zinc-500">
                   No notes yet. Add a note above to get started.
@@ -2328,7 +2328,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           <div>
             <h2
               id="rejection-override-modal-title"
-              class="text-lg font-semibold text-zinc-900"
+              class="text-lg text-zinc-900 type-subhead"
             >
               Override Rejection Decision
             </h2>
@@ -2383,7 +2383,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           <div>
             <h2
               id="confirm-delete-user-modal-title"
-              class="text-lg font-semibold text-zinc-900"
+              class="text-lg text-zinc-900 type-subhead"
             >
               Delete this user?
             </h2>

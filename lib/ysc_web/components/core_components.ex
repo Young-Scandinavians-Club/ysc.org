@@ -175,7 +175,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <h2
       id={@id}
-      class={["text-2xl font-semibold leading-8 text-zinc-800 mb-6", @class]}
+      class={["text-2xl text-zinc-800 mb-6 type-title", @class]}
     >
       {render_slot(@inner_block)}
     </h2>
@@ -1404,7 +1404,7 @@ defmodule YscWeb.CoreComponents do
       @class
     ]}>
       <div>
-        <h1 class="text-lg font-semibold leading-8 text-zinc-800">
+        <h1 class="text-lg text-zinc-800 type-subhead">
           {render_slot(@inner_block)}
         </h1>
         <p :if={@subtitle != []} class="mt-2 text-sm leading-6 text-zinc-600">
@@ -2731,7 +2731,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <h2
       id={@id}
-      class={["text-lg font-bold flex items-center gap-2", @class]}
+      class={["text-lg flex items-center gap-2 type-subhead", @class]}
     >
       <.numbered_badge tone={step_heading_tone(@accent)}>{@step}</.numbered_badge>
       {render_slot(@inner_block)}
@@ -3214,16 +3214,16 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div class="py-16 lg:py-24 max-w-xl mx-auto px-4" id={@id}>
       <div class="text-center">
-        <h1 :if={@show_unsubscribe?} class="text-2xl font-bold text-zinc-900">
+        <h1 :if={@show_unsubscribe?} class="text-2xl text-zinc-900 type-display">
           {@subscribed_title}
         </h1>
         <h1
           :if={@recipient? && @unsubscribed}
-          class="text-2xl font-bold text-zinc-900"
+          class="text-2xl text-zinc-900 type-display"
         >
           You have been unsubscribed
         </h1>
-        <h1 :if={!@recipient?} class="text-2xl font-bold text-zinc-900">
+        <h1 :if={!@recipient?} class="text-2xl text-zinc-900 type-display">
           This link no longer works
         </h1>
 
@@ -4018,7 +4018,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <ul class="shrink-0 flex-column space-y-4 md:pr-10 text-sm font-medium text-zinc-600 md:me-4 mb-4 md:mb-0">
       <li>
-        <h2 class="text-zinc-800 text-2xl font-semibold leading-8 mb-10">
+        <h2 class="text-zinc-800 text-2xl mb-10 type-title">
           Account
         </h2>
       </li>
@@ -4118,7 +4118,7 @@ defmodule YscWeb.CoreComponents do
     >
       <p
         :if={@eyebrow}
-        class="text-sm font-bold text-blue-600 uppercase tracking-wider mb-3 md:mb-4"
+        class="text-sm text-blue-600 mb-3 md:mb-4 type-eyebrow"
       >
         {@eyebrow}
       </p>
@@ -4143,10 +4143,10 @@ defmodule YscWeb.CoreComponents do
   defp page_masthead_padding_class(:large), do: "py-12"
 
   defp page_masthead_title_class(:default),
-    do: "text-4xl md:text-7xl font-bold text-zinc-900"
+    do: "text-4xl md:text-7xl text-zinc-900 type-display"
 
   defp page_masthead_title_class(:large),
-    do: "text-6xl md:text-8xl font-bold text-zinc-900 tracking-tighter"
+    do: "text-6xl md:text-8xl text-zinc-900 type-display"
 
   @doc """
   Rounded feature card with an uppercase eyebrow title and a body slot.
@@ -4199,10 +4199,10 @@ defmodule YscWeb.CoreComponents do
     do: "bg-blue-50/40 border-blue-200"
 
   defp feature_card_title_class(:muted),
-    do: "text-sm font-bold text-zinc-500 uppercase tracking-wider mb-4 md:mb-6"
+    do: "text-sm text-zinc-500 mb-4 md:mb-6 type-eyebrow"
 
   defp feature_card_title_class(:accent),
-    do: "text-sm font-bold text-blue-600 uppercase tracking-wider mb-3 md:mb-4"
+    do: "text-sm text-blue-600 mb-3 md:mb-4 type-eyebrow"
 
   @doc """
   Responsive grid wrapper for `at_glance_stat/1` tiles on booking landing pages.
@@ -4268,7 +4268,7 @@ defmodule YscWeb.CoreComponents do
       ]}>
         {@icon}
       </div>
-      <div class="text-xs uppercase tracking-wider text-zinc-500 font-bold mb-1 text-center">
+      <div class="text-xs text-zinc-500 mb-1 text-center type-eyebrow">
         {@label}
       </div>
       <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
@@ -4333,7 +4333,7 @@ defmodule YscWeb.CoreComponents do
     <h2
       id={@id}
       class={[
-        "flex items-center gap-2 font-bold",
+        "flex items-center gap-2 type-subhead",
         icon_heading_size_class(@size),
         @class
       ]}
@@ -4494,12 +4494,12 @@ defmodule YscWeb.CoreComponents do
         @image_side == :right && "lg:order-1"
       ]}>
         <div class={[
-          "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 sm:mb-6",
+          "inline-flex items-center px-3 py-1 rounded-full text-xs mb-4 sm:mb-6 type-eyebrow",
           cabin_showcase_badge_class(@accent)
         ]}>
           <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> {@location}
         </div>
-        <h3 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mb-3 sm:mb-4">
+        <h3 class="text-3xl sm:text-4xl text-zinc-900 mb-3 sm:mb-4 type-title">
           {@title}
         </h3>
         <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
@@ -4917,7 +4917,7 @@ defmodule YscWeb.CoreComponents do
           class="w-6 h-6 text-blue-600 shrink-0 mt-0.5"
         />
         <div>
-          <h3 class="font-bold text-zinc-900 mb-1">{@title}</h3>
+          <h3 class="text-zinc-900 mb-1 type-subhead">{@title}</h3>
           <p class="text-sm text-zinc-600">
             {render_slot(@inner_block)}
           </p>
@@ -5035,7 +5035,7 @@ defmodule YscWeb.CoreComponents do
           />
         </div>
         <div class="ms-2 flex-1">
-          <h3 :if={@title} class="text-sm font-semibold text-amber-900">
+          <h3 :if={@title} class="text-sm text-amber-900 type-subhead">
             {@title}
           </h3>
           <div class="mt-2 text-sm text-amber-800">
@@ -5130,7 +5130,7 @@ defmodule YscWeb.CoreComponents do
             <p class="text-sm font-bold text-zinc-900 leading-none">
               {@author}
             </p>
-            <p class="text-xs text-zinc-400 font-bold uppercase tracking-wider mt-1">
+            <p class="text-xs text-zinc-400 mt-1 type-eyebrow">
               <time
                 pubdate
                 datetime={Timex.format!(@date, "%Y-%m-%d", :strftime)}
@@ -5673,7 +5673,7 @@ defmodule YscWeb.CoreComponents do
             <.icon name="hero-exclamation-triangle" class="w-8 h-8 text-red-600" />
           </div>
           <div class="ml-3">
-            <h3 class="text-lg font-medium text-red-900">No Active Membership</h3>
+            <h3 class="text-lg text-red-900 type-subhead">No Active Membership</h3>
             <p class="text-sm text-red-700">
               <%= if @is_sub_account do %>
                 <%= if @primary_user do %>
@@ -6002,7 +6002,7 @@ defmodule YscWeb.CoreComponents do
       <div class="relative z-10 w-full min-w-0 max-w-(--breakpoint-lg) mx-auto px-5 sm:px-6 py-12 sm:py-14 md:py-16 text-center text-white box-border flex flex-col items-center justify-center">
         <h1
           :if={@title != []}
-          class="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight drop-shadow-lg"
+          class="text-4xl md:text-5xl lg:text-6xl drop-shadow-lg type-display"
         >
           {render_slot(@title)}
         </h1>
@@ -6108,7 +6108,7 @@ defmodule YscWeb.CoreComponents do
         id="payment-add-new-divider"
         class="my-6"
         show_label={!@show_new_payment_form}
-        label_class="bg-white px-3 text-xs text-zinc-400 uppercase tracking-wide"
+        label_class="bg-white px-3 text-xs text-zinc-400 type-eyebrow"
       >
         Add new
       </.labeled_divider>
@@ -6388,7 +6388,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <.modal id={@id} show on_cancel={JS.push("hide_membership_qr")}>
       <div class="text-center">
-        <h3 class="text-xl font-bold text-zinc-900 mb-1">
+        <h3 class="text-xl text-zinc-900 mb-1 type-subhead">
           My Membership QR
         </h3>
         <p class="text-sm text-zinc-500 mb-5">
@@ -6473,7 +6473,7 @@ defmodule YscWeb.CoreComponents do
   defp membership_qr_detail_row(assigns) do
     ~H"""
     <div class="flex items-center justify-between px-4 py-3">
-      <span class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+      <span class="text-xs text-zinc-500 type-eyebrow">
         {@label}
       </span>
       <span class={@value_class}>

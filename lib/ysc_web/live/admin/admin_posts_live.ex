@@ -107,7 +107,7 @@ defmodule YscWeb.AdminPostsLive do
                 <div class="flex items-start justify-between mb-3">
                   <div class="flex-1 min-w-0">
                     <div class="mb-1 flex items-center gap-1.5 min-w-0">
-                      <h3 class="text-base font-semibold text-zinc-900 flex items-center gap-1.5 min-w-0">
+                      <h3 class="text-base text-zinc-900 flex items-center gap-1.5 min-w-0 type-subhead">
                         <.icon
                           :if={post.featured_post}
                           name="hero-star-solid"

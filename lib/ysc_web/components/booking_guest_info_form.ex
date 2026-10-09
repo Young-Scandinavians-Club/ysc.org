@@ -21,7 +21,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
   def booking_guest_info_form(assigns) do
     ~H"""
     <div class="bg-white rounded-lg border border-zinc-200 p-8 shadow-xs">
-      <h2 class="text-xl font-bold mb-2">Guest Information</h2>
+      <h2 class="text-xl mb-2 type-subhead">Guest Information</h2>
       <p :if={@intro_text} class="text-sm text-zinc-600 mb-4">{@intro_text}</p>
       <p :if={!@intro_text} class="text-sm text-zinc-600 mb-4">
         Please provide details for everyone staying in {room_names(@booking)}.
@@ -192,7 +192,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
                 </.numbered_badge>
                 <div class="flex-1 space-y-3">
                   <div class="flex justify-between items-center">
-                    <h3 class="font-bold text-zinc-800">
+                    <h3 class="text-zinc-800 type-subhead">
                       {if is_child, do: "Child Guest", else: "Adult Guest"}
                     </h3>
                     <%= if !is_child && length(@other_family_members || []) > 0 do %>

@@ -64,7 +64,7 @@ defmodule YscWeb.Components.LayoutSiteComponentsTest do
         render_component(&Layouts.footer_section_heading/1, %{title: "Policies"})
 
       assert html =~ "Policies"
-      assert html =~ "uppercase"
+      assert html =~ "type-eyebrow"
     end
   end
 

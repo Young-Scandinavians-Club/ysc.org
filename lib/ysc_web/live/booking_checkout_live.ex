@@ -381,7 +381,7 @@ defmodule YscWeb.BookingCheckoutLive do
               />
             </div>
             <div class="flex-1">
-              <h2 class="text-2xl font-bold text-zinc-900">
+              <h2 class="text-2xl text-zinc-900 type-title">
                 {titleize(@booking.property)} Cabin
               </h2>
               <p class="text-zinc-500 mt-1">
@@ -441,7 +441,7 @@ defmodule YscWeb.BookingCheckoutLive do
             :if={@checkout_step == :payment}
             class="bg-white rounded-lg border border-zinc-200 p-8 shadow-xs"
           >
-            <h2 class="text-xl font-bold mb-6">
+            <h2 class="text-xl mb-6 type-subhead">
               <%= if @complimentary_checkout do %>
                 Confirm your booking
               <% else %>
@@ -606,7 +606,7 @@ defmodule YscWeb.BookingCheckoutLive do
               )
             ]}>
               <.icon name="hero-clock" class="w-4 h-4" />
-              <span class="text-xs font-semibold uppercase tracking-wide">
+              <span class="text-xs type-eyebrow">
                 Time remaining
               </span>
             </div>
@@ -638,7 +638,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 if assigns[:show_price_details], do: "true", else: "false"
               }
             >
-              <h3 class="text-sm font-bold text-zinc-400 uppercase tracking-wider">
+              <h3 class="text-sm text-zinc-400 type-eyebrow">
                 Price Details
               </h3>
               <.icon
@@ -651,7 +651,7 @@ defmodule YscWeb.BookingCheckoutLive do
               />
             </button>
             <%!-- Desktop Header --%>
-            <h3 class="hidden lg:block text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4">
+            <h3 class="hidden lg:block text-sm text-zinc-400 mb-4 type-eyebrow">
               Price Details
             </h3>
             <div class={[
@@ -663,7 +663,7 @@ defmodule YscWeb.BookingCheckoutLive do
               <% end %>
               <div class="pt-4 border-t border-zinc-700 flex justify-between items-baseline">
                 <span class="text-lg font-bold">Total</span>
-                <span class="text-3xl font-bold text-blue-400">
+                <span class="text-3xl text-blue-400 type-title">
                   {MoneyHelper.format_money!(@total_price)}
                 </span>
               </div>
@@ -673,7 +673,7 @@ defmodule YscWeb.BookingCheckoutLive do
           <div class="bg-white rounded-lg border border-zinc-200 p-6">
             <h3
               id="checkout-next-steps-heading"
-              class="text-lg font-bold text-zinc-900 mb-4"
+              class="text-lg text-zinc-900 mb-4 type-subhead"
             >
               What Happens Next?
             </h3>
@@ -718,8 +718,8 @@ defmodule YscWeb.BookingCheckoutLive do
       >
         <div class="max-w-(--breakpoint-xl) mx-auto flex items-center justify-between gap-4">
           <div>
-            <p class="text-xs text-zinc-500 uppercase tracking-wide">Total</p>
-            <p class="text-2xl font-bold text-blue-600">
+            <p class="text-xs text-zinc-500 type-eyebrow">Total</p>
+            <p class="text-2xl text-blue-600 type-title">
               {MoneyHelper.format_money!(@total_price)}
             </p>
           </div>

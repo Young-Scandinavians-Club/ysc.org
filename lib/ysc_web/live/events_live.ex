@@ -60,7 +60,7 @@ defmodule YscWeb.EventsLive do
               </.link>
             </.feature_card>
             <div class="p-6 md:p-8 bg-white rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-3 md:mb-4">
+              <h4 class="text-sm text-zinc-500 mb-3 md:mb-4 type-eyebrow">
                 Stay Connected
               </h4>
               <p class="text-base text-zinc-600 leading-relaxed mb-4">
@@ -81,7 +81,7 @@ defmodule YscWeb.EventsLive do
                   }
                   class="border-t border-zinc-100 pt-3"
                 >
-                  <p class="text-sm text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
+                  <p class="text-sm text-zinc-500 mb-2 type-eyebrow">
                     Events & Community
                   </p>
                   <div class="flex flex-col gap-2">
@@ -152,7 +152,7 @@ defmodule YscWeb.EventsLive do
       <%= if @async_data_loaded && @past_events_exist do %>
         <section class="mt-20 md:mt-32 py-12 md:py-16 border-t border-zinc-100">
           <div class="max-w-(--breakpoint-xl) mx-auto px-4">
-            <h2 class="text-3xl font-bold text-zinc-800 tracking-tighter italic mb-12 group relative inline-block">
+            <h2 class="text-3xl text-zinc-800 italic mb-12 group relative inline-block type-title">
               <span class="inline-block transition duration-500 ease-in-out group-hover:-translate-y-full group-hover:opacity-0">
                 {random_past_events_title()}
               </span>
@@ -187,7 +187,7 @@ defmodule YscWeb.EventsLive do
                     <div class="absolute inset-0 z-2 bg-linear-to-t from-zinc-900/70 via-zinc-900/20 to-transparent">
                     </div>
                     <div class="absolute bottom-0 left-0 right-0 z-3 p-3">
-                      <h4 class="text-white text-sm font-bold leading-tight line-clamp-2">
+                      <h4 class="text-white text-sm line-clamp-2 type-subhead">
                         {event.title}
                       </h4>
                       <p

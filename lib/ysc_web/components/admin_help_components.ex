@@ -41,7 +41,7 @@ defmodule YscWeb.AdminHelpComponents do
       <p class="text-sm font-medium text-zinc-500 mb-1">
         Step {@step_index} of {@step_count}
       </p>
-      <h2 class="text-xl font-semibold text-zinc-900 mb-3">{@step.title}</h2>
+      <h2 class="text-xl text-zinc-900 mb-3 type-subhead">{@step.title}</h2>
       <div class="prose prose-zinc prose-sm max-w-none mb-6">
         {raw(format_help_body(@step.body, @highlight))}
       </div>
@@ -90,7 +90,7 @@ defmodule YscWeb.AdminHelpComponents do
   def admin_help_public_effect(assigns) do
     ~H"""
     <div class="mt-6 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 print:break-inside-avoid">
-      <p class="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+      <p class="mb-3 flex items-center gap-2 text-xs text-emerald-800 type-eyebrow">
         <.icon name="hero-globe-alt" class="w-4 h-4 shrink-0" />
         {@label}
       </p>
@@ -373,14 +373,14 @@ defmodule YscWeb.AdminHelpComponents do
           class="rounded-xl border border-zinc-200 bg-white shadow-xs print:hidden mt-6"
         >
           <header class="border-b border-zinc-200 px-6 py-5 md:px-8">
-            <h2 class="text-lg font-semibold text-zinc-900">More help</h2>
+            <h2 class="text-lg text-zinc-900 type-subhead">More help</h2>
             <p class="mt-1 text-sm text-zinc-600">
               Answers and fixes for this guide — open a question to read more.
             </p>
           </header>
 
           <section :if={@faq != []} id={"#{@id}-faq"} class="px-6 py-5 md:px-8">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <h3 class="text-xs text-zinc-500 type-eyebrow">
               Frequently asked questions
             </h3>
             <div class="mt-3 divide-y divide-zinc-200 rounded-lg border border-zinc-200">
@@ -407,7 +407,7 @@ defmodule YscWeb.AdminHelpComponents do
               @faq != [] && "bg-zinc-50/80"
             ]}
           >
-            <h3 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            <h3 class="flex items-center gap-2 text-xs text-zinc-500 type-eyebrow">
               <.icon name="hero-wrench-screwdriver" class="w-4 h-4" />
               Troubleshooting
             </h3>
@@ -463,7 +463,7 @@ defmodule YscWeb.AdminHelpComponents do
       id={@id}
       class="rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-5 mb-8 mt-4"
     >
-      <h2 class="text-base font-semibold text-zinc-900 flex items-center gap-2">
+      <h2 class="text-base text-zinc-900 flex items-center gap-2 type-subhead">
         <.icon name="hero-sparkles" class="w-5 h-5 text-violet-500" />
         What are you trying to do?
       </h2>

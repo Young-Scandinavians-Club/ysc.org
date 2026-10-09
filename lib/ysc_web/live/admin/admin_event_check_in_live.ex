@@ -22,7 +22,7 @@ defmodule YscWeb.AdminEventCheckInLive do
         <div class="flex items-center gap-3 min-w-0">
           <.back navigate={~p"/admin/events"}>Events</.back>
           <span class="text-zinc-300 select-none hidden sm:inline">/</span>
-          <h1 class="text-base font-semibold text-zinc-900 truncate hidden sm:block">
+          <h1 class="text-base text-zinc-900 truncate hidden sm:block type-subhead">
             <%= if @event do %>
               {@event.title}
             <% else %>

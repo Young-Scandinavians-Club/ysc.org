@@ -124,7 +124,7 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
       </div>
 
       <div>
-        <h4 class="text-base font-semibold text-zinc-900">
+        <h4 class="text-base text-zinc-900 type-subhead">
           Ticket {@index + 1} of {@total}
         </h4>
         <p class="text-xs text-zinc-600">{@ticket.ticket_tier.name}</p>

@@ -23,7 +23,7 @@ defmodule YscWeb.AdminScannerLive do
     >
       <div class="py-6">
         <div class="flex items-center justify-between mb-6">
-          <h1 class="text-2xl font-semibold text-zinc-800">Check-in Sessions</h1>
+          <h1 class="text-2xl text-zinc-800 type-display">Check-in Sessions</h1>
           <.link
             navigate={~p"/admin/scanner"}
             class="inline-flex items-center rounded-sm py-2 px-3 text-sm font-semibold leading-6 bg-blue-700 hover:bg-blue-800 text-zinc-100 active:scale-[0.98] transition duration-150 ease-in-out"
@@ -82,7 +82,7 @@ defmodule YscWeb.AdminScannerLive do
                 ]}>
                   {if is_nil(session.closed_at), do: "Active", else: "Closed"}
                 </span>
-                <h3 class="font-medium text-zinc-900">{session.name}</h3>
+                <h3 class="text-zinc-900 type-subhead">{session.name}</h3>
               </div>
               <div class="flex items-center gap-3">
                 <.link
@@ -196,7 +196,7 @@ defmodule YscWeb.AdminScannerLive do
               <.icon name="hero-arrow-left" class="w-5 h-5" />
             </.link>
             <div class="flex flex-wrap items-center gap-2 min-w-0">
-              <h1 class="text-2xl font-semibold text-zinc-800 leading-tight">
+              <h1 class="text-2xl text-zinc-800 type-display">
                 {@detail_session.name}
               </h1>
               <span class={[
@@ -318,34 +318,34 @@ defmodule YscWeb.AdminScannerLive do
               <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                   <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                       Name
                     </th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                       Email
                     </th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                       Time
                     </th>
                     <th
                       :if={@detail_session.type == :membership}
-                      class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase"
+                      class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                     >
                       Status
                     </th>
                     <th
                       :if={@detail_session.type == :membership}
-                      class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase"
+                      class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                     >
                       Type
                     </th>
                     <th
                       :if={@detail_session.type == :event}
-                      class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase"
+                      class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                     >
                       Check-in
                     </th>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                       Result
                     </th>
                   </tr>
@@ -445,7 +445,7 @@ defmodule YscWeb.AdminScannerLive do
             :if={@open_sessions != []}
             class="bg-white rounded-xl border border-green-200 p-4 shadow-xs"
           >
-            <h2 class="text-sm font-semibold text-green-800 mb-3 flex items-center gap-1.5">
+            <h2 class="text-sm text-green-800 mb-3 flex items-center gap-1.5 type-subhead">
               <.icon name="hero-arrow-path" class="w-4 h-4" />
               Resume an Active Session
             </h2>
@@ -507,7 +507,7 @@ defmodule YscWeb.AdminScannerLive do
             :if={@joinable_sessions != []}
             class="bg-white rounded-xl border border-violet-200 p-4 shadow-xs"
           >
-            <h2 class="text-sm font-semibold text-violet-800 mb-3 flex items-center gap-1.5">
+            <h2 class="text-sm text-violet-800 mb-3 flex items-center gap-1.5 type-subhead">
               <.icon name="hero-user-group" class="w-4 h-4" />
               Join a Membership Check-in Session
             </h2>
@@ -554,7 +554,7 @@ defmodule YscWeb.AdminScannerLive do
           </div>
 
           <div class="bg-white rounded-xl border border-zinc-200 p-6 shadow-xs">
-            <h2 class="text-lg font-semibold text-zinc-800 mb-4">
+            <h2 class="text-lg text-zinc-800 mb-4 type-subhead">
               Start a Check-in Session
             </h2>
 
@@ -920,7 +920,7 @@ defmodule YscWeb.AdminScannerLive do
             on_cancel={JS.push("dismiss_group")}
           >
             <div class="p-2">
-              <h3 class="text-lg font-semibold text-zinc-800 mb-1">
+              <h3 class="text-lg text-zinc-800 mb-1 type-subhead">
                 Group Check-in
               </h3>
               <p
@@ -1070,10 +1070,10 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-check-badge" class="w-9 h-9 text-white" />
         </div>
         <div class="min-w-0">
-          <p class="text-xs font-semibold uppercase tracking-wider text-emerald-200 mb-0.5">
+          <p class="text-xs text-emerald-200 mb-0.5 type-eyebrow">
             Active Member
           </p>
-          <p class="text-2xl font-bold leading-tight truncate">
+          <p class="text-2xl truncate type-title">
             {@scan_result.user.first_name} {@scan_result.user.last_name}
           </p>
           <span
@@ -1136,10 +1136,10 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-x-circle" class="w-9 h-9 text-white" />
         </div>
         <div class="min-w-0">
-          <p class="text-xs font-semibold uppercase tracking-wider text-red-200 mb-0.5">
+          <p class="text-xs text-red-200 mb-0.5 type-eyebrow">
             Inactive / Expired
           </p>
-          <p class="text-2xl font-bold leading-tight truncate">
+          <p class="text-2xl truncate type-title">
             {@scan_result.user.first_name} {@scan_result.user.last_name}
           </p>
           <span
@@ -1176,7 +1176,7 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-check-circle" class="w-9 h-9 text-white" />
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wider text-emerald-200 mb-0.5">
+          <p class="text-xs text-emerald-200 mb-0.5 type-eyebrow">
             Checked In
           </p>
           <p class="text-xl font-bold">{@scan_result.message}</p>
@@ -1203,10 +1203,10 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-user-group" class="w-9 h-9 text-white" />
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wider text-emerald-200 mb-0.5">
+          <p class="text-xs text-emerald-200 mb-0.5 type-eyebrow">
             Group Checked In
           </p>
-          <p class="text-2xl font-bold">{@scan_result.count} guests</p>
+          <p class="text-2xl type-title">{@scan_result.count} guests</p>
         </div>
       </div>
       <button
@@ -1228,7 +1228,7 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-exclamation-triangle" class="w-9 h-9 text-white" />
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wider text-amber-200 mb-0.5">
+          <p class="text-xs text-amber-200 mb-0.5 type-eyebrow">
             Already Scanned
           </p>
           <p class="text-xl font-bold">Duplicate Check-in</p>
@@ -1276,7 +1276,7 @@ defmodule YscWeb.AdminScannerLive do
           <.icon name="hero-x-mark" class="w-9 h-9 text-white" />
         </div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-0.5">
+          <p class="text-xs text-zinc-400 mb-0.5 type-eyebrow">
             Error
           </p>
           <p class="text-lg font-bold leading-snug">{@scan_result.message}</p>

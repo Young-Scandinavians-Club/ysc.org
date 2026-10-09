@@ -183,7 +183,7 @@ defmodule YscWeb.UserRegistrationLive do
 
               <div :if={@show_family_input} id="family-members" class="pt-4">
                 <div class="pb-2">
-                  <h2 class="font-semibold leading-6 text-zinc-800">Family</h2>
+                  <h2 class="text-zinc-800 type-subhead">Family</h2>
                   <p class="text-sm leading-6 text-zinc-600">
                     List your spouse or partner and children under 18 who will be included on this family membership.
                   </p>

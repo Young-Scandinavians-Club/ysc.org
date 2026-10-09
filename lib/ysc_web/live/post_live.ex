@@ -47,15 +47,15 @@ defmodule YscWeb.PostLive do
       <div :if={@post != nil} class="max-w-(--breakpoint-lg) mx-auto px-4">
         <div class="max-w-3xl mx-auto text-center mb-12">
           <div class="flex items-center justify-center gap-3 mb-6">
-            <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">
+            <span class="text-xs text-blue-600 type-eyebrow">
               Club News
             </span>
             <span class="h-3 w-px bg-zinc-200"></span>
-            <span class="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+            <span class="text-xs text-zinc-400 type-eyebrow">
               {DateDisplay.format_date_in_zone(post_date(@post), @timezone)}
             </span>
           </div>
-          <h1 class="text-4xl md:text-6xl font-bold text-zinc-900 tracking-tighter leading-[1.1] mb-8">
+          <h1 class="text-4xl md:text-6xl text-zinc-900 mb-8 type-display">
             {@post.title}
           </h1>
           <div class="flex items-center justify-center gap-4 py-6 border-y border-zinc-100">
@@ -64,7 +64,7 @@ defmodule YscWeb.PostLive do
               class="w-10 h-10 rounded-full"
             />
             <div class="text-left">
-              <p class="text-xs font-bold text-zinc-900 uppercase tracking-wider">
+              <p class="text-xs text-zinc-900 type-eyebrow">
                 Posted by
               </p>
               <p class="text-sm font-medium text-zinc-500">
@@ -121,7 +121,7 @@ defmodule YscWeb.PostLive do
           <div class="bg-white border border-zinc-200 rounded-xl p-10 shadow-xs">
             <div class="flex items-center gap-3 mb-8">
               <div class="w-1.5 h-6 bg-blue-500 rounded-full"></div>
-              <h2 class="text-2xl font-bold text-zinc-900 tracking-tight">
+              <h2 class="text-2xl text-zinc-900 type-title">
                 Community Discussion ({@n_comments})
               </h2>
             </div>

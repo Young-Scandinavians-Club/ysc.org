@@ -31,7 +31,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       <%!-- Ticket Tiers List --%>
       <div class="border border-zinc-200 rounded-sm p-4 sm:p-6">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4">
-          <h3 class="text-lg font-semibold">Ticket Tiers</h3>
+          <h3 class="text-lg type-subhead">Ticket Tiers</h3>
           <div class="flex items-center">
             <.button
               :if={@admin_role == :admin}
@@ -89,19 +89,19 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
               <div class="flex flex-col lg:flex-row lg:items-center gap-4">
                 <div class="flex-1">
                   <div class="flex items-center gap-3 mb-1">
-                    <h4 class="font-bold text-zinc-900 text-lg">
+                    <h4 class="text-zinc-900 text-lg type-subhead">
                       {ticket_tier.name}
                     </h4>
                     <.badge
                       type={tier_status_badge_type(ticket_tier)}
-                      class="text-xs uppercase tracking-wider font-bold! rounded-full! px-2 py-0.5 me-0"
+                      class="text-xs font-bold! rounded-full! px-2 py-0.5 me-0 type-eyebrow"
                     >
                       {tier_status_text(ticket_tier)}
                     </.badge>
                     <.badge
                       :if={ticket_tier.member_only}
                       type="violet"
-                      class="inline-flex items-center gap-1 text-xs uppercase tracking-wider font-bold! rounded-full! px-2 py-0.5 me-0"
+                      class="inline-flex items-center gap-1 text-xs font-bold! rounded-full! px-2 py-0.5 me-0 type-eyebrow"
                     >
                       <.icon name="hero-lock-closed" class="w-3 h-3" /> Member only
                     </.badge>
@@ -124,7 +124,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
                   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                     <div>
-                      <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                      <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
                         Price
                       </p>
                       <p class="text-sm font-bold text-zinc-800">
@@ -142,7 +142,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     </div>
 
                     <div>
-                      <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                      <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
                         Sold
                       </p>
                       <div class="flex items-center gap-2">
@@ -187,7 +187,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     </div>
 
                     <div>
-                      <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                      <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
                         Sales Period
                       </p>
                       <p class="text-sm text-zinc-700 leading-tight">
@@ -199,7 +199,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     </div>
 
                     <div>
-                      <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                      <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
                         Attendee info
                       </p>
                       <p
@@ -278,7 +278,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                   Map.get(@expired_reservations_by_tier, ticket_tier.id, []) %>
                 <%= if length(reservations) > 0 do %>
                   <div class="mt-4 pt-4 border-t border-zinc-200">
-                    <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">
+                    <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                       Active Reservations
                     </p>
                     <div class="space-y-2">
@@ -330,7 +330,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                 <% end %>
                 <%= if length(expired_reservations) > 0 do %>
                   <div class="mt-4 pt-4 border-t border-zinc-200">
-                    <p class="text-xs font-semibold text-red-800 uppercase tracking-wide mb-1">
+                    <p class="text-xs text-red-800 mb-1 type-eyebrow">
                       Expired Reservations
                     </p>
                     <p class="text-xs text-zinc-500 mb-2">

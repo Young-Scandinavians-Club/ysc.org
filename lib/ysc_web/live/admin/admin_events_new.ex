@@ -63,7 +63,7 @@ defmodule YscWeb.AdminEventsNewLive do
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div class="min-w-0 flex flex-1 flex-col space-y-1">
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <h1 class="event-header-title wrap-break-word text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl">
+                  <h1 class="event-header-title wrap-break-word text-xl text-zinc-800 sm:text-2xl type-display">
                     {@event_title}
                   </h1>
 
@@ -402,7 +402,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
           <div :if={@live_action == :edit} class="relative py-8">
             <div class="border max-w-3xl rounded-sm border-zinc-200 py-6 px-4 space-y-4">
-              <h2 class="text-xl font-bold">Cover Image</h2>
+              <h2 class="text-xl type-subhead">Cover Image</h2>
 
               <.live_component
                 module={YscWeb.MediaPickerComponent}
@@ -427,7 +427,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
               <div class="border rounded-sm border-zinc-200 py-6 px-4 space-y-4">
                 <div>
-                  <h2 class="text-xl font-bold">Basics</h2>
+                  <h2 class="text-xl type-subhead">Basics</h2>
                   <p class="text-zinc-600 text-sm">
                     Give your event a nice title and summary to attract attendees.
                   </p>
@@ -462,9 +462,9 @@ defmodule YscWeb.AdminEventsNewLive do
               </div>
 
               <div class="border border-zinc-200 rounded-sm py-6 px-4 flex flex-col gap-4">
-                <h2 class="text-xl font-bold">Date and Location</h2>
+                <h2 class="text-xl type-subhead">Date and Location</h2>
 
-                <h3 class="text-lg font-medium">Date and Time</h3>
+                <h3 class="text-lg type-subhead">Date and Time</h3>
                 <div class="flex flex-row w-full space-x-4">
                   <div class="flex">
                     <%!-- Events: min_nights 0 = single day or multi-day range.
@@ -499,10 +499,10 @@ defmodule YscWeb.AdminEventsNewLive do
                   />
                 </div>
 
-                <h3 class="text-lg pt-4 font-medium">Location</h3>
+                <h3 class="text-lg pt-4 type-subhead">Location</h3>
                 <div class="space-y-4">
                   <div class="space-y-2">
-                    <span class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    <span class="text-xs text-zinc-500 type-eyebrow">
                       Frequent Venues
                     </span>
                     <div class="flex flex-wrap gap-2" id="location-presets">
@@ -536,7 +536,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     id="location-display-details"
                   >
                     <div class="flex items-center justify-between">
-                      <h4 class="text-sm font-medium text-zinc-700">
+                      <h4 class="text-sm text-zinc-700 type-subhead">
                         Display Details
                       </h4>
                       <p class="text-xs text-zinc-500">Publicly visible</p>
@@ -582,7 +582,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
               <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
                 <div>
-                  <h2 class="text-xl font-bold">Overview</h2>
+                  <h2 class="text-xl type-subhead">Overview</h2>
                   <p class="text-zinc-600 text-sm">
                     Add more details about the event to help attendees understand what to expect.
                   </p>
@@ -603,7 +603,7 @@ defmodule YscWeb.AdminEventsNewLive do
             <div id="hosts-section" class="max-w-3xl mt-6">
               <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
                 <div>
-                  <h2 class="text-xl font-bold">Hosts</h2>
+                  <h2 class="text-xl type-subhead">Hosts</h2>
                   <p class="text-zinc-600 text-sm">
                     Search and add members who will be listed as hosts of this event.
                   </p>
@@ -724,7 +724,7 @@ defmodule YscWeb.AdminEventsNewLive do
             <div class="max-w-3xl mt-6">
               <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border border-zinc-200 rounded-sm p-6 bg-white">
                 <div>
-                  <h2 class="text-xl font-bold">Agenda</h2>
+                  <h2 class="text-xl type-subhead">Agenda</h2>
                   <p class="text-zinc-600 text-sm mt-1">
                     Design your event schedule exactly as attendees will see it.
                   </p>
@@ -830,7 +830,7 @@ defmodule YscWeb.AdminEventsNewLive do
               <div class="mb-6">
                 <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
                   <div>
-                    <h2 class="text-xl font-bold">Event Capacity</h2>
+                    <h2 class="text-xl type-subhead">Event Capacity</h2>
                     <p class="text-zinc-600 text-sm">
                       Set the maximum number of attendees for this event. This limit applies across all ticket tiers.
                     </p>
@@ -899,7 +899,7 @@ defmodule YscWeb.AdminEventsNewLive do
                   id="event-photo-upload-link-card"
                 >
                   <div>
-                    <h2 class="text-xl font-bold">Event photo uploads</h2>
+                    <h2 class="text-xl type-subhead">Event photo uploads</h2>
                     <p class="text-zinc-600 text-sm mt-1">
                       Share this link with attendees so they can contribute photos after the event.
                       Reminder emails are sent automatically the morning after the event ends.
@@ -945,7 +945,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
                 <div class="bg-white border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
                   <div>
-                    <h2 class="text-xl font-bold">Send Update to Attendees</h2>
+                    <h2 class="text-xl type-subhead">Send Update to Attendees</h2>
                     <p class="text-zinc-600 text-sm">
                       Send a branded email notification to everyone who has a ticket for this event.
                       This includes both ticket purchasers and registered attendees.
@@ -1017,7 +1017,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       class="rounded-sm border border-zinc-200 bg-zinc-50 p-4 space-y-2"
                     >
                       <div class="flex flex-wrap items-center justify-between gap-2">
-                        <h3 class="text-sm font-semibold text-zinc-800">
+                        <h3 class="text-sm text-zinc-800 type-subhead">
                           SMS preview
                         </h3>
                         <p class="text-xs text-zinc-500">
@@ -1193,10 +1193,10 @@ defmodule YscWeb.AdminEventsNewLive do
                 id="stat-donations"
                 class="bg-purple-50 shadow-xs border border-purple-100 rounded-lg p-6"
               >
-                <p class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-3">
+                <p class="text-xs text-purple-400 mb-3 type-eyebrow">
                   Donations Collected
                 </p>
-                <p class="text-3xl font-bold text-purple-900">
+                <p class="text-3xl text-purple-900 type-title">
                   {money_display(@donations_total)}
                 </p>
                 <p class="text-xs text-purple-700 mt-1 font-medium">
@@ -1206,7 +1206,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
               <div class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4">
                 <div>
-                  <h2 class="text-xl font-bold">Sales Over Time</h2>
+                  <h2 class="text-xl type-subhead">Sales Over Time</h2>
                   <p class="text-zinc-600 text-sm">
                     Confirmed ticket revenue by day.
                     <span :if={ticket_sale_window_label(@ticket_sale_window)}>
@@ -1272,7 +1272,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
               <div class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4">
                 <div>
-                  <h2 class="text-xl font-bold">Sales by Ticket Tier</h2>
+                  <h2 class="text-xl type-subhead">Sales by Ticket Tier</h2>
                   <p class="text-zinc-600 text-sm">
                     Confirmed tickets, net of discounts.
                   </p>
@@ -1320,7 +1320,7 @@ defmodule YscWeb.AdminEventsNewLive do
               >
                 <div class="flex items-start justify-between gap-4">
                   <div>
-                    <h2 class="text-xl font-bold">Expense Reports</h2>
+                    <h2 class="text-xl type-subhead">Expense Reports</h2>
                     <p class="text-zinc-600 text-sm">
                       Costs linked to this event, net of any income items logged against the report. Only approved and paid reports count toward totals.
                     </p>

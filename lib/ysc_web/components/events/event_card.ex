@@ -64,7 +64,7 @@ defmodule YscWeb.Components.Events.EventCard do
         <div class="absolute top-6 left-6 flex gap-2 z-2 flex-wrap pointer-events-none">
           <%= for badge <- @badges do %>
             <span class={[
-              "px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider pointer-events-auto",
+              "px-3 py-1.5 rounded-sm text-xs pointer-events-auto type-eyebrow",
               badge_class(badge),
               if(badge.text == "Going Fast!",
                 do: "animate-badge-shine-emerald",
@@ -85,7 +85,7 @@ defmodule YscWeb.Components.Events.EventCard do
       <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
         <div class="flex items-center gap-2 mb-4">
           <span class={[
-            "text-sm font-bold px-2.5 py-1 rounded-sm uppercase tracking-wider",
+            "text-sm px-2.5 py-1 rounded-sm type-eyebrow",
             if(@variant == "dark",
               do: "text-zinc-300 bg-zinc-800",
               else: "text-zinc-900 bg-zinc-100"
@@ -96,7 +96,7 @@ defmodule YscWeb.Components.Events.EventCard do
           <span
             :if={@event.start_time && @event.start_time != ""}
             class={[
-              "text-sm font-bold uppercase tracking-wider",
+              "text-sm type-eyebrow",
               if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-600")
             ]}
           >
@@ -105,7 +105,7 @@ defmodule YscWeb.Components.Events.EventCard do
         </div>
         <.link navigate={~p"/events/#{@event.id}"} class="block">
           <h3 class={[
-            "text-2xl font-bold tracking-tight leading-tight mb-3 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-16",
+            "text-2xl mb-3 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-16 type-subhead",
             if(@variant == "dark", do: "text-white", else: "text-zinc-900")
           ]}>
             {@event.title}

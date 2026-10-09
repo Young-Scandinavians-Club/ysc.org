@@ -255,7 +255,7 @@ defmodule YscWeb.AdminUsersLive do
             </.tooltip>
           </:button_block>
           <div class="w-full px-4 py-3">
-            <h3 class="leading-8 font-semibold text-zinc-800 mb-2">
+            <h3 class="text-zinc-800 mb-2 type-subhead">
               Include Fields
             </h3>
             <form

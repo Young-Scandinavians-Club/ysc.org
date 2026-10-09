@@ -112,7 +112,7 @@ defmodule YscWeb.AdminHelpLive do
             :for={{category, guides} <- @guides_by_category}
             id={"admin-help-category-#{category}"}
           >
-            <h2 class="text-lg font-semibold text-zinc-800 mb-4">
+            <h2 class="text-lg text-zinc-800 mb-4 type-subhead">
               {Guide.category_label(category)}
             </h2>
             <div class="grid gap-4 sm:grid-cols-2">
@@ -122,7 +122,7 @@ defmodule YscWeb.AdminHelpLive do
                 id={"admin-help-card-#{slug_id(guide_mod.slug())}"}
                 class="block rounded-xl border border-zinc-200 bg-white p-5 shadow-xs hover:border-blue-300 hover:shadow-md transition"
               >
-                <h3 class="font-semibold text-zinc-900">{guide_mod.title()}</h3>
+                <h3 class="text-zinc-900 type-subhead">{guide_mod.title()}</h3>
                 <p class="mt-1 text-sm text-zinc-600 line-clamp-2">
                   {guide_mod.summary()}
                 </p>

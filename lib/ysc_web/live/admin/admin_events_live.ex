@@ -126,7 +126,7 @@ defmodule YscWeb.AdminEventsLive do
                   class="mb-3 cursor-pointer block"
                 >
                   <div class="mb-2 flex items-center gap-1.5">
-                    <h3 class="text-base font-semibold text-zinc-900 min-w-0 flex-1 truncate">
+                    <h3 class="text-base text-zinc-900 min-w-0 flex-1 truncate type-subhead">
                       {event.title}
                     </h3>
                     <.presence_avatars editors={@editors_by_event[event.id] || []} />

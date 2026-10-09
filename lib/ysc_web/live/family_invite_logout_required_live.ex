@@ -81,7 +81,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
     <div class="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-zinc-50">
       <div class="max-w-lg w-full">
         <div class="bg-white rounded-xl shadow-xs border border-zinc-200 p-8">
-          <h1 class="text-2xl font-semibold text-zinc-900 mb-4">
+          <h1 class="text-2xl text-zinc-900 mb-4 type-display">
             Sign out to accept this invitation
           </h1>
           <p class="text-zinc-600 mb-6">

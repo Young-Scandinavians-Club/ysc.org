@@ -121,7 +121,7 @@ defmodule YscWeb.AdminMembershipsLive do
       <div class="bg-zinc-50/80 min-h-screen -mx-4 lg:-mx-10 px-4 lg:px-10 py-8">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 py-8 border-b border-zinc-100 mb-8">
           <div>
-            <h1 class="text-3xl font-bold text-zinc-900 tracking-tight">
+            <h1 class="text-3xl text-zinc-900 type-display">
               Memberships
             </h1>
             <p class="text-sm text-zinc-500 mt-1">
@@ -168,7 +168,7 @@ defmodule YscWeb.AdminMembershipsLive do
         <%!-- Search, filter and membership list --%>
         <div class="bg-white rounded-lg shadow-xs border border-zinc-200 overflow-hidden">
           <div class="px-6 py-4 border-b border-zinc-100 space-y-4">
-            <h2 class="text-lg font-bold text-zinc-900">All Memberships</h2>
+            <h2 class="text-lg text-zinc-900 type-subhead">All Memberships</h2>
 
             <.admin_search_bar
               id="membership-search-form"
@@ -247,7 +247,7 @@ defmodule YscWeb.AdminMembershipsLive do
                 thead_attrs: [class: "bg-zinc-50"],
                 thead_th_attrs: [
                   class:
-                    "px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider whitespace-nowrap"
+                    "px-6 py-3 text-left text-xs text-zinc-500 whitespace-nowrap type-eyebrow"
                 ],
                 tbody_attrs: [class: "bg-white divide-y divide-zinc-200"],
                 tbody_tr_attrs: [class: "hover:bg-zinc-50"],

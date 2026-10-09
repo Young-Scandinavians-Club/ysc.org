@@ -391,7 +391,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   defp stat_with_percentage(assigns) do
     ~H"""
     <div id={@id}>
-      <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+      <p class="text-[11px] text-green-600 type-eyebrow">
         {@label}
       </p>
       <p class="text-sm font-semibold text-green-900 mt-0.5">
@@ -477,7 +477,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         <%!-- Delivery & engagement summary --%>
         <div class="flex flex-wrap gap-x-8 gap-y-3 mb-4">
           <div>
-            <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+            <p class="text-[11px] text-green-600 type-eyebrow">
               Sent at
             </p>
             <p class="text-sm font-semibold text-green-900 mt-0.5">
@@ -499,7 +499,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             </p>
           </div>
           <div>
-            <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+            <p class="text-[11px] text-green-600 type-eyebrow">
               Emails sent
             </p>
             <p class="text-sm font-semibold text-green-900 mt-0.5">
@@ -550,7 +550,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         <%!-- Link click breakdown --%>
         <%= if is_list(@click_stats) and @click_stats != [] do %>
           <div class="border-t border-green-200 pt-4">
-            <p class="text-[11px] font-medium uppercase tracking-wide text-green-600 mb-2">
+            <p class="text-[11px] text-green-600 mb-2 type-eyebrow">
               Clicks by link
             </p>
             <div class="space-y-2">
@@ -563,7 +563,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                     <%= if title do %>
                       <div class="flex items-center gap-1.5 flex-wrap">
                         <span class={[
-                          "inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shrink-0",
+                          "inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] shrink-0 type-eyebrow",
                           type == :event && "bg-purple-100 text-purple-800",
                           type == :post && "bg-sky-100 text-sky-700"
                         ]}>
@@ -668,7 +668,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           </div>
           <div :if={!@loading_edition?} class="space-y-6">
             <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-              <h2 class="text-lg font-semibold text-zinc-800 mb-4">Cover photo</h2>
+              <h2 class="text-lg text-zinc-800 mb-4 type-subhead">Cover photo</h2>
               <div :if={@readonly?}>
                 <%= if has_cover_image?(@preview_cover_image_id) do %>
                   <.live_component
@@ -701,7 +701,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
               <%!-- Hidden field keeps cover_image_id in phx-change params so auto-save never clobbers it --%>
               <.input type="hidden" field={@form[:cover_image_id]} />
               <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-                <h2 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h2 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Headline & subject
                 </h2>
                 <div class="space-y-4">
@@ -741,7 +741,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
               <div class="border border-zinc-200 rounded-lg overflow-hidden bg-white">
                 <div class="px-4 pt-4 pb-3">
-                  <h2 class="text-lg font-semibold text-zinc-800 mb-1">
+                  <h2 class="text-lg text-zinc-800 mb-1 type-subhead">
                     Intro text
                   </h2>
                   <p class="text-sm text-zinc-500">
@@ -833,7 +833,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         >
           <div class="flex flex-col h-full rounded-xl border border-zinc-200 overflow-hidden shadow-xs">
             <div class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 bg-zinc-50 shrink-0">
-              <h3 class="text-sm font-semibold text-zinc-700">Email Preview</h3>
+              <h3 class="text-sm text-zinc-700 type-subhead">Email Preview</h3>
               <div class="flex items-center gap-3">
                 <span class="text-xs text-zinc-400 italic">
                   Shown as: Subscriber

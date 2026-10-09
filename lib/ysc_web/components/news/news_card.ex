@@ -49,7 +49,7 @@ defmodule YscWeb.Components.News.NewsCard do
 
       <div class="px-4 pb-4 flex flex-col flex-1">
         <div class="flex items-center gap-3 mb-4">
-          <span class="text-sm font-bold text-blue-600 uppercase tracking-wider">
+          <span class="text-sm text-blue-600 type-eyebrow">
             {if @post.published_on,
               do: Timex.format!(@post.published_on, "{Mshort} {D}"),
               else: ""}
@@ -57,7 +57,7 @@ defmodule YscWeb.Components.News.NewsCard do
           <span class="h-3 w-px bg-zinc-200"></span>
           <span
             id={"news-card-reading-time-#{@post.id}"}
-            class="text-sm font-bold text-zinc-500 uppercase tracking-wider"
+            class="text-sm text-zinc-500 type-eyebrow"
           >
             {@reading_time} min read
           </span>
@@ -65,7 +65,7 @@ defmodule YscWeb.Components.News.NewsCard do
 
         <.link
           navigate={~p"/posts/#{@post.url_name}"}
-          class="text-2xl font-bold text-zinc-900 tracking-tight leading-[1.1] mb-4 group-hover:text-blue-600 group-hover:underline transition-colors"
+          class="text-2xl text-zinc-900 mb-4 group-hover:text-blue-600 group-hover:underline transition-colors type-subhead"
         >
           {@post.title}
         </.link>
@@ -83,7 +83,7 @@ defmodule YscWeb.Components.News.NewsCard do
               class="w-8 h-8 rounded-full transition"
             />
             <div>
-              <p class="text-sm font-bold text-zinc-500 group-hover:text-zinc-900 uppercase tracking-wider transition-colors leading-tight">
+              <p class="text-sm text-zinc-500 group-hover:text-zinc-900 transition-colors type-eyebrow">
                 {UserDisplay.full_name(@post.author)}
               </p>
               <p
