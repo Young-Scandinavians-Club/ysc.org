@@ -716,10 +716,24 @@ defmodule Ysc.Accounts do
     reviewed_at review_outcome reviewed_by_user_id
   )a
 
+  # Public membership applications never collect a password. The UI sets one
+  # later in account setup. Drop client-supplied password fields so they cannot
+  # be hashed onto a pending account and used after OAuth auto-verifies email
+  # (Finding 85).
+  @registration_user_client_drop_keys ~w(
+    password password_confirmation hashed_password
+  )a
+
   defp sanitize_registration_attrs(attrs) when is_map(attrs) do
     attrs
+    |> drop_registration_user_client_keys()
     |> sanitize_registration_form_attrs()
     |> sanitize_family_members_attrs()
+  end
+
+  defp drop_registration_user_client_keys(attrs) do
+    string_keys = Enum.map(@registration_user_client_drop_keys, &to_string/1)
+    Map.drop(attrs, @registration_user_client_drop_keys ++ string_keys)
   end
 
   defp sanitize_registration_form_attrs(attrs) do
@@ -3543,6 +3557,31 @@ defmodule Ysc.Accounts do
   defp admin_list_avatar_preload_query do
     from(a in Ysc.Avatars.Avatar, select: struct(a, ^@admin_list_avatar_fields))
   end
+
+  @doc """
+  Removes a password that was stored before the owner completed password setup.
+
+  Public registration must not persist a password. If `hashed_password` is
+  present but `password_set_at` is nil, the credential never went through
+  account setup and must not survive OAuth auto-verification (Finding 85).
+  """
+  def drop_unconfirmed_password(
+        %User{hashed_password: hash, password_set_at: nil} = user
+      )
+      when is_binary(hash) do
+    case user
+         |> Ecto.Changeset.change(%{hashed_password: nil})
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
+  end
+
+  def drop_unconfirmed_password(%User{} = user), do: {:ok, user}
 
   @doc """
   Marks a user's email as verified by setting the email_verified_at timestamp.
