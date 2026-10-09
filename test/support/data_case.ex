@@ -74,6 +74,11 @@ defmodule Ysc.DataCase do
     Ysc.Bookings.PricingRuleCache.invalidate()
     Ysc.Bookings.RefundPolicyCache.invalidate()
     Ysc.Sitemap.invalidate()
+    # Settings live in process-global Cachex. SQL sandbox rollback does not
+    # undo `all-site-settings`, so a prior test that inserted dummy rows and
+    # called `settings/0` can leave Admin Settings rendering `setting1` instead
+    # of facebook/instagram. Reload from this test's sandbox.
+    Ysc.Settings.warm_cache()
     :ok
   end
 
