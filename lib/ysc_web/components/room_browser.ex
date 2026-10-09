@@ -129,7 +129,7 @@ defmodule YscWeb.Components.RoomBrowser do
             class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
             title={label}
           >
-            {raw_bed_icon(type)}
+            <.bed_icon type={type} />
             <span>{count} {label}</span>
           </li>
         </ul>
@@ -167,13 +167,21 @@ defmodule YscWeb.Components.RoomBrowser do
     |> Enum.filter(fn {_type, count, _label} -> count > 0 end)
   end
 
-  defp raw_bed_icon(type) do
-    Phoenix.HTML.raw(bed_icon_svg(type, "w-3 h-3 text-zinc-600"))
-  end
+  attr :type, :atom, values: [:single, :queen, :king], required: true
 
-  defp bed_icon_svg(:single, class) do
-    """
-    <svg class="#{class}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  defp bed_icon(%{type: :single} = assigns) do
+    ~H"""
+    <svg
+      class="w-3 h-3 text-zinc-600"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
       <path d="M6 9h12" />
       <rect x="6" y="9" width="12" height="8" rx="2" />
       <path d="M8 17v2m8-2v2" />
@@ -182,9 +190,19 @@ defmodule YscWeb.Components.RoomBrowser do
     """
   end
 
-  defp bed_icon_svg(:queen, class) do
-    """
-    <svg class="#{class}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  defp bed_icon(%{type: :queen} = assigns) do
+    ~H"""
+    <svg
+      class="w-3 h-3 text-zinc-600"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
       <path d="M4 9h16" />
       <rect x="4" y="9" width="16" height="8" rx="2" />
       <path d="M7 17v2m10-2v2" />
@@ -194,9 +212,19 @@ defmodule YscWeb.Components.RoomBrowser do
     """
   end
 
-  defp bed_icon_svg(:king, class) do
-    """
-    <svg class="#{class}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  defp bed_icon(%{type: :king} = assigns) do
+    ~H"""
+    <svg
+      class="w-3 h-3 text-zinc-600"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
       <path d="M3 9h18" />
       <rect x="3" y="9" width="18" height="8" rx="2" />
       <path d="M6 17v2m12-2v2" />

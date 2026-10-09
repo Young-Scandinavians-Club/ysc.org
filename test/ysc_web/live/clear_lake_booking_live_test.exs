@@ -3555,6 +3555,32 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
   end
 
   describe "rooms info tab" do
+    test "appears and starts a booking search when the property has rooms", %{
+      conn: conn
+    } do
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Clear Lake test room #{System.unique_integer([:positive])}",
+          property: :clear_lake,
+          capacity_max: 2,
+          queen_beds: 1
+        })
+
+      on_exit(&Ysc.Bookings.RoomsListCache.invalidate/0)
+
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      assert has_element?(view, "#info-tab-rooms")
+
+      view |> element("#info-tab-rooms") |> render_click()
+      assert has_element?(view, "#browse-room-#{room.id}", room.name)
+
+      view |> element("#browse-room-pick-#{room.id}") |> render_click()
+      assert_push_event(view, "scroll-to-element", %{id: "booking-step-mode"})
+    end
+
     test "is hidden because Clear Lake has no individual rooms", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
