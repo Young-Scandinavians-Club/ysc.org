@@ -4143,10 +4143,10 @@ defmodule YscWeb.CoreComponents do
   defp page_masthead_padding_class(:large), do: "py-12"
 
   defp page_masthead_title_class(:default),
-    do: "text-4xl md:text-7xl font-bold text-zinc-900"
+    do: "text-4xl md:text-7xl text-zinc-900 type-display"
 
   defp page_masthead_title_class(:large),
-    do: "text-6xl md:text-8xl font-bold text-zinc-900 tracking-tighter"
+    do: "text-6xl md:text-8xl text-zinc-900 type-display"
 
   @doc """
   Rounded feature card with an uppercase eyebrow title and a body slot.

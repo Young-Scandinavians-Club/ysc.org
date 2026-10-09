@@ -225,7 +225,7 @@ defmodule YscWeb.NewsLive do
 
               <.link
                 navigate={~p"/posts/#{post.url_name}"}
-                class="text-2xl font-bold text-zinc-900 tracking-tight leading-[1.1] mb-3 group-hover:text-blue-600 group-hover:underline transition-colors"
+                class="text-2xl text-zinc-900 mb-3 group-hover:text-blue-600 group-hover:underline transition-colors type-subhead"
               >
                 {post.title}
               </.link>

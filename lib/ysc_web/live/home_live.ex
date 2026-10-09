@@ -516,7 +516,7 @@ defmodule YscWeb.HomeLive do
                 class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
               />
               <div class="absolute inset-0 bg-linear-to-t from-zinc-900/80 via-zinc-900/40 to-transparent flex flex-col justify-end p-3 sm:p-4">
-                <h3 class="text-base sm:text-lg font-bold text-white mb-1">
+                <h3 class="text-base sm:text-lg text-white mb-1 type-subhead">
                   Cultural Connection
                 </h3>
                 <p class="text-sm text-zinc-200">
@@ -528,14 +528,14 @@ defmodule YscWeb.HomeLive do
 
           <%!-- Community stats card --%>
           <div class="md:col-span-1 bg-blue-900 rounded-2xl p-5 sm:p-6 flex flex-col justify-center items-center text-center shadow-lg min-h-[180px] sm:min-h-0">
-            <div class="text-3xl sm:text-4xl font-bold text-white mb-1.5 sm:mb-2">
+            <div class="text-3xl sm:text-4xl text-white mb-1.5 sm:mb-2 type-title">
               500+
             </div>
             <div class="text-sm text-blue-100 type-eyebrow">
               Active Members
             </div>
             <div class="mt-4 pt-4 border-t border-blue-700/30 w-full">
-              <div class="text-2xl font-bold text-white mb-1">
+              <div class="text-2xl text-white mb-1 type-title">
                 {div(Date.utc_today().year - 1950, 5) * 5}+
               </div>
               <div class="text-xs text-blue-100 type-eyebrow">
@@ -895,7 +895,7 @@ defmodule YscWeb.HomeLive do
           >
             <dt>
               <span class="block text-lg font-medium text-blue-200">Single</span>
-              <span class="block mt-2 text-3xl font-bold text-white">
+              <span class="block mt-2 text-3xl text-white type-title">
                 {format_membership_plan_price(:single)}<span class="text-lg font-normal text-blue-200">/year</span>
               </span>
             </dt>
@@ -910,7 +910,7 @@ defmodule YscWeb.HomeLive do
           >
             <dt>
               <span class="block text-lg font-medium text-blue-200">Family</span>
-              <span class="block mt-2 text-3xl font-bold text-white">
+              <span class="block mt-2 text-3xl text-white type-title">
                 {format_membership_plan_price(:family)}<span class="text-lg font-normal text-blue-200">/year</span>
               </span>
             </dt>
@@ -1144,7 +1144,7 @@ defmodule YscWeb.HomeLive do
               <%!-- Your Itinerary Section --%>
               <section>
                 <div class="flex items-center justify-between mb-6">
-                  <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <h2 class="text-lg text-zinc-900 flex items-center gap-2 type-subhead">
                     <.icon name="hero-map-pin" class="w-5 h-5 text-blue-600" />Your Upcoming Stays
                   </h2>
                   <.link
@@ -1179,7 +1179,7 @@ defmodule YscWeb.HomeLive do
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <.icon name="hero-home" class="w-7 h-7 text-zinc-400" />
                   </div>
-                  <h3 class="text-base font-bold text-zinc-900 mb-2">
+                  <h3 class="text-base text-zinc-900 mb-2 type-subhead">
                     No upcoming bookings
                   </h3>
                   <p class="text-zinc-500 text-sm mb-6">
@@ -1235,7 +1235,7 @@ defmodule YscWeb.HomeLive do
                           <p class="text-xs text-zinc-400 type-eyebrow">
                             Destination
                           </p>
-                          <p class="font-bold text-2xl text-zinc-900 tracking-tight">
+                          <p class="text-2xl text-zinc-900 type-title">
                             {PropertyDisplay.medium_name(booking.property)}
                           </p>
                           <p class="text-xs font-mono text-zinc-400">
@@ -1297,7 +1297,7 @@ defmodule YscWeb.HomeLive do
               <%!-- Event Tickets Section --%>
               <section>
                 <div class="flex items-center justify-between mb-6">
-                  <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <h2 class="text-lg text-zinc-900 flex items-center gap-2 type-subhead">
                     <.icon name="hero-ticket" class="w-5 h-5 text-purple-600" />
                     Event Tickets
                   </h2>
@@ -1329,7 +1329,7 @@ defmodule YscWeb.HomeLive do
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-400" />
                   </div>
-                  <h3 class="text-base font-bold text-zinc-900 mb-2">
+                  <h3 class="text-base text-zinc-900 mb-2 type-subhead">
                     No upcoming event tickets
                   </h3>
                   <p class="text-zinc-500 text-sm mb-6">
@@ -1371,7 +1371,7 @@ defmodule YscWeb.HomeLive do
                         <.icon name="hero-ticket" class="w-8 h-8 text-zinc-300" />
                       </div>
                       <.link navigate={~p"/events/#{event.id}"} class="block group">
-                        <h3 class="font-bold text-zinc-900 leading-tight mb-2 group-hover:text-blue-600 transition-colors">
+                        <h3 class="text-zinc-900 mb-2 group-hover:text-blue-600 transition-colors type-subhead">
                           {event.title}
                         </h3>
                       </.link>
@@ -1436,7 +1436,7 @@ defmodule YscWeb.HomeLive do
               <%!-- Upcoming Events --%>
               <section>
                 <div class="flex items-center justify-between mb-6">
-                  <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <h2 class="text-lg text-zinc-900 flex items-center gap-2 type-subhead">
                     <.icon name="hero-calendar-days" class="w-5 h-5 text-blue-600" />
                     Upcoming Events
                   </h2>
@@ -1472,7 +1472,7 @@ defmodule YscWeb.HomeLive do
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <.icon name="hero-calendar" class="w-7 h-7 text-zinc-400" />
                   </div>
-                  <h3 class="text-base font-bold text-zinc-900 mb-2">
+                  <h3 class="text-base text-zinc-900 mb-2 type-subhead">
                     No upcoming events
                   </h3>
                   <p class="text-zinc-500 text-sm mb-6">
@@ -1855,7 +1855,7 @@ defmodule YscWeb.HomeLive do
                             @timezone
                           )}
                         </p>
-                        <h3 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
+                        <h3 class="text-sm text-zinc-900 group-hover:text-blue-600 transition-colors type-subhead">
                           {post.title}
                         </h3>
                       </div>

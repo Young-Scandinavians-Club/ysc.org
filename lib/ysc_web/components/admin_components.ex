@@ -169,10 +169,10 @@ defmodule YscWeb.AdminComponents do
     """
   end
 
-  defp title_base_classes(:emphasis), do: "text-2xl font-bold text-zinc-900"
+  defp title_base_classes(:emphasis), do: "text-2xl text-zinc-900 type-display"
 
   defp title_base_classes(:default),
-    do: "text-2xl font-semibold leading-8 text-zinc-800"
+    do: "text-2xl text-zinc-800 type-display"
 
   # ---------------------------------------------------------------------------
   # admin_kbd
