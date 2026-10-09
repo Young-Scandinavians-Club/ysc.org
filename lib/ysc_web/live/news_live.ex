@@ -94,13 +94,13 @@ defmodule YscWeb.NewsLive do
               <div class="relative z-3 flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition duration-300">
                 <div class="max-w-3xl">
                   <div class="flex items-center gap-2 mb-4">
-                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm shadow-xs sm:bg-amber-50/90 sm:border sm:border-amber-200 sm:text-amber-700">
+                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs rounded-sm shadow-xs sm:bg-amber-50/90 sm:border sm:border-amber-200 sm:text-amber-700 type-eyebrow">
                       <.icon name="hero-star-solid" class="w-3 h-3 inline me-1" />Pinned News
                     </span>
                   </div>
 
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-zinc-500 sm:text-white/80">
-                    <span class="text-sm font-bold uppercase tracking-wider">
+                    <span class="text-sm type-eyebrow">
                       {DateDisplay.format_date_short_in_zone(
                         @featured.published_on,
                         @timezone
@@ -109,13 +109,13 @@ defmodule YscWeb.NewsLive do
                     <span class="h-3 w-px bg-zinc-300 sm:bg-white/40"></span>
                     <span
                       id={"news-featured-reading-time-#{@featured.id}"}
-                      class="text-sm font-bold uppercase tracking-wider"
+                      class="text-sm type-eyebrow"
                     >
                       {ReadingTime.minutes(@featured)} min read
                     </span>
                   </div>
 
-                  <h2 class="text-3xl font-bold leading-tight tracking-tighter text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300">
+                  <h2 class="text-3xl text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300 type-display">
                     {@featured.title}
                   </h2>
 
@@ -208,7 +208,7 @@ defmodule YscWeb.NewsLive do
 
             <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
-                <span class="text-sm font-bold text-blue-600 uppercase tracking-wider">
+                <span class="text-sm text-blue-600 type-eyebrow">
                   {DateDisplay.format_date_short_in_zone(
                     post.published_on,
                     @timezone
@@ -217,7 +217,7 @@ defmodule YscWeb.NewsLive do
                 <span class="h-3 w-px bg-zinc-200"></span>
                 <span
                   id={"news-grid-reading-time-#{post.id}"}
-                  class="text-sm font-bold text-zinc-500 uppercase tracking-wider"
+                  class="text-sm text-zinc-500 type-eyebrow"
                 >
                   {ReadingTime.minutes(post)} min read
                 </span>
@@ -241,7 +241,7 @@ defmodule YscWeb.NewsLive do
                     class="w-8 h-8 rounded-full"
                   />
                   <div>
-                    <p class="text-sm font-bold text-zinc-500 group-hover:text-zinc-900 uppercase tracking-wider transition-colors leading-tight">
+                    <p class="text-sm text-zinc-500 group-hover:text-zinc-900 transition-colors type-eyebrow">
                       {UserDisplay.full_name(post.author)}
                     </p>
                     <p

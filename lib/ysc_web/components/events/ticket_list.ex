@@ -29,7 +29,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
     >
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div class="flex items-center gap-3">
-          <h3 class="text-lg font-semibold">Tickets</h3>
+          <h3 class="text-lg type-subhead">Tickets</h3>
           <span class="text-sm text-zinc-600">
             {length(@tickets)} confirmed ticket{if length(@tickets) != 1, do: "s"} across {length(
               @order_groups

@@ -270,7 +270,7 @@ defmodule YscWeb.Layouts do
   @doc "Uppercase section heading for the site footer link columns."
   def footer_section_heading(assigns) do
     ~H"""
-    <h2 class="mb-4 text-sm font-semibold text-zinc-900 uppercase tracking-wide">
+    <h2 class="mb-4 text-sm text-zinc-900 type-eyebrow">
       {@title}
     </h2>
     """

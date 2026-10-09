@@ -528,14 +528,14 @@ defmodule YscWeb.HomeLive do
 
           <%!-- Community stats card --%>
           <div class="md:col-span-1 bg-blue-900 rounded-2xl p-5 sm:p-6 flex flex-col justify-center items-center text-center shadow-lg min-h-[180px] sm:min-h-0">
-            <div class="text-3xl sm:text-4xl font-extrabold text-white mb-1.5 sm:mb-2">
+            <div class="text-3xl sm:text-4xl font-bold text-white mb-1.5 sm:mb-2">
               500+
             </div>
             <div class="text-sm text-blue-100 type-eyebrow">
               Active Members
             </div>
             <div class="mt-4 pt-4 border-t border-blue-700/30 w-full">
-              <div class="text-2xl font-extrabold text-white mb-1">
+              <div class="text-2xl font-bold text-white mb-1">
                 {div(Date.utc_today().year - 1950, 5) * 5}+
               </div>
               <div class="text-xs text-blue-100 type-eyebrow">

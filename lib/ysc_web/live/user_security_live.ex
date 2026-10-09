@@ -426,7 +426,7 @@ defmodule YscWeb.UserSecurityLive do
           <div class="space-y-8">
             <!-- Passkeys Section -->
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">Passkeys</h2>
+              <h2 class="text-zinc-900 text-xl type-subhead">Passkeys</h2>
               <p class="text-zinc-600 text-sm">
                 A passkey is a passwordless way to sign in using your device’s built-in security (fingerprint, face, or PIN). It’s tied to your device and this site, so it can’t be phished or leaked like a password.
               </p>
@@ -535,7 +535,7 @@ defmodule YscWeb.UserSecurityLive do
             </div>
             <!-- Password Change Section -->
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">
+              <h2 class="text-zinc-900 text-xl type-subhead">
                 {if @user_has_password,
                   do: "Change Password",
                   else: "Set Password"}
@@ -589,7 +589,7 @@ defmodule YscWeb.UserSecurityLive do
             </div>
             <!-- Recent Activity Section -->
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">Recent Activity</h2>
+              <h2 class="text-zinc-900 text-xl type-subhead">Recent Activity</h2>
               <p class="text-zinc-600 text-sm">
                 Review where and how you signed in. If you see an unfamiliar sign-in, change your password and sign out on your other devices.
               </p>
@@ -625,7 +625,7 @@ defmodule YscWeb.UserSecurityLive do
                 <div class="space-y-6">
                   <%= if current_event do %>
                     <div>
-                      <h3 class="text-sm font-semibold text-zinc-700 mb-3">
+                      <h3 class="text-sm text-zinc-700 mb-3 type-subhead">
                         This device
                       </h3>
                       <div class="flex items-start justify-between gap-4 p-4 border border-blue-200 rounded-lg bg-blue-50/50">
@@ -651,7 +651,7 @@ defmodule YscWeb.UserSecurityLive do
                     </div>
                   <% end %>
                   <div>
-                    <h3 class="text-sm font-semibold text-zinc-700 mb-3">
+                    <h3 class="text-sm text-zinc-700 mb-3 type-subhead">
                       Past sign-ins
                     </h3>
                     <div class="space-y-3">

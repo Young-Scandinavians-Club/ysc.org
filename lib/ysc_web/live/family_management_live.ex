@@ -468,7 +468,7 @@ defmodule YscWeb.FamilyManagementLive do
       <div>
         <h1
           id="family-management-heading"
-          class="text-zinc-900 font-bold text-2xl sm:text-3xl"
+          class="text-zinc-900 text-2xl sm:text-3xl type-display"
         >
           Family Management
         </h1>
@@ -502,7 +502,7 @@ defmodule YscWeb.FamilyManagementLive do
 
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-zinc-900 font-bold text-xl">
+        <h2 class="text-zinc-900 text-xl type-subhead">
           Family Members
           <span class="text-zinc-400 font-normal text-sm ml-2">
             ({length(@active_rows)})
@@ -533,25 +533,25 @@ defmodule YscWeb.FamilyManagementLive do
               <tr>
                 <th
                   scope="col"
-                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                 >
                   Member
                 </th>
                 <th
                   scope="col"
-                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                 >
                   Relationship
                 </th>
                 <th
                   scope="col"
-                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                 >
                   Status
                 </th>
                 <th
                   scope="col"
-                  class="px-4 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                  class="px-4 py-3 text-right text-xs text-zinc-500 type-eyebrow"
                 >
                   Actions
                 </th>
@@ -584,7 +584,7 @@ defmodule YscWeb.FamilyManagementLive do
     </section>
 
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-      <h2 class="text-zinc-900 font-bold text-xl">
+      <h2 class="text-zinc-900 text-xl type-subhead">
         Pending Invitations
         <span class="text-zinc-400 font-normal text-sm ml-2">
           ({length(@pending_invites)})
@@ -615,25 +615,25 @@ defmodule YscWeb.FamilyManagementLive do
               <tr>
                 <th
                   scope="col"
-                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                 >
                   Email
                 </th>
                 <th
                   scope="col"
-                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                 >
                   Relationship
                 </th>
                 <th
                   scope="col"
-                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                 >
                   Expires
                 </th>
                 <th
                   scope="col"
-                  class="px-4 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                  class="px-4 py-3 text-right text-xs text-zinc-500 type-eyebrow"
                 >
                   Actions
                 </th>
@@ -810,7 +810,7 @@ defmodule YscWeb.FamilyManagementLive do
   defp sub_account_view(assigns) do
     ~H"""
     <header>
-      <h1 class="text-zinc-900 font-bold text-2xl sm:text-3xl">
+      <h1 class="text-zinc-900 text-2xl sm:text-3xl type-display">
         Your Family Group
       </h1>
       <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
@@ -819,7 +819,7 @@ defmodule YscWeb.FamilyManagementLive do
     </header>
 
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-      <h2 class="text-zinc-900 font-bold text-xl">Family membership manager</h2>
+      <h2 class="text-zinc-900 text-xl type-subhead">Family membership manager</h2>
       <%= if @primary_user do %>
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p class="text-sm font-semibold text-blue-900">
@@ -839,7 +839,7 @@ defmodule YscWeb.FamilyManagementLive do
     </section>
 
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-      <h2 class="text-zinc-900 font-bold text-xl">
+      <h2 class="text-zinc-900 text-xl type-subhead">
         Other Family Members
         <span class="text-zinc-400 font-normal text-sm ml-2">
           ({length(@other_family_members)})
@@ -857,10 +857,10 @@ defmodule YscWeb.FamilyManagementLive do
           >
             <thead class="bg-zinc-50">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                   Name
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                   Email
                 </th>
               </tr>
@@ -884,7 +884,7 @@ defmodule YscWeb.FamilyManagementLive do
     </section>
 
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-      <h2 class="text-zinc-900 font-bold text-xl">Leave Family Membership</h2>
+      <h2 class="text-zinc-900 text-xl type-subhead">Leave Family Membership</h2>
       <p class="text-sm text-zinc-600">
         You can leave this family membership at any time. You will no longer share membership benefits and can purchase your own membership or join another family later.
       </p>

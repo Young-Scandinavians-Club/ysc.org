@@ -182,7 +182,7 @@ defmodule YscWeb.UserLoginLive do
             <.icon name="hero-exclamation-triangle" class="h-5 w-5 text-amber-600" />
           </div>
           <div class="ml-3 flex-1">
-            <h3 class="text-sm font-semibold text-amber-900">
+            <h3 class="text-sm text-amber-900 type-subhead">
               Having trouble signing in?
             </h3>
             <div class="mt-2 text-sm text-amber-800">

@@ -102,7 +102,7 @@ defmodule YscWeb.EventsListLive do
                         do: DateDisplay.event_day_label(@hero_event) %>
                     <span
                       :if={hero_day_label == :today}
-                      class="px-3 py-1.5 bg-rose-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm sm:bg-rose-500/90 sm:border sm:border-rose-400 animate-attention-once"
+                      class="px-3 py-1.5 bg-rose-600 text-white text-xs rounded-sm sm:bg-rose-500/90 sm:border sm:border-rose-400 animate-attention-once type-eyebrow"
                     >
                       <.icon
                         name="hero-bolt-solid"
@@ -111,7 +111,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <span
                       :if={hero_day_label == :tomorrow}
-                      class="px-3 py-1.5 bg-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm sm:bg-orange-500/90 sm:border sm:border-orange-400 animate-badge-shine-orange"
+                      class="px-3 py-1.5 bg-orange-600 text-white text-xs rounded-sm sm:bg-orange-500/90 sm:border sm:border-orange-400 animate-badge-shine-orange type-eyebrow"
                     >
                       <.icon
                         name="hero-calendar-solid"
@@ -120,7 +120,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <span
                       :if={hero_day_label == nil && !hero_cancelled?}
-                      class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm sm:bg-zinc-500/90 sm:border sm:border-zinc-400 animate-badge-shine-slate"
+                      class="px-3 py-1.5 bg-zinc-600 text-white text-xs rounded-sm sm:bg-zinc-500/90 sm:border sm:border-zinc-400 animate-badge-shine-slate type-eyebrow"
                     >
                       <.icon
                         name="hero-calendar-solid"
@@ -129,7 +129,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <%= for badge <- get_hero_event_badges(@hero_event) do %>
                       <span class={[
-                        "px-3 py-1.5 text-white text-xs font-bold uppercase tracking-wider rounded-sm",
+                        "px-3 py-1.5 text-white text-xs rounded-sm type-eyebrow",
                         badge_class_mobile(badge),
                         badge_class_desktop_responsive(badge),
                         if(badge.text == "Going Fast!",
@@ -149,18 +149,18 @@ defmodule YscWeb.EventsListLive do
 
                   <%!-- Date/time pill — mobile only, matches event_card --%>
                   <div class="flex items-center gap-2 mb-4 sm:hidden">
-                    <span class="text-sm font-bold px-2.5 py-1 rounded-sm bg-zinc-100 text-zinc-900 uppercase tracking-wider">
+                    <span class="text-sm px-2.5 py-1 rounded-sm bg-zinc-100 text-zinc-900 type-eyebrow">
                       {DateTimeFormatter.format_event_start(@hero_event)}
                     </span>
                   </div>
 
-                  <h2 class="text-3xl font-bold leading-tight tracking-tighter text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300 hero-title-shadow">
+                  <h2 class="text-3xl text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300 hero-title-shadow type-display">
                     {@hero_event.title}
                   </h2>
 
                   <%!-- Date + location inline row — desktop overlay only --%>
                   <div class="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-white/80">
-                    <span class="text-sm font-bold uppercase tracking-wider">
+                    <span class="text-sm type-eyebrow">
                       {DateTimeFormatter.format_event_start(@hero_event)}
                     </span>
                     <span
@@ -169,7 +169,7 @@ defmodule YscWeb.EventsListLive do
                     ></span>
                     <span
                       :if={@hero_event.location_name}
-                      class="text-sm font-bold uppercase tracking-wider flex items-center gap-1"
+                      class="text-sm flex items-center gap-1 type-eyebrow"
                     >
                       <.icon name="hero-map-pin" class="w-4 h-4" />
                       {@hero_event.location_name}
@@ -245,7 +245,7 @@ defmodule YscWeb.EventsListLive do
                   class="w-10 h-10 md:w-12 md:h-12 text-zinc-300"
                 />
               </div>
-              <h3 class="text-xl md:text-2xl font-bold text-zinc-900 tracking-tight mb-2 text-center">
+              <h3 class="text-xl md:text-2xl text-zinc-900 mb-2 text-center type-subhead">
                 The calendar is clear (for now)
               </h3>
               <p class="text-zinc-500 text-center max-w-sm mb-8 text-sm md:text-base leading-relaxed">
