@@ -1548,6 +1548,8 @@ defmodule YscWeb.TahoeBookingLive do
                       <% preferred_status == :selected -> %>
                         <strong>{@preferred_room_name}</strong>
                         is available for your dates and has been selected.
+                      <% preferred_status == :dates_invalid -> %>
+                        Fix the dates below and we'll check <strong>{@preferred_room_name}</strong>.
                       <% preferred_status == :unavailable -> %>
                         <strong>{@preferred_room_name}</strong>
                         isn't available for these dates. {preferred_room_unavailable_reason(
@@ -5711,7 +5713,7 @@ defmodule YscWeb.TahoeBookingLive do
       if socket.assigns.checkin_date && socket.assigns.checkout_date do
         "booking-step-rooms"
       else
-        "booking-step-stay-details"
+        "preferred-room-banner"
       end
 
     push_event(socket, "scroll-to-element", %{id: target})
@@ -5738,6 +5740,7 @@ defmodule YscWeb.TahoeBookingLive do
     room = Enum.find(assigns.available_rooms || [], &(&1.id == room_id))
 
     cond do
+      map_size(assigns[:date_validation_errors] || %{}) > 0 -> :dates_invalid
       room_id in (assigns.selected_room_ids || []) -> :selected
       is_nil(room) -> :pending
       match?({:unavailable, _}, room.availability_status) -> :unavailable

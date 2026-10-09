@@ -2177,7 +2177,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       view |> element("#browse-room-pick-#{room.id}") |> render_click()
 
       assert_push_event(view, "scroll-to-element", %{
-        id: "booking-step-stay-details"
+        id: "preferred-room-banner"
       })
 
       assert has_element?(view, "#preferred-room-banner", room.name)
