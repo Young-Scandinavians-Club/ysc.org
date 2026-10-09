@@ -78,6 +78,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 82 (HIGH)     Admin user notification panel rendered SMS/email bodies in an unsandboxed same-origin srcdoc iframe; SMS bodies embed user-controlled first_name / event titles as plain text, so a crafted name became stored XSS against the admin session
   Finding 83 (HIGH)     Family sub-accounts with their own lifetime/family membership could mint nested invites (UI hidden, LiveView/context ungated). Accept walked has_active_membership?/1 to the real primary and counted the 10-seat cap on the nested id, granting unpaid membership and bypassing the household limit. Leftover: a household holder with existing dependents could still join another family via link/admin and bring a nested tree.
   Finding 84 (HIGH)     GLightboxHook passed figcaption/link caption textContent into GLightbox `title`, which GLightbox assigns with innerHTML — entity-encoded HTML in Trix captions became stored XSS on public /events/:id and /posts/:id when a visitor opened the lightbox
+  Finding 85 (HIGH)     Public registration accepted a hidden `password` param, hashed it, then OAuth auto-verified the squatted email so the attacker could sign in and lock the victim out
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -5462,6 +5463,169 @@ defmodule YscWeb.SecurityAuditTest do
       """
 
       assert {"ok\n", 0} = System.cmd("node", ["-e", script])
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 85 (HIGH): Registration password injection + OAuth auto-verify
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 85: public registration cannot plant a password for OAuth takeover" do
+    test "register_user ignores a client-supplied password" do
+      attacker_password = "attacker-owned-pass!"
+      email = "finding85_#{System.unique_integer([:positive])}@example.com"
+
+      assert {:ok, user} =
+               Accounts.register_user(
+                 security_registration_attrs(%{
+                   email: email,
+                   password: attacker_password,
+                   password_confirmation: attacker_password,
+                   hashed_password: "not-a-real-hash"
+                 })
+               )
+
+      user = Repo.get!(User, user.id)
+      assert is_nil(user.hashed_password)
+      assert is_nil(user.password_set_at)
+
+      refute Accounts.get_user_by_email_and_password(email, attacker_password)
+    end
+
+    test "registration LiveView save ignores a hidden password field", %{
+      conn: conn
+    } do
+      email = "finding85lv_#{System.unique_integer([:positive])}@example.com"
+      attacker_password = "attacker-owned-pass!"
+
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+
+      render_submit(lv, "save", %{
+        "user" => %{
+          "email" => email,
+          "first_name" => "Victim",
+          "last_name" => "User",
+          "password" => attacker_password,
+          "registration_form" => %{
+            "membership_type" => "single",
+            "membership_eligibility" => ["born_in_scandinavia"],
+            "birth_date" => "1990-01-01",
+            "address" => "1 Main St",
+            "city" => "San Francisco",
+            "region" => "CA",
+            "country" => "US",
+            "postal_code" => "94105",
+            "place_of_birth" => "SE",
+            "citizenship" => "SE",
+            "most_connected_nordic_country" => "SE",
+            "link_to_scandinavia" => "Born in Stockholm",
+            "agreed_to_bylaws" => true
+          }
+        }
+      })
+
+      user = Accounts.get_user_by_email(email)
+      assert user
+      assert is_nil(user.hashed_password)
+      refute Accounts.get_user_by_email_and_password(email, attacker_password)
+    end
+
+    test "OAuth login clears a pre-setup password and auto-verifies email", %{
+      conn: conn
+    } do
+      attacker_password = "attacker-owned-pass!"
+      email = "finding85oauth_#{System.unique_integer([:positive])}@example.com"
+
+      poisoned =
+        %User{}
+        |> User.registration_changeset(%{
+          email: email,
+          first_name: "Victim",
+          last_name: "User",
+          password: attacker_password,
+          phone_number: unique_user_phone()
+        })
+        |> Ecto.Changeset.put_change(:state, :pending_approval)
+        |> Repo.insert!()
+
+      assert is_binary(poisoned.hashed_password)
+      assert is_nil(poisoned.password_set_at)
+      assert is_nil(poisoned.email_verified_at)
+
+      auth = %Ueberauth.Auth{
+        provider: :google,
+        info: %Ueberauth.Auth.Info{
+          email: email,
+          name: "Victim User",
+          first_name: "Victim",
+          last_name: "User"
+        },
+        credentials: %Ueberauth.Auth.Credentials{
+          token: "token123",
+          refresh_token: nil,
+          expires: false,
+          expires_at: nil,
+          scopes: ["email"],
+          token_type: "Bearer"
+        },
+        uid: "google_uid_finding85"
+      }
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert get_session(conn, :user_token)
+
+      updated = Repo.get!(User, poisoned.id)
+      assert updated.email_verified_at
+      assert is_nil(updated.hashed_password)
+      refute Accounts.get_user_by_email_and_password(email, attacker_password)
+    end
+
+    test "OAuth login keeps a password that was set through account setup", %{
+      conn: conn
+    } do
+      password = valid_user_password()
+      user = user_fixture(%{state: :pending_approval, password: password})
+      {:ok, user} = Accounts.mark_password_set(user)
+
+      auth = %Ueberauth.Auth{
+        provider: :google,
+        info: %Ueberauth.Auth.Info{
+          email: user.email,
+          name: "Setup User",
+          first_name: "Setup",
+          last_name: "User"
+        },
+        credentials: %Ueberauth.Auth.Credentials{
+          token: "token123",
+          refresh_token: nil,
+          expires: false,
+          expires_at: nil,
+          scopes: ["email"],
+          token_type: "Bearer"
+        },
+        uid: "google_uid_finding85_kept"
+      }
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert get_session(conn, :user_token)
+
+      updated = Repo.get!(User, user.id)
+      assert is_binary(updated.hashed_password)
+      assert updated.password_set_at
+
+      assert Accounts.get_user_by_email_and_password(user.email, password)
     end
   end
 

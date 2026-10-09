@@ -182,6 +182,15 @@ defmodule YscWeb.AuthController do
       user ->
         # Check if user is in an allowed state for login
         if user.state in [:pending_approval, :active] do
+          # Finding 85: OAuth proves mailbox ownership but must not keep a
+          # password that was injected at public registration (hashed, but
+          # never confirmed via account setup).
+          user =
+            case Accounts.drop_unconfirmed_password(user) do
+              {:ok, cleared} -> cleared
+              {:error, _} -> user
+            end
+
           # Set email_verified_at if not already set (OAuth providers verify emails)
           updated_user =
             if is_nil(user.email_verified_at) do
