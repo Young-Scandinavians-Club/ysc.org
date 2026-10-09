@@ -72,4 +72,35 @@ defmodule Ysc.Stripe.PaymentIntentHelpers do
   end
 
   def charge_id(_), do: nil
+
+  @doc """
+  Returns true when the PaymentIntent's captured charge has been fully refunded.
+
+  Stripe leaves `PaymentIntent.status` as `"succeeded"` after a refund, so
+  checkout-abandonment code that only looks at status would treat the refunded
+  Intent as a live capture and fulfill it.
+  """
+  @spec fully_refunded?(term()) :: boolean()
+  def fully_refunded?(payment_intent) do
+    case first_expanded_charge(payment_intent) do
+      nil -> false
+      charge -> charge_fully_refunded?(charge)
+    end
+  end
+
+  defp charge_fully_refunded?(charge) do
+    refunded? = charge_get(charge, :refunded) in [true, "true"]
+    amount = charge_get(charge, :amount)
+    amount_refunded = charge_get(charge, :amount_refunded)
+
+    refunded? or
+      (is_integer(amount) and amount > 0 and is_integer(amount_refunded) and
+         amount_refunded >= amount)
+  end
+
+  defp charge_get(charge, key) when is_map(charge) do
+    Map.get(charge, key) || Map.get(charge, Atom.to_string(key))
+  end
+
+  defp charge_get(_charge, _key), do: nil
 end
