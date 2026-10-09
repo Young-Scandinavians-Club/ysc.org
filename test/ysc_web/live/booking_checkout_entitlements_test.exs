@@ -703,8 +703,8 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
       {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "Guest Information"
 
-      html_after_save =
-        render_submit(view, "save-guest-info", guest_form_params(user, 2, 0))
+      render_submit(view, "save-guest-info", guest_form_params(user, 2, 0))
+      html_after_save = render(view)
 
       assert html_after_save =~ "stripe-payment-container"
       refute html_after_save =~ "confirm-complimentary-booking"
@@ -826,8 +826,8 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
       {:ok, view, _} = live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      html =
-        render_submit(view, "save-guest-info", guest_form_params(user, 2, 0))
+      render_submit(view, "save-guest-info", guest_form_params(user, 2, 0))
+      html = render(view)
 
       assert html =~ "stripe-payment-container"
       refute html =~ "confirm-complimentary-booking"
@@ -942,8 +942,8 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
       {:ok, view, _} = live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      html =
-        render_submit(view, "save-guest-info", guest_form_params(user, 2, 0))
+      render_submit(view, "save-guest-info", guest_form_params(user, 2, 0))
+      html = render(view)
 
       assert html =~ "stripe-payment-container"
       refute html =~ "confirm-complimentary-booking"
@@ -1050,8 +1050,8 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
       {:ok, view, _} = live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      html =
-        render_submit(view, "save-guest-info", guest_form_params(user, 2, 0))
+      render_submit(view, "save-guest-info", guest_form_params(user, 2, 0))
+      html = render(view)
 
       assert html =~ "stripe-payment-container"
       refute html =~ "confirm-complimentary-booking"
@@ -1309,6 +1309,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   defp checkout_shows_paid_stripe?(conn, %Booking{} = booking) do
     {:ok, view, _} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+    render(view)
 
     has_element?(view, "#stripe-payment-container") and
       has_element?(view, "#submit-payment") and
