@@ -268,13 +268,8 @@ defmodule YscWeb.BookingCheckoutLive do
          payment_error: BookingUserMessages.checkout_hold_expired()
        )}
     else
-      create_payment_intent_if_needed(
-        socket,
-        booking,
-        total_price,
-        user,
-        checkout_step
-      )
+      {:ok,
+       maybe_start_checkout_payment_intent(socket, total_price, checkout_step)}
     end
   end
 
@@ -293,50 +288,42 @@ defmodule YscWeb.BookingCheckoutLive do
     end
   end
 
-  defp create_payment_intent_if_needed(
-         socket,
-         booking,
-         total_price,
-         user,
-         :payment
-       ) do
+  # Stripe PaymentIntent create/retrieve is a network round-trip (and may
+  # persist a customer). Paint booking details first, then create the PI in
+  # handle_info so the hold countdown and price summary are not blocked on Stripe.
+  defp maybe_start_checkout_payment_intent(socket, total_price, :payment) do
     if Money.zero?(total_price) do
-      {:ok,
-       assign(socket,
-         payment_intent: nil,
-         show_payment_form: false
-       )}
+      assign(socket,
+        payment_intent: nil,
+        show_payment_form: false
+      )
     else
-      case create_payment_intent(booking, total_price, user) do
-        {:ok, payment_intent} ->
-          {booking, payment_intent} =
-            persist_checkout_payment_intent(booking, payment_intent)
-
-          {:ok,
-           assign(socket,
-             booking: booking,
-             payment_intent: payment_intent,
-             show_payment_form: true,
-             stripe_payment_element_ready: false
-           )}
-
-        {:error, message} ->
-          {:ok,
-           assign(socket,
-             payment_error: message
-           )}
-      end
+      send(self(), :create_checkout_payment_intent)
+      socket
     end
   end
 
-  defp create_payment_intent_if_needed(
-         socket,
-         _booking,
-         _total_price,
-         _user,
-         _checkout_step
-       ) do
-    {:ok, socket}
+  defp maybe_start_checkout_payment_intent(socket, _total_price, _checkout_step) do
+    socket
+  end
+
+  defp create_and_persist_checkout_payment_intent(booking, total_price, user) do
+    case create_payment_intent(booking, total_price, user) do
+      {:ok, payment_intent} ->
+        {:ok, persist_checkout_payment_intent(booking, payment_intent)}
+
+      {:error, message} ->
+        {:error, message}
+    end
+  end
+
+  defp assign_checkout_payment_intent(socket, booking, payment_intent) do
+    assign(socket,
+      booking: booking,
+      payment_intent: payment_intent,
+      show_payment_form: true,
+      stripe_payment_element_ready: false
+    )
   end
 
   @impl true
@@ -468,6 +455,30 @@ defmodule YscWeb.BookingCheckoutLive do
               class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
             >
               <p class="text-sm text-red-800">{@payment_error}</p>
+            </div>
+            <div
+              :if={
+                !@complimentary_checkout && !@payment_intent && !@payment_error &&
+                  !@is_expired
+              }
+              id="checkout-payment-loading"
+              role="status"
+              aria-live="polite"
+            >
+              <span class="sr-only">Loading payment form…</span>
+              <.payment_element_loading id="checkout-payment-intent-loading" />
+              <div class="pt-6 border-t border-zinc-100">
+                <button
+                  id="checkout-payment-loading-cancel"
+                  type="button"
+                  phx-click="cancel-booking"
+                  phx-disable-with="Cancelling..."
+                  phx-confirm={leave_checkout_confirm()}
+                  class="w-full sm:w-auto px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
             <!-- Complimentary checkout (entitlement / discount covers full amount) -->
             <div :if={@complimentary_checkout && !@is_expired}>
@@ -1342,8 +1353,6 @@ defmodule YscWeb.BookingCheckoutLive do
               )
 
             # Create payment intent now that guests are saved (skip Stripe when total is $0)
-            user = socket.assigns.current_user
-
             if Money.zero?(socket.assigns.total_price) do
               {:noreply,
                socket
@@ -1362,39 +1371,29 @@ defmodule YscWeb.BookingCheckoutLive do
                  title: "Checkout"
                )}
             else
-              case create_payment_intent(
-                     booking,
-                     socket.assigns.total_price,
-                     user
-                   ) do
-                {:ok, payment_intent} ->
-                  {booking, payment_intent} =
-                    persist_checkout_payment_intent(booking, payment_intent)
+              socket =
+                socket
+                |> assign(
+                  booking: booking,
+                  checkout_step: :payment,
+                  payment_intent: nil,
+                  show_payment_form: false,
+                  stripe_payment_element_ready: false,
+                  guest_info_form: nil,
+                  guest_info_errors: %{}
+                )
+                |> YscWeb.Flash.put_toast(
+                  :info,
+                  "Guest information saved. Please complete payment.",
+                  title: "Checkout"
+                )
 
-                  {:noreply,
-                   socket
-                   |> assign(
-                     booking: booking,
-                     checkout_step: :payment,
-                     payment_intent: payment_intent,
-                     show_payment_form: true,
-                     stripe_payment_element_ready: false,
-                     guest_info_form: nil,
-                     guest_info_errors: %{}
-                   )
-                   |> YscWeb.Flash.put_toast(
-                     :info,
-                     "Guest information saved. Please complete payment.",
-                     title: "Checkout"
-                   )}
-
-                {:error, message} ->
-                  {:noreply,
-                   assign(socket,
-                     payment_error: message,
-                     checkout_step: :payment
-                   )}
-              end
+              {:noreply,
+               maybe_start_checkout_payment_intent(
+                 socket,
+                 socket.assigns.total_price,
+                 :payment
+               )}
             end
 
           {:error, changeset} ->
@@ -1584,6 +1583,36 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   @impl true
+  def handle_info(:create_checkout_payment_intent, socket) do
+    cond do
+      not socket.assigns.checkout_data_loaded? ->
+        {:noreply, socket}
+
+      socket.assigns.is_expired ->
+        {:noreply, socket}
+
+      socket.assigns.checkout_step != :payment ->
+        {:noreply, socket}
+
+      Money.zero?(socket.assigns.total_price) ->
+        {:noreply, socket}
+
+      true ->
+        case create_and_persist_checkout_payment_intent(
+               socket.assigns.booking,
+               socket.assigns.total_price,
+               socket.assigns.current_user
+             ) do
+          {:ok, {booking, payment_intent}} ->
+            {:noreply,
+             assign_checkout_payment_intent(socket, booking, payment_intent)}
+
+          {:error, message} ->
+            {:noreply, assign(socket, payment_error: message)}
+        end
+    end
+  end
+
   def handle_info(:check_booking_expiration, socket) do
     if socket.assigns[:checkout_data_loaded?] && socket.assigns.booking do
       handle_booking_expiration_check(socket)
