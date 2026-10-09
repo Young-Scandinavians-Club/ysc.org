@@ -1139,7 +1139,7 @@ defmodule YscWeb.TahoeBookingLive do
               <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-white drop-shadow-lg">
                 Tahoe Cabin
               </h1>
-              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs font-bold uppercase tracking-wider rounded-sm backdrop-blur-xs">
+              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs font-bold uppercase tracking-wider rounded-sm">
                 Member Access
               </span>
             </div>

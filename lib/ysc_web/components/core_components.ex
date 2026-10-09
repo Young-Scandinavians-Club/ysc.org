@@ -121,7 +121,7 @@ defmodule YscWeb.CoreComponents do
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
-                  class="group inline-flex flex-none items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-xs shadow-md hover:shadow-lg hover:bg-white active:scale-95 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 transition duration-200 ease-out hover:scale-110"
+                  class="group inline-flex flex-none items-center justify-center w-10 h-10 rounded-full bg-white/90 shadow-md hover:shadow-lg hover:bg-white active:scale-95 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 transition duration-200 ease-out hover:scale-110"
                   aria-label={gettext("close")}
                 >
                   <.icon
@@ -2109,6 +2109,7 @@ defmodule YscWeb.CoreComponents do
           !@mobile && !@drop_up && "mt-1",
           !@mobile && @right && "right-0",
           !@mobile && !@right && "left-0",
+          !@mobile && dropdown_origin(@drop_up, @right),
           !@mobile && @wide && "wide"
         ]}
       >
@@ -2117,6 +2118,13 @@ defmodule YscWeb.CoreComponents do
     </div>
     """
   end
+
+  # Scale from the corner nearest the trigger, so the menu appears to grow out of
+  # its button rather than from its own centre.
+  defp dropdown_origin(true, true), do: "origin-bottom-right"
+  defp dropdown_origin(true, _right), do: "origin-bottom-left"
+  defp dropdown_origin(_drop_up, true), do: "origin-top-right"
+  defp dropdown_origin(_drop_up, _right), do: "origin-top-left"
 
   @doc """
   Ellipsis menu for per-row actions in tables and card lists.
@@ -2463,7 +2471,7 @@ defmodule YscWeb.CoreComponents do
       <!-- Dropdown menu -->
       <div
         id="avatar-menu"
-        class="dropdown-panel absolute z-110 hidden w-60 mt-0 font-normal bg-white divide-y rounded-sm shadow-sm divide-zinc-100 right-4 mt-1"
+        class="dropdown-panel absolute z-110 hidden w-60 mt-0 font-normal bg-white divide-y rounded-sm shadow-sm divide-zinc-100 right-4 mt-1 origin-top-right"
       >
         {render_slot(@inner_block)}
       </div>
@@ -5206,24 +5214,42 @@ defmodule YscWeb.CoreComponents do
 
   ## JS Commands
 
+  # Shared motion for show/1, hide/1 and the modal helpers below: one duration
+  # for enter and exit, and mirrored start/end states, so appearing and
+  # disappearing are the same motion played forwards and backwards.
+  #
+  # Enter decelerates (ease-out), exit accelerates (ease-in). The exit curve is
+  # deliberately NOT the strict time-reversal of the enter curve: reversing a
+  # strong ease-out gives a curve that barely moves for most of its duration and
+  # then snaps in the last few milliseconds, which reads as a delay followed by a
+  # hard cut (measured: still at 70% opacity when the element was hidden).
+  #
+  # `time` on every JS.show/JS.hide must exceed the CSS duration, because
+  # LiveView hides the element and strips the transition classes `time` after the
+  # call, but the CSS transition only starts about two animation frames later
+  # (LiveView applies the start and run classes over two requestAnimationFrames).
+  # With time == duration the last ~35ms is cut off; measured, an exit was hidden
+  # while still at 49% opacity. LiveView's default (200ms) cuts a 250ms one short.
+  @motion_ms 250
+  @motion_time @motion_ms + 50
+  @motion_in "transition-[opacity,translate,scale] duration-250 ease-[cubic-bezier(0.32,0.72,0,1)]"
+  @motion_out "transition-[opacity,translate,scale] duration-250 ease-[cubic-bezier(0.32,0,0.67,0)]"
+  @motion_away "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+  @motion_here "opacity-100 translate-y-0 sm:scale-100"
+
   def show(js \\ %JS{}, selector) do
     JS.show(js,
       to: selector,
-      transition:
-        {"transition transform ease-out duration-300",
-         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95",
-         "opacity-100 translate-y-0 sm:scale-100"}
+      time: @motion_time,
+      transition: {@motion_in, @motion_away, @motion_here}
     )
   end
 
   def hide(js \\ %JS{}, selector) do
     JS.hide(js,
       to: selector,
-      time: 200,
-      transition:
-        {"transition transform ease-in duration-200",
-         "opacity-100 translate-y-0 sm:scale-100",
-         "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"}
+      time: @motion_time,
+      transition: {@motion_out, @motion_here, @motion_away}
     )
   end
 
@@ -5253,16 +5279,15 @@ defmodule YscWeb.CoreComponents do
     hide_expanded(js, id)
   end
 
-  # Modal motion. One duration and mirrored curves for enter and exit, shared by
-  # the panel and its backdrop so the two layers never desync. (`time` must be
-  # at least the CSS duration: LiveView strips the transition classes after it.)
+  # Modal motion. Uses the shared @motion_* constants (one duration, ease-out in,
+  # ease-in out) for both the panel and its backdrop, so the layers never desync.
   #
   # On phones the panel is a full-height sheet that slides up from the bottom
   # (and can be dragged back down: see the ModalSheet hook). From `sm` up it
   # scales from the point that opened it (see modal_origin.js).
-  @modal_ms 250
-  @modal_enter "transition-[opacity,translate,scale] duration-250 ease-[cubic-bezier(0.32,0.72,0,1)]"
-  @modal_exit "transition-[opacity,translate,scale] duration-250 ease-[cubic-bezier(1,0.28,0.68,0)]"
+  @modal_time @motion_time
+  @modal_enter @motion_in
+  @modal_exit @motion_out
   @modal_away "opacity-0 translate-y-full sm:translate-y-0 sm:scale-[0.92]"
   @modal_here "opacity-100 translate-y-0 sm:scale-100"
 
@@ -5272,13 +5297,13 @@ defmodule YscWeb.CoreComponents do
     |> JS.show(to: "##{id}")
     |> JS.show(
       to: "##{id}-bg",
-      time: @modal_ms,
+      time: @modal_time,
       transition:
         {"transition-opacity duration-250 ease-out", "opacity-0", "opacity-100"}
     )
     |> JS.show(
       to: "##{id}-container",
-      time: @modal_ms,
+      time: @modal_time,
       transition: {@modal_enter, @modal_away, @modal_here}
     )
     |> JS.add_class("overflow-hidden", to: "body")
@@ -5290,18 +5315,18 @@ defmodule YscWeb.CoreComponents do
     |> JS.dispatch("ysc:modal-closing", to: "##{id}-container")
     |> JS.hide(
       to: "##{id}-bg",
-      time: @modal_ms,
+      time: @modal_time,
       transition:
         {"transition-opacity duration-250 ease-in", "opacity-100", "opacity-0"}
     )
     |> JS.hide(
       to: "##{id}-container",
-      time: @modal_ms,
+      time: @modal_time,
       transition: {@modal_exit, @modal_here, @modal_away}
     )
     |> JS.hide(
       to: "##{id}",
-      time: @modal_ms,
+      time: @modal_time,
       transition: {"block", "block", "hidden"}
     )
     |> JS.remove_class("overflow-hidden", to: "body")
@@ -5961,7 +5986,7 @@ defmodule YscWeb.CoreComponents do
               type="button"
               data-hero-video-toggle
               aria-label="Pause video"
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-xs border border-white/30 text-white shadow-lg hover:bg-white/30 hover:border-white/50 transition-colors focus:outline-hidden focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
+              class="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/40 border border-white/30 text-white shadow-lg hover:bg-zinc-900/55 hover:border-white/50 transition-colors focus:outline-hidden focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
             >
               <span class="pause-icon inline-flex in-[.paused]:hidden">
                 <.icon name="hero-pause" class="w-6 h-6" />

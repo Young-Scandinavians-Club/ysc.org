@@ -94,7 +94,7 @@ defmodule YscWeb.NewsLive do
               <div class="relative z-3 flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition duration-300">
                 <div class="max-w-3xl">
                   <div class="flex items-center gap-2 mb-4">
-                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm shadow-xs sm:bg-amber-50/90 sm:backdrop-blur-md sm:border sm:border-amber-200 sm:text-amber-700">
+                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm shadow-xs sm:bg-amber-50/90 sm:border sm:border-amber-200 sm:text-amber-700">
                       <.icon name="hero-star-solid" class="w-3 h-3 inline me-1" />Pinned News
                     </span>
                   </div>

@@ -69,7 +69,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
       <div class="absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end p-12 lg:p-16">
         <div class="max-w-[1400px]">
           <div class="flex flex-wrap items-center gap-4 mb-6">
-            <span class="text-lg font-black px-4 py-2 rounded-sm bg-white/15 backdrop-blur-xs uppercase tracking-wide">
+            <span class="text-lg font-black px-4 py-2 rounded-sm bg-white/20 uppercase tracking-wide">
               {DateTimeFormatter.format_event_start(@event, separator: " · ")}
             </span>
             <span
@@ -94,7 +94,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
 
           <div class="flex items-center gap-6 pt-8 border-t border-white/25">
             <span class={[
-              "text-xl font-black rounded-sm border border-white/35 px-5 py-2.5 backdrop-blur-xs",
+              "text-xl font-black rounded-sm border border-white/35 px-5 py-2.5",
               @sold_out && "line-through opacity-70"
             ]}>
               {pricing_display(@event)}

@@ -357,7 +357,7 @@ defmodule YscWeb.HomeLive do
           </.link>
           <.link
             navigate={~p"/events"}
-            class="flex items-center justify-center px-8 py-4 text-base font-medium text-white border border-white/60 rounded-sm hover:bg-white/10 hover:border-white active:bg-white/20 active:scale-[0.98] active:transition-none transition duration-200 backdrop-blur-xs w-full sm:w-auto focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+            class="flex items-center justify-center px-8 py-4 text-base font-medium text-white border border-white/60 rounded-sm hover:bg-white/10 hover:border-white active:bg-white/20 active:scale-[0.98] active:transition-none transition duration-200 w-full sm:w-auto focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
           >
             Explore Our Events
           </.link>
@@ -686,7 +686,7 @@ defmodule YscWeb.HomeLive do
           class="flex flex-wrap justify-center gap-6 sm:gap-8 lg:gap-10"
         >
           <%= for _i <- 1..3 do %>
-            <div class="flex flex-col bg-white/5 backdrop-blur-xs rounded-2xl sm:rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)] animate-pulse">
+            <div class="flex flex-col bg-white/5 rounded-2xl sm:rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)] animate-pulse">
               <div class="aspect-16/11 bg-zinc-700"></div>
               <div class="p-8 space-y-4">
                 <div class="h-4 bg-zinc-700 rounded-sm w-1/3"></div>
@@ -703,7 +703,7 @@ defmodule YscWeb.HomeLive do
           class="flex flex-wrap justify-center gap-6 sm:gap-8 lg:gap-10"
         >
           <%= for event <- @upcoming_events do %>
-            <div class="group flex flex-col bg-white/5 backdrop-blur-xs rounded-2xl sm:rounded-[2.5rem] border border-white/10 hover:border-blue-700/40 transition duration-500 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)]">
+            <div class="group flex flex-col bg-white/5 rounded-2xl sm:rounded-[2.5rem] border border-white/10 hover:border-blue-700/40 transition duration-500 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)]">
               <.link
                 navigate={~p"/events/#{event.id}"}
                 class="block relative aspect-16/11 overflow-hidden"
@@ -728,7 +728,7 @@ defmodule YscWeb.HomeLive do
                   <% end %>
                 </div>
                 <div class="absolute bottom-4 right-4 z-2">
-                  <span class="bg-zinc-900/80 backdrop-blur-md px-4 py-2 rounded-xl text-white text-xs font-semibold ring-1 ring-white/10 tracking-widest">
+                  <span class="bg-zinc-900/85 px-4 py-2 rounded-xl text-white text-xs font-semibold ring-1 ring-white/10 tracking-widest">
                     {event.pricing_info.display_text}
                   </span>
                 </div>
@@ -1541,7 +1541,7 @@ defmodule YscWeb.HomeLive do
                     "mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md",
                     if(@active_membership?,
                       do: "bg-blue-50",
-                      else: "backdrop-blur-md bg-white/10"
+                      else: "bg-white/10"
                     )
                   ]}>
                     <.icon

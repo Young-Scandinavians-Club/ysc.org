@@ -102,7 +102,7 @@ defmodule YscWeb.EventsListLive do
                         do: DateDisplay.event_day_label(@hero_event) %>
                     <span
                       :if={hero_day_label == :today}
-                      class="px-3 py-1.5 bg-rose-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm sm:bg-rose-500/90 sm:backdrop-blur-md sm:border sm:border-rose-400 animate-attention-once"
+                      class="px-3 py-1.5 bg-rose-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm sm:bg-rose-500/90 sm:border sm:border-rose-400 animate-attention-once"
                     >
                       <.icon
                         name="hero-bolt-solid"
@@ -111,7 +111,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <span
                       :if={hero_day_label == :tomorrow}
-                      class="px-3 py-1.5 bg-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400 animate-badge-shine-orange"
+                      class="px-3 py-1.5 bg-orange-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm sm:bg-orange-500/90 sm:border sm:border-orange-400 animate-badge-shine-orange"
                     >
                       <.icon
                         name="hero-calendar-solid"
@@ -120,7 +120,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <span
                       :if={hero_day_label == nil && !hero_cancelled?}
-                      class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate"
+                      class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-bold uppercase tracking-wider rounded-sm sm:bg-zinc-500/90 sm:border sm:border-zinc-400 animate-badge-shine-slate"
                     >
                       <.icon
                         name="hero-calendar-solid"
@@ -539,19 +539,19 @@ defmodule YscWeb.EventsListLive do
   defp badge_class_desktop_responsive(badge) do
     case badge.text do
       "Sold Out" ->
-        "sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400"
+        "sm:bg-red-500/90 sm:border sm:border-red-400"
 
       "Going Fast!" ->
-        "sm:bg-emerald-500/90 sm:backdrop-blur-md sm:border sm:border-emerald-400"
+        "sm:bg-emerald-500/90 sm:border sm:border-emerald-400"
 
       "Cancelled" ->
-        "sm:bg-zinc-600/90 sm:backdrop-blur-md sm:border sm:border-zinc-500"
+        "sm:bg-zinc-600/90 sm:border sm:border-zinc-500"
 
       "Save the Date" ->
-        "sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"
+        "sm:bg-blue-500/90 sm:border sm:border-blue-400"
 
       _ ->
-        "sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400"
+        "sm:bg-zinc-500/90 sm:border sm:border-zinc-400"
     end
   end
 end

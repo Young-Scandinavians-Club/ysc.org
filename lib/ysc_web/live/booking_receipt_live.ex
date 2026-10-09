@@ -327,7 +327,7 @@ defmodule YscWeb.BookingReceiptLive do
               </p>
             </div>
             <div class="shrink-0">
-              <div class="bg-white/20 backdrop-blur-xs rounded-lg px-8 py-6 border-2 border-white/30">
+              <div class="bg-white/20 rounded-lg px-8 py-6 border-2 border-white/30">
                 <p class={[
                   "text-xs font-bold uppercase tracking-wider mb-2 text-center",
                   if(@booking.property == :clear_lake,

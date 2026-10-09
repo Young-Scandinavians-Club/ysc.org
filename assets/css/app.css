@@ -3979,6 +3979,97 @@ cropper-canvas {
   transition: none;
 }
 
+/* Cards, rows, tiles and icon buttons.
+   Rather than tag every template, match the elements that already have a hover
+   treatment (hover:bg/border/shadow/ring, or a `group` that styles children on
+   hover) and no pressed state of their own. Tailwind class names are literal in
+   the DOM, so this also covers dynamically built class lists. Excluded: things
+   with their own press rule (buttons, nav links, dropdown items, mobile menu),
+   disabled controls, and table rows, which should not shrink. Inline text
+   links are unaffected: scale does not apply to non-replaced inline boxes. */
+
+:is(a[href], button, label, [role="button"]):is(
+    [class*="hover:bg-"],
+    [class*="hover:border-"],
+    [class*="hover:shadow"],
+    [class*="hover:ring"],
+    [class*="hover:-translate"],
+    [class~="group"]
+  ):not(
+    [class*="active:"],
+    [class*="nav-link"],
+    [class*="hamburger-btn"],
+    [disabled],
+    [aria-disabled="true"],
+    [class*="pointer-events-none"],
+    [class*="cursor-not-allowed"],
+    table *,
+    .dropdown-panel *,
+    .mobile-menu-panel *
+  ) {
+  /* Every property a hover or press can change, including scale, so letting go
+     eases back instead of snapping. Duration follows an authored duration-*
+     class when there is one. */
+  transition-property:
+    color, background-color, border-color, outline-color, text-decoration-color,
+    fill, stroke, opacity, box-shadow, translate, scale, rotate, filter;
+  transition-duration: var(--tw-duration, 200ms);
+  transition-timing-function: var(--tw-ease, cubic-bezier(0.32, 0.72, 0, 1));
+}
+
+:is(a[href], button, label, [role="button"]):is(
+    [class*="hover:bg-"],
+    [class*="hover:border-"],
+    [class*="hover:shadow"],
+    [class*="hover:ring"],
+    [class*="hover:-translate"],
+    [class~="group"]
+  ):not(
+    [class*="active:"],
+    [class*="nav-link"],
+    [class*="hamburger-btn"],
+    [disabled],
+    [aria-disabled="true"],
+    [class*="pointer-events-none"],
+    [class*="cursor-not-allowed"],
+    table *,
+    .dropdown-panel *,
+    .mobile-menu-panel *
+  ):active {
+  scale: 0.98;
+  transition-duration: 0ms;
+}
+
+/* Small round icon buttons: 2% of a 32px button is invisible, so press harder. */
+
+:is(a[href], button, [role="button"])[class~="rounded-full"]:is(
+    [class~="w-6"], [class~="w-7"], [class~="w-8"], [class~="w-9"],
+    [class~="w-10"], [class~="w-11"], [class~="w-12"],
+    [class~="size-8"], [class~="size-9"], [class~="size-10"]
+  ):is(
+    [class*="hover:bg-"],
+    [class*="hover:border-"],
+    [class*="hover:shadow"],
+    [class~="group"]
+  ):not([class*="active:"], [disabled], [aria-disabled="true"]):active {
+  scale: 0.92;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No shrink; a slight fade still confirms the press. */
+  :is(a[href], button, label, [role="button"]):is(
+      [class*="hover:bg-"],
+      [class*="hover:border-"],
+      [class*="hover:shadow"],
+      [class*="hover:ring"],
+      [class*="hover:-translate"],
+      [class~="group"]
+    ):not([class*="active:"], [class*="nav-link"], [disabled], table *, .dropdown-panel *, .mobile-menu-panel *):active {
+    scale: none;
+    opacity: 0.8;
+  }
+}
+
 /* Dropdown items: the nav "Club Info" panel, the avatar menu and the mobile
    accordion all carry .dropdown-panel. Pressing an item highlights and
    shrinks it at once; letting go eases it back on a settle curve. */

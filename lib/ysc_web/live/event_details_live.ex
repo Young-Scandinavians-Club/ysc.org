@@ -146,7 +146,7 @@ defmodule YscWeb.EventDetailsLive do
                 >
                   <span
                     :if={event_day_label == :today}
-                    class="px-3 py-1.5 text-white text-xs font-bold uppercase tracking-wider rounded-sm bg-rose-600 sm:bg-rose-500/90 sm:backdrop-blur-md sm:border sm:border-rose-400 animate-attention-once"
+                    class="px-3 py-1.5 text-white text-xs font-bold uppercase tracking-wider rounded-sm bg-rose-600 sm:bg-rose-500/90 sm:border sm:border-rose-400 animate-attention-once"
                   >
                     <.icon
                       name="hero-bolt-solid"
@@ -156,7 +156,7 @@ defmodule YscWeb.EventDetailsLive do
                   </span>
                   <span
                     :if={event_day_label == :tomorrow}
-                    class="px-3 py-1.5 text-white text-xs font-bold uppercase tracking-wider rounded-sm bg-orange-600 sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400"
+                    class="px-3 py-1.5 text-white text-xs font-bold uppercase tracking-wider rounded-sm bg-orange-600 sm:bg-orange-500/90 sm:border sm:border-orange-400"
                   >
                     <.icon
                       name="hero-calendar-solid"
@@ -166,7 +166,7 @@ defmodule YscWeb.EventDetailsLive do
                   </span>
                   <span
                     :if={@event.tickets_tbd && @event.state != :cancelled}
-                    class="px-3 py-1.5 text-white text-xs font-bold uppercase tracking-wider rounded-sm bg-blue-600 sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"
+                    class="px-3 py-1.5 text-white text-xs font-bold uppercase tracking-wider rounded-sm bg-blue-600 sm:bg-blue-500/90 sm:border sm:border-blue-400"
                   >
                     <.icon
                       name="hero-ticket"
@@ -179,7 +179,7 @@ defmodule YscWeb.EventDetailsLive do
                       @event.state != :cancelled && @async_data_loaded &&
                         @event_sold_out_for_user && !@event.tickets_tbd
                     }
-                    class="px-3 py-1.5 text-white text-xs font-bold uppercase tracking-wider rounded-sm bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400"
+                    class="px-3 py-1.5 text-white text-xs font-bold uppercase tracking-wider rounded-sm bg-red-600 sm:bg-red-500/90 sm:border sm:border-red-400"
                   >
                     <.icon
                       name="hero-no-symbol"
