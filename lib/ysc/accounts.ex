@@ -489,13 +489,17 @@ defmodule Ysc.Accounts do
   Checks if a user has an active membership.
   Includes lifetime membership which never expires.
 
-  For sub-accounts, checks the primary user's membership.
+  For sub-accounts, membership is inherited only when the primary hosts a
+  family or lifetime plan. A Single plan must never grant access to linked
+  members (e.g. after a Family→Single scheduled downgrade completes while
+  dependents remain linked).
   """
   def has_active_membership?(user) do
-    # If user is a sub-account, check primary user's membership
     if sub_account?(user) do
-      primary_user = get_primary_user(user)
-      if primary_user, do: has_active_membership?(primary_user), else: false
+      case get_primary_user(user) do
+        nil -> false
+        primary_user -> family_membership_host?(primary_user)
+      end
     else
       check_primary_user_membership(user)
     end
@@ -534,6 +538,52 @@ defmodule Ysc.Accounts do
   """
   def has_lifetime_membership?(user) do
     not is_nil(user.lifetime_membership_awarded_at)
+  end
+
+  @doc """
+  True when this user may host family sub-accounts: lifetime membership or a
+  currently valid family-plan subscription.
+
+  Used for invite mint/accept and for sub-account membership inheritance so a
+  Single plan cannot leave unpaid nested members with access.
+  """
+  def family_membership_host?(user) do
+    has_lifetime_membership?(user) or has_valid_family_subscription?(user)
+  end
+
+  defp has_valid_family_subscription?(user) do
+    user
+    |> loaded_subscriptions_for_membership()
+    |> Enum.filter(&Ysc.Subscriptions.valid?/1)
+    |> Enum.any?(&family_plan_subscription?/1)
+  end
+
+  defp loaded_subscriptions_for_membership(user) do
+    case user.subscriptions do
+      %Ecto.Association.NotLoaded{} ->
+        Ysc.Subscriptions.list_subscriptions(user)
+
+      subscriptions when is_list(subscriptions) ->
+        subscriptions
+
+      _ ->
+        []
+    end
+  end
+
+  defp family_plan_subscription?(subscription) do
+    subscription = Repo.preload(subscription, :subscription_items)
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+
+    case subscription.subscription_items do
+      [item | _] ->
+        Enum.any?(membership_plans, fn plan ->
+          plan.stripe_price_id == item.stripe_price_id and plan.id == :family
+        end)
+
+      _ ->
+        false
+    end
   end
 
   def get_signup_application_from_user_id!(id, current_user, preloads \\ []) do
@@ -3967,7 +4017,7 @@ defmodule Ysc.Accounts do
       count_sub_accounts_for_primary(user_to_link.id) > 0 ->
         {:error, :has_dependent_family_members}
 
-      not has_family_or_lifetime_membership?(primary_user) ->
+      not family_membership_host?(primary_user) ->
         {:error, :primary_must_have_family_or_lifetime}
 
       relationship == :spouse ->
@@ -3983,50 +4033,6 @@ defmodule Ysc.Accounts do
       true ->
         do_admin_link_user(primary_user, user_to_link, relationship)
     end
-  end
-
-  defp has_family_or_lifetime_membership?(user) do
-    has_lifetime_membership?(user) or
-      case user.subscriptions do
-        %Ecto.Association.NotLoaded{} ->
-          subs = Ysc.Subscriptions.list_subscriptions(user)
-
-          Enum.any?(subs, fn s ->
-            s = Repo.preload(s, :subscription_items)
-
-            case s.subscription_items do
-              [item | _] ->
-                plans = Application.get_env(:ysc, :membership_plans, [])
-
-                Enum.any?(plans, fn p ->
-                  p.stripe_price_id == item.stripe_price_id and p.id == :family
-                end)
-
-              _ ->
-                false
-            end
-          end)
-
-        subs when is_list(subs) ->
-          Enum.any?(subs, fn s ->
-            s = Repo.preload(s, :subscription_items)
-
-            case s.subscription_items do
-              [item | _] ->
-                plans = Application.get_env(:ysc, :membership_plans, [])
-
-                Enum.any?(plans, fn p ->
-                  p.stripe_price_id == item.stripe_price_id and p.id == :family
-                end)
-
-              _ ->
-                false
-            end
-          end)
-
-        _ ->
-          false
-      end
   end
 
   defp count_spouses(primary_user) do

@@ -4305,14 +4305,34 @@ defmodule YscWeb.EventDetailsLive do
           {:error, :checkout_payment_in_progress}
         end
       else
-        Ysc.Tickets.StripeService.cancel_payment_intent(
-          ticket_order.payment_intent_id
-        )
+        # Stripe-first cancel (not StripeService.cancel_payment_intent/1): the
+        # latter treats a succeeded Intent as `:ok`, so a TOCTOU reprice during
+        # confirmPayment could mint a new PI, overwrite the order, then leave
+        # the captured charge unrefundable once the order completes at the new
+        # amount (#1497/#1503 leftover).
+        replace_checkout_payment_intent_after_stripe_cancel(ticket_order, user)
+      end
+    end
+  end
 
+  defp replace_checkout_payment_intent_after_stripe_cancel(ticket_order, user) do
+    case Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           ticket_order,
+           "retrieve_or_replace_payment_intent"
+         ) do
+      {:cancel, _payment_intent} ->
         Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
           user: user
         )
-      end
+
+      {:already_succeeded, _payment_intent} ->
+        {:error, :checkout_payment_in_progress}
+
+      {:in_progress, _payment_intent} ->
+        {:error, :checkout_payment_in_progress}
+
+      {:error, _stripe_error} ->
+        {:error, :checkout_payment_in_progress}
     end
   end
 
@@ -4334,16 +4354,66 @@ defmodule YscWeb.EventDetailsLive do
           assign(socket, :ticket_order, synced_order)
 
         Ysc.Tickets.pending_order_still_complimentary?(synced_order) ->
-          socket
-          |> assign(:show_payment_modal, false)
-          |> assign(:payment_intent, nil)
-          |> assign(:stripe_payment_element_ready, false)
-          |> assign(:ticket_order, synced_order)
-          |> YscWeb.Flash.put_toast(
-            :info,
-            "Ticket prices were updated. Please review your order before continuing.",
-            title: "Prices updated"
-          )
+          # Drop the paid PaymentIntent before switching to free confirmation.
+          # Leaving it attached lets a concurrent tab / in-flight confirmCharge
+          # capture after free fulfillment, and amount_mismatch refund then
+          # skips because the order is already `:completed`.
+          case Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 synced_order,
+                 "reprice_to_complimentary"
+               ) do
+            {:cancel, _} ->
+              # Keep the original "review your order" path. Jumping straight to
+              # the free-ticket modal skips checkout_step "free" assigns
+              # (attendee forms / family picks) and can confirm with empty names.
+              socket
+              |> assign(:show_payment_modal, false)
+              |> assign(:payment_intent, nil)
+              |> assign(:stripe_payment_element_ready, false)
+              |> assign(:ticket_order, synced_order)
+              |> YscWeb.Flash.put_toast(
+                :info,
+                "Ticket prices were updated. Please review your order before continuing.",
+                title: "Prices updated"
+              )
+
+            {:already_succeeded, payment_intent} ->
+              case Ysc.Tickets.StripeService.process_successful_payment(
+                     payment_intent
+                   ) do
+                {:ok, completed_order} ->
+                  socket
+                  |> assign(:show_payment_modal, false)
+                  |> assign(:payment_intent, nil)
+                  |> assign(:stripe_payment_element_ready, false)
+                  |> assign(:ticket_order, completed_order)
+                  |> redirect(
+                    to:
+                      ~p"/orders/#{completed_order.id}/confirmation?confetti=true"
+                  )
+
+                {:error, _} ->
+                  socket
+                  |> assign(:show_payment_modal, false)
+                  |> assign(:payment_intent, nil)
+                  |> assign(:stripe_payment_element_ready, false)
+                  |> assign(:ticket_order, nil)
+                  |> YscWeb.Flash.put_toast(
+                    :info,
+                    "Ticket prices were updated and your previous checkout was closed. Please start checkout again if you still want tickets.",
+                    title: "Prices updated"
+                  )
+              end
+
+            _ ->
+              socket
+              |> assign(:ticket_order, synced_order)
+              |> YscWeb.Flash.put_toast(
+                :error,
+                "Ticket prices were updated while your payment is processing. Please finish this payment first, then start a new checkout if you need the updated price.",
+                title: "Checkout"
+              )
+          end
 
         true ->
           case retrieve_or_create_payment_intent(synced_order, user) do

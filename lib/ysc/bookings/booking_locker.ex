@@ -2180,13 +2180,11 @@ defmodule Ysc.Bookings.BookingLocker do
           error: inspect(error)
         )
 
-        Bookings.maybe_refund_unfulfilled_checkout_payment(
+        Bookings.release_after_unfulfilled_checkout_refund(
           booking,
           payment_intent,
           :payment_amount_mismatch
         )
-
-        :release
 
       {:error, reason} ->
         Ysc.Logging.error(
@@ -2361,13 +2359,11 @@ defmodule Ysc.Bookings.BookingLocker do
           error: inspect(error)
         )
 
-        Bookings.maybe_refund_unfulfilled_checkout_payment(
+        Bookings.release_after_unfulfilled_checkout_refund(
           booking,
           payment_intent,
           :payment_amount_mismatch
         )
-
-        :release
 
       {:error, reason} ->
         Ysc.Logging.error(

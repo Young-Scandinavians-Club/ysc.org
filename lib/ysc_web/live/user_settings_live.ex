@@ -4210,6 +4210,19 @@ defmodule YscWeb.UserSettingsLive do
            title: "Membership"
          )}
 
+      {:error, :invalid_membership_type} ->
+        {:noreply,
+         socket
+         |> assign(
+           :pending_family_invites,
+           FamilyInvites.list_pending_invites_for_email(user.email)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This family invitation is no longer valid because the membership is not a family or lifetime plan. Ask the person who invited you to upgrade to a family membership, then request a new invite.",
+           title: "Membership"
+         )}
+
       {:error, :date_of_birth_required} ->
         # The acceptance page collects the date of birth before linking.
         {:noreply,
