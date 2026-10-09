@@ -2132,6 +2132,110 @@ defmodule YscWeb.TahoeBookingLiveTest do
     end)
   end
 
+  describe "rooms info tab" do
+    setup %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      room = create_tahoe_room!(capacity_max: 3)
+      %{conn: log_in_user(conn, user), room: room}
+    end
+
+    test "lists the property's rooms", %{conn: conn, room: room} do
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      assert has_element?(view, "#info-tab-rooms")
+      refute has_element?(view, "#property-room-browser")
+
+      view |> element("#info-tab-rooms") |> render_click()
+
+      assert assert_patch(view) =~ "info_tab"
+      assert has_element?(view, "#property-room-browser")
+      assert has_element?(view, "#browse-room-#{room.id}", room.name)
+      assert has_element?(view, "#browse-room-pick-#{room.id}")
+    end
+
+    test "can be opened directly from the URL", %{conn: conn, room: room} do
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?info_tab=rooms")
+
+      assert has_element?(view, "#browse-room-#{room.id}")
+    end
+
+    test "omits inactive rooms", %{conn: conn, room: room} do
+      {:ok, _} = Bookings.update_room(room, %{is_active: false})
+      RoomsListCache.invalidate()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?info_tab=rooms")
+
+      refute has_element?(view, "#browse-room-#{room.id}")
+    end
+
+    test "picking a room starts an availability search for it", %{
+      conn: conn,
+      room: room
+    } do
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?info_tab=rooms")
+
+      view |> element("#browse-room-pick-#{room.id}") |> render_click()
+
+      assert_push_event(view, "scroll-to-element", %{
+        id: "booking-step-stay-details"
+      })
+
+      assert has_element?(view, "#preferred-room-banner", room.name)
+    end
+
+    test "preferred room is selected once available dates are chosen", %{
+      conn: conn,
+      room: room
+    } do
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?info_tab=rooms")
+      view |> element("#browse-room-pick-#{room.id}") |> render_click()
+
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      render_click(view, "date-changed", %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout)
+      })
+
+      assert has_element?(view, "#room-#{room.id}[checked]")
+      assert has_element?(view, "#preferred-room-banner", "has been selected")
+    end
+
+    test "picking a room with dates already chosen selects it immediately", %{
+      conn: conn,
+      room: room
+    } do
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "room",
+        "info_tab" => "rooms"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 2_000)
+
+      view |> element("#browse-room-pick-#{room.id}") |> render_click()
+
+      assert_push_event(view, "scroll-to-element", %{id: "booking-step-rooms"})
+      assert has_element?(view, "#room-#{room.id}[checked]")
+    end
+
+    test "the preferred room can be dismissed", %{conn: conn, room: room} do
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?info_tab=rooms")
+      view |> element("#browse-room-pick-#{room.id}") |> render_click()
+      assert has_element?(view, "#preferred-room-banner")
+
+      view |> element("#clear-preferred-room") |> render_click()
+
+      refute has_element?(view, "#preferred-room-banner")
+    end
+  end
+
   describe "admin config cache rebuild" do
     test "rebuilds season-derived assigns after season cache invalidation", %{
       conn: conn

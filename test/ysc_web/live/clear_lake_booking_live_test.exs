@@ -3553,4 +3553,26 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
     Date.add(date, days_ahead)
   end
+
+  describe "rooms info tab" do
+    test "is hidden because Clear Lake has no individual rooms", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      refute has_element?(view, "#info-tab-rooms")
+    end
+
+    test "falls back to general info when requested via the URL", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live_clear_lake(conn, ~p"/bookings/clear-lake?info_tab=rooms")
+
+      refute has_element?(view, "#property-room-browser")
+      assert has_element?(view, "#information-section")
+    end
+  end
 end

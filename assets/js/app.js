@@ -292,6 +292,17 @@ window.addEventListener("phx:scroll-to-top", () => {
     }, 100);
 });
 
+window.addEventListener("phx:scroll-to-element", (e) => {
+    setTimeout(() => {
+        const element = document.getElementById(e.detail.id);
+        if (!element) return;
+        const headerOffset = 100;
+        const top =
+            element.getBoundingClientRect().top + window.pageYOffset - headerOffset;
+        window.scrollTo({ top, behavior: "smooth" });
+    }, 100);
+});
+
 window.addEventListener("phx:focus-first-input", (e) => {
     setTimeout(() => {
         const container = document.getElementById(e.detail.id);
