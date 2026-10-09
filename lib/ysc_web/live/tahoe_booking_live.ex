@@ -4876,31 +4876,7 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   def handle_event("booking-mode-changed", %{"booking_mode" => "room"}, socket) do
-    socket =
-      socket
-      |> assign(
-        selected_booking_mode: :room,
-        guests_count: 1,
-        children_count: 0,
-        calculated_price: nil,
-        price_error: nil
-      )
-      |> update_available_rooms()
-      # Validate availability immediately
-      |> validate_dates()
-      |> calculate_price_if_ready()
-      |> then(fn s ->
-        update_url_with_search_params(
-          s,
-          s.assigns.checkin_date,
-          s.assigns.checkout_date,
-          s.assigns.guests_count,
-          s.assigns.children_count,
-          :room
-        )
-      end)
-
-    {:noreply, socket}
+    {:noreply, switch_to_room_mode(socket)}
   end
 
   def handle_event(
@@ -5681,6 +5657,31 @@ defmodule YscWeb.TahoeBookingLive do
     {:noreply, socket}
   end
 
+  defp switch_to_room_mode(socket) do
+    socket
+    |> assign(
+      selected_booking_mode: :room,
+      guests_count: 1,
+      children_count: 0,
+      calculated_price: nil,
+      price_error: nil
+    )
+    |> update_available_rooms()
+    # Validate availability immediately
+    |> validate_dates()
+    |> calculate_price_if_ready()
+    |> then(fn s ->
+      update_url_with_search_params(
+        s,
+        s.assigns.checkin_date,
+        s.assigns.checkout_date,
+        s.assigns.guests_count,
+        s.assigns.children_count,
+        :room
+      )
+    end)
+  end
+
   # Starts an availability search from the Rooms info tab: switches to room
   # booking, remembers the member's room of interest, selects it right away
   # when dates are already chosen, and scrolls to the next booking step.
@@ -5689,14 +5690,7 @@ defmodule YscWeb.TahoeBookingLive do
       if socket.assigns.selected_booking_mode == :room do
         socket
       else
-        {:noreply, switched} =
-          handle_event(
-            "booking-mode-changed",
-            %{"booking_mode" => "room"},
-            socket
-          )
-
-        switched
+        switch_to_room_mode(socket)
       end
 
     socket =

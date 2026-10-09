@@ -2225,6 +2225,33 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert has_element?(view, "#room-#{room.id}[checked]")
     end
 
+    test "picking a room while in buyout mode switches back to rooms", %{
+      conn: conn,
+      room: room
+    } do
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?info_tab=rooms")
+
+      view
+      |> form("#booking-mode-form", %{"booking_mode" => "buyout"})
+      |> render_change()
+
+      assert has_element?(view, "#booking-mode-buyout[checked]")
+
+      view |> element("#browse-room-pick-#{room.id}") |> render_click()
+
+      assert has_element?(view, "#booking-mode-room[checked]")
+      assert has_element?(view, "#preferred-room-banner", room.name)
+
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      render_click(view, "date-changed", %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout)
+      })
+
+      assert has_element?(view, "#room-#{room.id}[checked]")
+    end
+
     test "the preferred room can be dismissed", %{conn: conn, room: room} do
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?info_tab=rooms")
       view |> element("#browse-room-pick-#{room.id}") |> render_click()
