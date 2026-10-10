@@ -804,7 +804,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Book the whole cabin
+                            {BookingModeDisplay.stay_type_label(:buyout)}
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
@@ -817,7 +817,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           }
                           class="text-xs text-amber-600 mt-2 ml-9 font-medium"
                         >
-                          Whole-cabin booking unavailable: Other members have already booked spots on these dates.
+                          Entire cabin isn't available: Other members have already booked spots on these dates.
                         </p>
                       </label>
                     </div>
@@ -841,7 +841,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Shared cabin stays are not available for the selected dates. Try different dates or book the whole cabin if that option is open.
+                      Shared cabin stays are not available for the selected dates. Try different dates or book the entire cabin if that option is open.
                     </span>
                     <span
                       :if={
@@ -851,7 +851,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Booking the whole cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
+                      Booking the entire cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
                     </span>
                   </p>
                 </div>
@@ -1009,7 +1009,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </div>
                   <div class="mb-4">
                     <p class="text-sm font-medium text-zinc-800 mb-2">
-                      The calendar shows which dates are available for booking the whole cabin.
+                      The calendar shows which dates are available for booking the entire cabin.
                     </p>
                     <p class="text-xs text-zinc-600">
                       Click on a date to start your selection, then click another date to complete your range.
@@ -1739,7 +1739,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <ul class="space-y-2 text-zinc-700">
                     <li>
                       Use the <strong>booking form above</strong>
-                      to choose shared vs whole cabin, dates, and guests, then pay on this site.
+                      to choose Shared cabin vs Entire cabin, dates, and guests, then pay on this site.
                     </li>
                     <li>
                       You'll get a confirmation email with a link to view and manage your booking.
@@ -2297,7 +2297,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   rooms={browse_rooms}
                   property_name="YSC Clear Lake Cabin"
                   accent={:teal}
-                  pick_event={if @can_book, do: "browse-room-pick"}
+                  intro="You don't pick a specific room when you book. Shared cabin stays share the house with other members. Entire cabin stays include every room."
                 />
               </div>
               <!-- Tab Content: Cabin & Booking Rules -->
@@ -3201,17 +3201,6 @@ defmodule YscWeb.ClearLakeBookingLive do
      )}
   end
 
-  def handle_event("browse-room-pick", %{"room-id" => room_id}, socket) do
-    rooms = YscWeb.Components.RoomBrowser.browsable_rooms(:clear_lake)
-
-    if socket.assigns.can_book && Enum.any?(rooms, &(&1.id == room_id)) do
-      {:noreply,
-       push_event(socket, "scroll-to-element", %{id: "booking-step-mode"})}
-    else
-      {:noreply, socket}
-    end
-  end
-
   def handle_event("switch-tab", %{"tab" => tab}, socket) do
     active_tab =
       case tab do
@@ -3488,7 +3477,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp format_booking_error(:invalid_booking_mode),
     do:
-      "We couldn't book with the option you selected for these dates. Try different dates, or switch between Shared cabin and Book the whole cabin."
+      "We couldn't book with the option you selected for these dates. Try different dates, or switch between Shared cabin and Entire cabin."
 
   defp format_booking_error(:membership_required),
     do: YscWeb.BookingUserMessages.membership_required_plain_message()
@@ -3985,10 +3974,10 @@ defmodule YscWeb.ClearLakeBookingLive do
           YscWeb.BookingUserMessages.clear_lake_blackout_date(date_str)
 
         day_availability && assigns[:selected_booking_mode] == :day ->
-          "The date #{date_str} isn't available for a shared cabin stay — another member may already have the whole cabin booked that day."
+          "The date #{date_str} isn't available for a shared cabin stay — another member may already have the entire cabin booked that day."
 
         day_availability && assigns[:selected_booking_mode] == :buyout ->
-          "The date #{date_str} isn't available for booking the whole cabin — there are existing shared-stay bookings or another whole-cabin booking."
+          "The date #{date_str} isn't available for booking the entire cabin — another member already has a shared stay or the entire cabin booked."
 
         true ->
           "The date #{date_str} is unavailable for your selected number of guests."
@@ -4109,10 +4098,10 @@ defmodule YscWeb.ClearLakeBookingLive do
        ) do
     cond do
       booking_mode == :day && !day_booking_allowed ->
-        "Shared cabin stays are not available for the selected dates. Try different dates or book the whole cabin if that option is open."
+        "Shared cabin stays are not available for the selected dates. Try different dates or book the entire cabin if that option is open."
 
       booking_mode == :buyout && !buyout_booking_allowed ->
-        "Booking the whole cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open."
+        "Booking the entire cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open."
 
       true ->
         nil

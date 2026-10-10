@@ -5,7 +5,7 @@ defmodule YscWeb.Components.RoomBrowser do
 
   Lets members see what kinds of rooms a property offers before they start a
   booking. Each card can optionally offer a button that fires an event so the
-  host LiveView can start an availability search for that room.
+  host LiveView can check whether that room is free on the member's dates.
   """
   use Phoenix.Component
 
@@ -36,6 +36,12 @@ defmodule YscWeb.Components.RoomBrowser do
       "LiveView event fired with `room-id` when a member picks a room. " <>
         "When nil, no availability button is shown."
 
+  attr :intro, :string,
+    default: nil,
+    doc:
+      "Optional override for the intro paragraph. When nil, a default " <>
+        "browse/pick sentence is used."
+
   def room_browser(assigns) do
     ~H"""
     <section id={@id} class="space-y-8">
@@ -44,10 +50,14 @@ defmodule YscWeb.Components.RoomBrowser do
           Rooms at the {@property_name}
         </h2>
         <p class="text-lg text-zinc-600 leading-relaxed">
-          Browse the rooms we offer to find the one that suits your group.
-          <span :if={@pick_event}>
-            Found one you like? Choose it and we'll start an availability search for it.
-          </span>
+          <%= if @intro do %>
+            {@intro}
+          <% else %>
+            Browse the rooms we offer to find the one that suits your group.
+            <span :if={@pick_event}>
+              Found one you like? Choose it and we'll check whether it's free on your dates.
+            </span>
+          <% end %>
         </p>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
