@@ -11,7 +11,11 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
   alias YscWeb.MembershipHelpers
 
   import YscWeb.Emails.Helpers,
-    only: [member_greeting_name: 1, format_date: 1, format_membership_money: 1]
+    only: [
+      format_date: 1,
+      format_membership_money: 1,
+      membership_member_assigns: 2
+    ]
 
   def get_template_name() do
     "membership_renewal_success"
@@ -43,24 +47,6 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
         billing_reason \\ nil,
         proration_details \\ nil
       ) do
-    # Validate input
-    if is_nil(user) do
-      raise ArgumentError, "User cannot be nil"
-    end
-
-    # Ensure user has required fields
-    first_name = member_greeting_name(user)
-
-    membership_type_name =
-      MembershipHelpers.membership_type_name(membership_type)
-
-    # Format amount
-    amount_str = format_membership_money(amount)
-
-    # Format renewal date
-    renewal_date_str = format_date(renewal_date)
-
-    # Extract proration details if available
     {is_upgrade, is_downgrade, old_membership_type_name, has_proration} =
       if proration_details do
         old_type_name =
@@ -85,16 +71,16 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
       billing_reason in ["subscription_update", :subscription_update] and
         membership_type in [:family, "family"] and not has_proration
 
-    %{
-      first_name: first_name,
-      membership_type: membership_type_name,
-      amount: amount_str,
-      renewal_date: renewal_date_str,
+    user
+    |> membership_member_assigns(membership_type)
+    |> Map.merge(%{
+      amount: format_membership_money(amount),
+      renewal_date: format_date(renewal_date),
       is_single_to_family_upgrade: is_single_to_family_upgrade,
       is_upgrade: is_upgrade,
       is_downgrade: is_downgrade,
       old_membership_type: old_membership_type_name,
       has_proration: has_proration
-    }
+    })
   end
 end

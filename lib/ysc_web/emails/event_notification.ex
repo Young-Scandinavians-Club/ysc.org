@@ -11,7 +11,8 @@ defmodule YscWeb.Emails.EventNotification do
   import YscWeb.Emails.Helpers,
     only: [
       event_notification_unsubscribe_url: 1,
-      member_greeting_name: 1
+      membership_greeting_assigns: 1,
+      require_user!: 1
     ]
 
   alias YscWeb.Emails.EventHelpers
@@ -74,13 +75,11 @@ defmodule YscWeb.Emails.EventNotification do
   - Map with all necessary data for the email template
   """
   def prepare_email_data(event, user) do
-    if is_nil(user) do
-      raise ArgumentError, "User cannot be nil"
-    end
+    user = require_user!(user)
 
     event
     |> prepare_shared_email_data()
-    |> Map.put(:first_name, member_greeting_name(user))
+    |> Map.merge(membership_greeting_assigns(user))
     |> Map.put(:unsubscribe_url, event_notification_unsubscribe_url(user.id))
   end
 

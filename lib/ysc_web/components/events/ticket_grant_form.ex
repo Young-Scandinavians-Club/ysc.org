@@ -16,7 +16,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
       <div>
         <h2
           id={"#{@dialog_id}-title"}
-          class="text-lg font-semibold leading-8 text-zinc-800"
+          class="text-lg text-zinc-800 type-subhead"
         >
           Grant Tickets
         </h2>

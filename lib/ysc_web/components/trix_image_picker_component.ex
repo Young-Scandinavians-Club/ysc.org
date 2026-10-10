@@ -72,7 +72,7 @@ defmodule YscWeb.TrixImagePickerComponent do
         max_width="max-w-5xl"
       >
         <div class="space-y-4">
-          <h2 class="text-lg font-semibold text-zinc-800">
+          <h2 class="text-lg text-zinc-800 type-subhead">
             Insert image from library
           </h2>
 

@@ -49,7 +49,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
         <div class="bg-white p-4 rounded-2xl shadow-xl">
           <.qr_code data={@event_url} size={168} />
         </div>
-        <span class="text-sm font-bold uppercase tracking-[0.2em] text-white/90 drop-shadow-sm">
+        <span class="text-sm font-bold uppercase tracking-wider text-white/90 drop-shadow-sm">
           Scan for details
         </span>
       </div>
@@ -57,7 +57,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
       <div class="absolute top-12 left-12 z-10 flex flex-wrap gap-3 max-w-[calc(100%-280px)]">
         <%= for badge <- @badges do %>
           <span class={[
-            "px-4 py-2 rounded-sm text-sm font-black uppercase tracking-widest",
+            "px-4 py-2 rounded-sm text-sm font-black uppercase tracking-wider",
             badge.class
           ]}>
             <.icon :if={badge.icon} name={badge.icon} class="w-4 h-4 inline me-1" />
@@ -69,12 +69,12 @@ defmodule YscWeb.Components.Events.EventTvPoster do
       <div class="absolute inset-x-0 bottom-0 z-10 flex flex-col justify-end p-12 lg:p-16">
         <div class="max-w-[1400px]">
           <div class="flex flex-wrap items-center gap-4 mb-6">
-            <span class="text-lg font-black px-4 py-2 rounded-sm bg-white/15 backdrop-blur-xs uppercase tracking-[0.2em]">
+            <span class="text-lg font-black px-4 py-2 rounded-sm bg-white/20 uppercase tracking-wide">
               {DateTimeFormatter.format_event_start(@event, separator: " · ")}
             </span>
             <span
               :if={@event.location_name}
-              class="text-lg font-bold uppercase tracking-widest text-white/85 flex items-center gap-2"
+              class="text-lg font-bold uppercase tracking-wide text-white/85 flex items-center gap-2"
             >
               <.icon name="hero-map-pin" class="w-5 h-5" />
               {@event.location_name}
@@ -94,12 +94,12 @@ defmodule YscWeb.Components.Events.EventTvPoster do
 
           <div class="flex items-center gap-6 pt-8 border-t border-white/25">
             <span class={[
-              "text-xl font-black rounded-sm border border-white/35 px-5 py-2.5 backdrop-blur-xs",
+              "text-xl font-black rounded-sm border border-white/35 px-5 py-2.5",
               @sold_out && "line-through opacity-70"
             ]}>
               {pricing_display(@event)}
             </span>
-            <span class="text-lg font-bold uppercase tracking-widest text-white/80">
+            <span class="text-lg font-bold uppercase tracking-wide text-white/80">
               Young Scandinavians Club
             </span>
           </div>

@@ -54,7 +54,7 @@ defmodule YscWeb.NewsLive do
         <div id="featured" class="group">
           <.link
             navigate={~p"/posts/#{@featured.url_name}"}
-            class="block overflow-hidden rounded-xl border border-zinc-100 bg-white transition-all duration-300 sm:border-0 sm:bg-transparent sm:rounded-xl hover:ring-2 hover:ring-blue-500"
+            class="block overflow-hidden rounded-xl border border-zinc-100 bg-white transition duration-300 sm:border-0 sm:bg-transparent sm:rounded-xl hover:ring-2 hover:ring-blue-500"
           >
             <div class="relative flex flex-col sm:block sm:aspect-16/10 sm:rounded-xl sm:overflow-hidden">
               <%!-- Image container --%>
@@ -91,16 +91,16 @@ defmodule YscWeb.NewsLive do
               </div>
 
               <%!-- Content (stacked on mobile, overlaid on sm+) --%>
-              <div class="relative z-3 flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-300">
+              <div class="relative z-3 flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition duration-300">
                 <div class="max-w-3xl">
                   <div class="flex items-center gap-2 mb-4">
-                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs font-black uppercase tracking-widest rounded-sm shadow-xs sm:bg-amber-50/90 sm:backdrop-blur-md sm:border sm:border-amber-200 sm:text-amber-700">
+                    <span class="px-2.5 py-1 bg-amber-600 text-white text-xs rounded-sm shadow-xs sm:bg-amber-50/90 sm:border sm:border-amber-200 sm:text-amber-700 type-eyebrow">
                       <.icon name="hero-star-solid" class="w-3 h-3 inline me-1" />Pinned News
                     </span>
                   </div>
 
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-zinc-500 sm:text-white/80">
-                    <span class="text-sm font-black uppercase tracking-widest">
+                    <span class="text-sm type-eyebrow">
                       {DateDisplay.format_date_short_in_zone(
                         @featured.published_on,
                         @timezone
@@ -109,13 +109,13 @@ defmodule YscWeb.NewsLive do
                     <span class="h-3 w-px bg-zinc-300 sm:bg-white/40"></span>
                     <span
                       id={"news-featured-reading-time-#{@featured.id}"}
-                      class="text-sm font-bold uppercase tracking-widest"
+                      class="text-sm type-eyebrow"
                     >
                       {ReadingTime.minutes(@featured)} min read
                     </span>
                   </div>
 
-                  <h2 class="text-3xl font-black leading-tight tracking-tighter text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300">
+                  <h2 class="text-3xl text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300 type-display">
                     {@featured.title}
                   </h2>
 
@@ -129,7 +129,7 @@ defmodule YscWeb.NewsLive do
                       class="w-8 h-8 sm:w-10 sm:h-10 rounded-full ring-2 ring-zinc-200 sm:ring-white/30"
                     />
                     <div>
-                      <p class="text-sm font-black text-zinc-900 sm:text-white leading-tight">
+                      <p class="text-sm font-bold text-zinc-900 sm:text-white leading-tight">
                         {UserDisplay.full_name(@featured.author)}
                       </p>
                       <p
@@ -191,7 +191,7 @@ defmodule YscWeb.NewsLive do
           <div
             :for={{dom_id, post} <- @streams.posts}
             id={dom_id}
-            class="group flex flex-col bg-white rounded-xl p-2 border border-zinc-100 transition-all duration-300 hover:ring-2 hover:ring-blue-500"
+            class="group flex flex-col bg-white rounded-xl p-2 border border-zinc-100 transition duration-300 hover:ring-2 hover:ring-blue-500"
           >
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
               <div class="relative aspect-video sm:aspect-16/10 overflow-hidden rounded-lg">
@@ -208,7 +208,7 @@ defmodule YscWeb.NewsLive do
 
             <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
-                <span class="text-sm font-black text-blue-600 uppercase tracking-[0.2em]">
+                <span class="text-sm text-blue-600 type-eyebrow">
                   {DateDisplay.format_date_short_in_zone(
                     post.published_on,
                     @timezone
@@ -217,7 +217,7 @@ defmodule YscWeb.NewsLive do
                 <span class="h-3 w-px bg-zinc-200"></span>
                 <span
                   id={"news-grid-reading-time-#{post.id}"}
-                  class="text-sm font-bold text-zinc-500 uppercase tracking-widest"
+                  class="text-sm text-zinc-500 type-eyebrow"
                 >
                   {ReadingTime.minutes(post)} min read
                 </span>
@@ -225,7 +225,7 @@ defmodule YscWeb.NewsLive do
 
               <.link
                 navigate={~p"/posts/#{post.url_name}"}
-                class="text-2xl font-black text-zinc-900 tracking-tight leading-[1.1] mb-3 group-hover:text-blue-600 group-hover:underline transition-colors"
+                class="text-2xl text-zinc-900 mb-3 group-hover:text-blue-600 group-hover:underline transition-colors type-subhead"
               >
                 {post.title}
               </.link>
@@ -241,7 +241,7 @@ defmodule YscWeb.NewsLive do
                     class="w-8 h-8 rounded-full"
                   />
                   <div>
-                    <p class="text-sm font-black text-zinc-500 group-hover:text-zinc-900 uppercase tracking-widest transition-colors leading-tight">
+                    <p class="text-sm text-zinc-500 group-hover:text-zinc-900 transition-colors type-eyebrow">
                       {UserDisplay.full_name(post.author)}
                     </p>
                     <p
@@ -256,7 +256,7 @@ defmodule YscWeb.NewsLive do
                 </div>
                 <.icon
                   name="hero-arrow-right"
-                  class="w-5 h-5 text-zinc-200 group-hover:text-blue-600 group-hover:translate-x-1 transition-all"
+                  class="w-5 h-5 text-zinc-200 group-hover:text-blue-600 group-hover:translate-x-1 transition"
                 />
               </div>
             </div>

@@ -22,8 +22,8 @@ defmodule YscWeb.PostLive do
     >
       <div
         id="reading-progress"
-        class="h-full bg-blue-500 transition-all duration-150"
-        style="width: 0%"
+        class="h-full w-full origin-left bg-blue-500"
+        style="transform: scaleX(0)"
       >
       </div>
     </div>
@@ -47,15 +47,15 @@ defmodule YscWeb.PostLive do
       <div :if={@post != nil} class="max-w-(--breakpoint-lg) mx-auto px-4">
         <div class="max-w-3xl mx-auto text-center mb-12">
           <div class="flex items-center justify-center gap-3 mb-6">
-            <span class="text-xs font-black text-blue-600 uppercase tracking-[0.3em]">
+            <span class="text-xs text-blue-600 type-eyebrow">
               Club News
             </span>
             <span class="h-3 w-px bg-zinc-200"></span>
-            <span class="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+            <span class="text-xs text-zinc-400 type-eyebrow">
               {DateDisplay.format_date_in_zone(post_date(@post), @timezone)}
             </span>
           </div>
-          <h1 class="text-4xl md:text-6xl font-black text-zinc-900 tracking-tighter leading-[1.1] mb-8">
+          <h1 class="text-4xl md:text-6xl text-zinc-900 mb-8 type-display">
             {@post.title}
           </h1>
           <div class="flex items-center justify-center gap-4 py-6 border-y border-zinc-100">
@@ -64,7 +64,7 @@ defmodule YscWeb.PostLive do
               class="w-10 h-10 rounded-full"
             />
             <div class="text-left">
-              <p class="text-xs font-black text-zinc-900 uppercase tracking-widest">
+              <p class="text-xs text-zinc-900 type-eyebrow">
                 Posted by
               </p>
               <p class="text-sm font-medium text-zinc-500">
@@ -103,7 +103,7 @@ defmodule YscWeb.PostLive do
         <article class="prose prose-zinc prose-lg lg:prose-xl prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-3xl mx-auto py-12 bg-zinc-50/50 rounded-xl px-8 md:px-12">
           <div
             id="article-body"
-            class="post-render first-letter:text-7xl first-letter:font-black first-letter:text-zinc-900 first-letter:mr-3 first-letter:float-left first-letter:leading-[.8] leading-relaxed text-zinc-600 font-normal border-l border-zinc-100 -ml-8 pl-8"
+            class="post-render first-letter:text-7xl first-letter:font-bold first-letter:text-zinc-900 first-letter:mr-3 first-letter:float-left first-letter:leading-[.8] leading-relaxed text-zinc-600 font-normal border-l border-zinc-100 -ml-8 pl-8"
             phx-hook="GLightboxHook"
             phx-update="ignore"
           >
@@ -121,7 +121,7 @@ defmodule YscWeb.PostLive do
           <div class="bg-white border border-zinc-200 rounded-xl p-10 shadow-xs">
             <div class="flex items-center gap-3 mb-8">
               <div class="w-1.5 h-6 bg-blue-500 rounded-full"></div>
-              <h2 class="text-2xl font-black text-zinc-900 tracking-tight">
+              <h2 class="text-2xl text-zinc-900 type-title">
                 Community Discussion ({@n_comments})
               </h2>
             </div>
@@ -137,7 +137,7 @@ defmodule YscWeb.PostLive do
                 type="textarea"
                 id="comment"
                 rows="4"
-                class="w-full bg-zinc-50 border-none rounded-lg p-6 text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500/20 transition-all min-h-[120px]"
+                class="w-full bg-zinc-50 border-none rounded-lg p-6 text-zinc-900 placeholder:text-zinc-400 focus:ring-2 focus:ring-blue-500/20 transition min-h-[120px]"
                 placeholder="Share your thoughts..."
                 required
               >

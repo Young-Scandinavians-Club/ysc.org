@@ -216,7 +216,7 @@ defmodule YscWeb.UserBookingDetailLive do
           <!-- Cancellation Policy -->
           <%= if @refund_info && @can_cancel do %>
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-              <h2 class="text-lg font-semibold text-blue-900 mb-3">
+              <h2 class="text-lg text-blue-900 mb-3 type-subhead">
                 Cancellation Policy
               </h2>
               <div class="text-sm text-blue-800 space-y-3">
@@ -289,7 +289,7 @@ defmodule YscWeb.UserBookingDetailLive do
           <% end %>
           <!-- Booking Summary -->
           <div class="bg-white rounded-lg border border-zinc-200 p-6">
-            <h2 class="text-xl font-semibold text-zinc-900 mb-4">
+            <h2 class="text-xl text-zinc-900 mb-4 type-subhead">
               Booking Summary
             </h2>
 
@@ -397,7 +397,7 @@ defmodule YscWeb.UserBookingDetailLive do
           <!-- Payment Summary -->
           <%= if @payment do %>
             <div class="bg-white rounded-lg border border-zinc-200 p-6">
-              <h2 class="text-xl font-semibold text-zinc-900 mb-4">
+              <h2 class="text-xl text-zinc-900 mb-4 type-subhead">
                 Payment Summary
               </h2>
 
@@ -439,7 +439,7 @@ defmodule YscWeb.UserBookingDetailLive do
                     <span class="text-lg font-semibold text-zinc-900">
                       Total Paid
                     </span>
-                    <span class="text-2xl font-bold text-zinc-900">
+                    <span class="text-2xl text-zinc-900 type-title">
                       {MoneyHelper.format_money!(@payment.amount)}
                     </span>
                   </div>

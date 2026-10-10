@@ -121,15 +121,15 @@ defmodule Ysc.Bookings.HoldExpiryWorker do
           error: inspect(error)
         )
 
-        Ysc.Bookings.maybe_refund_unfulfilled_checkout_payment(
+        # Charge does not match this hold. Refund first; only release when the
+        # money is returned (or refund is skipped). A failed refund must :skip
+        # so the next cron run retries — releasing here would clear the hold
+        # and entitlement with money still captured (ticket #1503 leftover).
+        Ysc.Bookings.release_after_unfulfilled_checkout_refund(
           booking,
           payment_intent,
           :payment_amount_mismatch
         )
-
-        # Charge does not match this hold — release so the entitlement is not
-        # stuck and inventory is not held against an unfulfillable payment.
-        :release
 
       {:error, reason} ->
         Ysc.Logging.error(

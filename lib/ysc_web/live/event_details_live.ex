@@ -64,7 +64,7 @@ defmodule YscWeb.EventDetailsLive do
       rel="noopener noreferrer"
       class={"flex items-center justify-center gap-2 #{@class}"}
     >
-      <span class="uppercase tracking-widest">RSVP on</span>
+      <span class="type-eyebrow">RSVP on</span>
       <.partiful_logo class={@logo_class} />
       <.icon name="hero-arrow-top-right-on-square" class={@icon_class} />
     </.button>
@@ -109,7 +109,7 @@ defmodule YscWeb.EventDetailsLive do
 
           <%!-- Floating Card with Title/Date/Location - Overlaps bottom of image --%>
           <div class={[
-            "relative -mt-16 mx-4 z-10 transition-all duration-500 ease-in-out",
+            "relative -mt-16 mx-4 z-10 transition duration-500 ease-in-out",
             "lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:translate-y-1/2 lg:mx-0 lg:px-8 lg:mt-0"
           ]}>
             <div class={[
@@ -146,7 +146,7 @@ defmodule YscWeb.EventDetailsLive do
                 >
                   <span
                     :if={event_day_label == :today}
-                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-sm bg-rose-600 sm:bg-rose-500/90 sm:backdrop-blur-md sm:border sm:border-rose-400 animate-pulse"
+                    class="px-3 py-1.5 text-white text-xs rounded-sm bg-rose-600 sm:bg-rose-500/90 sm:border sm:border-rose-400 animate-attention-once type-eyebrow"
                   >
                     <.icon
                       name="hero-bolt-solid"
@@ -156,7 +156,7 @@ defmodule YscWeb.EventDetailsLive do
                   </span>
                   <span
                     :if={event_day_label == :tomorrow}
-                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-sm bg-orange-600 sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400"
+                    class="px-3 py-1.5 text-white text-xs rounded-sm bg-orange-600 sm:bg-orange-500/90 sm:border sm:border-orange-400 type-eyebrow"
                   >
                     <.icon
                       name="hero-calendar-solid"
@@ -166,7 +166,7 @@ defmodule YscWeb.EventDetailsLive do
                   </span>
                   <span
                     :if={@event.tickets_tbd && @event.state != :cancelled}
-                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-sm bg-blue-600 sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"
+                    class="px-3 py-1.5 text-white text-xs rounded-sm bg-blue-600 sm:bg-blue-500/90 sm:border sm:border-blue-400 type-eyebrow"
                   >
                     <.icon
                       name="hero-ticket"
@@ -179,7 +179,7 @@ defmodule YscWeb.EventDetailsLive do
                       @event.state != :cancelled && @async_data_loaded &&
                         @event_sold_out_for_user && !@event.tickets_tbd
                     }
-                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-sm bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400"
+                    class="px-3 py-1.5 text-white text-xs rounded-sm bg-red-600 sm:bg-red-500/90 sm:border sm:border-red-400 type-eyebrow"
                   >
                     <.icon
                       name="hero-no-symbol"
@@ -196,12 +196,12 @@ defmodule YscWeb.EventDetailsLive do
                   }
                   class="flex items-center gap-3"
                 >
-                  <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
+                  <p class="text-xs text-blue-600 type-eyebrow">
                     {format_start_date(@event.start_date)}
                   </p>
                   <%= if @event_selling_fast && !@event_sold_out_for_user do %>
                     <span class="h-3 w-px bg-zinc-200"></span>
-                    <span class="inline-flex items-center gap-1 text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-sm uppercase tracking-widest">
+                    <span class="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-sm type-eyebrow">
                       <.icon name="hero-fire-solid" class="w-3 h-3" /> Going Fast!
                     </span>
                   <% end %>
@@ -209,7 +209,7 @@ defmodule YscWeb.EventDetailsLive do
 
                 <h1
                   :if={@event.title != nil && @event.title != ""}
-                  class="text-2xl md:text-4xl lg:text-5xl font-black text-zinc-900 tracking-tighter leading-tight transition-all"
+                  class="text-2xl md:text-4xl lg:text-5xl text-zinc-900 transition type-display"
                 >
                   {@event.title}
                 </h1>
@@ -263,12 +263,12 @@ defmodule YscWeb.EventDetailsLive do
                       />
                     </div>
                     <div>
-                      <h3 class="text-lg font-black text-white tracking-tight leading-none">
+                      <h3 class="text-lg text-white type-subhead">
                         Your Tickets
                       </h3>
                       <p
                         id="user-tickets-confirmed-count"
-                        class="text-xs text-zinc-500 uppercase tracking-widest font-bold mt-1"
+                        class="text-xs text-zinc-500 mt-1 type-eyebrow"
                       >
                         {all_confirmed_count} confirmed {if all_confirmed_count == 1,
                           do: "ticket",
@@ -282,7 +282,7 @@ defmodule YscWeb.EventDetailsLive do
                         ~p"/events/#{@event.id}/tickets/qr" <>
                           "?return_to=/events/#{@event.id}"
                       }
-                      class="shrink-0 flex items-center gap-2 px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-black uppercase tracking-widest transition-all"
+                      class="shrink-0 flex items-center gap-2 px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs transition type-eyebrow"
                     >
                       <.icon name="hero-qr-code" class="w-4 h-4" />
                       View tickets for check-in
@@ -351,7 +351,7 @@ defmodule YscWeb.EventDetailsLive do
                         ]} />
                         <div class="min-w-0">
                           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1.5">
-                            <span class="text-sm font-black text-white tracking-tight">
+                            <span class="text-sm font-bold text-white">
                               {order_label}
                             </span>
                             <%= if purchase_date do %>
@@ -361,11 +361,11 @@ defmodule YscWeb.EventDetailsLive do
                             <% end %>
                             <%= cond do %>
                               <% all_refunded -> %>
-                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-xs font-bold uppercase tracking-wider rounded-sm border border-red-500/30">
+                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-xs rounded-sm border border-red-500/30 type-eyebrow">
                                   Refunded
                                 </span>
                               <% partial_refund -> %>
-                                <span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs font-bold uppercase tracking-wider rounded-sm border border-amber-500/30">
+                                <span class="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-xs rounded-sm border border-amber-500/30 type-eyebrow">
                                   Partial Refund
                                 </span>
                               <% true -> %>
@@ -411,7 +411,7 @@ defmodule YscWeb.EventDetailsLive do
                       <.link
                         navigate={~p"/orders/#{order_id}/confirmation"}
                         class={[
-                          "shrink-0 px-4 py-1.5 rounded-sm text-xs font-black uppercase tracking-widest transition-all border",
+                          "shrink-0 px-4 py-1.5 rounded-sm text-xs transition border type-eyebrow",
                           if(all_refunded,
                             do:
                               "bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/20",
@@ -449,10 +449,10 @@ defmodule YscWeb.EventDetailsLive do
                   "md:border-b-0 md:border-r md:border-dashed border-zinc-200"
                 end
               ]}>
-                <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-2">
+                <p class="text-xs text-blue-600 mb-2 type-eyebrow">
                   When
                 </p>
-                <p class="font-black text-xl text-zinc-900 tracking-tight leading-none">
+                <p class="font-bold text-xl text-zinc-900 tracking-tight leading-none">
                   {format_event_when_date_heading(@event)}
                 </p>
                 <%= if time_subline = format_event_when_time_subline(@event) do %>
@@ -462,10 +462,10 @@ defmodule YscWeb.EventDetailsLive do
                 <% end %>
                 <%= if !event_in_past?(@event) && @event.state != :cancelled do %>
                   <div class="mt-3 inline-flex items-center gap-2 bg-blue-50 px-2 py-1 rounded-full">
-                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                     <span
                       id="event-status-label"
-                      class="text-xs font-black text-blue-600 uppercase tracking-widest"
+                      class="text-xs text-blue-600 type-eyebrow"
                     >
                       {if event_live?(@event), do: "Live", else: "Upcoming"}
                     </span>
@@ -480,10 +480,10 @@ defmodule YscWeb.EventDetailsLive do
                   "md:border-b-0"
                 end
               ]}>
-                <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-2">
+                <p class="text-xs text-blue-600 mb-2 type-eyebrow">
                   Where
                 </p>
-                <p class="font-black text-xl text-zinc-900 tracking-tight leading-none">
+                <p class="font-bold text-xl text-zinc-900 tracking-tight leading-none">
                   <%= if @event.location_name != nil && @event.location_name != "" do %>
                     {@event.location_name}
                   <% else %>
@@ -500,10 +500,10 @@ defmodule YscWeb.EventDetailsLive do
               </div>
               <%= if has_duration do %>
                 <div class="p-8 bg-zinc-50/30">
-                  <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-2">
+                  <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
                     Duration
                   </p>
-                  <p class="font-black text-xl text-zinc-900 tracking-tight leading-none">
+                  <p class="font-bold text-xl text-zinc-900 tracking-tight leading-none">
                     {case {format_time(@event.start_time),
                            format_time(@event.end_time)} do
                       {%Time{} = start_time, %Time{} = end_time} ->
@@ -544,7 +544,7 @@ defmodule YscWeb.EventDetailsLive do
                     <.icon name="hero-bolt" class="w-4 h-4 text-blue-600" />
                   </div>
                   <div class="min-w-0">
-                    <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-1">
+                    <p class="text-xs text-blue-600 mb-1 type-eyebrow">
                       RSVP on another website
                     </p>
                     <p class="text-zinc-600 text-sm font-medium leading-relaxed">
@@ -641,7 +641,7 @@ defmodule YscWeb.EventDetailsLive do
 
             <%!-- Agenda --%>
             <section :if={length(@agendas) > 0} class="space-y-6">
-              <h3 class="text-2xl font-black text-zinc-900 tracking-tight mb-12 flex items-center gap-3">
+              <h3 class="text-2xl text-zinc-900 mb-12 flex items-center gap-3 type-subhead">
                 <span class="w-8 h-px bg-zinc-200"></span> Agenda
               </h3>
 
@@ -679,9 +679,9 @@ defmodule YscWeb.EventDetailsLive do
                     <% is_current = agenda_item_current?(agenda_item, @event) %>
                     <div class="relative group">
                       <div class={[
-                        "absolute left-[-25px] w-4 h-4 rounded-full border-4 border-white transition-all shadow-xs z-10 mt-1.5",
+                        "absolute left-[-25px] w-4 h-4 rounded-full border-4 border-white transition shadow-xs z-10 mt-1.5",
                         if is_current do
-                          "bg-blue-600 animate-pulse"
+                          "bg-blue-600 ring-4 ring-blue-200"
                         else
                           "bg-zinc-200 group-hover:bg-blue-600 group-hover:scale-125"
                         end
@@ -689,7 +689,7 @@ defmodule YscWeb.EventDetailsLive do
                       </div>
                       <div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
                         <div class="w-36 shrink-0">
-                          <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-sm uppercase tracking-widest whitespace-nowrap group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                          <span class="text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-sm whitespace-nowrap group-hover:bg-blue-600 group-hover:text-white transition-colors type-eyebrow">
                             {format_start_end(
                               agenda_item.start_time,
                               agenda_item.end_time
@@ -697,7 +697,7 @@ defmodule YscWeb.EventDetailsLive do
                           </span>
                         </div>
                         <div class="flex-1 min-w-0">
-                          <h4 class="text-lg font-black text-zinc-900 tracking-tight leading-none group-hover:text-blue-600 transition-colors">
+                          <h4 class="text-lg text-zinc-900 group-hover:text-blue-600 transition-colors type-subhead">
                             {agenda_item.title}
                           </h4>
                           <p
@@ -716,14 +716,17 @@ defmodule YscWeb.EventDetailsLive do
 
             <%!-- Event Updates --%>
             <section :if={@event_updates != []} class="flex flex-col gap-6">
-              <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+              <h3 class="text-2xl text-zinc-900 flex items-center gap-3 type-subhead">
                 <span class="w-8 h-px bg-zinc-200"></span> Updates
               </h3>
               <div class="space-y-6">
                 <%= for update <- @event_updates do %>
                   <div class="rounded-xl border border-zinc-200 bg-zinc-50/50 p-6">
                     <div class="flex items-start justify-between gap-4 mb-3">
-                      <h4 :if={update.title} class="text-lg font-bold text-zinc-900">
+                      <h4
+                        :if={update.title}
+                        class="text-lg text-zinc-900 type-subhead"
+                      >
                         {update.title}
                       </h4>
                       <span class="shrink-0 text-sm text-zinc-400">
@@ -750,7 +753,7 @@ defmodule YscWeb.EventDetailsLive do
 
             <%!-- Details --%>
             <section class="flex flex-col gap-6">
-              <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+              <h3 class="text-2xl text-zinc-900 flex items-center gap-3 type-subhead">
                 <span class="w-8 h-px bg-zinc-200"></span> Details
               </h3>
               <article class="prose prose-zinc prose-lg prose-a:text-blue-600 prose-strong:text-zinc-900 max-w-none text-zinc-600 font-normal leading-relaxed">
@@ -773,7 +776,7 @@ defmodule YscWeb.EventDetailsLive do
               <% overflow_count =
                 length(unique_attendees) - length(attendees_to_show) %>
               <section id="attendees-section" class="space-y-5">
-                <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+                <h3 class="text-2xl text-zinc-900 flex items-center gap-3 type-subhead">
                   <span class="w-8 h-px bg-zinc-200"></span> Who's going
                 </h3>
                 <div id="attendees-list" class="flex flex-wrap gap-5">
@@ -801,7 +804,7 @@ defmodule YscWeb.EventDetailsLive do
                         />
                         <%= if ticket_count > 1 do %>
                           <span
-                            class="absolute -top-0.5 -right-0.5 z-10 w-[30%] min-w-[0.65rem] aspect-square rounded-full bg-zinc-900 text-white text-[8px] font-black leading-none flex items-center justify-center ring-2 ring-white shadow-xs"
+                            class="absolute -top-0.5 -right-0.5 z-10 w-[30%] min-w-[0.65rem] aspect-square rounded-full bg-zinc-900 text-white text-[8px] font-bold leading-none flex items-center justify-center ring-2 ring-white shadow-xs"
                             aria-label={"#{ticket_count} tickets"}
                           >
                             {ticket_count}
@@ -844,7 +847,7 @@ defmodule YscWeb.EventDetailsLive do
                       class="flex flex-col items-center gap-2 w-16 group"
                     >
                       <div class="w-14 h-14 rounded-full bg-zinc-100 border-2 border-dashed border-zinc-300 flex items-center justify-center group-hover:bg-zinc-200 group-hover:border-zinc-400 transition-colors">
-                        <span class="text-sm font-black text-zinc-500 group-hover:text-zinc-700">
+                        <span class="text-sm font-bold text-zinc-500 group-hover:text-zinc-700">
                           +{overflow_count}
                         </span>
                       </div>
@@ -905,11 +908,11 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                 <% else %>
                   <div class="p-8 text-center bg-zinc-50/50 shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)]">
-                    <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.3em] mb-2">
+                    <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
                       Tickets
                     </p>
                     <p class={[
-                      "text-4xl font-black text-zinc-900 tracking-tighter",
+                      "text-4xl text-zinc-900 type-title",
                       if @event_sold_out_for_user && !@event.tickets_tbd do
                         "line-through"
                       else
@@ -946,14 +949,14 @@ defmodule YscWeb.EventDetailsLive do
                               class="w-4 h-4 text-white"
                             />
                           </div>
-                          <p class="text-[11px] font-black text-orange-800 uppercase tracking-tight">
+                          <p class="text-[11px] text-orange-800 type-eyebrow">
                             Demand is High
                           </p>
                         </div>
                         <%= if sold_percentage != nil do %>
                           <div class="space-y-2">
                             <div class="flex justify-between items-end">
-                              <p class="text-xs font-black text-orange-600 uppercase tracking-widest">
+                              <p class="text-xs text-orange-600 type-eyebrow">
                                 Limited Availability
                               </p>
                               <p class="text-xs font-mono text-zinc-400">
@@ -962,7 +965,7 @@ defmodule YscWeb.EventDetailsLive do
                             </div>
                             <div class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
                               <div
-                                class="bg-orange-500 h-full transition-all duration-1000 animate-pulse"
+                                class="bg-orange-500 h-full transition-[width] duration-1000"
                                 style={"width: #{sold_percentage}%"}
                               >
                               </div>
@@ -1062,7 +1065,7 @@ defmodule YscWeb.EventDetailsLive do
                         Sign in with your YSC account to buy tickets. An active, paid membership is required.
                       </div>
                       <.button
-                        class="w-full py-4 uppercase tracking-widest"
+                        class="w-full py-4 type-eyebrow"
                         navigate={
                           ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                         }
@@ -1115,7 +1118,7 @@ defmodule YscWeb.EventDetailsLive do
                             <.tooltip tooltip_text="This event is sold out">
                               <.button
                                 :if={@current_user != nil && @active_membership?}
-                                class="w-full py-4 uppercase tracking-widest"
+                                class="w-full py-4 type-eyebrow"
                                 disabled
                               >
                                 <.icon
@@ -1128,7 +1131,7 @@ defmodule YscWeb.EventDetailsLive do
                         <% else %>
                           <.button
                             :if={@current_user != nil && @active_membership?}
-                            class="w-full py-4 uppercase tracking-widest"
+                            class="w-full py-4 type-eyebrow"
                             phx-click="open-ticket-modal"
                           >
                             <.icon name="hero-ticket" class="w-6 h-6" />Get Tickets
@@ -1212,7 +1215,7 @@ defmodule YscWeb.EventDetailsLive do
                 <div class="max-w-(--breakpoint-md) mx-auto flex items-center justify-between gap-6">
                   <%= if ticket_sales_closed?(@event) do %>
                     <div class="flex-1 text-center">
-                      <div class="text-red-700 font-black text-base">
+                      <div class="text-red-700 font-bold text-base">
                         {if event_in_past?(@event),
                           do: "Event Ended",
                           else: "Event Started"}
@@ -1225,7 +1228,7 @@ defmodule YscWeb.EventDetailsLive do
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2 mb-0.5">
                         <p class={[
-                          "font-black text-2xl text-zinc-900 tracking-tight leading-none",
+                          "text-2xl text-zinc-900 type-title",
                           if @event_sold_out_for_user && !@event.tickets_tbd do
                             "line-through"
                           else
@@ -1235,13 +1238,13 @@ defmodule YscWeb.EventDetailsLive do
                           {@event.pricing_info.display_text}
                         </p>
                         <%= if @event_selling_fast && !@event_sold_out_for_user do %>
-                          <span class="inline-flex items-center gap-1 text-xs font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded-sm">
+                          <span class="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-sm type-eyebrow">
                             <.icon name="hero-fire-solid" class="w-3 h-3" />
                             Going Fast
                           </span>
                         <% else %>
                           <%= if event_live?(@event) do %>
-                            <span class="inline-flex items-center gap-1 text-xs font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-1.5 py-0.5 rounded-sm">
+                            <span class="inline-flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-sm type-eyebrow">
                               <.icon name="hero-signal" class="w-3 h-3" /> Live
                             </span>
                           <% end %>
@@ -1249,7 +1252,7 @@ defmodule YscWeb.EventDetailsLive do
                       </div>
                       <%= if @event.start_date != nil do %>
                         <%!-- Mobile: Short format (Wed, Dec 25) --%>
-                        <p class="sm:hidden text-xs font-bold text-zinc-400 uppercase tracking-widest truncate">
+                        <p class="sm:hidden text-xs text-zinc-400 truncate type-eyebrow">
                           {format_start_date_short(@event.start_date)}
                           <%= if @event.start_time != nil do %>
                             • {case format_time(@event.start_time) do
@@ -1262,7 +1265,7 @@ defmodule YscWeb.EventDetailsLive do
                           <% end %>
                         </p>
                         <%!-- Desktop: Full format (Wednesday, December 25) --%>
-                        <p class="hidden sm:block text-xs font-bold text-zinc-400 uppercase tracking-widest truncate">
+                        <p class="hidden sm:block text-xs text-zinc-400 truncate type-eyebrow">
                           {format_start_date(@event.start_date)}
                           <%= if @event.start_time != nil do %>
                             • {case format_time(@event.start_time) do
@@ -1291,7 +1294,7 @@ defmodule YscWeb.EventDetailsLive do
                     <% else %>
                       <%= if @current_user == nil && @has_ticket_tiers do %>
                         <.button
-                          class="shrink-0 px-8 py-3.5 uppercase tracking-widest"
+                          class="shrink-0 px-8 py-3.5 type-eyebrow"
                           navigate={
                             ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                           }
@@ -1301,13 +1304,13 @@ defmodule YscWeb.EventDetailsLive do
                       <% else %>
                         <%= if @has_ticket_tiers do %>
                           <%= if @event_sold_out_for_user && !@event.tickets_tbd do %>
-                            <div class="text-red-700 font-black text-sm text-center">
+                            <div class="text-red-700 font-bold text-sm text-center">
                               Sold Out
                             </div>
                           <% else %>
                             <%= if @active_membership? do %>
                               <.button
-                                class="shrink-0 px-8 py-3.5 uppercase tracking-widest"
+                                class="shrink-0 px-8 py-3.5 type-eyebrow"
                                 phx-click="open-ticket-modal"
                               >
                                 <.icon
@@ -1317,7 +1320,7 @@ defmodule YscWeb.EventDetailsLive do
                               </.button>
                             <% else %>
                               <.button
-                                class="shrink-0 px-8 py-3.5 uppercase tracking-widest"
+                                class="shrink-0 px-8 py-3.5 type-eyebrow"
                                 navigate={~p"/users/membership"}
                               >
                                 <.icon
@@ -1393,7 +1396,7 @@ defmodule YscWeb.EventDetailsLive do
         <!-- Left Panel: Ticket Tiers -->
         <div class="lg:w-2/3 space-y-8">
           <div class="w-full border-b border-zinc-200 pb-4">
-            <h2 class="text-2xl font-semibold">{@event.title}</h2>
+            <h2 class="text-2xl type-title">{@event.title}</h2>
             <p :if={@event.start_date != nil} class="text-sm text-zinc-600">
               {format_start_date(@event.start_date)}
             </p>
@@ -1405,7 +1408,7 @@ defmodule YscWeb.EventDetailsLive do
                 name="hero-ticket"
                 class="w-12 h-12 text-blue-600 mx-auto mb-4"
               />
-              <h3 class="text-xl font-semibold text-blue-900 mb-2">
+              <h3 class="text-xl text-blue-900 mb-2 type-subhead">
                 Tickets Coming Soon
               </h3>
               <p class="text-blue-700">
@@ -1509,7 +1512,7 @@ defmodule YscWeb.EventDetailsLive do
                   data-tier-card
                   data-tier-id={ticket_tier.id}
                   class={[
-                    "border rounded-xl p-6 transition-all duration-200",
+                    "border rounded-xl p-6 transition duration-200",
                     cond do
                       is_sold_out -> "border-zinc-200 bg-zinc-50 opacity-60"
                       is_sale_ended -> "border-zinc-200 bg-zinc-50 opacity-60"
@@ -1522,7 +1525,7 @@ defmodule YscWeb.EventDetailsLive do
                   <div class="flex justify-between items-start mb-4">
                     <div>
                       <div class="flex items-center gap-2">
-                        <h4 class="font-semibold text-lg text-zinc-900">
+                        <h4 class="text-lg text-zinc-900 type-subhead">
                           {ticket_tier.name}
                         </h4>
                         <%= if has_reservation do %>
@@ -1781,7 +1784,7 @@ defmodule YscWeb.EventDetailsLive do
                           }
                           phx-click-stop
                           class={[
-                            "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold active:scale-95",
+                            "w-10 h-10 rounded-full border-2 flex items-center justify-center transition duration-200 font-semibold active:scale-95",
                             if(
                               is_sold_out or is_sale_ended or is_pre_sale or
                                 !can_increase
@@ -1900,7 +1903,7 @@ defmodule YscWeb.EventDetailsLive do
               />
             </div>
 
-            <h3 class="font-semibold">Order Summary</h3>
+            <h3 class="type-subhead">Order Summary</h3>
 
             <div
               class="bg-zinc-50 rounded-xl p-6 space-y-4 flex flex-col justify-between"
@@ -2026,7 +2029,7 @@ defmodule YscWeb.EventDetailsLive do
         >
           <div class="flex items-center gap-4">
             <div class="min-w-0 flex-1">
-              <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              <p class="text-xs text-zinc-500 type-eyebrow">
                 Total
               </p>
               <p
@@ -2076,7 +2079,7 @@ defmodule YscWeb.EventDetailsLive do
             <div class="text-red-500 mb-4">
               <.icon name="hero-clock" class="w-16 h-16 mx-auto" />
             </div>
-            <h2 class="text-2xl font-semibold text-red-700 mb-2">
+            <h2 class="text-2xl text-red-700 mb-2 type-title">
               Time ran out
             </h2>
             <p class="text-zinc-600 max-w-md">
@@ -2111,7 +2114,7 @@ defmodule YscWeb.EventDetailsLive do
               <div class="text-red-500 mb-4">
                 <.icon name="hero-x-circle" class="w-16 h-16 mx-auto" />
               </div>
-              <h2 class="text-2xl font-semibold text-red-700 mb-2">
+              <h2 class="text-2xl text-red-700 mb-2 type-title">
                 Payment failed
               </h2>
               <p class="text-zinc-600 max-w-md">
@@ -2167,7 +2170,7 @@ defmodule YscWeb.EventDetailsLive do
             <!-- Left Panel: Payment Details -->
             <div class="lg:w-2/3 space-y-6">
               <div class="text-center">
-                <h2 class="text-2xl font-semibold">Complete Your Purchase</h2>
+                <h2 class="text-2xl type-title">Complete Your Purchase</h2>
                 <p class="text-zinc-600 mt-2">
                   Order: {@ticket_order.reference_id}
                 </p>
@@ -2208,7 +2211,7 @@ defmodule YscWeb.EventDetailsLive do
                           1
                         <% end %>
                       </span>
-                      <h3 class="font-semibold text-lg">
+                      <h3 class="text-lg type-subhead">
                         {AttendeeInfoCards.heading(tickets_requiring_registration)}
                       </h3>
                     </div>
@@ -2249,21 +2252,32 @@ defmodule YscWeb.EventDetailsLive do
                       2
                     <% end %>
                   </span>
-                  <h3 class="font-semibold text-lg">Payment Information</h3>
+                  <h3 class="text-lg type-subhead">Payment Information</h3>
                 </div>
-                <div
-                  id="payment-element"
-                  phx-hook="StripeElements"
-                  phx-update="ignore"
-                  data-publicKey={@public_key}
-                  data-public-key={@public_key}
-                  data-client-secret={@payment_intent.client_secret}
-                  data-clientSecret={@payment_intent.client_secret}
-                  data-ticket-order-id={@ticket_order.id}
-                  data-billing-details={@stripe_billing_details}
-                >
-                  <!-- Stripe Elements will be mounted here -->
-                </div>
+                <%= if @payment_intent do %>
+                  <div
+                    id="payment-element"
+                    phx-hook="StripeElements"
+                    phx-update="ignore"
+                    data-publicKey={@public_key}
+                    data-public-key={@public_key}
+                    data-client-secret={@payment_intent.client_secret}
+                    data-clientSecret={@payment_intent.client_secret}
+                    data-ticket-order-id={@ticket_order.id}
+                    data-billing-details={@stripe_billing_details}
+                  >
+                    <!-- Stripe Elements will be mounted here -->
+                  </div>
+                <% else %>
+                  <div
+                    id="checkout-payment-loading"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span class="sr-only">Loading payment form…</span>
+                    <.payment_element_loading id="checkout-payment-intent-loading" />
+                  </div>
+                <% end %>
                 <div id="payment-message" class="hidden text-sm"></div>
               </div>
               <!-- Checkout Zone: Payment Action Area -->
@@ -2271,7 +2285,7 @@ defmodule YscWeb.EventDetailsLive do
                 <div class="max-w-md mx-auto flex flex-col gap-4">
                   <div class="flex items-center justify-between">
                     <span class="text-zinc-600">Amount due:</span>
-                    <span class="text-2xl font-bold text-zinc-900">
+                    <span class="text-2xl text-zinc-900 type-title">
                       {calculate_total_price(
                         @selected_tickets,
                         @event.id,
@@ -2328,8 +2342,8 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
 
                 <div>
-                  <h2 class="text-lg font-semibold mb-6">{@event.title}</h2>
-                  <h3 class="font-semibold mb-2">Order Summary</h3>
+                  <h2 class="text-lg mb-6 type-subhead">{@event.title}</h2>
+                  <h3 class="mb-2 type-subhead">Order Summary</h3>
                 </div>
 
                 <div class="bg-zinc-50 rounded-xl p-6 space-y-4">
@@ -2449,7 +2463,7 @@ defmodule YscWeb.EventDetailsLive do
           <div class="text-green-500 mb-4">
             <.icon name="hero-ticket" class="w-16 h-16 mx-auto" />
           </div>
-          <h2 class="text-2xl font-semibold text-zinc-900 mb-2">
+          <h2 class="text-2xl text-zinc-900 mb-2 type-title">
             Confirm Your Free Tickets
           </h2>
           <p class="text-zinc-600 mb-6">
@@ -2460,7 +2474,7 @@ defmodule YscWeb.EventDetailsLive do
         <%!-- Compact Order Summary (receipt-style) --%>
         <div class="w-full bg-zinc-50 rounded-xl p-4 border border-zinc-200">
           <div class="flex items-center justify-between mb-3">
-            <h3 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
+            <h3 class="text-sm text-zinc-700 type-eyebrow">
               Order Summary
             </h3>
             <p class="text-sm font-bold text-green-600">Free</p>
@@ -2484,7 +2498,7 @@ defmodule YscWeb.EventDetailsLive do
             id="free-ticket-whos-going"
             class="flex flex-col gap-3 border-t border-zinc-200 pt-6"
           >
-            <h3 class="font-semibold text-lg">
+            <h3 class="text-lg type-subhead">
               {AttendeeInfoCards.heading(tickets_requiring_registration)}
             </h3>
             <p class="text-base text-zinc-600">
@@ -2537,13 +2551,13 @@ defmodule YscWeb.EventDetailsLive do
           <div class="text-green-500 mb-4">
             <.icon name="hero-check-circle" class="w-16 h-16 mx-auto" />
           </div>
-          <h2 class="text-2xl font-semibold text-zinc-900 mb-2">
+          <h2 class="text-2xl text-zinc-900 mb-2 type-title">
             Order Confirmed!
           </h2>
         </div>
         <!-- Order Details -->
         <div class="w-full max-w-md bg-zinc-50 rounded-xl p-6">
-          <h3 class="text-lg font-semibold text-zinc-900 mb-4">Order Details</h3>
+          <h3 class="text-lg text-zinc-900 mb-4 type-subhead">Order Details</h3>
           <div class="space-y-3">
             <div class="flex justify-between">
               <span class="text-zinc-600">Order ID:</span>
@@ -2569,7 +2583,7 @@ defmodule YscWeb.EventDetailsLive do
         </div>
         <!-- Tickets List -->
         <div class="w-full max-w-md bg-white border rounded-xl p-6">
-          <h3 class="text-lg font-semibold text-zinc-900 mb-4">Your Tickets</h3>
+          <h3 class="text-lg text-zinc-900 mb-4 type-subhead">Your Tickets</h3>
           <% donation_amounts =
             DonationDisplay.amounts_by_ticket_id(@ticket_order) %>
           <div class="space-y-3">
@@ -2741,7 +2755,7 @@ defmodule YscWeb.EventDetailsLive do
     >
       <div class="flex flex-col space-y-6">
         <div class="text-center">
-          <h2 class="text-2xl font-semibold text-zinc-900 mb-2">Who's Going</h2>
+          <h2 class="text-2xl text-zinc-900 mb-2 type-title">Who's Going</h2>
           <p class="text-zinc-600">
             <%= if @attendees_count do %>
               {@attendees_count} {if @attendees_count == 1,
@@ -2970,6 +2984,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:load_calendar, true)
     |> assign(:payment_redirect_in_progress, false)
     |> assign(:preserve_failed_checkout_state, false)
+    |> assign(:checkout_payment_intent_pending, false)
     |> assign(:stripe_payment_element_ready, false)
     |> assign(:stripe_billing_details, "{}")
     # Reservations - will be loaded async
@@ -3648,6 +3663,7 @@ defmodule YscWeb.EventDetailsLive do
             |> assign(:checkout_expired, false)
             |> assign(:checkout_payment_failed, true)
             |> assign(:stripe_payment_element_ready, false)
+            |> assign(:checkout_payment_intent_pending, false)
             |> assign(:show_ticket_modal, false)
             |> assign(:payment_intent, nil)
             |> assign(:ticket_order, nil)
@@ -3698,6 +3714,7 @@ defmodule YscWeb.EventDetailsLive do
             |> assign(:show_payment_modal, false)
             |> assign(:checkout_expired, false)
             |> assign(:checkout_payment_failed, false)
+            |> assign(:checkout_payment_intent_pending, false)
             |> assign(:stripe_payment_element_ready, false)
             |> assign(:show_free_ticket_confirmation, false)
         end
@@ -3830,6 +3847,74 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
+  defp checkout_payment_intent_pending_for?(socket, ticket_order) do
+    socket.assigns[:checkout_payment_intent_pending] == true &&
+      socket.assigns[:show_payment_modal] == true &&
+      match?(
+        %{id: id} when id == ticket_order.id,
+        socket.assigns[:ticket_order]
+      )
+  end
+
+  defp schedule_checkout_payment_intent(socket) do
+    if socket.assigns[:checkout_payment_intent_pending] do
+      socket
+    else
+      send(self(), :create_checkout_payment_intent)
+      assign(socket, :checkout_payment_intent_pending, true)
+    end
+  end
+
+  defp create_checkout_payment_intent_now(socket) do
+    require Ysc.Logging
+
+    case {socket.assigns[:ticket_order], socket.assigns[:current_user]} do
+      {%Ysc.Tickets.TicketOrder{status: :pending} = ticket_order, user}
+      when not is_nil(user) ->
+        case retrieve_or_create_payment_intent(ticket_order, user) do
+          {:ok, payment_intent} ->
+            Ysc.Logging.debug(
+              "create_checkout_payment_intent: Payment intent ready",
+              order_id: ticket_order.id,
+              payment_intent_id: payment_intent.id,
+              payment_intent_status: payment_intent.status
+            )
+
+            {:noreply,
+             socket
+             |> assign(:payment_intent, payment_intent)
+             |> assign(:ticket_order, %{
+               ticket_order
+               | payment_intent_id: payment_intent.id
+             })
+             |> assign(:checkout_payment_intent_pending, false)
+             |> assign(:stripe_payment_element_ready, false)}
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "create_checkout_payment_intent: Failed to retrieve/create payment intent",
+              order_id: ticket_order.id,
+              error: reason
+            )
+
+            {:noreply,
+             socket
+             |> assign(:checkout_payment_intent_pending, false)
+             |> assign(:show_payment_modal, false)
+             |> assign(:payment_intent, nil)
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "We couldn't start checkout. Please try again in a moment. If it keeps failing, email #{Ysc.EmailConfig.contact_email()} with the event name.",
+               title: "Payment"
+             )
+             |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
+        end
+
+      {_ticket_order, _user} ->
+        {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
+    end
+  end
+
   # Restore checkout state from a pending order (legacy support)
   defp restore_checkout_state(socket, order_id, event_id) do
     require Ysc.Logging
@@ -3947,6 +4032,18 @@ defmodule YscWeb.EventDetailsLive do
   defp effective_checkout_step(checkout_step, _ticket_order), do: checkout_step
 
   defp restore_payment_state_from_url(socket, ticket_order, checkout_step) do
+    # proceed_to_payment_or_free already assigned checkout state and queued
+    # the Stripe round-trip. Skip a second household/details load + PI schedule
+    # when handle_params runs for the checkout=payment patch.
+    if checkout_step == "payment" &&
+         checkout_payment_intent_pending_for?(socket, ticket_order) do
+      socket
+    else
+      restore_payment_state_from_url_now(socket, ticket_order, checkout_step)
+    end
+  end
+
+  defp restore_payment_state_from_url_now(socket, ticket_order, checkout_step) do
     require Ysc.Logging
 
     Ysc.Logging.debug("restore_payment_state_from_url: Starting restore",
@@ -4125,68 +4222,20 @@ defmodule YscWeb.EventDetailsLive do
   defp restore_payment_intent_for_order(socket, ticket_order, restore_context) do
     require Ysc.Logging
 
+    # Stripe retrieve/create is a network round-trip. Paint the order summary,
+    # hold timer, and attendee step first, then create the PI in handle_info.
     Ysc.Logging.debug(
-      "restore_payment_state_from_url: Retrieving/creating payment intent",
+      "restore_payment_state_from_url: Scheduling payment intent",
       order_id: ticket_order.id,
       payment_intent_id: ticket_order.payment_intent_id,
       user_stripe_id: socket.assigns.current_user.stripe_id
     )
 
-    case retrieve_or_create_payment_intent(
-           ticket_order,
-           socket.assigns.current_user
-         ) do
-      {:ok, payment_intent} ->
-        Ysc.Logging.debug(
-          "restore_payment_state_from_url: Payment intent retrieved/created successfully",
-          order_id: ticket_order.id,
-          payment_intent_id: payment_intent.id,
-          payment_intent_status: payment_intent.status
-        )
-
-        socket
-        |> assign(:show_ticket_modal, false)
-        |> assign(:show_payment_modal, true)
-        |> assign(:checkout_expired, false)
-        |> assign(:checkout_payment_failed, false)
-        |> assign(:stripe_payment_element_ready, false)
-        |> assign(:payment_intent, payment_intent)
-        |> assign(:ticket_order, ticket_order)
-        |> assign(
-          :tickets_requiring_registration,
-          restore_context.tickets_requiring_registration
-        )
-        |> assign(:ticket_details_form, restore_context.ticket_details_form)
-        |> assign(:tickets_for_me, restore_context.tickets_for_me)
-        |> assign(
-          :selected_family_members,
-          restore_context.selected_family_members
-        )
-        |> assign(:family_members, restore_context.family_members)
-        |> assign(:active_ticket_index, restore_context.active_ticket_index)
-        |> assign(
-          :ticket_registration_details_by_id,
-          restore_context.ticket_registration_details_by_id
-        )
-        |> assign(:ticket_tiers, restore_context.ticket_tiers)
-        |> assign(:availability_data, restore_context.availability_data)
-        |> assign(:payment_redirect_in_progress, false)
-
-      {:error, reason} ->
-        Ysc.Logging.error(
-          "restore_payment_state_from_url: Failed to retrieve/create payment intent",
-          order_id: ticket_order.id,
-          error: reason
-        )
-
-        socket
-        |> YscWeb.Flash.put_toast(
-          :error,
-          "We couldn't reload your payment page. Please select your tickets again and try checkout once more. If this keeps happening, email info@ysc.org.",
-          title: "Payment"
-        )
-        |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
-    end
+    socket
+    |> assign_restored_payment_checkout(ticket_order, restore_context)
+    |> assign(:stripe_payment_element_ready, false)
+    |> assign(:payment_redirect_in_progress, false)
+    |> schedule_checkout_payment_intent()
   end
 
   # Build selected_tickets map from a ticket order
@@ -4305,14 +4354,34 @@ defmodule YscWeb.EventDetailsLive do
           {:error, :checkout_payment_in_progress}
         end
       else
-        Ysc.Tickets.StripeService.cancel_payment_intent(
-          ticket_order.payment_intent_id
-        )
+        # Stripe-first cancel (not StripeService.cancel_payment_intent/1): the
+        # latter treats a succeeded Intent as `:ok`, so a TOCTOU reprice during
+        # confirmPayment could mint a new PI, overwrite the order, then leave
+        # the captured charge unrefundable once the order completes at the new
+        # amount (#1497/#1503 leftover).
+        replace_checkout_payment_intent_after_stripe_cancel(ticket_order, user)
+      end
+    end
+  end
 
+  defp replace_checkout_payment_intent_after_stripe_cancel(ticket_order, user) do
+    case Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           ticket_order,
+           "retrieve_or_replace_payment_intent"
+         ) do
+      {:cancel, _payment_intent} ->
         Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
           user: user
         )
-      end
+
+      {:already_succeeded, _payment_intent} ->
+        {:error, :checkout_payment_in_progress}
+
+      {:in_progress, _payment_intent} ->
+        {:error, :checkout_payment_in_progress}
+
+      {:error, _stripe_error} ->
+        {:error, :checkout_payment_in_progress}
     end
   end
 
@@ -4320,6 +4389,7 @@ defmodule YscWeb.EventDetailsLive do
     require Ysc.Logging
 
     with true <- socket.assigns[:show_payment_modal],
+         true <- socket.assigns[:checkout_payment_intent_pending] != true,
          %Ysc.Tickets.TicketOrder{status: :pending} = order <-
            socket.assigns[:ticket_order],
          user when not is_nil(user) <- socket.assigns[:current_user],
@@ -4334,16 +4404,66 @@ defmodule YscWeb.EventDetailsLive do
           assign(socket, :ticket_order, synced_order)
 
         Ysc.Tickets.pending_order_still_complimentary?(synced_order) ->
-          socket
-          |> assign(:show_payment_modal, false)
-          |> assign(:payment_intent, nil)
-          |> assign(:stripe_payment_element_ready, false)
-          |> assign(:ticket_order, synced_order)
-          |> YscWeb.Flash.put_toast(
-            :info,
-            "Ticket prices were updated. Please review your order before continuing.",
-            title: "Prices updated"
-          )
+          # Drop the paid PaymentIntent before switching to free confirmation.
+          # Leaving it attached lets a concurrent tab / in-flight confirmCharge
+          # capture after free fulfillment, and amount_mismatch refund then
+          # skips because the order is already `:completed`.
+          case Ysc.Tickets.CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 synced_order,
+                 "reprice_to_complimentary"
+               ) do
+            {:cancel, _} ->
+              # Keep the original "review your order" path. Jumping straight to
+              # the free-ticket modal skips checkout_step "free" assigns
+              # (attendee forms / family picks) and can confirm with empty names.
+              socket
+              |> assign(:show_payment_modal, false)
+              |> assign(:payment_intent, nil)
+              |> assign(:stripe_payment_element_ready, false)
+              |> assign(:ticket_order, synced_order)
+              |> YscWeb.Flash.put_toast(
+                :info,
+                "Ticket prices were updated. Please review your order before continuing.",
+                title: "Prices updated"
+              )
+
+            {:already_succeeded, payment_intent} ->
+              case Ysc.Tickets.StripeService.process_successful_payment(
+                     payment_intent
+                   ) do
+                {:ok, completed_order} ->
+                  socket
+                  |> assign(:show_payment_modal, false)
+                  |> assign(:payment_intent, nil)
+                  |> assign(:stripe_payment_element_ready, false)
+                  |> assign(:ticket_order, completed_order)
+                  |> redirect(
+                    to:
+                      ~p"/orders/#{completed_order.id}/confirmation?confetti=true"
+                  )
+
+                {:error, _} ->
+                  socket
+                  |> assign(:show_payment_modal, false)
+                  |> assign(:payment_intent, nil)
+                  |> assign(:stripe_payment_element_ready, false)
+                  |> assign(:ticket_order, nil)
+                  |> YscWeb.Flash.put_toast(
+                    :info,
+                    "Ticket prices were updated and your previous checkout was closed. Please start checkout again if you still want tickets.",
+                    title: "Prices updated"
+                  )
+              end
+
+            _ ->
+              socket
+              |> assign(:ticket_order, synced_order)
+              |> YscWeb.Flash.put_toast(
+                :error,
+                "Ticket prices were updated while your payment is processing. Please finish this payment first, then start a new checkout if you need the updated price.",
+                title: "Checkout"
+              )
+          end
 
         true ->
           case retrieve_or_create_payment_intent(synced_order, user) do
@@ -4396,6 +4516,26 @@ defmodule YscWeb.EventDetailsLive do
       end
     else
       _ -> socket
+    end
+  end
+
+  @impl true
+  def handle_info(:create_checkout_payment_intent, socket) do
+    cond do
+      socket.assigns[:checkout_payment_intent_pending] != true ->
+        {:noreply, socket}
+
+      socket.assigns[:show_payment_modal] != true ->
+        {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
+
+      socket.assigns[:checkout_expired] == true ->
+        {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
+
+      socket.assigns[:checkout_payment_failed] == true ->
+        {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
+
+      true ->
+        create_checkout_payment_intent_now(socket)
     end
   end
 
@@ -5040,6 +5180,7 @@ defmodule YscWeb.EventDetailsLive do
         {:noreply,
          socket
          |> assign(:show_payment_modal, false)
+         |> assign(:checkout_payment_intent_pending, false)
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:show_order_completion, true)
          |> assign(:ticket_order, completed_order)
@@ -5083,6 +5224,7 @@ defmodule YscWeb.EventDetailsLive do
          |> assign(:show_payment_modal, false)
          |> assign(:checkout_expired, false)
          |> assign(:checkout_payment_failed, false)
+         |> assign(:checkout_payment_intent_pending, false)
          |> assign(:payment_intent, nil)
          |> assign(:ticket_order, nil)
          |> assign(:tickets_requiring_registration, [])
@@ -6896,6 +7038,7 @@ defmodule YscWeb.EventDetailsLive do
         {:noreply,
          socket
          |> assign(:show_payment_modal, false)
+         |> assign(:checkout_payment_intent_pending, false)
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:show_order_completion, true)
          |> assign(:ticket_order, completed_order)
@@ -7740,55 +7883,36 @@ defmodule YscWeb.EventDetailsLive do
            ~p"/events/#{socket.assigns.event.id}?checkout=free&order_id=#{ticket_order.id}"
        )}
     else
-      # For paid tickets, create Stripe payment intent
-      case Ysc.Tickets.StripeService.create_payment_intent(
-             ticket_order,
-             user: socket.assigns.current_user
-           ) do
-        {:ok, payment_intent} ->
-          ticket_order = %{ticket_order | payment_intent_id: payment_intent.id}
-
-          # Show payment form with Stripe Elements
-          # Update URL to reflect checkout state
-          {:noreply,
-           socket
-           |> assign(:show_ticket_modal, false)
-           |> assign(:show_payment_modal, true)
-           |> assign(:checkout_expired, false)
-           |> assign(:checkout_payment_failed, false)
-           |> assign(:stripe_payment_element_ready, false)
-           |> assign(:payment_intent, payment_intent)
-           |> assign(:ticket_order, ticket_order)
-           |> assign(
-             :tickets_requiring_registration,
-             tickets_requiring_registration
-           )
-           |> assign(:ticket_details_form, ticket_details_form)
-           |> assign(:tickets_for_me, tickets_for_me)
-           |> assign(:selected_family_members, selected_family_members)
-           |> assign(:family_members, family_members)
-           |> assign(:active_ticket_index, active_ticket_index)
-           |> assign(
-             :ticket_registration_details_by_id,
-             ticket_registration_details_by_id
-           )
-           |> assign(:payment_redirect_in_progress, false)
-           |> push_patch(
-             to:
-               ~p"/events/#{socket.assigns.event.id}?checkout=payment&order_id=#{ticket_order.id}"
-           )}
-
-        {:error, _reason} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "We couldn't start checkout. Please try again in a moment. If it keeps failing, email #{Ysc.EmailConfig.contact_email()} with the event name.",
-             title: "Payment"
-           )
-           |> assign(:show_ticket_modal, false)
-           |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
-      end
+      # Stripe PaymentIntent create is a network round-trip. Paint the order
+      # summary, hold timer, and attendee step first, then create the PI in
+      # handle_info so first paint is not blocked on Stripe.
+      {:noreply,
+       socket
+       |> assign(:show_ticket_modal, false)
+       |> assign(:show_payment_modal, true)
+       |> assign(:checkout_expired, false)
+       |> assign(:checkout_payment_failed, false)
+       |> assign(:stripe_payment_element_ready, false)
+       |> assign(:ticket_order, ticket_order)
+       |> assign(
+         :tickets_requiring_registration,
+         tickets_requiring_registration
+       )
+       |> assign(:ticket_details_form, ticket_details_form)
+       |> assign(:tickets_for_me, tickets_for_me)
+       |> assign(:selected_family_members, selected_family_members)
+       |> assign(:family_members, family_members)
+       |> assign(:active_ticket_index, active_ticket_index)
+       |> assign(
+         :ticket_registration_details_by_id,
+         ticket_registration_details_by_id
+       )
+       |> assign(:payment_redirect_in_progress, false)
+       |> schedule_checkout_payment_intent()
+       |> push_patch(
+         to:
+           ~p"/events/#{socket.assigns.event.id}?checkout=payment&order_id=#{ticket_order.id}"
+       )}
     end
   end
 

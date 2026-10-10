@@ -41,7 +41,7 @@ defmodule YscWeb.EventsListLive do
         <div id="hero-event" class="group">
           <.link
             navigate={~p"/events/#{@hero_event.id}"}
-            class="block overflow-hidden rounded-2xl border border-zinc-100 bg-white transition-all duration-300 sm:border-0 sm:bg-transparent sm:rounded-xl hover:ring-2 hover:ring-blue-500"
+            class="block overflow-hidden rounded-2xl border border-zinc-100 bg-white transition duration-300 sm:border-0 sm:bg-transparent sm:rounded-xl hover:ring-2 hover:ring-blue-500"
           >
             <div class="relative flex flex-col sm:block sm:aspect-16/10 sm:rounded-xl sm:overflow-hidden sm:border sm:border-zinc-100">
               <%!-- Image container --%>
@@ -88,7 +88,7 @@ defmodule YscWeb.EventsListLive do
               </div>
 
               <%!-- Content (stacked on mobile, overlaid on sm+) --%>
-              <div class="relative z-3 flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition-all duration-300">
+              <div class="relative z-3 flex flex-col p-5 sm:absolute sm:inset-0 sm:justify-end sm:p-8 lg:p-12 transition duration-300">
                 <div class="max-w-3xl">
                   <%!-- Status badges (both mobile and desktop) --%>
                   <div class="flex flex-wrap items-center gap-2 mb-4">
@@ -102,7 +102,7 @@ defmodule YscWeb.EventsListLive do
                         do: DateDisplay.event_day_label(@hero_event) %>
                     <span
                       :if={hero_day_label == :today}
-                      class="px-3 py-1.5 bg-rose-600 text-white text-xs font-black uppercase tracking-widest rounded-sm sm:bg-rose-500/90 sm:backdrop-blur-md sm:border sm:border-rose-400 animate-pulse"
+                      class="px-3 py-1.5 bg-rose-600 text-white text-xs rounded-sm sm:bg-rose-500/90 sm:border sm:border-rose-400 animate-attention-once type-eyebrow"
                     >
                       <.icon
                         name="hero-bolt-solid"
@@ -111,7 +111,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <span
                       :if={hero_day_label == :tomorrow}
-                      class="px-3 py-1.5 bg-orange-600 text-white text-xs font-black uppercase tracking-widest rounded-sm sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400 animate-badge-shine-orange"
+                      class="px-3 py-1.5 bg-orange-600 text-white text-xs rounded-sm sm:bg-orange-500/90 sm:border sm:border-orange-400 animate-badge-shine-orange type-eyebrow"
                     >
                       <.icon
                         name="hero-calendar-solid"
@@ -120,7 +120,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <span
                       :if={hero_day_label == nil && !hero_cancelled?}
-                      class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-black uppercase tracking-widest rounded-sm sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate"
+                      class="px-3 py-1.5 bg-zinc-600 text-white text-xs rounded-sm sm:bg-zinc-500/90 sm:border sm:border-zinc-400 animate-badge-shine-slate type-eyebrow"
                     >
                       <.icon
                         name="hero-calendar-solid"
@@ -129,7 +129,7 @@ defmodule YscWeb.EventsListLive do
                     </span>
                     <%= for badge <- get_hero_event_badges(@hero_event) do %>
                       <span class={[
-                        "px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded-sm",
+                        "px-3 py-1.5 text-white text-xs rounded-sm type-eyebrow",
                         badge_class_mobile(badge),
                         badge_class_desktop_responsive(badge),
                         if(badge.text == "Going Fast!",
@@ -149,18 +149,18 @@ defmodule YscWeb.EventsListLive do
 
                   <%!-- Date/time pill — mobile only, matches event_card --%>
                   <div class="flex items-center gap-2 mb-4 sm:hidden">
-                    <span class="text-sm font-black px-2.5 py-1 rounded-sm bg-zinc-100 text-zinc-900 uppercase tracking-[0.2em]">
+                    <span class="text-sm px-2.5 py-1 rounded-sm bg-zinc-100 text-zinc-900 type-eyebrow">
                       {DateTimeFormatter.format_event_start(@hero_event)}
                     </span>
                   </div>
 
-                  <h2 class="text-3xl font-black leading-tight tracking-tighter text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300 hero-title-shadow">
+                  <h2 class="text-3xl text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300 hero-title-shadow type-display">
                     {@hero_event.title}
                   </h2>
 
                   <%!-- Date + location inline row — desktop overlay only --%>
                   <div class="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-white/80">
-                    <span class="text-sm font-black uppercase tracking-widest">
+                    <span class="text-sm type-eyebrow">
                       {DateTimeFormatter.format_event_start(@hero_event)}
                     </span>
                     <span
@@ -169,7 +169,7 @@ defmodule YscWeb.EventsListLive do
                     ></span>
                     <span
                       :if={@hero_event.location_name}
-                      class="text-sm font-bold uppercase tracking-widest flex items-center gap-1"
+                      class="text-sm flex items-center gap-1 type-eyebrow"
                     >
                       <.icon name="hero-map-pin" class="w-4 h-4" />
                       {@hero_event.location_name}
@@ -192,19 +192,19 @@ defmodule YscWeb.EventsListLive do
                       <span class="truncate">{@hero_event.location_name}</span>
                     </div>
                     <div class="flex items-center justify-between gap-3">
-                      <span class="px-3 py-1.5 rounded-sm text-sm font-black border bg-zinc-50 text-zinc-900 border-zinc-200">
+                      <span class="px-3 py-1.5 rounded-sm text-sm font-bold border bg-zinc-50 text-zinc-900 border-zinc-200">
                         {@hero_event.pricing_info.display_text}
                       </span>
                       <.icon
                         name="hero-arrow-right"
-                        class="w-5 h-5 text-zinc-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all shrink-0"
+                        class="w-5 h-5 text-zinc-300 group-hover:text-blue-600 group-hover:translate-x-1 transition shrink-0"
                       />
                     </div>
                   </div>
 
                   <%!-- Footer — desktop overlay only --%>
                   <div class="hidden sm:flex items-center gap-4 pt-4 border-t border-white/20">
-                    <span class="text-sm font-black text-white rounded-sm border border-white/30 px-3 py-1.5">
+                    <span class="text-sm font-bold text-white rounded-sm border border-white/30 px-3 py-1.5">
                       {@hero_event.pricing_info.display_text}
                     </span>
                     <span class="inline-flex items-center gap-1 text-sm font-bold text-white/90 hover:text-white transition-colors">
@@ -245,7 +245,7 @@ defmodule YscWeb.EventsListLive do
                   class="w-10 h-10 md:w-12 md:h-12 text-zinc-300"
                 />
               </div>
-              <h3 class="text-xl md:text-2xl font-black text-zinc-900 tracking-tight mb-2 text-center">
+              <h3 class="text-xl md:text-2xl text-zinc-900 mb-2 text-center type-subhead">
                 The calendar is clear (for now)
               </h3>
               <p class="text-zinc-500 text-center max-w-sm mb-8 text-sm md:text-base leading-relaxed">
@@ -539,19 +539,19 @@ defmodule YscWeb.EventsListLive do
   defp badge_class_desktop_responsive(badge) do
     case badge.text do
       "Sold Out" ->
-        "sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400"
+        "sm:bg-red-500/90 sm:border sm:border-red-400"
 
       "Going Fast!" ->
-        "sm:bg-emerald-500/90 sm:backdrop-blur-md sm:border sm:border-emerald-400"
+        "sm:bg-emerald-500/90 sm:border sm:border-emerald-400"
 
       "Cancelled" ->
-        "sm:bg-zinc-600/90 sm:backdrop-blur-md sm:border sm:border-zinc-500"
+        "sm:bg-zinc-600/90 sm:border sm:border-zinc-500"
 
       "Save the Date" ->
-        "sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"
+        "sm:bg-blue-500/90 sm:border sm:border-blue-400"
 
       _ ->
-        "sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400"
+        "sm:bg-zinc-500/90 sm:border sm:border-zinc-400"
     end
   end
 end

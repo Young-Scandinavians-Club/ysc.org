@@ -1,7 +1,29 @@
+// AdminFloatingButton — a draggable shortcut that snaps to the nearest corner.
+//
+//   * Pointer Events (mouse, touch and pen through one path) with pointer
+//     capture, so the drag keeps tracking outside the button.
+//   * The button moves with `translate`, 1:1 with the pointer; no layout
+//     properties are touched while dragging.
+//   * On release the corner is chosen from where the gesture is *going* (the
+//     release velocity projected forward), then the button springs there. The
+//     spring is independent on X and Y and inherits the release velocity, so
+//     there is no seam between the drag and the animation.
+//   * It can be grabbed again mid-flight and continues from where it is on
+//     screen.
+
+import {
+  VelocityTracker,
+  animateSpring,
+  prefersReducedMotion,
+  project,
+} from "./spring";
+
 const STORAGE_KEY = "ysc_admin_button_corner";
 const DRAG_THRESHOLD_PX = 5;
+const MAX_RELEASE_VELOCITY = 2500; // px/s; a hard throw must not fling it off-screen
+const VIEWPORT_MARGIN_PX = 4; // the spring may overshoot its corner, but never leave the screen
 const BASE_CLASSES =
-  "fixed z-110 group print:hidden cursor-grab active:cursor-grabbing transition-[left,right,top,bottom] duration-300 ease-out";
+  "fixed z-110 group print:hidden cursor-grab active:cursor-grabbing touch-none select-none";
 
 const CORNER_CLASSES = {
   "top-left": "admin-floating-top-left",
@@ -33,202 +55,188 @@ function applyCorner(el, corner) {
 }
 
 function cornerFromPoint(clientX, clientY, viewportWidth, viewportHeight) {
-  const vertical =
-    clientY < viewportHeight / 2 ? "top" : "bottom";
-  const horizontal =
-    clientX < viewportWidth / 2 ? "left" : "right";
+  const vertical = clientY < viewportHeight / 2 ? "top" : "bottom";
+  const horizontal = clientX < viewportWidth / 2 ? "left" : "right";
   return `${vertical}-${horizontal}`;
 }
 
 const AdminFloatingButton = {
   mounted() {
     const wrapper = this.el;
-    const link = wrapper.querySelector('a[href*="/admin"]');
-    if (!link) return;
+    this.link = wrapper.querySelector('a[href*="/admin"]');
+    if (!this.link) return;
 
     applyCorner(wrapper, getStoredCorner());
 
-    this.dragStart = null;
-    this.isDragging = false;
+    this.tx = 0; // translate from the corner's resting position
+    this.ty = 0;
+    this.pointerId = null;
+    this.dragging = false;
     this.justDragged = false;
+    this.springs = [];
+    this.vx = new VelocityTracker();
+    this.vy = new VelocityTracker();
 
-    this.handleMousedown = this.handleMousedown.bind(this);
-    this.handleMousemove = this.handleMousemove.bind(this);
-    this.handleMouseup = this.handleMouseup.bind(this);
-    this.handleClick = this.handleClick.bind(this);
-    this.handleTouchstart = this.handleTouchstart.bind(this);
-    this.handleTouchmove = this.handleTouchmove.bind(this);
-    this.handleTouchend = this.handleTouchend.bind(this);
+    this.onPointerDown = this.onPointerDown.bind(this);
+    this.onPointerMove = this.onPointerMove.bind(this);
+    this.onPointerUp = this.onPointerUp.bind(this);
+    this.onClick = this.onClick.bind(this);
+    this.onDragStart = (event) => event.preventDefault(); // no native link drag
 
-    wrapper.addEventListener("mousedown", this.handleMousedown);
-    document.addEventListener("mousemove", this.handleMousemove);
-    document.addEventListener("mouseup", this.handleMouseup);
-    link.addEventListener("click", this.handleClick, true);
-
-    wrapper.addEventListener("touchstart", this.handleTouchstart, { passive: true });
-    document.addEventListener("touchmove", this.handleTouchmove, { passive: false });
-    document.addEventListener("touchend", this.handleTouchend);
+    wrapper.addEventListener("pointerdown", this.onPointerDown);
+    wrapper.addEventListener("pointermove", this.onPointerMove);
+    wrapper.addEventListener("pointerup", this.onPointerUp);
+    wrapper.addEventListener("pointercancel", this.onPointerUp);
+    wrapper.addEventListener("dragstart", this.onDragStart);
+    // Capture phase: swallow the click that follows a drag before it navigates.
+    this.link.addEventListener("click", this.onClick, true);
   },
 
   destroyed() {
+    this.cancelSprings();
     const wrapper = this.el;
-    const link = wrapper?.querySelector('a[href*="/admin"]');
-    if (wrapper) {
-      wrapper.removeEventListener("mousedown", this.handleMousedown);
-      wrapper.removeEventListener("touchstart", this.handleTouchstart);
-    }
-    document.removeEventListener("mousemove", this.handleMousemove);
-    document.removeEventListener("mouseup", this.handleMouseup);
-    document.removeEventListener("touchmove", this.handleTouchmove);
-    document.removeEventListener("touchend", this.handleTouchend);
-    if (link) {
-      link.removeEventListener("click", this.handleClick, true);
-    }
+    wrapper.removeEventListener("pointerdown", this.onPointerDown);
+    wrapper.removeEventListener("pointermove", this.onPointerMove);
+    wrapper.removeEventListener("pointerup", this.onPointerUp);
+    wrapper.removeEventListener("pointercancel", this.onPointerUp);
+    wrapper.removeEventListener("dragstart", this.onDragStart);
+    this.link?.removeEventListener("click", this.onClick, true);
   },
 
-  handleMousedown(event) {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    const wrapper = this.el;
-    const rect = wrapper.getBoundingClientRect();
-    this.dragStart = {
-      x: event.clientX,
-      y: event.clientY,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    this.isDragging = false;
+  render() {
+    this.el.style.translate = `${this.tx}px ${this.ty}px`;
   },
 
-  handleMousemove(event) {
-    if (this.dragStart == null) return;
-    const wrapper = this.el;
-    const dx = event.clientX - this.dragStart.x;
-    const dy = event.clientY - this.dragStart.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (!this.isDragging && distance >= DRAG_THRESHOLD_PX) {
-      this.isDragging = true;
-      wrapper.style.transition = "none";
-      wrapper.style.right = "auto";
-      wrapper.style.bottom = "auto";
-      wrapper.style.left = `${event.clientX - this.dragStart.offsetX}px`;
-      wrapper.style.top = `${event.clientY - this.dragStart.offsetY}px`;
-    }
-
-    if (this.isDragging) {
-      wrapper.style.left = `${event.clientX - this.dragStart.offsetX}px`;
-      wrapper.style.top = `${event.clientY - this.dragStart.offsetY}px`;
-    }
+  cancelSprings() {
+    this.springs.forEach((spring) => spring.cancel());
+    this.springs = [];
   },
 
-  handleMouseup(event) {
-    if (this.dragStart == null) return;
+  onPointerDown(event) {
+    if (!event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) return;
 
-    const wrapper = this.el;
+    // Grabbed mid-flight: stop the springs; tx/ty already hold the live offset.
+    this.cancelSprings();
+    this.pointerId = event.pointerId;
+    this.dragging = false;
+    this.start = { x: event.clientX, y: event.clientY, tx: this.tx, ty: this.ty };
+    this.vx.reset(event.timeStamp, event.clientX);
+    this.vy.reset(event.timeStamp, event.clientY);
+  },
 
-    if (this.isDragging) {
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const corner = cornerFromPoint(
-        event.clientX,
-        event.clientY,
-        viewportWidth,
-        viewportHeight
-      );
-      applyCorner(wrapper, corner);
-      saveCorner(corner);
-      wrapper.style.left = "";
-      wrapper.style.top = "";
-      wrapper.style.right = "";
-      wrapper.style.bottom = "";
-      wrapper.style.transition = "";
+  onPointerMove(event) {
+    if (event.pointerId !== this.pointerId) return;
+
+    const dx = event.clientX - this.start.x;
+    const dy = event.clientY - this.start.y;
+
+    if (!this.dragging) {
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+      this.dragging = true;
       this.justDragged = true;
-      const self = this;
-      setTimeout(() => {
-        self.justDragged = false;
-      }, 100);
+      try {
+        this.el.setPointerCapture(event.pointerId);
+      } catch (_) {
+        // The pointer is already gone; bubbling still delivers the moves.
+      }
     }
 
-    this.dragStart = null;
-    this.isDragging = false;
+    this.vx.push(event.timeStamp, event.clientX);
+    this.vy.push(event.timeStamp, event.clientY);
+    this.tx = this.start.tx + dx;
+    this.ty = this.start.ty + dy;
+    this.render();
   },
 
-  handleClick(event) {
+  onPointerUp(event) {
+    if (event.pointerId !== this.pointerId) return;
+    this.pointerId = null;
+
+    if (this.dragging) {
+      this.dragging = false;
+      this.release(event);
+      // The click (if any) fires synchronously after pointerup.
+      setTimeout(() => (this.justDragged = false), 100);
+    } else if (this.tx !== 0 || this.ty !== 0) {
+      // Grabbed mid-flight and let go without dragging: carry on to rest.
+      this.settle(0, 0);
+    }
+  },
+
+  onClick(event) {
     if (this.justDragged) {
       event.preventDefault();
       event.stopPropagation();
     }
   },
 
-  handleTouchstart(event) {
-    if (event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    const wrapper = this.el;
-    const rect = wrapper.getBoundingClientRect();
-    this.dragStart = {
-      x: touch.clientX,
-      y: touch.clientY,
-      offsetX: touch.clientX - rect.left,
-      offsetY: touch.clientY - rect.top,
+  release(event) {
+    const clamp = (v) => Math.max(-MAX_RELEASE_VELOCITY, Math.min(MAX_RELEASE_VELOCITY, v));
+    const vx = clamp(this.vx.velocity(event.timeStamp));
+    const vy = clamp(this.vy.velocity(event.timeStamp));
+
+    // Choose the corner from where the gesture is going, not where it stopped.
+    const corner = cornerFromPoint(
+      event.clientX + project(vx),
+      event.clientY + project(vy),
+      window.innerWidth,
+      window.innerHeight,
+    );
+
+    // FLIP: remember where the button is on screen, move it to its new corner,
+    // then express the old position as an offset from the new rest position.
+    const before = this.el.getBoundingClientRect();
+    this.el.style.translate = "";
+    applyCorner(this.el, corner);
+    saveCorner(corner);
+    const after = this.el.getBoundingClientRect();
+
+    this.tx = before.left - after.left;
+    this.ty = before.top - after.top;
+    this.render();
+
+    // Where the offset may travel while settling. The release position itself
+    // is always allowed, so a button dropped half off-screen doesn't jump.
+    this.bounds = {
+      minX: Math.min(VIEWPORT_MARGIN_PX - after.left, this.tx),
+      maxX: Math.max(window.innerWidth - VIEWPORT_MARGIN_PX - after.right, this.tx),
+      minY: Math.min(VIEWPORT_MARGIN_PX - after.top, this.ty),
+      maxY: Math.max(window.innerHeight - VIEWPORT_MARGIN_PX - after.bottom, this.ty),
     };
-    this.isDragging = false;
+    this.settle(vx, vy);
   },
 
-  handleTouchmove(event) {
-    if (this.dragStart == null || event.touches.length !== 1) return;
-    const touch = event.touches[0];
-    const wrapper = this.el;
-    const dx = touch.clientX - this.dragStart.x;
-    const dy = touch.clientY - this.dragStart.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (!this.isDragging && distance >= DRAG_THRESHOLD_PX) {
-      this.isDragging = true;
-      wrapper.style.transition = "none";
-      wrapper.style.right = "auto";
-      wrapper.style.bottom = "auto";
-      wrapper.style.left = `${touch.clientX - this.dragStart.offsetX}px`;
-      wrapper.style.top = `${touch.clientY - this.dragStart.offsetY}px`;
+  // Spring the offset back to zero. X and Y are independent springs: a single
+  // spring on the distance would desync when the axes have different velocities.
+  settle(vx, vy) {
+    if (prefersReducedMotion()) {
+      this.tx = 0;
+      this.ty = 0;
+      this.render();
+      return;
     }
 
-    if (this.isDragging) {
-      event.preventDefault();
-      wrapper.style.left = `${touch.clientX - this.dragStart.offsetX}px`;
-      wrapper.style.top = `${touch.clientY - this.dragStart.offsetY}px`;
-    }
-  },
-
-  handleTouchend(event) {
-    if (this.dragStart == null) return;
-    const wrapper = this.el;
-
-    if (this.isDragging) {
-      const changedTouch = event.changedTouches[0];
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      const corner = cornerFromPoint(
-        changedTouch.clientX,
-        changedTouch.clientY,
-        viewportWidth,
-        viewportHeight
-      );
-      applyCorner(wrapper, corner);
-      saveCorner(corner);
-      wrapper.style.left = "";
-      wrapper.style.top = "";
-      wrapper.style.right = "";
-      wrapper.style.bottom = "";
-      wrapper.style.transition = "";
-      this.justDragged = true;
-      const self = this;
-      setTimeout(() => {
-        self.justDragged = false;
-      }, 300);
-    }
-
-    this.dragStart = null;
-    this.isDragging = false;
+    this.cancelSprings();
+    this.springs = [
+      animateSpring({
+        from: this.tx,
+        to: 0,
+        velocity: vx,
+        onUpdate: (x) => {
+          this.tx = this.bounds ? Math.max(this.bounds.minX, Math.min(this.bounds.maxX, x)) : x;
+          this.render();
+        },
+      }),
+      animateSpring({
+        from: this.ty,
+        to: 0,
+        velocity: vy,
+        onUpdate: (y) => {
+          this.ty = this.bounds ? Math.max(this.bounds.minY, Math.min(this.bounds.maxY, y)) : y;
+          this.render();
+        },
+      }),
+    ];
   },
 };
 

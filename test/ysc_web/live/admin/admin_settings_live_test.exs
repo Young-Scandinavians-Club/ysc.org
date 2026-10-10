@@ -4,6 +4,10 @@ defmodule YscWeb.AdminSettingsLiveTest do
 
   Runs with `async: false` because connected-mount async loading and Oban PubSub
   can race with assertions when the full suite runs under CI load.
+
+  The settings form is driven by Cachex `all-site-settings`. `DataCase`
+  re-warms that key from the current sandbox so a prior `SettingsTest` cannot
+  leave dummy `setting1` rows in the form.
   """
   use YscWeb.ConnCase, async: false
 
@@ -21,6 +25,7 @@ defmodule YscWeb.AdminSettingsLiveTest do
     refute html =~ ~s|id="admin-settings-loading"|
     assert html =~ "Save"
     assert html =~ ~s|name="settings|
+    assert has_element?(view, ~s(input[name="settings[facebook][value]"]))
     html
   end
 
@@ -98,6 +103,30 @@ defmodule YscWeb.AdminSettingsLiveTest do
       |> render_submit()
 
       assert_redirected(view, ~p"/admin/settings")
+    end
+
+    test "renders social fields after another test leaves dummy rows in Cachex",
+         %{conn: conn} do
+      Cachex.put(:ysc_cache, "all-site-settings", [
+        %Ysc.SiteSettings.SiteSetting{
+          name: "setting1",
+          value: "value1",
+          group: "group1"
+        }
+      ])
+
+      assert "setting1" in Enum.map(Ysc.Settings.settings(), & &1.name)
+
+      Ysc.DataCase.invalidate_shared_caches()
+
+      names = Enum.map(Ysc.Settings.settings(), & &1.name)
+      refute "setting1" in names
+      assert "facebook" in names
+
+      {:ok, view, _html} = live(conn, ~p"/admin/settings")
+      render_loaded_settings(view)
+
+      refute has_element?(view, ~s(input[name="settings[setting1][value]"]))
     end
 
     test "rejects a javascript facebook URL and leaves the stored footer href unchanged",

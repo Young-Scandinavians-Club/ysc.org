@@ -41,7 +41,7 @@ defmodule YscWeb.Components.PageMastheadTest do
 
       assert html =~ "py-12"
       assert html =~ "text-6xl md:text-8xl"
-      assert html =~ "tracking-tighter"
+      assert html =~ "type-display"
       assert html =~ "Browse our past newsletters."
       refute html =~ "py-8 md:py-12"
     end

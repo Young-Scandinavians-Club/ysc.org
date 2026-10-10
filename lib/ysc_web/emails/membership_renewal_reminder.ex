@@ -11,7 +11,7 @@ defmodule YscWeb.Emails.MembershipRenewalReminder do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [member_greeting_name: 1, membership_url: 0, format_date: 1]
+    only: [membership_renewal_assigns: 2, require_subscription!: 1]
 
   def get_template_name() do
     "membership_renewal_reminder"
@@ -34,25 +34,15 @@ defmodule YscWeb.Emails.MembershipRenewalReminder do
   end
 
   def prepare_email_data(user, subscription) do
-    if is_nil(user) do
-      raise ArgumentError, "User cannot be nil"
-    end
-
-    if is_nil(subscription) do
-      raise ArgumentError, "Subscription cannot be nil"
-    end
-
-    first_name = member_greeting_name(user)
-    renewal_date = format_date(subscription.current_period_end)
+    subscription = require_subscription!(subscription)
     days = days_until_renewal(subscription.current_period_end)
 
-    %{
-      first_name: first_name,
-      renewal_date: renewal_date,
-      membership_url: membership_url(),
+    user
+    |> membership_renewal_assigns(subscription)
+    |> Map.merge(%{
       days_until_renewal: days,
       headline: "Your Membership Renews #{timing_phrase(days, :title)}"
-    }
+    })
   end
 
   @doc """

@@ -17,7 +17,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
     ~H"""
     <div id={"#{@event_id}-ticket-tier-form"}>
       <div class="mb-5">
-        <h2 class="text-lg font-semibold text-zinc-900">
+        <h2 class="text-lg text-zinc-900 type-subhead">
           {if assigns[:ticket_tier], do: "Edit ticket tier", else: "New ticket tier"}
         </h2>
         <p class="mt-0.5 text-sm text-zinc-500">
@@ -123,7 +123,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         >
           <h3
             id="tier-availability-heading"
-            class="text-sm font-semibold text-zinc-900"
+            class="text-sm text-zinc-900 type-subhead"
           >
             Availability
           </h3>
@@ -211,7 +211,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         >
           <h3
             id="tier-checkout-heading"
-            class="text-sm font-semibold text-zinc-900"
+            class="text-sm text-zinc-900 type-subhead"
           >
             Checkout
           </h3>
@@ -348,7 +348,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
 
         <div class="space-y-3 border-t border-zinc-100 pt-4">
           <div>
-            <h4 class="text-sm font-medium text-zinc-900">Extra questions</h4>
+            <h4 class="text-sm text-zinc-900 type-subhead">Extra questions</h4>
             <p class="text-xs text-zinc-500">
               Asked once per ticket. Admins and check-in staff see the
               answers; buyers see their own on the order confirmation.

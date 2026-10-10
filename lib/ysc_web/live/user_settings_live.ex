@@ -202,7 +202,7 @@ defmodule YscWeb.UserSettingsLive do
           <div :if={!assigns[:loading_payment_methods]}>
             <%!-- Section 1: Existing payment methods --%>
             <div :if={length(@all_payment_methods) > 0}>
-              <p class="text-sm font-medium text-zinc-500 uppercase tracking-wide mb-3">
+              <p class="text-sm text-zinc-500 mb-3 type-eyebrow">
                 Saved payment methods
               </p>
               <div class="space-y-2">
@@ -211,7 +211,7 @@ defmodule YscWeb.UserSettingsLive do
                     @deleting_payment_method_id == payment_method.id %>
                   <% busy? = @selecting_payment_method || deleting_this? %>
                   <div class={[
-                    "border rounded-lg p-4 transition-all duration-200 flex items-center gap-2",
+                    "border rounded-lg p-4 transition duration-200 flex items-center gap-2",
                     busy? && "opacity-50",
                     @default_payment_method &&
                       payment_method.id == @default_payment_method.id &&
@@ -303,7 +303,7 @@ defmodule YscWeb.UserSettingsLive do
               id="payment-add-new-divider"
               class="my-6"
               show_label={!@show_new_payment_form}
-              label_class="bg-white px-3 text-xs text-zinc-400 uppercase tracking-wide"
+              label_class="bg-white px-3 text-xs text-zinc-400 type-eyebrow"
             >
               Add new
             </.labeled_divider>
@@ -387,7 +387,7 @@ defmodule YscWeb.UserSettingsLive do
           <div :if={@live_action == :edit} class="space-y-8">
             <!-- Profile Picture Section -->
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">Profile Picture</h2>
+              <h2 class="text-zinc-900 text-xl type-subhead">Profile Picture</h2>
               <p class="text-sm text-zinc-500">
                 Adding a profile picture helps other members recognize you at events and makes the community feel more personal.
               </p>
@@ -451,7 +451,7 @@ defmodule YscWeb.UserSettingsLive do
                           class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
                         >
                           <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
-                            <h3 class="text-lg font-semibold text-zinc-900">
+                            <h3 class="text-lg text-zinc-900 type-subhead">
                               Crop your photo
                             </h3>
                             <div
@@ -488,7 +488,7 @@ defmodule YscWeb.UserSettingsLive do
                     <div class="flex items-center gap-3">
                       <div class="w-full bg-zinc-200 rounded-full h-2">
                         <div
-                          class="bg-blue-600 h-2 rounded-full transition-all"
+                          class="bg-blue-600 h-2 rounded-full transition-[width]"
                           style={"width: #{entry.progress}%"}
                         >
                         </div>
@@ -540,7 +540,7 @@ defmodule YscWeb.UserSettingsLive do
                             id={"avatar-#{avatar.id}"}
                             disabled={@selecting_avatar_id == avatar.id}
                             class={[
-                              "w-14 h-14 rounded-full border-2 transition-all hover:scale-105 cursor-pointer overflow-hidden",
+                              "w-14 h-14 rounded-full border-2 transition hover:scale-105 cursor-pointer overflow-hidden",
                               if(@user.current_avatar_id == avatar.id,
                                 do: "border-blue-600 ring-2 ring-blue-200",
                                 else: "border-zinc-200 hover:border-zinc-400"
@@ -615,7 +615,9 @@ defmodule YscWeb.UserSettingsLive do
             </div>
             <!-- Personal Information Section -->
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">Personal Information</h2>
+              <h2 class="text-zinc-900 text-xl type-subhead">
+                Personal Information
+              </h2>
 
               <.simple_form
                 for={@profile_form}
@@ -682,7 +684,7 @@ defmodule YscWeb.UserSettingsLive do
             </div>
             <!-- Billing Address Section -->
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">Billing Address</h2>
+              <h2 class="text-zinc-900 text-xl type-subhead">Billing Address</h2>
 
               <.simple_form
                 for={@address_form}
@@ -733,7 +735,7 @@ defmodule YscWeb.UserSettingsLive do
             </div>
             <!-- Email Change Section -->
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">Email</h2>
+              <h2 class="text-zinc-900 text-xl type-subhead">Email</h2>
 
               <%= if @pending_email do %>
                 <div class="p-4 bg-amber-50 border border-amber-200 rounded-md">
@@ -801,7 +803,7 @@ defmodule YscWeb.UserSettingsLive do
               :if={@is_sub_account}
               class="rounded-sm border border-zinc-100 p-6 flex flex-col gap-4"
             >
-              <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
+              <h2 class="text-zinc-900 text-xl type-subhead">Membership</h2>
               <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div class="flex gap-3">
                   <.icon
@@ -809,7 +811,7 @@ defmodule YscWeb.UserSettingsLive do
                     class="h-5 w-5 text-blue-500 shrink-0 mt-0.5"
                   />
                   <div>
-                    <h3 class="text-sm font-semibold text-blue-800">
+                    <h3 class="text-sm text-blue-800 type-subhead">
                       Family Account
                     </h3>
                     <p class="text-sm text-blue-700 mt-1">
@@ -866,7 +868,7 @@ defmodule YscWeb.UserSettingsLive do
                     class="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
                   />
                   <div class="flex-1">
-                    <h3 class="text-sm font-semibold text-amber-800">
+                    <h3 class="text-sm text-amber-800 type-subhead">
                       Plan change scheduled
                     </h3>
                     <p class="text-sm text-amber-700 mt-1">
@@ -913,7 +915,7 @@ defmodule YscWeb.UserSettingsLive do
                 :if={@pending_family_invites != []}
                 class="mt-2 border-t border-zinc-100 pt-4"
               >
-                <h3 class="text-sm font-semibold text-zinc-900">
+                <h3 class="text-sm text-zinc-900 type-subhead">
                   Pending Family Invitations
                 </h3>
                 <p class="text-xs text-zinc-500 mt-1">
@@ -949,7 +951,7 @@ defmodule YscWeb.UserSettingsLive do
               :if={@active_plan_type == :lifetime && !@is_sub_account}
               class="rounded-sm border border-zinc-100 p-6 flex flex-col gap-4"
             >
-              <h2 class="text-zinc-900 font-bold text-xl">Membership</h2>
+              <h2 class="text-zinc-900 text-xl type-subhead">Membership</h2>
               <.membership_status
                 current_membership={@current_membership}
                 primary_user={@primary_user}
@@ -967,7 +969,7 @@ defmodule YscWeb.UserSettingsLive do
                     class="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
                   />
                   <div class="flex-1">
-                    <h3 class="text-sm font-semibold text-amber-800">
+                    <h3 class="text-sm text-amber-800 type-subhead">
                       Plan change scheduled
                     </h3>
                     <p class="text-sm text-amber-700 mt-1">
@@ -1010,7 +1012,7 @@ defmodule YscWeb.UserSettingsLive do
                 :if={@pending_family_invites != []}
                 class="mt-2 border-t border-zinc-100 pt-4"
               >
-                <h3 class="text-sm font-semibold text-zinc-900">
+                <h3 class="text-sm text-zinc-900 type-subhead">
                   Pending Family Invitations
                 </h3>
                 <p class="text-xs text-zinc-500 mt-1">
@@ -1047,7 +1049,7 @@ defmodule YscWeb.UserSettingsLive do
                 !@is_sub_account
             }>
               <div class="mb-6">
-                <h2 class="text-2xl font-bold text-zinc-900">
+                <h2 class="text-2xl text-zinc-900 type-title">
                   Get Your YSC Membership
                 </h2>
                 <p class="text-zinc-500 mt-1">
@@ -1056,7 +1058,7 @@ defmodule YscWeb.UserSettingsLive do
               </div>
 
               <div :if={@pending_family_invites != []} class="mb-6">
-                <h3 class="text-sm font-semibold text-zinc-900">
+                <h3 class="text-sm text-zinc-900 type-subhead">
                   Pending Family Invitations
                 </h3>
                 <p class="text-xs text-zinc-500 mt-1">
@@ -1096,7 +1098,7 @@ defmodule YscWeb.UserSettingsLive do
                     class="h-5 w-5 text-yellow-500 shrink-0 mt-0.5"
                   />
                   <div>
-                    <h3 class="text-sm font-semibold text-yellow-800">
+                    <h3 class="text-sm text-yellow-800 type-subhead">
                       Application pending review
                     </h3>
                     <p class="text-sm text-yellow-700 mt-1">
@@ -1129,7 +1131,7 @@ defmodule YscWeb.UserSettingsLive do
                         1
                       </span>
                       <div>
-                        <h3 class="text-lg font-semibold text-zinc-900">
+                        <h3 class="text-lg text-zinc-900 type-subhead">
                           Choose Your Plan
                         </h3>
                         <p class="text-sm text-zinc-500 mt-0.5">
@@ -1166,7 +1168,7 @@ defmodule YscWeb.UserSettingsLive do
                         2
                       </span>
                       <div>
-                        <h3 class="text-lg font-semibold text-zinc-900">
+                        <h3 class="text-lg text-zinc-900 type-subhead">
                           Payment method
                         </h3>
                         <p class="text-sm text-zinc-500 mt-0.5">
@@ -1186,7 +1188,7 @@ defmodule YscWeb.UserSettingsLive do
                         !@loading_payment_methods && @default_payment_method == nil
                       }
                       navigate={~p"/users/membership/payment-method"}
-                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition group"
                     >
                       <div class="flex items-center gap-3">
                         <.icon
@@ -1228,7 +1230,7 @@ defmodule YscWeb.UserSettingsLive do
                       <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shrink-0">
                         3
                       </span>
-                      <h3 class="text-lg font-semibold text-zinc-900">
+                      <h3 class="text-lg text-zinc-900 type-subhead">
                         Confirm & Pay
                       </h3>
                     </div>
@@ -1249,7 +1251,7 @@ defmodule YscWeb.UserSettingsLive do
                           <p class="text-sm text-zinc-500">
                             {String.capitalize(to_string(selected_plan.id))} Membership &middot; Billed annually
                           </p>
-                          <p class="text-2xl font-bold text-zinc-900 mt-0.5">
+                          <p class="text-2xl text-zinc-900 mt-0.5 type-title">
                             {Ysc.MoneyHelper.format_money!(
                               Money.new(:USD, selected_plan.amount)
                             )}
@@ -1316,7 +1318,9 @@ defmodule YscWeb.UserSettingsLive do
             >
               <%!-- Current status card --%>
               <div class="rounded-sm border border-zinc-100 p-6 space-y-4">
-                <h2 class="text-zinc-900 font-bold text-xl">Current Membership</h2>
+                <h2 class="text-zinc-900 text-xl type-subhead">
+                  Current Membership
+                </h2>
 
                 <.board_pause_notice
                   :if={@membership_paused_by_board != nil}
@@ -1334,7 +1338,7 @@ defmodule YscWeb.UserSettingsLive do
                   :if={@pending_family_invites != []}
                   class="border-t border-zinc-100 pt-4"
                 >
-                  <h3 class="text-sm font-semibold text-zinc-900">
+                  <h3 class="text-sm text-zinc-900 type-subhead">
                     Pending Family Invitations
                   </h3>
                   <p class="text-xs text-zinc-500 mt-1">
@@ -1375,7 +1379,7 @@ defmodule YscWeb.UserSettingsLive do
                       class="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
                     />
                     <div class="flex-1">
-                      <h3 class="text-sm font-semibold text-amber-800">
+                      <h3 class="text-sm text-amber-800 type-subhead">
                         Plan change scheduled
                       </h3>
                       <p class="text-sm text-amber-700 mt-1">
@@ -1462,7 +1466,7 @@ defmodule YscWeb.UserSettingsLive do
                 class="rounded-sm border border-zinc-100 overflow-hidden"
               >
                 <div class="p-6 border-b border-zinc-100">
-                  <h2 class="text-zinc-900 font-bold text-xl">Change Plan</h2>
+                  <h2 class="text-zinc-900 text-xl type-subhead">Change Plan</h2>
                   <p class="text-sm text-zinc-500 mt-1">
                     You can switch between Single and Family. Switching to Family starts right away and you'll be charged the difference for the rest of this year. Switching to Single starts at your next renewal.
                   </p>
@@ -1478,7 +1482,7 @@ defmodule YscWeb.UserSettingsLive do
                       class="h-5 w-5 text-yellow-500 shrink-0 mt-0.5"
                     />
                     <div>
-                      <h3 class="text-sm font-semibold text-yellow-800">
+                      <h3 class="text-sm text-yellow-800 type-subhead">
                         Application pending review
                       </h3>
                       <p class="text-sm text-yellow-700 mt-1">
@@ -1500,7 +1504,7 @@ defmodule YscWeb.UserSettingsLive do
                       <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shrink-0">
                         1
                       </span>
-                      <h3 class="text-lg font-semibold text-zinc-900">
+                      <h3 class="text-lg text-zinc-900 type-subhead">
                         Select Plan
                       </h3>
                     </div>
@@ -1558,7 +1562,7 @@ defmodule YscWeb.UserSettingsLive do
                         <h4
                           id="plan-change-banner-heading"
                           class={[
-                            "text-sm font-semibold mb-1",
+                            "text-sm mb-1 type-subhead",
                             if(@membership_change_info.direction == :upgrade,
                               do: "text-blue-900",
                               else: "text-amber-900"
@@ -1617,7 +1621,7 @@ defmodule YscWeb.UserSettingsLive do
                         2
                       </span>
                       <div>
-                        <h3 class="text-lg font-semibold text-zinc-900">
+                        <h3 class="text-lg text-zinc-900 type-subhead">
                           Payment method
                         </h3>
                         <p class="text-sm text-zinc-500 mt-0.5">
@@ -1636,7 +1640,7 @@ defmodule YscWeb.UserSettingsLive do
                         !@loading_payment_methods && @default_payment_method == nil
                       }
                       navigate={~p"/users/membership/payment-method"}
-                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all group"
+                      class="flex w-full items-center justify-between p-4 bg-white border-2 border-dashed border-zinc-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition group"
                     >
                       <div class="flex items-center gap-3">
                         <.icon
@@ -1726,7 +1730,7 @@ defmodule YscWeb.UserSettingsLive do
 
           <div :if={@live_action == :notifications} class="space-y-6">
             <div class="rounded-sm border border-zinc-100 py-4 px-4 flex flex-col gap-4">
-              <h2 class="text-zinc-900 font-bold text-xl">
+              <h2 class="text-zinc-900 text-xl type-subhead">
                 Notification Preferences
               </h2>
               <p class="text-sm text-zinc-600">
@@ -1791,19 +1795,19 @@ defmodule YscWeb.UserSettingsLive do
                         <tr>
                           <th
                             scope="col"
-                            class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                            class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                           >
                             Category
                           </th>
                           <th
                             scope="col"
-                            class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                            class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
                           >
                             Email
                           </th>
                           <th
                             scope="col"
-                            class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                            class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
                           >
                             Text
                           </th>
@@ -1943,7 +1947,9 @@ defmodule YscWeb.UserSettingsLive do
               >
                 <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <h2 class="text-lg font-bold text-zinc-900">Your stay perks</h2>
+                    <h2 class="text-lg text-zinc-900 type-subhead">
+                      Your stay perks
+                    </h2>
                     <p class="text-sm text-zinc-500 mt-1 max-w-xl">
                       Applied automatically when you book a cabin stay that matches each perk below. Discounts and free nights appear in your price before you pay.
                     </p>
@@ -2008,7 +2014,7 @@ defmodule YscWeb.UserSettingsLive do
               >
                 <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <h2 class="text-lg font-bold text-zinc-900">
+                    <h2 class="text-lg text-zinc-900 type-subhead">
                       Tickets reserved for you
                     </h2>
                     <p class="text-sm text-zinc-500 mt-1 max-w-xl">
@@ -2099,7 +2105,7 @@ defmodule YscWeb.UserSettingsLive do
             <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-6">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
-                  <h2 class="text-zinc-900 font-bold text-xl">
+                  <h2 class="text-zinc-900 text-xl type-subhead">
                     My Bookings & Payments
                   </h2>
                   <p
@@ -2141,7 +2147,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="all"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition",
                       if(@payment_filter == :all,
                         do: "bg-blue-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2154,7 +2160,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="tahoe"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :tahoe,
                         do: "bg-blue-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2176,7 +2182,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="clear_lake"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :clear_lake,
                         do: "bg-emerald-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2198,7 +2204,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="events"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :events,
                         do: "bg-purple-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2220,7 +2226,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="donations"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :donations,
                         do: "bg-yellow-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2242,7 +2248,7 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="filter-payments"
                     phx-value-filter="membership"
                     class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2",
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
                       if(@payment_filter == :membership,
                         do: "bg-teal-600 text-white shadow-md",
                         else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
@@ -2268,25 +2274,25 @@ defmodule YscWeb.UserSettingsLive do
                       <tr>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                         >
                           Transaction
                         </th>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                         >
                           Details
                         </th>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow"
                         >
                           Amount
                         </th>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
                         >
                           Status
                         </th>
@@ -4210,6 +4216,19 @@ defmodule YscWeb.UserSettingsLive do
            title: "Membership"
          )}
 
+      {:error, :invalid_membership_type} ->
+        {:noreply,
+         socket
+         |> assign(
+           :pending_family_invites,
+           FamilyInvites.list_pending_invites_for_email(user.email)
+         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This family invitation is no longer valid because the membership is not a family or lifetime plan. Ask the person who invited you to upgrade to a family membership, then request a new invite.",
+           title: "Membership"
+         )}
+
       {:error, :date_of_birth_required} ->
         # The acceptance page collects the date of birth before linking.
         {:noreply,
@@ -5657,14 +5676,14 @@ defmodule YscWeb.UserSettingsLive do
         phx-click={@row_navigate}
         aria-label={@row_navigate_label}
         class={[
-          "group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition-all bg-white cursor-pointer w-full text-left font-normal",
+          "group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition bg-white cursor-pointer w-full text-left font-normal",
           "appearance-none m-0"
         ]}
       >
         {render_payment_card_body(assigns)}
       </button>
     <% else %>
-      <div class="group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition-all bg-white">
+      <div class="group border border-zinc-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-xs transition bg-white">
         {render_payment_card_body(assigns)}
       </div>
     <% end %>
@@ -5688,7 +5707,7 @@ defmodule YscWeb.UserSettingsLive do
       </div>
       <div class="flex-1">
         <div class="flex items-center gap-2">
-          <h3 class="font-bold text-zinc-900 text-lg leading-tight">
+          <h3 class="text-zinc-900 text-lg type-subhead">
             {PaymentDisplay.get_payment_title(@payment_info)}
           </h3>
           <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
@@ -5736,14 +5755,14 @@ defmodule YscWeb.UserSettingsLive do
 
     <div class="flex items-center justify-between pt-4 border-t border-zinc-200">
       <div class="text-right">
-        <p class="text-lg font-black text-zinc-900">
+        <p class="text-lg font-bold text-zinc-900">
           {if @payment_info.payment do
             Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
           else
             "Free"
           end}
         </p>
-        <p class="text-xs text-zinc-400 uppercase tracking-widest font-bold">
+        <p class="text-xs text-zinc-400 type-eyebrow">
           Paid on {if @payment_info.payment do
             if @payment_info.payment.payment_date do
               format_payment_date(@payment_info.payment.payment_date, @timezone)
@@ -5825,7 +5844,7 @@ defmodule YscWeb.UserSettingsLive do
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h3 class="font-bold text-zinc-900 text-sm">
+              <h3 class="text-zinc-900 text-sm type-subhead">
                 {PaymentDisplay.get_payment_title(@payment_info)}
               </h3>
               <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
@@ -5847,14 +5866,14 @@ defmodule YscWeb.UserSettingsLive do
         </div>
       </td>
       <td class="px-6 py-4 whitespace-nowrap text-right">
-        <p class="text-base font-black text-zinc-900">
+        <p class="text-base font-bold text-zinc-900">
           {if @payment_info.payment do
             Ysc.MoneyHelper.format_money!(@payment_info.payment.amount)
           else
             "Free"
           end}
         </p>
-        <p class="text-xs text-zinc-400 uppercase tracking-wider font-bold">
+        <p class="text-xs text-zinc-400 type-eyebrow">
           {if @payment_info.payment do
             if @payment_info.payment.payment_date do
               format_payment_date(@payment_info.payment.payment_date, @timezone)

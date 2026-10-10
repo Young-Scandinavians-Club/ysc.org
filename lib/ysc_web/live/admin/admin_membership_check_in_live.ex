@@ -21,7 +21,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
           <.back navigate={~p"/admin/scanner"}>Back</.back>
           <span class="text-zinc-300 select-none hidden sm:inline">/</span>
           <div class="min-w-0 hidden sm:block">
-            <h1 class="text-base font-semibold text-zinc-900 truncate">
+            <h1 class="text-base text-zinc-900 truncate type-subhead">
               {@session.name}
             </h1>
             <p
@@ -224,7 +224,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
     ~H"""
     <div class={[
-      "flex items-center gap-4 px-4 py-3 transition-all duration-100 ease-out",
+      "flex items-center gap-4 px-4 py-3 transition duration-100 ease-out",
       if(@result.membership_status == :inactive,
         do: "bg-red-50/30",
         else: "hover:bg-zinc-50/60"

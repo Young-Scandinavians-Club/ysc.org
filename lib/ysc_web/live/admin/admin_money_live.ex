@@ -1390,16 +1390,16 @@ defmodule YscWeb.AdminMoneyLive do
               <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                   <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       User
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Purpose
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Submitted
                     </th>
-                    <th class="px-4 py-2 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    <th class="px-4 py-2 text-right text-xs text-zinc-500 type-eyebrow">
                       Actions
                     </th>
                   </tr>
@@ -1514,31 +1514,31 @@ defmodule YscWeb.AdminMoneyLive do
           class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8"
         >
           <div class="px-6 py-4 border-b border-zinc-100">
-            <h2 class="text-lg font-semibold text-zinc-900">Recent Payments</h2>
+            <h2 class="text-lg text-zinc-900 type-subhead">Recent Payments</h2>
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Reference
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     User
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Payment Type
                   </th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
                     Amount
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Status
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Date
                   </th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
                     Actions
                   </th>
                 </tr>
@@ -1696,7 +1696,7 @@ defmodule YscWeb.AdminMoneyLive do
       <div :if={@active_tab == :expenses} id="money-expenses-tab">
         <div class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8">
           <div class="px-6 py-4 border-b border-zinc-100">
-            <h2 class="text-lg font-semibold text-zinc-900">Expense Reports</h2>
+            <h2 class="text-lg text-zinc-900 type-subhead">Expense Reports</h2>
             <p class="text-sm text-zinc-500 mt-1">
               All reports in the selected date range
             </p>
@@ -1705,32 +1705,32 @@ defmodule YscWeb.AdminMoneyLive do
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     ID
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     User
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Purpose
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Status
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     <span class="block max-w-28 whitespace-normal leading-tight">
                       QuickBooks Sync Status
                     </span>
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     <span class="block max-w-28 whitespace-normal leading-tight">
                       QuickBooks Bill ID
                     </span>
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Submitted At
                   </th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
                     Actions
                   </th>
                 </tr>
@@ -1838,7 +1838,7 @@ defmodule YscWeb.AdminMoneyLive do
 
       <div :if={@active_tab == :ledger} id="money-ledger-tab">
         <div class="mb-8">
-          <h2 class="text-lg font-semibold text-zinc-900 mb-4">
+          <h2 class="text-lg text-zinc-900 mb-4 type-subhead">
             Account Balances
           </h2>
           <div
@@ -1871,10 +1871,10 @@ defmodule YscWeb.AdminMoneyLive do
               class="bg-white p-4 rounded-lg shadow-xs border border-zinc-100"
             >
               <div class="flex justify-between items-start mb-2">
-                <h3 class="font-medium text-zinc-900">
+                <h3 class="text-zinc-900 type-subhead">
                   {account_data.account.name}
                 </h3>
-                <span class="text-[10px] text-zinc-400 uppercase tracking-wide">
+                <span class="text-[10px] text-zinc-400 type-eyebrow">
                   {String.capitalize(
                     to_string(account_data.account.normal_balance || "debit")
                   )}-normal
@@ -1883,7 +1883,7 @@ defmodule YscWeb.AdminMoneyLive do
               <p class="text-sm text-zinc-600 mb-3">
                 {account_data.account.description}
               </p>
-              <p class={"text-2xl font-semibold #{get_balance_color(account_data.balance, account_data.account.normal_balance)}"}>
+              <p class={"text-2xl #{get_balance_color(account_data.balance, account_data.account.normal_balance)} type-title"}>
                 {Money.to_string!(account_data.balance || Money.new(0, :USD))}
               </p>
               <p class="text-xs text-zinc-500 capitalize mt-1">
@@ -1895,34 +1895,34 @@ defmodule YscWeb.AdminMoneyLive do
 
         <div class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8">
           <div class="px-6 py-4 border-b border-zinc-100">
-            <h2 class="text-lg font-semibold text-zinc-900">Ledger Entries</h2>
+            <h2 class="text-lg text-zinc-900 type-subhead">Ledger Entries</h2>
           </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Date
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Account
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Description
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Debit/Credit
                   </th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
                     Amount
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Payment
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Refund
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Entity
                   </th>
                 </tr>
@@ -2019,7 +2019,7 @@ defmodule YscWeb.AdminMoneyLive do
       <div :if={@active_tab == :webhooks} id="money-webhooks-tab">
         <div class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8">
           <div class="px-6 py-4 border-b border-zinc-100">
-            <h2 class="text-lg font-semibold text-zinc-900">
+            <h2 class="text-lg text-zinc-900 type-subhead">
               Stripe Webhook Events
             </h2>
           </div>
@@ -2027,19 +2027,19 @@ defmodule YscWeb.AdminMoneyLive do
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Event ID
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Event Type
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     State
                   </th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                     Received At
                   </th>
-                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
                     Actions
                   </th>
                 </tr>
@@ -2116,7 +2116,7 @@ defmodule YscWeb.AdminMoneyLive do
         show
         on_cancel={JS.push("close_refund_modal")}
       >
-        <h3 class="text-lg font-medium text-zinc-900 mb-4">Process Refund</h3>
+        <h3 class="text-lg text-zinc-900 mb-4 type-subhead">Process Refund</h3>
 
         <div class="mb-4">
           <p class="text-sm text-zinc-600">
@@ -2147,7 +2147,7 @@ defmodule YscWeb.AdminMoneyLive do
             :if={@ticket_order}
             class="mb-4 p-4 bg-blue-50 rounded-sm border border-blue-200"
           >
-            <h4 class="text-sm font-semibold text-zinc-800 mb-3">
+            <h4 class="text-sm text-zinc-800 mb-3 type-subhead">
               Select Tickets to Refund
             </h4>
             <p class="text-xs text-zinc-600 mb-3">
@@ -2295,7 +2295,7 @@ defmodule YscWeb.AdminMoneyLive do
         show
         on_cancel={JS.push("close_credit_modal")}
       >
-        <h3 class="text-lg font-medium text-zinc-900 mb-4">Add Credit</h3>
+        <h3 class="text-lg text-zinc-900 mb-4 type-subhead">Add Credit</h3>
 
         <div :if={@selected_user} class="mb-4">
           <p class="text-sm text-zinc-600">
@@ -2394,7 +2394,7 @@ defmodule YscWeb.AdminMoneyLive do
         show
         on_cancel={JS.push("close_webhook_modal")}
       >
-        <h3 class="text-lg font-medium text-zinc-900 mb-4">
+        <h3 class="text-lg text-zinc-900 mb-4 type-subhead">
           Webhook Event Details
         </h3>
 
@@ -2482,7 +2482,7 @@ defmodule YscWeb.AdminMoneyLive do
         show
         on_cancel={JS.push("close_payout_modal")}
       >
-        <h3 class="text-lg font-medium text-zinc-900 mb-4">Payout Details</h3>
+        <h3 class="text-lg text-zinc-900 mb-4 type-subhead">Payout Details</h3>
 
         <div class="mb-6 space-y-3">
           <div class="grid grid-cols-2 gap-4">
@@ -2555,7 +2555,7 @@ defmodule YscWeb.AdminMoneyLive do
         </div>
         <!-- QuickBooks Information -->
         <div class="mb-6 p-4 bg-amber-50 rounded-sm border border-amber-200">
-          <h4 class="text-md font-semibold text-zinc-800 mb-3">
+          <h4 class="text-md text-zinc-800 mb-3 type-subhead">
             QuickBooks Information
           </h4>
           <div class="grid grid-cols-2 gap-4 text-sm">
@@ -2653,7 +2653,7 @@ defmodule YscWeb.AdminMoneyLive do
         </div>
         <!-- Associated Payments -->
         <div class="mb-6">
-          <h4 class="text-md font-semibold text-zinc-800 mb-3">
+          <h4 class="text-md text-zinc-800 mb-3 type-subhead">
             Associated Payments ({length(@selected_payout.payments || [])})
           </h4>
           <div
@@ -2663,22 +2663,22 @@ defmodule YscWeb.AdminMoneyLive do
             <table class="min-w-full divide-y divide-zinc-200 text-sm">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     Reference
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     User
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     Amount
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     Status
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     QB Status
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     Date
                   </th>
                 </tr>
@@ -2766,7 +2766,7 @@ defmodule YscWeb.AdminMoneyLive do
         </div>
         <!-- Associated Refunds -->
         <div class="mb-6">
-          <h4 class="text-md font-semibold text-zinc-800 mb-3">
+          <h4 class="text-md text-zinc-800 mb-3 type-subhead">
             Associated Refunds ({length(@selected_payout.refunds || [])})
           </h4>
           <div
@@ -2776,25 +2776,25 @@ defmodule YscWeb.AdminMoneyLive do
             <table class="min-w-full divide-y divide-zinc-200 text-sm">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     Reference
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     User
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     Amount
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     Reason
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     Status
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     QB Status
                   </th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                     Date
                   </th>
                 </tr>
@@ -2923,7 +2923,7 @@ defmodule YscWeb.AdminMoneyLive do
         payout_reconciles? =
           payout_computed_net == @selected_payout.amount %>
         <div class="mb-4 p-4 bg-zinc-50 rounded-sm border">
-          <h4 class="text-sm font-semibold text-zinc-800 mb-2">Summary</h4>
+          <h4 class="text-sm text-zinc-800 mb-2 type-subhead">Summary</h4>
           <div class="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p class="text-zinc-600">Total Payments (gross):</p>
@@ -3014,7 +3014,7 @@ defmodule YscWeb.AdminMoneyLive do
         show
         on_cancel={JS.push("close_payment_modal")}
       >
-        <h3 class="text-lg font-medium text-zinc-900 mb-4">Payment Details</h3>
+        <h3 class="text-lg text-zinc-900 mb-4 type-subhead">Payment Details</h3>
 
         <div class="mb-6 flex flex-col gap-4">
           <!-- Payment Information -->
@@ -3112,7 +3112,7 @@ defmodule YscWeb.AdminMoneyLive do
           </div>
           <!-- QuickBooks Information -->
           <div class="p-4 bg-amber-50 rounded-sm border border-amber-200">
-            <h4 class="text-sm font-semibold text-zinc-800 mb-3">
+            <h4 class="text-sm text-zinc-800 mb-3 type-subhead">
               QuickBooks Information
             </h4>
             <div class="grid grid-cols-2 gap-4 text-sm">
@@ -3193,7 +3193,7 @@ defmodule YscWeb.AdminMoneyLive do
             id="payment-related-entity"
             class="p-4 bg-blue-50 rounded-sm border border-blue-200"
           >
-            <h4 class="text-sm font-semibold text-zinc-800 mb-2">Related Entity</h4>
+            <h4 class="text-sm text-zinc-800 mb-2 type-subhead">Related Entity</h4>
             <%= case @payment_related_entity do %>
               <% {:booking, booking} -> %>
                 <div id="payment-related-booking" class="text-sm text-zinc-700">
@@ -3245,29 +3245,29 @@ defmodule YscWeb.AdminMoneyLive do
           </div>
           <!-- Refunds Section -->
           <div>
-            <h4 class="text-md font-semibold text-zinc-800 mb-3">
+            <h4 class="text-md text-zinc-800 mb-3 type-subhead">
               Refunds ({length(@payment_refunds || [])})
             </h4>
             <div :if={length(@payment_refunds || []) > 0} class="overflow-x-auto">
               <table class="min-w-full divide-y divide-zinc-200 text-sm">
                 <thead class="bg-zinc-50">
                   <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Reference
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Amount
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Reason
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Status
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       QB Status
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Date
                     </th>
                   </tr>
@@ -3321,7 +3321,7 @@ defmodule YscWeb.AdminMoneyLive do
           </div>
           <!-- Ledger Entries Section -->
           <div>
-            <h4 class="text-md font-semibold text-zinc-800 mb-3">
+            <h4 class="text-md text-zinc-800 mb-3 type-subhead">
               Ledger Entries ({length(@payment_ledger_entries || [])})
             </h4>
             <div
@@ -3331,19 +3331,19 @@ defmodule YscWeb.AdminMoneyLive do
               <table class="min-w-full divide-y divide-zinc-200 text-sm">
                 <thead class="bg-zinc-50">
                   <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Account
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Description
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Debit/Credit
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Amount
                     </th>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase">
+                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                       Date
                     </th>
                   </tr>
@@ -3454,7 +3454,7 @@ defmodule YscWeb.AdminMoneyLive do
             <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-8">
               <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
-                  <h3 class="text-lg font-semibold text-zinc-900">
+                  <h3 class="text-lg text-zinc-900 type-subhead">
                     {report.purpose}
                   </h3>
                   <p class="mt-1 text-sm text-zinc-600">
@@ -4039,7 +4039,7 @@ defmodule YscWeb.AdminMoneyLive do
   defp line_items_table(assigns) do
     ~H"""
     <div id={@id}>
-      <h4 class="mb-2 text-sm font-semibold text-zinc-800">{@title}</h4>
+      <h4 class="mb-2 text-sm text-zinc-800 type-subhead">{@title}</h4>
       <%= if @rows == [] do %>
         <p class="text-sm italic text-zinc-500">{@empty_copy}</p>
       <% else %>
@@ -4047,22 +4047,22 @@ defmodule YscWeb.AdminMoneyLive do
           <table class="min-w-full divide-y divide-zinc-200 text-sm">
             <thead class="bg-zinc-50">
               <tr>
-                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                   #
                 </th>
-                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                   Date
                 </th>
-                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                   Vendor
                 </th>
-                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                   Description
                 </th>
-                <th class="px-2 py-2 text-right text-xs font-medium uppercase text-zinc-500">
+                <th class="px-2 py-2 text-right text-xs text-zinc-500 type-eyebrow">
                   Amount
                 </th>
-                <th class="px-2 py-2 text-left text-xs font-medium uppercase text-zinc-500">
+                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
                   Receipt
                 </th>
               </tr>
@@ -4201,7 +4201,7 @@ defmodule YscWeb.AdminMoneyLive do
               <tr class="bg-zinc-50">
                 <td
                   colspan="4"
-                  class="px-2 py-2 text-right text-xs font-medium uppercase text-zinc-500"
+                  class="px-2 py-2 text-right text-xs text-zinc-500 type-eyebrow"
                 >
                   Subtotal
                 </td>

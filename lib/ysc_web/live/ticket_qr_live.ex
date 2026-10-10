@@ -176,10 +176,10 @@ defmodule YscWeb.TicketQrLive do
                       <div class="rounded-t-3xl bg-emerald-700">
                         <div class="px-6 py-4 flex items-center justify-between">
                           <div>
-                            <p class="text-white/70 text-xs font-black uppercase tracking-[0.2em] mb-0.5">
+                            <p class="text-white/70 text-xs mb-0.5 type-eyebrow">
                               Event Ticket
                             </p>
-                            <p class="text-white font-black text-lg leading-tight drop-shadow-sm">
+                            <p class="text-white font-bold text-lg leading-tight drop-shadow-sm">
                               {ticket.tier_name}
                             </p>
                           </div>
@@ -201,7 +201,7 @@ defmodule YscWeb.TicketQrLive do
                             class="rounded-xl"
                           />
                         </div>
-                        <p class="text-center text-xs font-bold tracking-[0.2em] uppercase text-zinc-400 mt-4">
+                        <p class="text-center text-xs text-zinc-400 mt-4 type-eyebrow">
                           Scan to check in
                         </p>
                         <%!-- Fixed-height wallet row: platform detection must not expand the card --%>
@@ -235,7 +235,7 @@ defmodule YscWeb.TicketQrLive do
                       <div class="bg-white rounded-b-3xl px-6 pt-1 pb-6">
                         <div class="flex items-start justify-between gap-4">
                           <div class="min-w-0">
-                            <p class="text-zinc-400 text-xs font-bold uppercase tracking-widest mb-1">
+                            <p class="text-zinc-400 text-xs mb-1 type-eyebrow">
                               Ticket Holder
                             </p>
                             <p class="text-zinc-900 font-bold text-base leading-snug truncate">
@@ -245,7 +245,7 @@ defmodule YscWeb.TicketQrLive do
                             </p>
                           </div>
                           <div class="shrink-0 text-right">
-                            <p class="text-zinc-400 text-xs font-bold uppercase tracking-widest mb-1">
+                            <p class="text-zinc-400 text-xs mb-1 type-eyebrow">
                               Ticket number
                             </p>
                             <p class="text-zinc-700 text-sm font-mono font-bold">
@@ -277,7 +277,7 @@ defmodule YscWeb.TicketQrLive do
                       <div
                         data-dot
                         class={[
-                          "rounded-full transition-all duration-200",
+                          "rounded-full transition duration-200",
                           if(i == 0,
                             do: "w-3 h-3 bg-white",
                             else: "w-2.5 h-2.5 bg-zinc-400"

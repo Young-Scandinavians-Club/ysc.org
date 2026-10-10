@@ -163,11 +163,11 @@ defmodule YscWeb.OrderConfirmationLive do
           <%= if @ticket_order.status == :cancelled do %>
             <div class="flex items-center gap-2 text-red-600 mb-2">
               <.icon name="hero-x-circle" class="w-6 h-6" />
-              <span class="font-bold uppercase tracking-wider text-sm">
+              <span class="text-sm type-eyebrow">
                 Order Cancelled
               </span>
             </div>
-            <h1 class="text-4xl font-bold text-zinc-900">
+            <h1 class="text-4xl text-zinc-900 type-display">
               Order Cancelled
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
@@ -186,11 +186,11 @@ defmodule YscWeb.OrderConfirmationLive do
           <% else %>
             <div class="flex items-center gap-2 text-green-600 mb-2">
               <.icon name="hero-check-circle-solid" class="w-6 h-6" />
-              <span class="font-bold uppercase tracking-wider text-sm">
+              <span class="text-sm type-eyebrow">
                 Order Confirmed
               </span>
             </div>
-            <h1 class="text-4xl font-bold text-zinc-900">
+            <h1 class="text-4xl text-zinc-900 type-display">
               <%= if @event_in_past do %>
                 Hope you had a blast, {@user_first_name}!
               <% else %>
@@ -208,7 +208,7 @@ defmodule YscWeb.OrderConfirmationLive do
           <% end %>
         </div>
         <div class="text-left md:text-right">
-          <p class="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+          <p class="text-xs text-zinc-400 type-eyebrow">
             Order number
           </p>
           <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
@@ -246,7 +246,7 @@ defmodule YscWeb.OrderConfirmationLive do
               <% end %>
               <div class="absolute inset-0 bg-linear-to-t from-black/40 to-transparent flex items-end p-6 z-10">
                 <div class="flex items-center justify-between w-full">
-                  <h2 class="text-white text-xl font-bold flex items-center gap-2">
+                  <h2 class="text-white text-xl flex items-center gap-2 type-subhead">
                     <.icon name="hero-information-circle" class="w-8 h-8" />
                     Event Details
                   </h2>
@@ -264,11 +264,11 @@ defmodule YscWeb.OrderConfirmationLive do
             </div>
             <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8 relative z-0">
               <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase mb-1">Event</p>
+                <p class="text-xs text-zinc-400 mb-1 type-eyebrow">Event</p>
                 <p class="text-xl font-bold text-zinc-900">{@event.title}</p>
               </div>
               <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
+                <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
                   Date & Time
                 </p>
                 <p class="text-xl font-bold text-zinc-900">
@@ -287,7 +287,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 </p>
               </div>
               <div>
-                <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
+                <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
                   Location
                 </p>
                 <p class="text-xl font-bold text-zinc-900">
@@ -311,7 +311,7 @@ defmodule YscWeb.OrderConfirmationLive do
             <div class="px-6 py-4 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between gap-4">
               <h2
                 id="order-items-section-title"
-                class="text-lg font-semibold text-zinc-900 flex items-center gap-2"
+                class="text-lg text-zinc-900 flex items-center gap-2 type-subhead"
               >
                 <.icon
                   name={
@@ -488,7 +488,7 @@ defmodule YscWeb.OrderConfirmationLive do
                         id={"ticket-answers-#{ticket.id}"}
                         class="mt-3 pt-3 border-t border-zinc-300"
                       >
-                        <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                        <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                           Your Answers
                         </p>
                         <dl class="space-y-1 text-sm">
@@ -512,7 +512,7 @@ defmodule YscWeb.OrderConfirmationLive do
                         "pt-3 border-t border-zinc-300",
                         if(has_ticket_discount, do: "mt-3", else: "mt-3")
                       ]}>
-                        <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                        <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                           Registration Details
                         </p>
                         <div class="space-y-1 text-sm">
@@ -561,7 +561,7 @@ defmodule YscWeb.OrderConfirmationLive do
             )
           ]}>
             <h3 class={[
-              "text-xs font-bold uppercase tracking-widest mb-6",
+              "text-xs mb-6 type-eyebrow",
               if(
                 @ticket_order.status == :cancelled ||
                   (@refund_data && @refund_data.total_refunded),
@@ -673,7 +673,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 </div>
                 <%= if @refund_data.processed_refunds && length(@refund_data.processed_refunds) > 0 do %>
                   <div class="border-t border-red-200 pt-4 space-y-2">
-                    <p class="text-xs font-semibold text-zinc-600 uppercase tracking-wider">
+                    <p class="text-xs text-zinc-600 type-eyebrow">
                       Refund Details
                     </p>
                     <%= for refund <- @refund_data.processed_refunds do %>
@@ -707,7 +707,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 <% end %>
                 <%= if @refund_data.refunded_tickets && length(@refund_data.refunded_tickets) > 0 do %>
                   <div class="border-t border-red-200 pt-4 space-y-2">
-                    <p class="text-xs font-semibold text-zinc-600 uppercase tracking-wider">
+                    <p class="text-xs text-zinc-600 type-eyebrow">
                       Refunded Tickets
                     </p>
                     <%= for ticket <- @refund_data.refunded_tickets do %>

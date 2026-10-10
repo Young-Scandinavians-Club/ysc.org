@@ -14,7 +14,7 @@ defmodule YscWeb.ConductViolationReportLive do
           <div class="flex justify-center mb-6">
             <.icon name="hero-check-circle" class="text-green-600 w-16 h-16" />
           </div>
-          <h1 class="text-2xl lg:text-3xl font-bold text-zinc-900 mb-4">
+          <h1 class="text-2xl lg:text-3xl text-zinc-900 mb-4 type-display">
             Thank You for Your Report
           </h1>
           <p class="text-zinc-600 mb-4 text-lg">
@@ -27,7 +27,7 @@ defmodule YscWeb.ConductViolationReportLive do
             :if={@submitted_summary}
             class="mb-8 p-4 bg-zinc-50 border border-zinc-200 rounded-lg text-left"
           >
-            <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">
+            <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
               Your Submitted Report
             </p>
             <p class="text-sm text-zinc-700 whitespace-pre-wrap">
@@ -64,7 +64,7 @@ defmodule YscWeb.ConductViolationReportLive do
                 />
               </.link>
             </div>
-            <h1 class="text-3xl lg:text-4xl font-bold text-zinc-900 mb-4">
+            <h1 class="text-3xl lg:text-4xl text-zinc-900 mb-4 type-display">
               Report a concern
             </h1>
             <p class="text-lg text-zinc-600 max-w-xl mx-auto mb-4">
@@ -124,7 +124,7 @@ defmodule YscWeb.ConductViolationReportLive do
             >
               <%!-- Contact Information Section --%>
               <div class="mb-8">
-                <h2 class="text-xl font-bold text-zinc-900 mb-6">
+                <h2 class="text-xl text-zinc-900 mb-6 type-subhead">
                   Your Contact Information
                 </h2>
 
@@ -138,7 +138,7 @@ defmodule YscWeb.ConductViolationReportLive do
                   </p>
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1">
+                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                         Name
                       </p>
                       <p class="text-zinc-900 font-medium">
@@ -146,7 +146,7 @@ defmodule YscWeb.ConductViolationReportLive do
                       </p>
                     </div>
                     <div>
-                      <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1">
+                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                         Email
                       </p>
                       <p class="text-zinc-900 font-medium">
@@ -154,7 +154,7 @@ defmodule YscWeb.ConductViolationReportLive do
                       </p>
                     </div>
                     <div>
-                      <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-1">
+                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                         Phone
                       </p>
                       <p class="text-zinc-900 font-medium">
@@ -241,7 +241,7 @@ defmodule YscWeb.ConductViolationReportLive do
 
               <%!-- Incident Details Section --%>
               <div class="mb-8">
-                <h2 class="text-xl font-bold text-zinc-900 mb-2">
+                <h2 class="text-xl text-zinc-900 mb-2 type-subhead">
                   Incident Details
                 </h2>
                 <p class="text-sm text-zinc-500 mb-3">

@@ -240,7 +240,7 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ "Tier"
       assert html =~ "Ticket"
       assert html =~ "Order"
-      assert html =~ "uppercase tracking-wide"
+      assert html =~ "type-eyebrow"
     end
   end
 
