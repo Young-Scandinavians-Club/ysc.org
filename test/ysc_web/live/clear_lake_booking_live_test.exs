@@ -519,7 +519,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       # Lifetime members should see booking functionality
       assert html =~ "Clear Lake"
-      assert html =~ "Book the whole cabin"
+      assert html =~ "Entire cabin"
+      refute html =~ "Book the whole cabin"
       refute html =~ "Reserve the whole cabin"
       refute html =~ "Reserve space for your group"
     end
@@ -534,7 +535,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         render_click(view, "booking-mode-changed", %{"booking_mode" => "buyout"})
 
       assert html =~
-               "The calendar shows which dates are available for booking the whole cabin."
+               "The calendar shows which dates are available for booking the entire cabin."
 
       refute html =~ "full cabin rental"
     end
@@ -3255,7 +3256,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       state = :sys.get_state(view.pid)
 
       assert state.socket.assigns.form_errors.general ==
-               "The cabin isn't available for those dates. Try different dates or book the whole cabin."
+               "The cabin isn't available for those dates. Try different dates or book the entire cabin."
     end
 
     test "shows application-pending message when a pending-approval user attempts to book",
@@ -3555,9 +3556,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
   end
 
   describe "rooms info tab" do
-    test "appears and starts a booking search when the property has rooms", %{
-      conn: conn
-    } do
+    test "lists rooms as browse-only because stays are shared or entire-cabin",
+         %{
+           conn: conn
+         } do
       {:ok, room} =
         Bookings.create_room(%{
           name: "Clear Lake test room #{System.unique_integer([:positive])}",
@@ -3576,9 +3578,19 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       view |> element("#info-tab-rooms") |> render_click()
       assert has_element?(view, "#browse-room-#{room.id}", room.name)
+      refute has_element?(view, "#browse-room-pick-#{room.id}")
 
-      view |> element("#browse-room-pick-#{room.id}") |> render_click()
-      assert_push_event(view, "scroll-to-element", %{id: "booking-step-mode"})
+      assert has_element?(
+               view,
+               "#property-room-browser",
+               "You don't pick a specific room when you book"
+             )
+
+      assert has_element?(
+               view,
+               "#property-room-browser",
+               "Entire cabin stays include every room"
+             )
     end
 
     test "is hidden because Clear Lake has no individual rooms", %{conn: conn} do

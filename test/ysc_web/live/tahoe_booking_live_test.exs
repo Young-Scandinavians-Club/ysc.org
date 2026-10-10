@@ -2151,6 +2151,14 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert has_element?(view, "#property-room-browser")
       assert has_element?(view, "#browse-room-#{room.id}", room.name)
       assert has_element?(view, "#browse-room-pick-#{room.id}")
+
+      assert has_element?(
+               view,
+               "#property-room-browser",
+               "we'll check whether it's free on your dates"
+             )
+
+      refute has_element?(view, "#property-room-browser", "availability search")
     end
 
     test "can be opened directly from the URL", %{conn: conn, room: room} do
