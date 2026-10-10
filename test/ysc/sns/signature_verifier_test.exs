@@ -152,6 +152,23 @@ defmodule Ysc.SNS.SignatureVerifierTest do
 
       refute SignatureVerifier.allow_notification_topic?(nil)
     end
+
+    test "rejects every topic when the allowlist is empty (Finding 73)" do
+      prev = Application.get_env(:ysc, :sns_allowed_topic_arns)
+      Application.put_env(:ysc, :sns_allowed_topic_arns, [])
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :sns_allowed_topic_arns, prev)
+      end)
+
+      refute SignatureVerifier.allow_notification_topic?(
+               "arn:aws:sns:us-west-1:123456789:ses-events"
+             )
+
+      refute SignatureVerifier.allow_notification_topic?(
+               "arn:aws:sns:us-west-1:999999999999:attacker-topic"
+             )
+    end
   end
 
   describe "signed_message_type/2" do
