@@ -18,6 +18,7 @@ defmodule Ysc.Events do
   alias Ysc.Events.TicketReservation
   alias Ysc.Events.EventNotificationSubscription
   alias Ysc.Events.EventUpdate
+  alias Ysc.Events.PricingDisplay
   alias Ysc.Accounts.User
   alias Ysc.Avatars.Avatar
   alias Ysc.StaffPreview
@@ -1316,16 +1317,7 @@ defmodule Ysc.Events do
     ticket_tiers = Map.get(ticket_tiers_by_event, event.id, [])
     ticket_count = Map.get(ticket_counts_by_event, event.id, 0)
 
-    pricing_info =
-      if Map.get(event, :tickets_tbd) do
-        %{
-          display_text: "Tickets Coming Soon",
-          has_free_tiers: false,
-          lowest_price: nil
-        }
-      else
-        calculate_event_pricing(ticket_tiers)
-      end
+    pricing_info = PricingDisplay.pricing_info(event, ticket_tiers)
 
     image = get_event_image(event, images_by_id)
 
@@ -1430,60 +1422,6 @@ defmodule Ysc.Events do
     |> Enum.into(%{}, fn {event_id, count} -> {event_id, count} end)
   end
 
-  # Calculate pricing display information for an event
-  defp calculate_event_pricing([]) do
-    %{display_text: "Free", has_free_tiers: true, lowest_price: nil}
-  end
-
-  defp calculate_event_pricing(ticket_tiers) do
-    # Check if there are any free tiers (handle both atom and string types)
-    has_free_tiers =
-      Enum.any?(ticket_tiers, &(&1.type == :free or &1.type == "free"))
-
-    # Get the lowest price from paid tiers only (exclude donation tiers)
-    # Filter out donation, free, and tiers with nil prices
-    paid_tiers =
-      Enum.filter(ticket_tiers, fn tier ->
-        (tier.type == :paid or tier.type == "paid") && tier.price != nil
-      end)
-
-    case {has_free_tiers, paid_tiers} do
-      {true, []} ->
-        %{display_text: "Free", has_free_tiers: true, lowest_price: nil}
-
-      {true, _paid_tiers} ->
-        # When there are both free and paid tiers, show "From $0.00"
-        %{display_text: "From $0.00", has_free_tiers: true, lowest_price: nil}
-
-      {false, []} ->
-        %{display_text: "Free", has_free_tiers: false, lowest_price: nil}
-
-      {false, paid_tiers} ->
-        lowest_price = Enum.min_by(paid_tiers, & &1.price.amount, fn -> nil end)
-
-        # If there's only one paid tier, show the exact price instead of "From $X"
-        display_text =
-          if length(paid_tiers) == 1 do
-            format_price(lowest_price.price)
-          else
-            "From #{format_price(lowest_price.price)}"
-          end
-
-        %{
-          display_text: display_text,
-          has_free_tiers: false,
-          lowest_price: lowest_price
-        }
-    end
-  end
-
-  # Format price for display
-  defp format_price(%Money{} = money) do
-    Ysc.MoneyHelper.format_money!(money)
-  end
-
-  defp format_price(_), do: "$0.00"
-
   @doc """
   Returns a short display string for event pricing (e.g. "Free", "From $10", "Tickets coming soon").
   Use for newsletters and other places that need a single line. Event can have ticket_tiers preloaded
@@ -1496,8 +1434,7 @@ defmodule Ysc.Events do
       "Tickets coming soon"
     else
       tiers = Map.get(event, :ticket_tiers) || []
-      pricing = calculate_event_pricing(tiers)
-      pricing.display_text
+      PricingDisplay.from_tiers(tiers).display_text
     end
   end
 
