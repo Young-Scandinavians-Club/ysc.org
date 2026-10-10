@@ -394,7 +394,14 @@ defmodule Ysc.MixProject do
       # span/parent fixes. We do not enable Sentry.Integrations.Oban or OpenTelemetry.
       # 13.5.1: rate-limit windows log once; per-event 429 drops at :debug (SDK spec).
       {:sentry, "~> 13.5.1"},
-      {:sobelow, "~> 0.15", only: [:dev, :test], runtime: false},
+      # 0.16.0: XSS.Raw covers HEEx/~H (and ignores benign local raw/1);
+      # XSS.SendResp follows put_resp_content_type / put_resp_header;
+      # github format; --include-mix-tasks/--include-scripts/--summary.
+      # Check names, CLI flags, JSON fields, and skip fingerprints are
+      # unchanged. Elixir floor stays ~> 1.12. A bare `--exit` now means
+      # `--exit low` and overrides `.sobelow-conf`; CI passes `--exit high`
+      # to keep the committed fail-on-high gate.
+      {:sobelow, "~> 0.16.0", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+.
       # 1.27.1: AmazonSES returns {:error, %{code, message}} instead of crashing when
