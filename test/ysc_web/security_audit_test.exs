@@ -80,6 +80,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 84 (HIGH)     GLightboxHook passed figcaption/link caption textContent into GLightbox `title`, which GLightbox assigns with innerHTML — entity-encoded HTML in Trix captions became stored XSS on public /events/:id and /posts/:id when a visitor opened the lightbox
   Finding 85 (HIGH)     Public registration accepted a hidden `password` param, hashed it, then OAuth auto-verified the squatted email so the attacker could sign in and lock the victim out
   Finding 86 (HIGH)     After Family→Single (scheduled downgrade or stale invite), linked sub-accounts still inherited membership via has_active_membership?/1 because any valid primary subscription counted. Accept also did not re-check that the primary still hosts Family/Lifetime.
+  Finding 87 (HIGH)     Impersonation ignored whether the admin session token still authenticated a full admin. After suspend/revoke/demotion the signed cookie still had `:impersonated_user_id`, so fetch_current_user/LiveView mount kept acting as the victim. Stop impersonation is full-admin-only, so the leftover session could not even be ended.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -5693,6 +5694,60 @@ defmodule YscWeb.SecurityAuditTest do
       MembershipCache.invalidate_user(linked.id)
       refute Accounts.has_active_membership?(linked)
       assert MembershipCache.get_active_membership(linked) == nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 87 (HIGH): Impersonation must die with the admin session
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 87: impersonation does not survive admin session death" do
+    test "revoking the admin session logs out instead of remaining the victim",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "ImpersonationVictim"})
+      conn = impersonate_as_admin(conn, admin, target)
+
+      assert get_session(conn, :impersonated_user_id) == target.id
+
+      Accounts.revoke_all_user_sessions(admin)
+
+      conn = get(conn, ~p"/users/tickets")
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+      refute conn.assigns.current_user
+      refute conn.assigns[:impersonating?]
+    end
+
+    test "suspending the admin while impersonating cannot keep the victim session",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin", state: :active})
+      actor = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "ImpersonationVictim"})
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, _} = Accounts.update_user(admin, %{"state" => "suspended"}, actor)
+
+      conn = get(conn, ~p"/users/tickets")
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+      refute conn.assigns.current_user
+    end
+
+    test "demoting the admin while impersonating returns to their own member session",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      actor = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "ImpersonationVictim"})
+      conn = impersonate_as_admin(conn, admin, target)
+
+      {:ok, _} = Accounts.update_user(admin, %{"role" => "member"}, actor)
+
+      conn = get(conn, ~p"/users/tickets")
+
+      assert conn.assigns.current_user.id == admin.id
+      refute conn.assigns.impersonating?
+      refute get_session(conn, :impersonated_user_id)
     end
   end
 
