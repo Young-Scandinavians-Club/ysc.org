@@ -3292,15 +3292,41 @@ defmodule Ysc.Events do
     end
   end
 
+  # Event page, member settings, and admin reservation cards: hold window +
+  # discount. Omits notes, ticket_order, and created_by (those lists never
+  # render grant copy or the admin who created the hold).
+  @ticket_reservation_hold_fields [
+    :id,
+    :ticket_tier_id,
+    :user_id,
+    :quantity,
+    :discount_percentage,
+    :expires_at,
+    :status
+  ]
+
+  # Admin reservation cards: member name/email only — skip hashed_password,
+  # bios, Stripe ids that `preload([:user, :created_by])` would SELECT.
+  @ticket_reservation_user_fields [:id, :first_name, :last_name, :email]
+
+  # Member settings "tickets reserved for you": tier name + event title/id
+  # for the finish-buying link. Skip tier description, attendee_questions,
+  # and event body HTML.
+  @ticket_reservation_hold_tier_fields [:id, :name, :event_id]
+  @ticket_reservation_hold_event_fields [:id, :title]
+
   @doc """
   List all ticket reservations for a ticket tier.
   """
   def list_ticket_reservations_for_tier(tier_id) do
+    ticket_reservation_user_query = ticket_reservation_user_preload_query()
+
     TicketReservation
     |> where([tr], tr.ticket_tier_id == ^tier_id)
     |> order_by([tr], desc: tr.inserted_at)
+    |> select([tr], struct(tr, ^@ticket_reservation_hold_fields))
+    |> preload(user: ^ticket_reservation_user_query)
     |> Repo.all()
-    |> Repo.preload([:ticket_tier, :user, :created_by, :ticket_order])
   end
 
   @doc """
@@ -3323,15 +3349,24 @@ defmodule Ysc.Events do
   List ticket reservations for a user for a specific event.
 
   Only returns holds that are still valid for pricing (`expires_at` unset or in the future).
+
+  Struct-selects hold columns used on the public event page (quantity and
+  discount). Does not preload the member, grant author, order, or tier —
+  checkout already has the tier list, and the viewer is `current_user`.
   """
   def list_ticket_reservations_for_user(user_id, event_id) do
+    user_id
+    |> ticket_reservations_for_user_query(event_id)
+    |> Repo.all()
+  end
+
+  defp ticket_reservations_for_user_query(user_id, event_id) do
     TicketReservation
     |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
     |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
     |> where_ticket_reservation_hold_active()
     |> order_by([tr], desc: tr.inserted_at)
-    |> Repo.all()
-    |> Repo.preload([:ticket_tier, :user, :created_by, :ticket_order])
+    |> select([tr], struct(tr, ^@ticket_reservation_hold_fields))
   end
 
   @doc """
@@ -3339,13 +3374,15 @@ defmodule Ysc.Events do
   is still open (`expires_at` unset or in the future). These apply at checkout.
 
   Fulfilled, cancelled, or lapsed holds are excluded.
+
+  Struct-selects the reservation, tier name, and event title/id used on
+  Membership → My Bookings & Payments. Omits event body HTML and unused
+  tier columns.
   """
   def list_active_ticket_holds_for_user(user_id) do
-    TicketReservation
-    |> where([tr], tr.user_id == ^user_id)
+    user_id
+    |> ticket_reservations_for_user_with_tier_query()
     |> where_ticket_reservation_hold_active()
-    |> order_by([tr], desc: tr.inserted_at)
-    |> preload(ticket_tier: :event)
     |> Repo.all()
   end
 
@@ -3353,14 +3390,33 @@ defmodule Ysc.Events do
   Lists every ticket reservation for the member (`user_id`), in any status,
   newest first.
 
-  Preloads `ticket_tier` (with `event`) for account settings and similar UIs.
+  Same slim `ticket_tier` / `event` columns as
+  `list_active_ticket_holds_for_user/1`.
   """
   def list_all_ticket_reservations_for_user(user_id) do
-    TicketReservation
-    |> where([tr], tr.user_id == ^user_id)
-    |> order_by([tr], desc: tr.inserted_at)
-    |> preload(ticket_tier: :event)
+    user_id
+    |> ticket_reservations_for_user_with_tier_query()
     |> Repo.all()
+  end
+
+  defp ticket_reservations_for_user_with_tier_query(user_id) do
+    event_query =
+      from(e in Event,
+        select: struct(e, ^@ticket_reservation_hold_event_fields)
+      )
+
+    tier_query =
+      from(tt in TicketTier,
+        select: struct(tt, ^@ticket_reservation_hold_tier_fields),
+        preload: [event: ^event_query]
+      )
+
+    from(tr in TicketReservation,
+      where: tr.user_id == ^user_id,
+      order_by: [desc: tr.inserted_at],
+      select: struct(tr, ^@ticket_reservation_hold_fields),
+      preload: [ticket_tier: ^tier_query]
+    )
   end
 
   @doc """
@@ -3369,8 +3425,6 @@ defmodule Ysc.Events do
   Excludes `status: "active"` rows whose `expires_at` is in the past (those remain
   in the database until fulfilled or cancelled; see `list_expired_active_reservations_for_tier/1`).
   """
-  @ticket_reservation_detail_preloads [:ticket_tier, :user, :created_by]
-
   def list_active_reservations_for_tier(tier_id) do
     tier_id
     |> List.wrap()
@@ -3390,14 +3444,10 @@ defmodule Ysc.Events do
     if tier_ids == [] do
       %{}
     else
-      TicketReservation
-      |> where([tr], tr.ticket_tier_id in ^tier_ids)
+      tier_ids
+      |> ticket_reservations_for_tiers_query()
       |> where_ticket_reservation_hold_active()
-      |> order_by([tr], desc: tr.inserted_at)
-      |> Repo.all()
-      |> Repo.preload(@ticket_reservation_detail_preloads)
-      |> Enum.group_by(& &1.ticket_tier_id)
-      |> reservations_by_tier(tier_ids)
+      |> load_reservations_grouped_by_tier(tier_ids)
     end
   end
 
@@ -3426,15 +3476,34 @@ defmodule Ysc.Events do
     if tier_ids == [] do
       %{}
     else
-      TicketReservation
-      |> where([tr], tr.ticket_tier_id in ^tier_ids and tr.status == "active")
+      tier_ids
+      |> ticket_reservations_for_tiers_query()
+      |> where([tr], tr.status == "active")
       |> where([tr], not is_nil(tr.expires_at) and tr.expires_at <= ^now)
-      |> order_by([tr], desc: tr.inserted_at)
-      |> Repo.all()
-      |> Repo.preload(@ticket_reservation_detail_preloads)
-      |> Enum.group_by(& &1.ticket_tier_id)
-      |> reservations_by_tier(tier_ids)
+      |> load_reservations_grouped_by_tier(tier_ids)
     end
+  end
+
+  defp ticket_reservations_for_tiers_query(tier_ids) do
+    ticket_reservation_user_query = ticket_reservation_user_preload_query()
+
+    from(tr in TicketReservation,
+      where: tr.ticket_tier_id in ^tier_ids,
+      order_by: [desc: tr.inserted_at],
+      select: struct(tr, ^@ticket_reservation_hold_fields),
+      preload: [user: ^ticket_reservation_user_query]
+    )
+  end
+
+  defp ticket_reservation_user_preload_query do
+    from(u in User, select: struct(u, ^@ticket_reservation_user_fields))
+  end
+
+  defp load_reservations_grouped_by_tier(query, tier_ids) do
+    query
+    |> Repo.all()
+    |> Enum.group_by(& &1.ticket_tier_id)
+    |> reservations_by_tier(tier_ids)
   end
 
   defp reservations_by_tier(grouped, tier_ids) do
@@ -4205,5 +4274,23 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_list_tickets_for_export_query do
     list_tickets_for_export_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_ticket_reservations_for_user_query do
+    ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
+    ticket_reservations_for_user_query(ulid, ulid)
+  end
+
+  @doc false
+  def ci_query_explain_ticket_reservations_for_user_with_tier_query do
+    ticket_reservations_for_user_with_tier_query(
+      Ysc.Ci.QueryExplain.Fixtures.ulid()
+    )
+  end
+
+  @doc false
+  def ci_query_explain_ticket_reservations_for_tiers_query do
+    ticket_reservations_for_tiers_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
   end
 end
