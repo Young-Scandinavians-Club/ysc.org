@@ -991,11 +991,40 @@ defmodule Ysc.Tickets do
 
   @doc """
   Updates a ticket order's payment intent ID.
+
+  Only pending orders are updated. Deferred checkout (#1532) can create a
+  Stripe PaymentIntent after another tab, admin grant, or `create_ticket_order/4`
+  has already cancelled this cart. Attaching anyway lets the member pay a
+  `:cancelled` order; `process_ticket_order_payment/2` then returns
+  `:cannot_complete_order` and `maybe_refund_unfulfilled_ticket_payment/3`
+  does not refund (only `:amount_mismatch` on pending/expired carts).
   """
-  def update_payment_intent(ticket_order, payment_intent_id) do
-    ticket_order
-    |> TicketOrder.payment_changeset(%{payment_intent_id: payment_intent_id})
-    |> Repo.update()
+  def update_payment_intent(ticket_order, payment_intent_id)
+      when is_binary(payment_intent_id) do
+    require Ysc.Logging
+
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {count, _} =
+      from(to in TicketOrder,
+        where: to.id == ^ticket_order.id and to.status == :pending
+      )
+      |> Repo.update_all(
+        set: [payment_intent_id: payment_intent_id, updated_at: now]
+      )
+
+    if count == 1 do
+      {:ok,
+       %{ticket_order | payment_intent_id: payment_intent_id, updated_at: now}}
+    else
+      Ysc.Logging.warning(
+        "Refusing to attach PaymentIntent to non-pending ticket order",
+        ticket_order_id: ticket_order.id,
+        payment_intent_id: payment_intent_id
+      )
+
+      {:error, :order_not_pending}
+    end
   end
 
   @doc """

@@ -3869,50 +3869,77 @@ defmodule YscWeb.EventDetailsLive do
     require Ysc.Logging
 
     case {socket.assigns[:ticket_order], socket.assigns[:current_user]} do
-      {%Ysc.Tickets.TicketOrder{status: :pending} = ticket_order, user}
+      {%Ysc.Tickets.TicketOrder{status: :pending, id: order_id}, user}
       when not is_nil(user) ->
-        case retrieve_or_create_payment_intent(ticket_order, user) do
-          {:ok, payment_intent} ->
-            Ysc.Logging.debug(
-              "create_checkout_payment_intent: Payment intent ready",
-              order_id: ticket_order.id,
-              payment_intent_id: payment_intent.id,
-              payment_intent_status: payment_intent.status
+        case Ysc.Tickets.get_ticket_order(order_id) do
+          %Ysc.Tickets.TicketOrder{status: :pending} = ticket_order ->
+            case retrieve_or_create_payment_intent(ticket_order, user) do
+              {:ok, payment_intent} ->
+                Ysc.Logging.debug(
+                  "create_checkout_payment_intent: Payment intent ready",
+                  order_id: ticket_order.id,
+                  payment_intent_id: payment_intent.id,
+                  payment_intent_status: payment_intent.status
+                )
+
+                {:noreply,
+                 socket
+                 |> assign(:payment_intent, payment_intent)
+                 |> assign(:ticket_order, %{
+                   ticket_order
+                   | payment_intent_id: payment_intent.id
+                 })
+                 |> assign(:checkout_payment_intent_pending, false)
+                 |> assign(:stripe_payment_element_ready, false)}
+
+              {:error, reason} ->
+                Ysc.Logging.error(
+                  "create_checkout_payment_intent: Failed to retrieve/create payment intent",
+                  order_id: ticket_order.id,
+                  error: reason
+                )
+
+                {:noreply, fail_deferred_checkout_payment_intent(socket)}
+            end
+
+          _stale_order ->
+            Ysc.Logging.info(
+              "create_checkout_payment_intent: Order is no longer pending",
+              order_id: order_id
             )
 
-            {:noreply,
-             socket
-             |> assign(:payment_intent, payment_intent)
-             |> assign(:ticket_order, %{
-               ticket_order
-               | payment_intent_id: payment_intent.id
-             })
-             |> assign(:checkout_payment_intent_pending, false)
-             |> assign(:stripe_payment_element_ready, false)}
-
-          {:error, reason} ->
-            Ysc.Logging.error(
-              "create_checkout_payment_intent: Failed to retrieve/create payment intent",
-              order_id: ticket_order.id,
-              error: reason
-            )
-
-            {:noreply,
-             socket
-             |> assign(:checkout_payment_intent_pending, false)
-             |> assign(:show_payment_modal, false)
-             |> assign(:payment_intent, nil)
-             |> YscWeb.Flash.put_toast(
-               :error,
-               "We couldn't start checkout. Please try again in a moment. If it keeps failing, email #{Ysc.EmailConfig.contact_email()} with the event name.",
-               title: "Payment"
-             )
-             |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
+            {:noreply, abandon_deferred_checkout_payment_intent(socket)}
         end
 
       {_ticket_order, _user} ->
         {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
     end
+  end
+
+  defp fail_deferred_checkout_payment_intent(socket) do
+    socket
+    |> assign(:checkout_payment_intent_pending, false)
+    |> assign(:show_payment_modal, false)
+    |> assign(:payment_intent, nil)
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "We couldn't start checkout. Please try again in a moment. If it keeps failing, email #{Ysc.EmailConfig.contact_email()} with the event name.",
+      title: "Payment"
+    )
+    |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
+  end
+
+  defp abandon_deferred_checkout_payment_intent(socket) do
+    socket
+    |> assign(:checkout_payment_intent_pending, false)
+    |> assign(:show_payment_modal, false)
+    |> assign(:payment_intent, nil)
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "This ticket checkout was cancelled. Please choose your tickets again.",
+      title: "Tickets"
+    )
+    |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
   end
 
   # Restore checkout state from a pending order (legacy support)

@@ -121,6 +121,44 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert has_element?(view, "#payment-modal")
     end
 
+    test "does not attach a PaymentIntent after the cart is cancelled during deferred create",
+         %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      stub(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        {:ok, build_payment_intent(%{amount: params.amount})}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      view = wait_for_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      html = render_click(view, "proceed-to-checkout")
+
+      assert html =~ ~s(id="checkout-payment-loading")
+      refute html =~ ~s(id="payment-element")
+
+      order =
+        Tickets.list_user_ticket_orders(user.id)
+        |> List.first()
+
+      assert order.status == :pending
+      assert is_nil(order.payment_intent_id)
+
+      assert {:ok, _} =
+               Tickets.cancel_ticket_order(order, "started a new checkout")
+
+      render(view)
+
+      refute has_element?(view, "#payment-element")
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :cancelled
+      assert is_nil(reloaded.payment_intent_id)
+    end
+
     test "restored checkout paints the hold timer before retrieving the PaymentIntent",
          %{conn: conn, user: user} do
       {event, _tier, order, payment_intent} = setup_pending_order(user)
