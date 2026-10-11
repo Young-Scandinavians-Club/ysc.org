@@ -2254,19 +2254,30 @@ defmodule YscWeb.EventDetailsLive do
                   </span>
                   <h3 class="text-lg type-subhead">Payment Information</h3>
                 </div>
-                <div
-                  id="payment-element"
-                  phx-hook="StripeElements"
-                  phx-update="ignore"
-                  data-publicKey={@public_key}
-                  data-public-key={@public_key}
-                  data-client-secret={@payment_intent.client_secret}
-                  data-clientSecret={@payment_intent.client_secret}
-                  data-ticket-order-id={@ticket_order.id}
-                  data-billing-details={@stripe_billing_details}
-                >
-                  <!-- Stripe Elements will be mounted here -->
-                </div>
+                <%= if @payment_intent do %>
+                  <div
+                    id="payment-element"
+                    phx-hook="StripeElements"
+                    phx-update="ignore"
+                    data-publicKey={@public_key}
+                    data-public-key={@public_key}
+                    data-client-secret={@payment_intent.client_secret}
+                    data-clientSecret={@payment_intent.client_secret}
+                    data-ticket-order-id={@ticket_order.id}
+                    data-billing-details={@stripe_billing_details}
+                  >
+                    <!-- Stripe Elements will be mounted here -->
+                  </div>
+                <% else %>
+                  <div
+                    id="checkout-payment-loading"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span class="sr-only">Loading payment form…</span>
+                    <.payment_element_loading id="checkout-payment-intent-loading" />
+                  </div>
+                <% end %>
                 <div id="payment-message" class="hidden text-sm"></div>
               </div>
               <!-- Checkout Zone: Payment Action Area -->
@@ -2973,6 +2984,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:load_calendar, true)
     |> assign(:payment_redirect_in_progress, false)
     |> assign(:preserve_failed_checkout_state, false)
+    |> assign(:checkout_payment_intent_pending, false)
     |> assign(:stripe_payment_element_ready, false)
     |> assign(:stripe_billing_details, "{}")
     # Reservations - will be loaded async
@@ -3651,6 +3663,7 @@ defmodule YscWeb.EventDetailsLive do
             |> assign(:checkout_expired, false)
             |> assign(:checkout_payment_failed, true)
             |> assign(:stripe_payment_element_ready, false)
+            |> assign(:checkout_payment_intent_pending, false)
             |> assign(:show_ticket_modal, false)
             |> assign(:payment_intent, nil)
             |> assign(:ticket_order, nil)
@@ -3701,6 +3714,7 @@ defmodule YscWeb.EventDetailsLive do
             |> assign(:show_payment_modal, false)
             |> assign(:checkout_expired, false)
             |> assign(:checkout_payment_failed, false)
+            |> assign(:checkout_payment_intent_pending, false)
             |> assign(:stripe_payment_element_ready, false)
             |> assign(:show_free_ticket_confirmation, false)
         end
@@ -3833,6 +3847,74 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
+  defp checkout_payment_intent_pending_for?(socket, ticket_order) do
+    socket.assigns[:checkout_payment_intent_pending] == true &&
+      socket.assigns[:show_payment_modal] == true &&
+      match?(
+        %{id: id} when id == ticket_order.id,
+        socket.assigns[:ticket_order]
+      )
+  end
+
+  defp schedule_checkout_payment_intent(socket) do
+    if socket.assigns[:checkout_payment_intent_pending] do
+      socket
+    else
+      send(self(), :create_checkout_payment_intent)
+      assign(socket, :checkout_payment_intent_pending, true)
+    end
+  end
+
+  defp create_checkout_payment_intent_now(socket) do
+    require Ysc.Logging
+
+    case {socket.assigns[:ticket_order], socket.assigns[:current_user]} do
+      {%Ysc.Tickets.TicketOrder{status: :pending} = ticket_order, user}
+      when not is_nil(user) ->
+        case retrieve_or_create_payment_intent(ticket_order, user) do
+          {:ok, payment_intent} ->
+            Ysc.Logging.debug(
+              "create_checkout_payment_intent: Payment intent ready",
+              order_id: ticket_order.id,
+              payment_intent_id: payment_intent.id,
+              payment_intent_status: payment_intent.status
+            )
+
+            {:noreply,
+             socket
+             |> assign(:payment_intent, payment_intent)
+             |> assign(:ticket_order, %{
+               ticket_order
+               | payment_intent_id: payment_intent.id
+             })
+             |> assign(:checkout_payment_intent_pending, false)
+             |> assign(:stripe_payment_element_ready, false)}
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "create_checkout_payment_intent: Failed to retrieve/create payment intent",
+              order_id: ticket_order.id,
+              error: reason
+            )
+
+            {:noreply,
+             socket
+             |> assign(:checkout_payment_intent_pending, false)
+             |> assign(:show_payment_modal, false)
+             |> assign(:payment_intent, nil)
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "We couldn't start checkout. Please try again in a moment. If it keeps failing, email #{Ysc.EmailConfig.contact_email()} with the event name.",
+               title: "Payment"
+             )
+             |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
+        end
+
+      {_ticket_order, _user} ->
+        {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
+    end
+  end
+
   # Restore checkout state from a pending order (legacy support)
   defp restore_checkout_state(socket, order_id, event_id) do
     require Ysc.Logging
@@ -3950,6 +4032,18 @@ defmodule YscWeb.EventDetailsLive do
   defp effective_checkout_step(checkout_step, _ticket_order), do: checkout_step
 
   defp restore_payment_state_from_url(socket, ticket_order, checkout_step) do
+    # proceed_to_payment_or_free already assigned checkout state and queued
+    # the Stripe round-trip. Skip a second household/details load + PI schedule
+    # when handle_params runs for the checkout=payment patch.
+    if checkout_step == "payment" &&
+         checkout_payment_intent_pending_for?(socket, ticket_order) do
+      socket
+    else
+      restore_payment_state_from_url_now(socket, ticket_order, checkout_step)
+    end
+  end
+
+  defp restore_payment_state_from_url_now(socket, ticket_order, checkout_step) do
     require Ysc.Logging
 
     Ysc.Logging.debug("restore_payment_state_from_url: Starting restore",
@@ -4128,68 +4222,20 @@ defmodule YscWeb.EventDetailsLive do
   defp restore_payment_intent_for_order(socket, ticket_order, restore_context) do
     require Ysc.Logging
 
+    # Stripe retrieve/create is a network round-trip. Paint the order summary,
+    # hold timer, and attendee step first, then create the PI in handle_info.
     Ysc.Logging.debug(
-      "restore_payment_state_from_url: Retrieving/creating payment intent",
+      "restore_payment_state_from_url: Scheduling payment intent",
       order_id: ticket_order.id,
       payment_intent_id: ticket_order.payment_intent_id,
       user_stripe_id: socket.assigns.current_user.stripe_id
     )
 
-    case retrieve_or_create_payment_intent(
-           ticket_order,
-           socket.assigns.current_user
-         ) do
-      {:ok, payment_intent} ->
-        Ysc.Logging.debug(
-          "restore_payment_state_from_url: Payment intent retrieved/created successfully",
-          order_id: ticket_order.id,
-          payment_intent_id: payment_intent.id,
-          payment_intent_status: payment_intent.status
-        )
-
-        socket
-        |> assign(:show_ticket_modal, false)
-        |> assign(:show_payment_modal, true)
-        |> assign(:checkout_expired, false)
-        |> assign(:checkout_payment_failed, false)
-        |> assign(:stripe_payment_element_ready, false)
-        |> assign(:payment_intent, payment_intent)
-        |> assign(:ticket_order, ticket_order)
-        |> assign(
-          :tickets_requiring_registration,
-          restore_context.tickets_requiring_registration
-        )
-        |> assign(:ticket_details_form, restore_context.ticket_details_form)
-        |> assign(:tickets_for_me, restore_context.tickets_for_me)
-        |> assign(
-          :selected_family_members,
-          restore_context.selected_family_members
-        )
-        |> assign(:family_members, restore_context.family_members)
-        |> assign(:active_ticket_index, restore_context.active_ticket_index)
-        |> assign(
-          :ticket_registration_details_by_id,
-          restore_context.ticket_registration_details_by_id
-        )
-        |> assign(:ticket_tiers, restore_context.ticket_tiers)
-        |> assign(:availability_data, restore_context.availability_data)
-        |> assign(:payment_redirect_in_progress, false)
-
-      {:error, reason} ->
-        Ysc.Logging.error(
-          "restore_payment_state_from_url: Failed to retrieve/create payment intent",
-          order_id: ticket_order.id,
-          error: reason
-        )
-
-        socket
-        |> YscWeb.Flash.put_toast(
-          :error,
-          "We couldn't reload your payment page. Please select your tickets again and try checkout once more. If this keeps happening, email info@ysc.org.",
-          title: "Payment"
-        )
-        |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
-    end
+    socket
+    |> assign_restored_payment_checkout(ticket_order, restore_context)
+    |> assign(:stripe_payment_element_ready, false)
+    |> assign(:payment_redirect_in_progress, false)
+    |> schedule_checkout_payment_intent()
   end
 
   # Build selected_tickets map from a ticket order
@@ -4343,6 +4389,7 @@ defmodule YscWeb.EventDetailsLive do
     require Ysc.Logging
 
     with true <- socket.assigns[:show_payment_modal],
+         true <- socket.assigns[:checkout_payment_intent_pending] != true,
          %Ysc.Tickets.TicketOrder{status: :pending} = order <-
            socket.assigns[:ticket_order],
          user when not is_nil(user) <- socket.assigns[:current_user],
@@ -4469,6 +4516,26 @@ defmodule YscWeb.EventDetailsLive do
       end
     else
       _ -> socket
+    end
+  end
+
+  @impl true
+  def handle_info(:create_checkout_payment_intent, socket) do
+    cond do
+      socket.assigns[:checkout_payment_intent_pending] != true ->
+        {:noreply, socket}
+
+      socket.assigns[:show_payment_modal] != true ->
+        {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
+
+      socket.assigns[:checkout_expired] == true ->
+        {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
+
+      socket.assigns[:checkout_payment_failed] == true ->
+        {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
+
+      true ->
+        create_checkout_payment_intent_now(socket)
     end
   end
 
@@ -5113,6 +5180,7 @@ defmodule YscWeb.EventDetailsLive do
         {:noreply,
          socket
          |> assign(:show_payment_modal, false)
+         |> assign(:checkout_payment_intent_pending, false)
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:show_order_completion, true)
          |> assign(:ticket_order, completed_order)
@@ -5156,6 +5224,7 @@ defmodule YscWeb.EventDetailsLive do
          |> assign(:show_payment_modal, false)
          |> assign(:checkout_expired, false)
          |> assign(:checkout_payment_failed, false)
+         |> assign(:checkout_payment_intent_pending, false)
          |> assign(:payment_intent, nil)
          |> assign(:ticket_order, nil)
          |> assign(:tickets_requiring_registration, [])
@@ -6969,6 +7038,7 @@ defmodule YscWeb.EventDetailsLive do
         {:noreply,
          socket
          |> assign(:show_payment_modal, false)
+         |> assign(:checkout_payment_intent_pending, false)
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:show_order_completion, true)
          |> assign(:ticket_order, completed_order)
@@ -7813,55 +7883,36 @@ defmodule YscWeb.EventDetailsLive do
            ~p"/events/#{socket.assigns.event.id}?checkout=free&order_id=#{ticket_order.id}"
        )}
     else
-      # For paid tickets, create Stripe payment intent
-      case Ysc.Tickets.StripeService.create_payment_intent(
-             ticket_order,
-             user: socket.assigns.current_user
-           ) do
-        {:ok, payment_intent} ->
-          ticket_order = %{ticket_order | payment_intent_id: payment_intent.id}
-
-          # Show payment form with Stripe Elements
-          # Update URL to reflect checkout state
-          {:noreply,
-           socket
-           |> assign(:show_ticket_modal, false)
-           |> assign(:show_payment_modal, true)
-           |> assign(:checkout_expired, false)
-           |> assign(:checkout_payment_failed, false)
-           |> assign(:stripe_payment_element_ready, false)
-           |> assign(:payment_intent, payment_intent)
-           |> assign(:ticket_order, ticket_order)
-           |> assign(
-             :tickets_requiring_registration,
-             tickets_requiring_registration
-           )
-           |> assign(:ticket_details_form, ticket_details_form)
-           |> assign(:tickets_for_me, tickets_for_me)
-           |> assign(:selected_family_members, selected_family_members)
-           |> assign(:family_members, family_members)
-           |> assign(:active_ticket_index, active_ticket_index)
-           |> assign(
-             :ticket_registration_details_by_id,
-             ticket_registration_details_by_id
-           )
-           |> assign(:payment_redirect_in_progress, false)
-           |> push_patch(
-             to:
-               ~p"/events/#{socket.assigns.event.id}?checkout=payment&order_id=#{ticket_order.id}"
-           )}
-
-        {:error, _reason} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "We couldn't start checkout. Please try again in a moment. If it keeps failing, email #{Ysc.EmailConfig.contact_email()} with the event name.",
-             title: "Payment"
-           )
-           |> assign(:show_ticket_modal, false)
-           |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
-      end
+      # Stripe PaymentIntent create is a network round-trip. Paint the order
+      # summary, hold timer, and attendee step first, then create the PI in
+      # handle_info so first paint is not blocked on Stripe.
+      {:noreply,
+       socket
+       |> assign(:show_ticket_modal, false)
+       |> assign(:show_payment_modal, true)
+       |> assign(:checkout_expired, false)
+       |> assign(:checkout_payment_failed, false)
+       |> assign(:stripe_payment_element_ready, false)
+       |> assign(:ticket_order, ticket_order)
+       |> assign(
+         :tickets_requiring_registration,
+         tickets_requiring_registration
+       )
+       |> assign(:ticket_details_form, ticket_details_form)
+       |> assign(:tickets_for_me, tickets_for_me)
+       |> assign(:selected_family_members, selected_family_members)
+       |> assign(:family_members, family_members)
+       |> assign(:active_ticket_index, active_ticket_index)
+       |> assign(
+         :ticket_registration_details_by_id,
+         ticket_registration_details_by_id
+       )
+       |> assign(:payment_redirect_in_progress, false)
+       |> schedule_checkout_payment_intent()
+       |> push_patch(
+         to:
+           ~p"/events/#{socket.assigns.event.id}?checkout=payment&order_id=#{ticket_order.id}"
+       )}
     end
   end
 

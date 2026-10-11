@@ -91,6 +91,67 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(html)
     end
 
+    test "paints the payment modal before the Stripe PaymentIntent is ready", %{
+      conn: conn,
+      user: user
+    } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        {:ok, build_payment_intent(%{amount: params.amount})}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      view = wait_for_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+
+      html = render_click(view, "proceed-to-checkout")
+
+      assert html =~ "Complete Your Purchase"
+      assert html =~ ~s(id="checkout-payment-loading")
+      refute html =~ ~s(id="payment-element")
+
+      render(view)
+
+      refute has_element?(view, "#checkout-payment-loading")
+      assert has_element?(view, "#payment-element")
+      assert has_element?(view, "#payment-modal")
+    end
+
+    test "restored checkout paints the hold timer before retrieving the PaymentIntent",
+         %{conn: conn, user: user} do
+      {event, _tier, order, payment_intent} = setup_pending_order(user)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: id,
+           client_secret: payment_intent.client_secret,
+           amount: order.total_amount.amount
+         })}
+      end)
+
+      {:ok, view, html} =
+        live(
+          conn,
+          ~p"/events/#{event.id}?checkout=payment&order_id=#{order.id}"
+        )
+
+      assert html =~ "Complete Your Purchase"
+      assert html =~ order.reference_id
+      assert html =~ ~s(id="checkout-payment-loading")
+      refute html =~ ~s(id="payment-element")
+
+      render(view)
+
+      refute has_element?(view, "#checkout-payment-loading")
+      assert has_element?(view, "#payment-element")
+      assert has_element?(view, "#payment-modal")
+    end
+
     test "restored payment checkout disables submit until Stripe element is ready",
          %{conn: conn, user: user} do
       {event, _tier, order, payment_intent} = setup_pending_order(user)
@@ -342,6 +403,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
   describe "payment intent creation failures" do
     defp checkout_error_flash(view) do
+      render(view)
       :sys.get_state(view.pid).socket.assigns.flash
     end
 
@@ -509,6 +571,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
+      render(view)
 
       order =
         Tickets.list_user_ticket_orders(user.id)
@@ -553,6 +616,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
+      render(view)
 
       order =
         Tickets.list_user_ticket_orders(user.id)
@@ -597,6 +661,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
+      render(view)
 
       order =
         Tickets.list_user_ticket_orders(user.id)
@@ -1210,6 +1275,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
+      render(view)
 
       order =
         Tickets.list_user_ticket_orders(user.id)
@@ -1253,6 +1319,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
         render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
         render_click(view, "proceed-to-checkout")
+        render(view)
 
         order =
           Tickets.list_user_ticket_orders(user.id)
@@ -1297,6 +1364,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
         render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
         render_click(view, "proceed-to-checkout")
+        render(view)
 
         order =
           Tickets.list_user_ticket_orders(user.id)

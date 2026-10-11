@@ -76,7 +76,21 @@ defmodule YscWeb.Components.RoomBrowserTest do
 
       assert with_pick =~ ~s(id="browse-room-pick-room-1")
       assert with_pick =~ ~s(phx-click="browse-room-pick")
+      assert with_pick =~ "check whether it"
+      assert with_pick =~ "free on your dates"
+      refute with_pick =~ "availability search"
       refute without_pick =~ "browse-room-pick-room-1"
+      refute without_pick =~ "free on your dates"
+    end
+
+    test "uses a custom intro when one is provided" do
+      html =
+        render_browser([room(%{})], %{
+          intro: "You don't pick a specific room when you book."
+        })
+
+      assert html =~ "pick a specific room when you book"
+      refute html =~ "Browse the rooms we offer"
     end
 
     test "supports the teal accent" do
