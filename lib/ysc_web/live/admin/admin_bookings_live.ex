@@ -3387,14 +3387,7 @@ defmodule YscWeb.AdminBookingsLive do
     # Parse query parameters (may be malformed if URL is double-encoded)
     parsed_params = parse_mount_params(params)
 
-    # Get timezone from connect params
-    connect_params =
-      case get_connect_params(socket) do
-        nil -> %{}
-        v -> v
-      end
-
-    timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     # Read property from params if available, otherwise default to :tahoe
     selected_property =
@@ -3419,7 +3412,7 @@ defmodule YscWeb.AdminBookingsLive do
         :calendar
       end
 
-    today = today_in_timezone(timezone)
+    today = YscWeb.TimeZone.today(timezone)
 
     # Read calendar dates from params if available, otherwise default to current month
     {calendar_start, calendar_end} =
@@ -4598,14 +4591,14 @@ defmodule YscWeb.AdminBookingsLive do
     start_date =
       socket.assigns[:calendar_start_date] ||
         Date.add(
-          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          YscWeb.TimeZone.today(socket.assigns[:timezone]),
           -2
         )
 
     end_date =
       socket.assigns[:calendar_end_date] ||
         Date.add(
-          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          YscWeb.TimeZone.today(socket.assigns[:timezone]),
           14
         )
 
@@ -4695,14 +4688,14 @@ defmodule YscWeb.AdminBookingsLive do
     start_date =
       socket.assigns[:calendar_start_date] ||
         Date.add(
-          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          YscWeb.TimeZone.today(socket.assigns[:timezone]),
           -2
         )
 
     end_date =
       socket.assigns[:calendar_end_date] ||
         Date.add(
-          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          YscWeb.TimeZone.today(socket.assigns[:timezone]),
           14
         )
 
@@ -4742,11 +4735,11 @@ defmodule YscWeb.AdminBookingsLive do
 
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(tz), -2)
+          Date.add(YscWeb.TimeZone.today(tz), -2)
 
       calendar_end =
         socket.assigns[:calendar_end_date] ||
-          Date.add(today_in_timezone(tz), 14)
+          Date.add(YscWeb.TimeZone.today(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -4793,11 +4786,11 @@ defmodule YscWeb.AdminBookingsLive do
 
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(tz), -2)
+          Date.add(YscWeb.TimeZone.today(tz), -2)
 
       calendar_end =
         socket.assigns[:calendar_end_date] ||
-          Date.add(today_in_timezone(tz), 14)
+          Date.add(YscWeb.TimeZone.today(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -4846,11 +4839,11 @@ defmodule YscWeb.AdminBookingsLive do
 
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(tz), -2)
+          Date.add(YscWeb.TimeZone.today(tz), -2)
 
       calendar_end =
         socket.assigns[:calendar_end_date] ||
-          Date.add(today_in_timezone(tz), 14)
+          Date.add(YscWeb.TimeZone.today(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -4904,11 +4897,11 @@ defmodule YscWeb.AdminBookingsLive do
 
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(tz), -2)
+          Date.add(YscWeb.TimeZone.today(tz), -2)
 
       calendar_end =
         socket.assigns[:calendar_end_date] ||
-          Date.add(today_in_timezone(tz), 14)
+          Date.add(YscWeb.TimeZone.today(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -7721,13 +7714,13 @@ defmodule YscWeb.AdminBookingsLive do
   # Default date range: today - 3 days to today + 30 days (current bookings visible with minimal scrolling)
   defp default_date_range(timezone)
        when is_binary(timezone) and timezone != "" do
-    today = today_in_timezone(timezone)
+    today = YscWeb.TimeZone.today(timezone)
     start_date = Date.add(today, -3)
     end_date = Date.add(today, 30)
     {start_date, end_date}
   end
 
-  defp default_date_range(_), do: default_date_range("America/Los_Angeles")
+  defp default_date_range(_), do: default_date_range(YscWeb.TimeZone.default())
 
   # Inventory is [checkin, checkout). Same-day check-in/check-out is 0 nights
   # and would previously feed Date.range/2 a descending bound.
@@ -7738,15 +7731,6 @@ defmodule YscWeb.AdminBookingsLive do
       {checkin_date, Date.add(checkin_date, 1)}
     end
   end
-
-  defp today_in_timezone(timezone) when is_binary(timezone) do
-    DateTime.now!(timezone) |> DateTime.to_date()
-  rescue
-    _ -> DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-  end
-
-  defp today_in_timezone(_),
-    do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
   # Step size for prev/next calendar navigation (shift window by this many days)
   defp calendar_shift_days, do: 30

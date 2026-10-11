@@ -26,7 +26,7 @@ defmodule YscWeb.BookingCheckoutLive do
   @impl true
   def mount(%{"booking_id" => booking_id}, _session, socket) do
     user = socket.assigns.current_user
-    timezone = get_timezone_from_connect_params(socket)
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     case validate_user_signed_in(user) do
       :ok ->
@@ -89,11 +89,6 @@ defmodule YscWeb.BookingCheckoutLive do
     if connected?(socket) do
       Process.send_after(self(), :check_booking_expiration, 5_000)
     end
-  end
-
-  defp get_timezone_from_connect_params(socket) do
-    connect_params = get_connect_params(socket) || %{}
-    Map.get(connect_params, "timezone", "America/Los_Angeles")
   end
 
   defp validate_user_signed_in(nil) do

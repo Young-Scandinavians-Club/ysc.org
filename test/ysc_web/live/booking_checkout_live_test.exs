@@ -80,6 +80,16 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       %{conn: log_in_user(conn, user), user: user, booking: booking}
     end
 
+    test "falls back to Pacific time instead of crashing on an invalid browser timezone",
+         %{conn: conn, booking: booking} do
+      conn = put_connect_params(conn, %{"timezone" => "Not/A/Real/Zone"})
+
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert html =~ "Complete Your Booking"
+      assert has_element?(view, "#checkout-next-steps")
+    end
+
     test "renders checkout page", %{conn: conn, booking: booking} do
       {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "Complete Your Booking"
