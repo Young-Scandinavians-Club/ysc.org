@@ -173,9 +173,14 @@ defmodule Ysc.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      # GHSA-rhv4-8758-jx7v: Decimal < 3.0.0 (DoS via unbounded exponent). Override pulls 3.1.x onto
-      # transitive ~> 2.x (e.g. retry_on).
-      {:decimal, "~> 3.1", override: true},
+      # GHSA-rhv4-8758-jx7v: Decimal < 3.0.0 (DoS via unbounded exponent).
+      # GHSA-6c27-994x-c52f / CVE-2026-97853: Decimal < 3.1.2 (DoS via
+      # unbounded Decimal.round/3 places). Override pulls 3.2.x onto
+      # transitive ~> 2.x (e.g. retry_on, ex_money). 3.2.0 includes the
+      # 3.1.2 security fix plus faster arithmetic. We round money with
+      # small places (0/1/2) and compare finite amounts; we do not pass
+      # NaN, custom Context, or user-controlled places.
+      {:decimal, "~> 3.2.0", override: true},
       # ex_aws 2.7+ and stripity_stripe 3.3+ require hackney 4.x; tzdata still lists ~> 1.17
       # and its Hackney adapter expects the 1.x body/ref API. See Ysc.Tzdata.HttpClient.
       # webtransport 0.4.5 pins h2 ~> 0.12; hackney 4.7.4 needs h2 ~> 0.12.0 — override below.
