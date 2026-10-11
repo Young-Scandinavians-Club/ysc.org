@@ -3,6 +3,7 @@ defmodule YscWeb.UserTicketsLive do
   require Ysc.Logging
 
   import YscWeb.Live.AsyncHelpers
+  import Ysc.MoneyHelper, only: [format_price: 1]
 
   alias Ysc.Tickets
   alias Ysc.Tickets.DonationDisplay
@@ -463,12 +464,6 @@ defmodule YscWeb.UserTicketsLive do
   defp format_date(datetime) do
     Timex.format!(datetime, "{Mshort} {D}, {YYYY}")
   end
-
-  defp format_price(%Money{} = money) do
-    Ysc.MoneyHelper.format_money!(money)
-  end
-
-  defp format_price(_), do: "$0.00"
 
   defp payment_deadline_copy(expires_at) do
     now = DateTime.utc_now()

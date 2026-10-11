@@ -3089,14 +3089,14 @@ defmodule YscWeb.AdminBookingsLive do
                   </td>
                   <td class="py-3 pr-6 font-semibold text-zinc-800">
                     {if rule.amount do
-                      format_price(rule.amount)
+                      MoneyHelper.format_price(rule.amount)
                     else
                       "$0.00"
                     end}
                   </td>
                   <td class="py-3 pr-6 text-zinc-600 text-xs">
                     {if rule.children_amount do
-                      format_price(rule.children_amount)
+                      MoneyHelper.format_price(rule.children_amount)
                     else
                       "-"
                     end}
@@ -7323,13 +7323,6 @@ defmodule YscWeb.AdminBookingsLive do
         "General"
     end
   end
-
-  defp format_price(%Money{} = money) do
-    formatted = MoneyHelper.format_money!(money)
-    "#{formatted}"
-  end
-
-  defp format_price(_), do: "$0.00"
 
   defp format_datetime(%DateTime{} = datetime, timezone) do
     datetime
