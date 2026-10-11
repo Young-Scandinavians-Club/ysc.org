@@ -1380,6 +1380,52 @@ defmodule Ysc.PaymentsTest do
       assert :ok = Payments.sync_stripe_default_payment_method(user, pm)
     end
 
+    test "does not skip when the replacement payment method is missing" do
+      user = user_fixture(%{stripe_id: "cus_push_pm_gone"})
+
+      pm =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_push_pm_gone"
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_push_pm_gone",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.CustomerMock, :update, fn "cus_push_pm_gone",
+                                              _params,
+                                              _opts ->
+        {:ok, %Stripe.Customer{id: "cus_push_pm_gone"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :update, fn "sub_push_pm_gone", _params ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message: "No such PaymentMethod: 'pm_push_pm_gone'",
+           extra: %{
+             http_status: 404,
+             card_code: :resource_missing,
+             raw_error: %{
+               "code" => "resource_missing",
+               "param" => "default_payment_method",
+               "message" => "No such PaymentMethod: 'pm_push_pm_gone'"
+             }
+           }
+         }}
+      end)
+
+      assert {:error, %Stripe.Error{code: :invalid_request_error}} =
+               Payments.sync_stripe_default_payment_method(user, pm)
+    end
+
     test "skips subscriptions Stripe reports as canceled" do
       user = user_fixture(%{stripe_id: "cus_push_canceled"})
 

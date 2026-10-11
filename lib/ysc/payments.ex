@@ -894,10 +894,12 @@ defmodule Ysc.Payments do
         :ok
 
       {:error, error} ->
-        if stripe_resource_missing?(error) or
-             stripe_subscription_canceled?(error) do
+        if stripe_stale_subscription?(error) do
           # The local row is stale (deleted or already canceled in Stripe), so
           # there is nothing left to charge and nothing to re-point.
+          # A resource_missing for the replacement payment method must still
+          # fail — otherwise detach would delete the old card while a
+          # chargeable subscription stays pinned to it.
           Ysc.Logging.warning(
             "Skipping stale Stripe subscription while pushing default payment method",
             user_id: user.id,
@@ -935,6 +937,51 @@ defmodule Ysc.Payments do
   end
 
   defp stripe_resource_missing?(_), do: false
+
+  defp stripe_stale_subscription?(error) do
+    stripe_subscription_canceled?(error) or
+      stripe_missing_subscription?(error)
+  end
+
+  defp stripe_missing_subscription?(%Stripe.Error{} = error) do
+    stripe_resource_missing?(error) and missing_subscription_resource?(error)
+  end
+
+  defp stripe_missing_subscription?(_), do: false
+
+  defp missing_subscription_resource?(%Stripe.Error{} = error) do
+    param = stripe_error_param(error)
+
+    cond do
+      param in ["default_payment_method", "payment_method"] ->
+        false
+
+      subscription_missing_message?(error) ->
+        true
+
+      param == "id" ->
+        true
+
+      true ->
+        false
+    end
+  end
+
+  defp subscription_missing_message?(%Stripe.Error{message: message})
+       when is_binary(message) do
+    String.contains?(message, "No such subscription")
+  end
+
+  defp subscription_missing_message?(_), do: false
+
+  defp stripe_error_param(%Stripe.Error{extra: extra}) when is_map(extra) do
+    case extra[:raw_error] do
+      %{"param" => param} when is_binary(param) -> param
+      _ -> extra[:param]
+    end
+  end
+
+  defp stripe_error_param(_), do: nil
 
   defp stripe_subscription_canceled?(%Stripe.Error{message: message})
        when is_binary(message) do
