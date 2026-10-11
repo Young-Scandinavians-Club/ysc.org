@@ -1526,6 +1526,44 @@ defmodule Ysc.TicketsTest do
 
       assert updated.payment_intent_id == "pi_updated_123"
     end
+
+    test "does not attach a PaymentIntent after the order is cancelled", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:ok, cancelled} =
+               Tickets.cancel_ticket_order(order, "started a new checkout")
+
+      assert {:error, :order_not_pending} =
+               Tickets.update_payment_intent(cancelled, "pi_stale_#{order.id}")
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :cancelled
+      assert is_nil(reloaded.payment_intent_id)
+    end
+
+    test "does not attach a PaymentIntent after the order is expired", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:ok, expired} = Tickets.expire_ticket_order(order)
+      assert expired.status == :expired
+
+      assert {:error, :order_not_pending} =
+               Tickets.update_payment_intent(expired, "pi_expired_#{order.id}")
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :expired
+      assert is_nil(reloaded.payment_intent_id)
+    end
   end
 
   describe "calculate_event_and_donation_amounts/1" do
