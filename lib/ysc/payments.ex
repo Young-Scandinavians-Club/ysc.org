@@ -158,16 +158,17 @@ defmodule Ysc.Payments do
       {:ok, _} ->
         :ok
 
-      {:error, %Stripe.Error{code: :resource_missing}} ->
-        :ok
-
       {:error, error} ->
-        Ysc.Logging.error("Failed to detach payment method from Stripe",
-          payment_method_provider_id: provider_id,
-          error: inspect(error)
-        )
+        if stripe_resource_missing?(error) do
+          :ok
+        else
+          Ysc.Logging.error("Failed to detach payment method from Stripe",
+            payment_method_provider_id: provider_id,
+            error: inspect(error)
+          )
 
-        {:error, :stripe_error}
+          {:error, :stripe_error}
+        end
     end
   end
 
@@ -892,21 +893,55 @@ defmodule Ysc.Payments do
       {:ok, _subscription} ->
         :ok
 
-      {:error, %Stripe.Error{code: :resource_missing}} ->
-        :ok
-
       {:error, error} ->
-        Ysc.Logging.error(
-          "Failed to push default payment method to Stripe subscription",
-          user_id: user.id,
-          payment_method_id: payment_method.id,
-          stripe_subscription_id: stripe_id,
-          error: inspect(error)
-        )
+        if stripe_resource_missing?(error) or
+             stripe_subscription_canceled?(error) do
+          # The local row is stale (deleted or already canceled in Stripe), so
+          # there is nothing left to charge and nothing to re-point.
+          Ysc.Logging.warning(
+            "Skipping stale Stripe subscription while pushing default payment method",
+            user_id: user.id,
+            payment_method_id: payment_method.id,
+            stripe_subscription_id: stripe_id,
+            error: inspect(error)
+          )
 
-        {:error, error}
+          :ok
+        else
+          Ysc.Logging.error(
+            "Failed to push default payment method to Stripe subscription",
+            user_id: user.id,
+            payment_method_id: payment_method.id,
+            stripe_subscription_id: stripe_id,
+            error: inspect(error)
+          )
+
+          {:error, error}
+        end
     end
   end
+
+  # stripity_stripe sets `%Stripe.Error{}.code` to the error *type* (e.g.
+  # `:invalid_request_error`); Stripe's own code (`"resource_missing"`) is kept
+  # in `extra.card_code` / `extra.raw_error`. Matching on `code:` alone never
+  # fires for real API responses.
+  defp stripe_resource_missing?(%Stripe.Error{code: :resource_missing}),
+    do: true
+
+  defp stripe_resource_missing?(%Stripe.Error{extra: extra})
+       when is_map(extra) do
+    extra[:card_code] == :resource_missing or
+      match?(%{"code" => "resource_missing"}, extra[:raw_error])
+  end
+
+  defp stripe_resource_missing?(_), do: false
+
+  defp stripe_subscription_canceled?(%Stripe.Error{message: message})
+       when is_binary(message) do
+    String.contains?(message, "canceled subscription")
+  end
+
+  defp stripe_subscription_canceled?(_), do: false
 
   defp stripe_payment_method_module do
     Application.get_env(

@@ -1339,6 +1339,86 @@ defmodule Ysc.PaymentsTest do
       assert :ok = Payments.sync_stripe_default_payment_method(user, pm)
     end
 
+    test "skips subscriptions Stripe reports as missing (real error shape)" do
+      user = user_fixture(%{stripe_id: "cus_push_gone"})
+
+      pm =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_push_gone"
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_push_gone",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.CustomerMock, :update, fn "cus_push_gone", _params, _opts ->
+        {:ok, %Stripe.Customer{id: "cus_push_gone"}}
+      end)
+
+      # stripity_stripe puts the error *type* in `code`; Stripe's own code
+      # lives in `extra`.
+      expect(Stripe.SubscriptionMock, :update, fn "sub_push_gone", _params ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message: "No such subscription: 'sub_push_gone'",
+           extra: %{
+             http_status: 404,
+             card_code: :resource_missing,
+             raw_error: %{"code" => "resource_missing"}
+           }
+         }}
+      end)
+
+      assert :ok = Payments.sync_stripe_default_payment_method(user, pm)
+    end
+
+    test "skips subscriptions Stripe reports as canceled" do
+      user = user_fixture(%{stripe_id: "cus_push_canceled"})
+
+      pm =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_push_canceled"
+        })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_push_canceled",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.CustomerMock, :update, fn "cus_push_canceled",
+                                              _params,
+                                              _opts ->
+        {:ok, %Stripe.Customer{id: "cus_push_canceled"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :update, fn "sub_push_canceled",
+                                                  _params ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message:
+             "A canceled subscription can only update its cancellation_details.",
+           extra: %{http_status: 400}
+         }}
+      end)
+
+      assert :ok = Payments.sync_stripe_default_payment_method(user, pm)
+    end
+
     test "skips migrated_ subscription ids when pushing the default" do
       user = user_fixture(%{stripe_id: "cus_push_migrated"})
 
