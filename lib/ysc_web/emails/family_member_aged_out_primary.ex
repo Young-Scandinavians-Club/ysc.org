@@ -12,7 +12,7 @@ defmodule YscWeb.Emails.FamilyMemberAgedOutPrimary do
   end
 
   def get_subject do
-    "A family member has aged out of your YSC membership"
+    "A family member turned 18 and is no longer on your YSC membership"
   end
 
   def family_management_url,
