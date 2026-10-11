@@ -19,6 +19,14 @@ defmodule YscWeb.TimeZoneTest do
     test "returns the calendar date in the given zone" do
       assert TimeZone.today("UTC") == DateTime.to_date(DateTime.utc_now())
     end
+
+    test "falls back to Pacific time for blank, nil, and unknown names" do
+      pacific_today = TimeZone.today("America/Los_Angeles")
+
+      assert TimeZone.today(nil) == pacific_today
+      assert TimeZone.today("") == pacific_today
+      assert TimeZone.today("Not/AZone") == pacific_today
+    end
   end
 
   describe "shift/2" do

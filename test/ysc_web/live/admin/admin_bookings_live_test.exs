@@ -128,6 +128,17 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert html =~ "Calendar"
     end
 
+    test "falls back to Pacific time instead of crashing on an invalid browser timezone",
+         %{conn: conn} do
+      conn = put_connect_params(conn, %{"timezone" => "Not/A/Real/Zone"})
+
+      {:ok, view, html} = live(conn, ~p"/admin/bookings")
+
+      assert html =~ "Bookings"
+      assert html =~ "Calendar"
+      assert has_element?(view, "#calendar-container")
+    end
+
     test "loads reservations section from query param", %{conn: conn} do
       {:ok, view, html} =
         live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")

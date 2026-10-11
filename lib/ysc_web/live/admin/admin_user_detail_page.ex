@@ -2422,13 +2422,11 @@ defmodule YscWeb.AdminUserDetailsLive do
   def mount(%{"id" => id} = _params, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    connect_params = get_connect_params(socket) || %{}
-    timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     today_max =
       timezone
-      |> DateTime.now!()
-      |> DateTime.to_date()
+      |> YscWeb.TimeZone.today()
       |> Date.to_iso8601()
 
     connected_remount? =

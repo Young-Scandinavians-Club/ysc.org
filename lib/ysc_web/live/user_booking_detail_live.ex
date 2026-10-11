@@ -525,7 +525,7 @@ defmodule YscWeb.UserBookingDetailLive do
   ## Helper Functions
 
   defp assign_booking_detail_loading_shell(socket, booking_id) do
-    timezone = get_timezone_from_connect_params(socket)
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     assign(socket,
       booking_id: booking_id,
@@ -607,16 +607,6 @@ defmodule YscWeb.UserBookingDetailLive do
     else
       socket
     end
-  end
-
-  defp get_timezone_from_connect_params(socket) do
-    connect_params =
-      case get_connect_params(socket) do
-        nil -> %{}
-        v -> v
-      end
-
-    Map.get(connect_params, "timezone", "America/Los_Angeles")
   end
 
   defp assign_booking_payment_details(socket, booking) do
