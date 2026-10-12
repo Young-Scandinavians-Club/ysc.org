@@ -932,6 +932,27 @@ defmodule YscWeb.AdminTicketListLiveTest do
       assert row["Child's age"] == "-3"
     end
 
+    test "the CSV export also neutralizes formulas in purchaser names", ctx do
+      ctx.buyer
+      |> Ecto.Changeset.change(first_name: "=HYPERLINK(1)")
+      |> Repo.update!()
+
+      {:ok, view, _html} =
+        live(ctx.conn, ~p"/admin/events/#{ctx.event.id}/tickets")
+
+      view |> element("#export-tickets-csv") |> render_click()
+      assert_push_event(view, "download-csv", %{content: content})
+
+      [row] =
+        content
+        |> Base.decode64!()
+        |> String.split("\n", trim: true)
+        |> CSV.decode!(headers: true)
+        |> Enum.to_list()
+
+      assert row["Purchaser First Name"] == "'=HYPERLINK(1)"
+    end
+
     test "the CSV export has no question columns when no tier asks", ctx do
       plain_event = event_fixture()
 
