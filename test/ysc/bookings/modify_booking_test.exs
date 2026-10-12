@@ -12,6 +12,12 @@ defmodule Ysc.Bookings.ModifyBookingTest do
 
   setup do
     Ledgers.ensure_basic_accounts()
+    # Canonical Tahoe Winter is rooms-only. Near the Summer/Winter boundary
+    # only one or two Monday buyout stays remain, and `locker_buyout_dates_after/2`
+    # used to wrap back onto the same week (`{:error, :no_changes}`). Widen the
+    # advance-booking window so next Summer weeks are in play, matching
+    # `BookingLockerTest`.
+    allow_far_future_booking_dates()
 
     user =
       user_fixture()
@@ -133,6 +139,51 @@ defmodule Ysc.Bookings.ModifyBookingTest do
     room
   end
 
+  describe "locker_buyout_dates_after/2" do
+    test "returns a different stay when wrapping at the end of a short buyout window" do
+      # Reproduce the late-Summer window: Winter nights are rooms-only, so only a
+      # couple of Monday buyout stays remain. The helper used to wrap to the same
+      # week, and modify_complete_booking/3 then returned {:error, :no_changes}.
+      clear_seasons!()
+
+      today = Date.utc_today()
+
+      {:ok, _} =
+        %Ysc.Bookings.Season{}
+        |> Ysc.Bookings.Season.changeset(%{
+          name: "Summer",
+          property: :tahoe,
+          start_date: Date.add(today, -7),
+          end_date: Date.add(today, 20),
+          is_default: true,
+          advance_booking_days: 21,
+          max_nights: 4
+        })
+        |> Repo.insert()
+
+      Ysc.Bookings.SeasonCache.invalidate()
+
+      unique_stays =
+        0..10
+        |> Enum.map(&locker_buyout_dates/1)
+        |> Enum.uniq()
+        |> Enum.sort_by(&elem(&1, 0), Date)
+
+      assert length(unique_stays) >= 2
+
+      last_stay = List.last(unique_stays)
+      {_checkin, last_checkout} = last_stay
+      next_stay = locker_buyout_dates_after(last_checkout, 7)
+
+      refute next_stay == last_stay
+
+      {_next_checkin, next_checkout} = next_stay
+      third_stay = locker_buyout_dates_after(next_checkout, 7)
+
+      refute third_stay == next_stay
+    end
+  end
+
   describe "modification_hold_form_params/1" do
     test "normalizes atom-key attrs with Date structs" do
       attrs = %{
@@ -231,6 +282,11 @@ defmodule Ysc.Bookings.ModifyBookingTest do
 
       {third_checkin, third_checkout} =
         locker_buyout_dates_after(second_checkout, 7)
+
+      refute {second_checkin, second_checkout} == {checkin, checkout}
+
+      refute {third_checkin, third_checkout} ==
+               {second_checkin, second_checkout}
 
       booking = complete_buyout_booking!(user, checkin, checkout)
 
