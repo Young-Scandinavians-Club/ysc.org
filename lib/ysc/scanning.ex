@@ -11,6 +11,7 @@ defmodule Ysc.Scanning do
   import Ecto.Query
 
   alias Ysc.Repo
+  alias Ysc.Csv
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts.User
@@ -915,7 +916,7 @@ defmodule Ysc.Scanning do
         end
       end)
 
-    [headers | rows]
+    [headers | Enum.map(rows, &Csv.sanitize_row/1)]
     |> CSV.encode()
     |> Enum.to_list()
     |> IO.iodata_to_binary()
@@ -985,7 +986,7 @@ defmodule Ysc.Scanning do
         ]
       end)
 
-    [headers | rows]
+    [headers | Enum.map(rows, &Csv.sanitize_row/1)]
     |> CSV.encode()
     |> Enum.to_list()
     |> IO.iodata_to_binary()

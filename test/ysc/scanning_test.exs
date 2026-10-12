@@ -1586,6 +1586,25 @@ defmodule Ysc.ScanningTest do
       lines = String.split(String.trim(csv), "\n")
       assert length(lines) == 1
     end
+
+    test "neutralizes spreadsheet formulas in member names" do
+      session = scan_session_fixture()
+
+      user =
+        user_fixture(%{first_name: "=HYPERLINK(1)", last_name: "Doe"})
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      token = QrToken.sign_membership(user.id)
+      Scanning.process_scan(session, token)
+
+      csv = Scanning.export_session_csv(session.id)
+      refute csv =~ ~r/(^|,)=HYPERLINK/
+      assert csv =~ "'=HYPERLINK(1) Doe"
+    end
   end
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -2578,6 +2597,28 @@ defmodule Ysc.ScanningTest do
       csv = Scanning.export_membership_checkins_csv(session.id)
       assert csv =~ "Name,Email,Membership Status,Membership Type"
       refute csv =~ "@"
+    end
+
+    test "neutralizes spreadsheet formulas in member names" do
+      admin =
+        user_fixture(%{role: "admin", first_name: "Desk", last_name: "Admin"})
+
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+
+      user =
+        user_fixture(%{first_name: "=cmd|'/C calc'!A0", last_name: "Doe"})
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      csv = Scanning.export_membership_checkins_csv(session.id)
+      refute csv =~ ~r/(^|,)=cmd/
+      assert csv =~ "'=cmd|'/C calc'!A0 Doe"
     end
   end
 
