@@ -247,6 +247,48 @@ defmodule YscWeb.AdminComponents do
     ]
 
   # ---------------------------------------------------------------------------
+  # admin_local_time
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Renders a UTC timestamp that the `LocalTime` hook converts to the browser timezone.
+
+  The inner block is the server-rendered fallback shown before JS runs and when
+  conversion fails. Pass `phx-update="ignore"` when LiveView should not replace
+  the converted text on subsequent diffs.
+
+  ## Examples
+
+      <.admin_local_time id="outage-time-1" datetime={outage.inserted_at}>
+        {DateTimeDisplay.format_utc_iso(outage.inserted_at)}
+      </.admin_local_time>
+  """
+  attr :id, :string, required: true
+  attr :datetime, :any, required: true, doc: "A `%DateTime{}` in UTC"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the span"
+
+  attr :rest, :global, include: ~w(phx-update)
+
+  slot :inner_block, required: true
+
+  def admin_local_time(assigns) do
+    ~H"""
+    <span
+      id={@id}
+      phx-hook="LocalTime"
+      data-utc-time={DateTime.to_iso8601(@datetime)}
+      class={@class}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </span>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_check_in_keyboard_hints
   # ---------------------------------------------------------------------------
 
@@ -1524,14 +1566,13 @@ defmodule YscWeb.AdminComponents do
               />
               <:tooltip_body>
                 Checked in:
-                <span
+                <.admin_local_time
                   id={"checkin-time-#{@ticket_id}"}
-                  phx-hook="LocalTime"
+                  datetime={@checked_in_at}
                   phx-update="ignore"
-                  data-utc-time={DateTime.to_iso8601(@checked_in_at)}
                 >
                   {@checked_in_time_label}
-                </span>
+                </.admin_local_time>
               </:tooltip_body>
             </.tooltip_special>
           </div>

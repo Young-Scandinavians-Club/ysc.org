@@ -153,18 +153,14 @@ defmodule YscWeb.AdminSettingsLive do
                     class="text-sm text-zinc-600"
                   >
                     <span class="font-semibold text-zinc-800">Connected:</span>
-                    <span
+                    <.admin_local_time
                       id="google-photos-connected-at"
-                      phx-hook="LocalTime"
-                      data-utc-time={
-                        DateTime.to_iso8601(@google_photos_status.connected_at)
-                      }
-                      data-prefix=""
+                      datetime={@google_photos_status.connected_at}
                     >
                       {DateTimeDisplay.format_utc_iso_minute(
                         @google_photos_status.connected_at
                       )}
-                    </span>
+                    </.admin_local_time>
                   </p>
                   <p
                     :if={@google_photos_scopes_preview}
@@ -301,14 +297,12 @@ defmodule YscWeb.AdminSettingsLive do
                     {DateTimeDisplay.format_calendar_date_long(outage.incident_date)}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    <span
+                    <.admin_local_time
                       id={"outage-time-#{outage.id}"}
-                      phx-hook="LocalTime"
-                      data-utc-time={DateTime.to_iso8601(outage.inserted_at)}
-                      data-prefix=""
+                      datetime={outage.inserted_at}
                     >
                       {DateTimeDisplay.format_utc_iso(outage.inserted_at)}
-                    </span>
+                    </.admin_local_time>
                   </td>
                 </tr>
                 <tr :if={Enum.empty?(@recent_outages)} id="reported-outages-empty">
@@ -487,36 +481,31 @@ defmodule YscWeb.AdminSettingsLive do
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                     <%= if job.completed_at do %>
-                      <span
+                      <.admin_local_time
                         id={"job-time-#{job.id}-completed"}
-                        phx-hook="LocalTime"
-                        data-utc-time={DateTime.to_iso8601(job.completed_at)}
-                        data-prefix=""
+                        datetime={job.completed_at}
                       >
                         {DateTimeDisplay.format_utc_iso(job.completed_at)}
-                      </span>
+                      </.admin_local_time>
                     <% else %>
                       <%= if job.scheduled_at do %>
-                        <span
+                        <.admin_local_time
                           id={"job-time-#{job.id}-scheduled"}
-                          phx-hook="LocalTime"
-                          data-utc-time={DateTime.to_iso8601(job.scheduled_at)}
+                          datetime={job.scheduled_at}
                           data-prefix="Scheduled: "
                         >
                           Scheduled: {DateTimeDisplay.format_utc_iso(
                             job.scheduled_at
                           )}
-                        </span>
+                        </.admin_local_time>
                       <% else %>
                         <%= if job.inserted_at do %>
-                          <span
+                          <.admin_local_time
                             id={"job-time-#{job.id}-inserted"}
-                            phx-hook="LocalTime"
-                            data-utc-time={DateTime.to_iso8601(job.inserted_at)}
-                            data-prefix=""
+                            datetime={job.inserted_at}
                           >
                             {DateTimeDisplay.format_utc_iso(job.inserted_at)}
-                          </span>
+                          </.admin_local_time>
                         <% else %>
                           N/A
                         <% end %>
