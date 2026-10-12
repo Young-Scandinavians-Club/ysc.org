@@ -172,6 +172,10 @@ defmodule YscWeb.Workers.FamilyMemberAgeOutWorkerTest do
         assert holder_job.args["params"]["family_management_url"] =~
                  "/users/settings/family"
 
+        assert holder_job.args["subject"] ==
+                 FamilyMemberAgedOutPrimary.get_subject()
+
+        refute holder_job.args["subject"] =~ "aged out"
         assert holder_job.args["text_body"] =~ "Freja Berg has turned 18"
       end)
 

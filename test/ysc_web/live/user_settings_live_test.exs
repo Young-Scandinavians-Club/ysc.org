@@ -12,6 +12,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
   alias Money
   alias Ysc.Accounts
+  alias Ysc.Accounts.FamilyInvite
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Avatars
@@ -2671,6 +2672,39 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert render(view) =~ "18 or older"
       assert is_nil(Repo.get!(Ysc.Accounts.User, invitee.id).primary_user_id)
     end
+
+    test "accept-family-invite refuses when the inviter only has a Single plan",
+         %{conn: conn} do
+      primary = primary_user_with_single_membership_for_stale_invite()
+      invite_email = unique_user_email()
+
+      {:ok, invite} =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: invite_email,
+          token: FamilyInvite.build_token(),
+          primary_user_id: primary.id,
+          created_by_user_id: primary.id,
+          relationship: :child
+        })
+        |> Repo.insert()
+
+      invitee =
+        user_fixture(%{
+          email: invite_email,
+          date_of_birth: Date.shift(Date.utc_today(), year: -10)
+        })
+
+      conn = log_in_user(conn, invitee)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "accept-family-invite", %{"token" => invite.token})
+
+      assert render(view) =~ "not a family or lifetime plan"
+      assert is_nil(Repo.get!(Ysc.Accounts.User, invitee.id).primary_user_id)
+    end
   end
 
   describe "settings page — handle_info and membership edge cases" do
@@ -3546,6 +3580,35 @@ defmodule YscWeb.UserSettingsLiveTest do
         DateTime.utc_now() |> DateTime.truncate(:second)
     })
     |> Repo.update!()
+  end
+
+  defp primary_user_with_single_membership_for_stale_invite(attrs \\ %{}) do
+    user = user_fixture(Map.merge(%{state: :active}, attrs))
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+    single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+    assert single_plan,
+           "membership_plans must include :single (another test may have cleared Application env)"
+
+    {:ok, subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_single_#{System.unique_integer()}",
+        stripe_status: "active",
+        name: "Single Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+      })
+
+    {:ok, _} =
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_price_id: single_plan.stripe_price_id,
+        stripe_product_id: "prod_single_#{System.unique_integer()}",
+        stripe_id: "si_single_#{System.unique_integer()}",
+        quantity: 1
+      })
+
+    Accounts.get_user!(user.id, [:subscriptions])
   end
 
   defp active_user_with_default_payment_method(prefix) do

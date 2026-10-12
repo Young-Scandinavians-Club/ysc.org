@@ -25,6 +25,20 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert html =~ "Doe"
     end
 
+    test "falls back to Pacific time instead of crashing on an invalid browser timezone",
+         %{conn: conn} do
+      user = user_fixture(%{first_name: "Timezone", last_name: "Fallback"})
+      conn = put_connect_params(conn, %{"timezone" => "Not/A/Real/Zone"})
+
+      {:ok, view, html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      assert html =~ "Timezone"
+      assert html =~ "Fallback"
+
+      today_max = Date.to_iso8601(YscWeb.TimeZone.today())
+      assert has_element?(view, ~s|#user_date_of_birth[max="#{today_max}"]|)
+    end
+
     test "ignores the legacy email preview handshake", %{conn: conn} do
       user = user_fixture()
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")

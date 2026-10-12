@@ -158,16 +158,17 @@ defmodule Ysc.Payments do
       {:ok, _} ->
         :ok
 
-      {:error, %Stripe.Error{code: :resource_missing}} ->
-        :ok
-
       {:error, error} ->
-        Ysc.Logging.error("Failed to detach payment method from Stripe",
-          payment_method_provider_id: provider_id,
-          error: inspect(error)
-        )
+        if stripe_resource_missing?(error) do
+          :ok
+        else
+          Ysc.Logging.error("Failed to detach payment method from Stripe",
+            payment_method_provider_id: provider_id,
+            error: inspect(error)
+          )
 
-        {:error, :stripe_error}
+          {:error, :stripe_error}
+        end
     end
   end
 
@@ -892,21 +893,102 @@ defmodule Ysc.Payments do
       {:ok, _subscription} ->
         :ok
 
-      {:error, %Stripe.Error{code: :resource_missing}} ->
-        :ok
-
       {:error, error} ->
-        Ysc.Logging.error(
-          "Failed to push default payment method to Stripe subscription",
-          user_id: user.id,
-          payment_method_id: payment_method.id,
-          stripe_subscription_id: stripe_id,
-          error: inspect(error)
-        )
+        if stripe_stale_subscription?(error) do
+          # The local row is stale (deleted or already canceled in Stripe), so
+          # there is nothing left to charge and nothing to re-point.
+          # A resource_missing for the replacement payment method must still
+          # fail — otherwise detach would delete the old card while a
+          # chargeable subscription stays pinned to it.
+          Ysc.Logging.warning(
+            "Skipping stale Stripe subscription while pushing default payment method",
+            user_id: user.id,
+            payment_method_id: payment_method.id,
+            stripe_subscription_id: stripe_id,
+            error: inspect(error)
+          )
 
-        {:error, error}
+          :ok
+        else
+          Ysc.Logging.error(
+            "Failed to push default payment method to Stripe subscription",
+            user_id: user.id,
+            payment_method_id: payment_method.id,
+            stripe_subscription_id: stripe_id,
+            error: inspect(error)
+          )
+
+          {:error, error}
+        end
     end
   end
+
+  # stripity_stripe sets `%Stripe.Error{}.code` to the error *type* (e.g.
+  # `:invalid_request_error`); Stripe's own code (`"resource_missing"`) is kept
+  # in `extra.card_code` / `extra.raw_error`. Matching on `code:` alone never
+  # fires for real API responses.
+  defp stripe_resource_missing?(%Stripe.Error{code: :resource_missing}),
+    do: true
+
+  defp stripe_resource_missing?(%Stripe.Error{extra: extra})
+       when is_map(extra) do
+    extra[:card_code] == :resource_missing or
+      match?(%{"code" => "resource_missing"}, extra[:raw_error])
+  end
+
+  defp stripe_resource_missing?(_), do: false
+
+  defp stripe_stale_subscription?(error) do
+    stripe_subscription_canceled?(error) or
+      stripe_missing_subscription?(error)
+  end
+
+  defp stripe_missing_subscription?(%Stripe.Error{} = error) do
+    stripe_resource_missing?(error) and missing_subscription_resource?(error)
+  end
+
+  defp stripe_missing_subscription?(_), do: false
+
+  defp missing_subscription_resource?(%Stripe.Error{} = error) do
+    param = stripe_error_param(error)
+
+    cond do
+      param in ["default_payment_method", "payment_method"] ->
+        false
+
+      subscription_missing_message?(error) ->
+        true
+
+      param == "id" ->
+        true
+
+      true ->
+        false
+    end
+  end
+
+  defp subscription_missing_message?(%Stripe.Error{message: message})
+       when is_binary(message) do
+    String.contains?(message, "No such subscription")
+  end
+
+  defp subscription_missing_message?(_), do: false
+
+  defp stripe_error_param(%Stripe.Error{extra: extra}) when is_map(extra) do
+    case extra[:raw_error] do
+      %{"param" => param} when is_binary(param) -> param
+      _ -> extra[:param]
+    end
+  end
+
+  defp stripe_error_param(_), do: nil
+
+  defp stripe_subscription_canceled?(%Stripe.Error{message: message})
+       when is_binary(message) do
+    String.contains?(message, "canceled subscription")
+  end
+
+  defp stripe_subscription_canceled?(_), do: false
 
   defp stripe_payment_method_module do
     Application.get_env(

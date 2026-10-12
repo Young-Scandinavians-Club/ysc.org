@@ -354,6 +354,24 @@ defmodule YscWeb.Workers.UserExporterTest do
       refute Map.has_key?(row, "first_name")
       refute Map.has_key?(row, "last_name")
     end
+
+    test "neutralizes spreadsheet formulas in exported name fields", %{
+      channel: channel
+    } do
+      user = user_fixture(%{first_name: "=HYPERLINK(1)", last_name: "Doe"})
+
+      path =
+        run_export(
+          channel,
+          oban_job(channel, ["id", "email", "first_name", "last_name"], false)
+        )
+
+      rows = parse_csv(path)
+      row = require_csv_row!(rows, user.id)
+
+      assert row["first_name"] == "'=HYPERLINK(1)"
+      assert row["last_name"] == "Doe"
+    end
   end
 
   describe "address field" do

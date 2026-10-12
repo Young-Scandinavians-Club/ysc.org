@@ -2,6 +2,7 @@ defmodule YscWeb.EventDetailsLive do
   use YscWeb, :live_view
 
   import YscWeb.Live.AsyncHelpers
+  import Ysc.MoneyHelper, only: [format_price: 1]
 
   @attendees_preview_count 10
   @availability_refresh_debounce_ms 300
@@ -15,6 +16,7 @@ defmodule YscWeb.EventDetailsLive do
     AttendeeInfo,
     EventPricingCache,
     MemberOnlyTickets,
+    PricingDisplay,
     TicketTierHelpers
   }
 
@@ -3869,50 +3871,77 @@ defmodule YscWeb.EventDetailsLive do
     require Ysc.Logging
 
     case {socket.assigns[:ticket_order], socket.assigns[:current_user]} do
-      {%Ysc.Tickets.TicketOrder{status: :pending} = ticket_order, user}
+      {%Ysc.Tickets.TicketOrder{status: :pending, id: order_id}, user}
       when not is_nil(user) ->
-        case retrieve_or_create_payment_intent(ticket_order, user) do
-          {:ok, payment_intent} ->
-            Ysc.Logging.debug(
-              "create_checkout_payment_intent: Payment intent ready",
-              order_id: ticket_order.id,
-              payment_intent_id: payment_intent.id,
-              payment_intent_status: payment_intent.status
+        case Ysc.Tickets.get_ticket_order(order_id) do
+          %Ysc.Tickets.TicketOrder{status: :pending} = ticket_order ->
+            case retrieve_or_create_payment_intent(ticket_order, user) do
+              {:ok, payment_intent} ->
+                Ysc.Logging.debug(
+                  "create_checkout_payment_intent: Payment intent ready",
+                  order_id: ticket_order.id,
+                  payment_intent_id: payment_intent.id,
+                  payment_intent_status: payment_intent.status
+                )
+
+                {:noreply,
+                 socket
+                 |> assign(:payment_intent, payment_intent)
+                 |> assign(:ticket_order, %{
+                   ticket_order
+                   | payment_intent_id: payment_intent.id
+                 })
+                 |> assign(:checkout_payment_intent_pending, false)
+                 |> assign(:stripe_payment_element_ready, false)}
+
+              {:error, reason} ->
+                Ysc.Logging.error(
+                  "create_checkout_payment_intent: Failed to retrieve/create payment intent",
+                  order_id: ticket_order.id,
+                  error: reason
+                )
+
+                {:noreply, fail_deferred_checkout_payment_intent(socket)}
+            end
+
+          _stale_order ->
+            Ysc.Logging.info(
+              "create_checkout_payment_intent: Order is no longer pending",
+              order_id: order_id
             )
 
-            {:noreply,
-             socket
-             |> assign(:payment_intent, payment_intent)
-             |> assign(:ticket_order, %{
-               ticket_order
-               | payment_intent_id: payment_intent.id
-             })
-             |> assign(:checkout_payment_intent_pending, false)
-             |> assign(:stripe_payment_element_ready, false)}
-
-          {:error, reason} ->
-            Ysc.Logging.error(
-              "create_checkout_payment_intent: Failed to retrieve/create payment intent",
-              order_id: ticket_order.id,
-              error: reason
-            )
-
-            {:noreply,
-             socket
-             |> assign(:checkout_payment_intent_pending, false)
-             |> assign(:show_payment_modal, false)
-             |> assign(:payment_intent, nil)
-             |> YscWeb.Flash.put_toast(
-               :error,
-               "We couldn't start checkout. Please try again in a moment. If it keeps failing, email #{Ysc.EmailConfig.contact_email()} with the event name.",
-               title: "Payment"
-             )
-             |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
+            {:noreply, abandon_deferred_checkout_payment_intent(socket)}
         end
 
       {_ticket_order, _user} ->
         {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
     end
+  end
+
+  defp fail_deferred_checkout_payment_intent(socket) do
+    socket
+    |> assign(:checkout_payment_intent_pending, false)
+    |> assign(:show_payment_modal, false)
+    |> assign(:payment_intent, nil)
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "We couldn't start checkout. Please try again in a moment. If it keeps failing, email #{Ysc.EmailConfig.contact_email()} with the event name.",
+      title: "Payment"
+    )
+    |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
+  end
+
+  defp abandon_deferred_checkout_payment_intent(socket) do
+    socket
+    |> assign(:checkout_payment_intent_pending, false)
+    |> assign(:show_payment_modal, false)
+    |> assign(:payment_intent, nil)
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "This ticket checkout was cancelled. Please choose your tickets again.",
+      title: "Tickets"
+    )
+    |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
   end
 
   # Restore checkout state from a pending order (legacy support)
@@ -6318,22 +6347,12 @@ defmodule YscWeb.EventDetailsLive do
     active_agenda_id
   end
 
-  # Helper function to add pricing information to events (same logic as Events module)
   defp add_pricing_info_from_tiers(event, ticket_tiers) do
-    pricing_info = pricing_info_for_event(event, ticket_tiers)
-    Map.put(event, :pricing_info, pricing_info)
-  end
-
-  defp pricing_info_for_event(event, ticket_tiers) do
-    if Map.get(event, :tickets_tbd) do
-      %{
-        display_text: "Tickets coming soon",
-        has_free_tiers: false,
-        lowest_price: nil
-      }
-    else
-      calculate_event_pricing(ticket_tiers)
-    end
+    Map.put(
+      event,
+      :pricing_info,
+      PricingDisplay.pricing_info(event, ticket_tiers)
+    )
   end
 
   # Get ticket tiers from pre-loaded list (sorted)
@@ -6544,53 +6563,6 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  # Calculate pricing display information for an event
-  defp calculate_event_pricing([]) do
-    %{display_text: "Free", has_free_tiers: true, lowest_price: nil}
-  end
-
-  defp calculate_event_pricing(ticket_tiers) do
-    # Check if there are any free tiers (handle both atom and string types)
-    has_free_tiers =
-      Enum.any?(ticket_tiers, &(&1.type == :free or &1.type == "free"))
-
-    # Get the lowest price from paid tiers only (exclude donation tiers)
-    # Filter out donation, free, and tiers with nil prices
-    paid_tiers =
-      Enum.filter(ticket_tiers, fn tier ->
-        (tier.type == :paid or tier.type == "paid") && tier.price != nil
-      end)
-
-    case {has_free_tiers, paid_tiers} do
-      {true, []} ->
-        %{display_text: "Free", has_free_tiers: true, lowest_price: nil}
-
-      {true, _paid_tiers} ->
-        # When there are both free and paid tiers, show "From $0.00"
-        %{display_text: "From $0.00", has_free_tiers: true, lowest_price: nil}
-
-      {false, []} ->
-        %{display_text: "Free", has_free_tiers: false, lowest_price: nil}
-
-      {false, paid_tiers} ->
-        lowest_price = Enum.min_by(paid_tiers, & &1.price.amount, fn -> nil end)
-
-        # If there's only one paid tier, show the exact price instead of "From $X"
-        display_text =
-          if length(paid_tiers) == 1 do
-            format_price(lowest_price.price)
-          else
-            "From #{format_price(lowest_price.price)}"
-          end
-
-        %{
-          display_text: display_text,
-          has_free_tiers: false,
-          lowest_price: lowest_price
-        }
-    end
-  end
-
   defp member_hold_message(1),
     do:
       "We've set aside 1 ticket at the member price. Finish buying it soon so we can keep it for you."
@@ -6598,13 +6570,6 @@ defmodule YscWeb.EventDetailsLive do
   defp member_hold_message(n),
     do:
       "We've set aside #{n} tickets at the member price. Finish buying them soon so we can keep them for you."
-
-  # Format price for display
-  defp format_price(%Money{} = money) do
-    Ysc.MoneyHelper.format_money!(money)
-  end
-
-  defp format_price(_), do: "$0.00"
 
   # Helper functions for ticket modal
 

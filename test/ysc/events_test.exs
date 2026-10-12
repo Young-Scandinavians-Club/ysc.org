@@ -5576,9 +5576,195 @@ defmodule Ysc.EventsTest do
       assert Map.fetch!(expired_by_tier, tier_a.id) == []
     end
 
+    test "slims member columns and omits created_by / ticket_tier / secrets", %{
+      user: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, tier} =
+        Events.update_ticket_tier(
+          ticket_tier_fixture(%{event_id: event.id, name: "GA"}),
+          %{description: "tier copy reservation lists must not load"}
+        )
+
+      member =
+        user_fixture(%{
+          first_name: "Astrid",
+          last_name: "Hold",
+          board_bio: "bio the admin reservation card must not load"
+        })
+
+      future_expiry =
+        DateTime.utc_now()
+        |> DateTime.truncate(:second)
+        |> DateTime.add(2, :day)
+
+      assert {:ok, reservation} =
+               Events.create_ticket_reservation(%{
+                 ticket_tier_id: tier.id,
+                 user_id: member.id,
+                 created_by_id: admin.id,
+                 quantity: 2,
+                 discount_percentage: Decimal.new("15"),
+                 expires_at: future_expiry
+               })
+
+      {_loaded, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_active_reservations_for_tiers([tier.id]) end,
+          pattern: ~r/hashed_password|board_bio|ticket_tiers.*description/i,
+          caller_pids: [self()]
+        )
+
+      [loaded] =
+        Events.list_active_reservations_for_tiers([tier.id])
+        |> Map.fetch!(tier.id)
+
+      assert fat_cols == 0
+      assert loaded.id == reservation.id
+      assert loaded.quantity == 2
+      assert loaded.user.id == member.id
+      assert loaded.user.first_name == "Astrid"
+      assert loaded.user.email == member.email
+      assert loaded.user.hashed_password == nil
+      assert loaded.user.board_bio == nil
+      refute Ecto.assoc_loaded?(loaded.created_by)
+      refute Ecto.assoc_loaded?(loaded.ticket_tier)
+      refute Ecto.assoc_loaded?(loaded.ticket_order)
+    end
+
     test "returns empty map for empty tier id list" do
       assert Events.list_active_reservations_for_tiers([]) == %{}
       assert Events.list_expired_active_reservations_for_tiers([]) == %{}
+    end
+  end
+
+  describe "list_ticket_reservations_for_user/2" do
+    test "returns active holds for the event without user or tier preloads", %{
+      user: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      other_event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id, name: "GA"})
+
+      other_tier =
+        ticket_tier_fixture(%{event_id: other_event.id, name: "Other"})
+
+      member = user_fixture()
+
+      future_expiry =
+        DateTime.utc_now()
+        |> DateTime.truncate(:second)
+        |> DateTime.add(2, :day)
+
+      assert {:ok, hold} =
+               Events.create_ticket_reservation(%{
+                 ticket_tier_id: tier.id,
+                 user_id: member.id,
+                 created_by_id: admin.id,
+                 quantity: 3,
+                 discount_percentage: Decimal.new("10"),
+                 expires_at: future_expiry
+               })
+
+      assert {:ok, _other} =
+               Events.create_ticket_reservation(%{
+                 ticket_tier_id: other_tier.id,
+                 user_id: member.id,
+                 created_by_id: admin.id,
+                 quantity: 1,
+                 expires_at: future_expiry
+               })
+
+      {_loaded, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Events.list_ticket_reservations_for_user(member.id, event.id)
+          end,
+          pattern: ~r/hashed_password|board_bio|raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      [loaded] = Events.list_ticket_reservations_for_user(member.id, event.id)
+
+      assert fat_cols == 0
+      assert loaded.id == hold.id
+      assert loaded.ticket_tier_id == tier.id
+      assert loaded.quantity == 3
+      assert Decimal.eq?(loaded.discount_percentage, Decimal.new("10"))
+      refute Ecto.assoc_loaded?(loaded.user)
+      refute Ecto.assoc_loaded?(loaded.created_by)
+      refute Ecto.assoc_loaded?(loaded.ticket_tier)
+      refute Ecto.assoc_loaded?(loaded.ticket_order)
+    end
+  end
+
+  describe "list_active_ticket_holds_for_user/1" do
+    test "slims tier name and event title used on membership payments", %{
+      user: admin
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Midsummer Dance",
+          description: "Description",
+          state: :published,
+          organizer_id: admin.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>event body html holds must not load</p>",
+        rendered_details: "<p>event body html holds must not load</p>"
+      })
+      |> Repo.update!()
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 20,
+          event_id: event.id,
+          description: "tier copy holds must not load"
+        })
+
+      member = user_fixture()
+
+      future_expiry =
+        DateTime.utc_now()
+        |> DateTime.truncate(:second)
+        |> DateTime.add(2, :day)
+
+      assert {:ok, hold} =
+               Events.create_ticket_reservation(%{
+                 ticket_tier_id: tier.id,
+                 user_id: member.id,
+                 created_by_id: admin.id,
+                 quantity: 2,
+                 expires_at: future_expiry
+               })
+
+      {_loaded, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_active_ticket_holds_for_user(member.id) end,
+          pattern: ~r/raw_details|rendered_details|ticket_tiers.*description/i,
+          caller_pids: [self()]
+        )
+
+      [loaded] = Events.list_active_ticket_holds_for_user(member.id)
+
+      assert fat_cols == 0
+      assert loaded.id == hold.id
+      assert loaded.quantity == 2
+      assert loaded.ticket_tier.id == tier.id
+      assert loaded.ticket_tier.name == "GA"
+      assert loaded.ticket_tier.description == nil
+      assert loaded.ticket_tier.event.id == event.id
+      assert loaded.ticket_tier.event.title == "Midsummer Dance"
+      assert loaded.ticket_tier.event.raw_details == nil
+      assert loaded.ticket_tier.event.rendered_details == nil
     end
   end
 

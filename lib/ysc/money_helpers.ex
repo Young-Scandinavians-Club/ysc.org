@@ -80,6 +80,16 @@ defmodule Ysc.MoneyHelper do
     end
   end
 
+  @doc """
+  Formats Money for member-facing price labels, falling back to `$0.00`.
+
+  Use this for tickets, event cards, and booking rate tables. Admin tables
+  that should show an em dash for missing amounts keep a local
+  `format_money_safe/1` instead.
+  """
+  def format_price(%Money{} = money), do: format_money!(money)
+  def format_price(_), do: "$0.00"
+
   def cents_to_dollars(nil), do: Decimal.new("0.0")
 
   def cents_to_dollars(cents) when is_integer(cents) do

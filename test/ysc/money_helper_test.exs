@@ -82,6 +82,19 @@ defmodule Ysc.MoneyHelperTest do
     end
   end
 
+  describe "format_price/1" do
+    test "formats Money for member-facing price labels" do
+      assert MoneyHelper.format_price(Money.new(:USD, "10.99")) == "$10.99"
+      assert MoneyHelper.format_price(Money.new(:USD, "1000.00")) == "$1,000.00"
+    end
+
+    test "falls back to $0.00 for nil and non-Money values" do
+      assert MoneyHelper.format_price(nil) == "$0.00"
+      assert MoneyHelper.format_price("") == "$0.00"
+      assert MoneyHelper.format_price(%{amount: Decimal.new(100)}) == "$0.00"
+    end
+  end
+
   describe "cents_to_dollars/1" do
     test "converts integer cents to a decimal dollars amount" do
       assert Decimal.equal?(

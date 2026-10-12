@@ -36,6 +36,7 @@ defmodule Ysc.Accounts.MembershipReport do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
+  alias Ysc.Csv
   alias Ysc.Accounts.{User, SignupApplication, UserEvent}
   alias Ysc.Subscriptions.Subscription
 
@@ -166,7 +167,7 @@ defmodule Ysc.Accounts.MembershipReport do
         subscription_rows("Returning", report.returning, :start_date) ++
         subscription_rows("Expired", report.expired, :current_period_end)
 
-    [header | rows]
+    [header | Enum.map(rows, &Csv.sanitize_row/1)]
     |> CSV.encode()
     |> Enum.join()
   end

@@ -56,6 +56,26 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       assert path == "/users/log-in"
     end
 
+    test "falls back to Pacific time instead of crashing on an invalid browser timezone",
+         %{conn: conn} do
+      %{conn: conn, user: user} = log_in_member(conn)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe
+        })
+
+      conn = put_connect_params(conn, %{"timezone" => "Not/A/Real/Zone"})
+
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
+
+      assert html =~ "Booking Details"
+      assert html =~ booking.reference_id
+      assert has_element?(view, "#booking-detail")
+    end
+
     test "renders booking summary for a complete booking", %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
 

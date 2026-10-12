@@ -12,6 +12,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   import YscWeb.AdminComponents
 
   alias Ysc.Accounts.UserDisplay
+  alias Ysc.Csv
   alias Ysc.Events
   alias Ysc.Events.AttendeeInfo
   alias Ysc.Events.TicketDetail
@@ -1101,9 +1102,10 @@ defmodule YscWeb.AdminEventsLive.TicketList do
         Map.put(
           row,
           csv_answer_header(label),
-          csv_safe(AttendeeInfo.export_value(ticket.ticket_detail, label))
+          AttendeeInfo.export_value(ticket.ticket_detail, label)
         )
       end)
+      |> Csv.sanitize_row()
     end)
     |> then(fn rows ->
       {@csv_base_headers ++ Enum.map(answer_labels, &csv_answer_header/1), rows}
@@ -1111,27 +1113,9 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   end
 
   defp csv_answer_header(label) when label in @csv_base_headers,
-    do: csv_safe("#{label} (answer)")
+    do: Csv.sanitize_cell("#{label} (answer)")
 
-  defp csv_answer_header(label), do: csv_safe(label)
-
-  # Members type free text that admins open in a spreadsheet. A cell starting
-  # with = + - @ (or a tab / carriage return) can run as a formula, so prefix
-  # it with an apostrophe. Plain negative numbers are left alone.
-  defp csv_safe(value) when is_binary(value) do
-    cond do
-      Regex.match?(~r/^-\d+$/, value) ->
-        value
-
-      String.starts_with?(value, ["=", "+", "-", "@", "\t", "\r"]) ->
-        "'" <> value
-
-      true ->
-        value
-    end
-  end
-
-  defp csv_safe(value), do: value
+  defp csv_answer_header(label), do: Csv.sanitize_cell(label)
 
   defp deny_full_admin(socket, title) do
     YscWeb.Flash.put_toast(

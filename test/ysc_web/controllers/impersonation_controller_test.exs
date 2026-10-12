@@ -220,9 +220,9 @@ defmodule YscWeb.ImpersonationControllerTest do
 
       assert redirected_to(conn) == ~p"/"
 
-      assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
-               "Stopped impersonating"
-
+      # Finding 87: fetch_current_user already dropped the mismatched keys,
+      # so stop-impersonation is a no-op and does not toast success.
+      refute Phoenix.Flash.get(conn.assigns.flash, :info)
       refute get_session(conn, :impersonated_user_id)
       refute get_session(conn, :original_admin_id)
     end

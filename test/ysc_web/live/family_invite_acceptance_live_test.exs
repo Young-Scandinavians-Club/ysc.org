@@ -58,6 +58,59 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
     Accounts.get_user!(user.id, [:subscriptions])
   end
 
+  defp create_user_with_single_membership(attrs \\ %{}) do
+    user = user_fixture(attrs)
+
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+    single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+    assert single_plan,
+           "membership_plans must include :single (another test may have cleared Application env)"
+
+    {:ok, subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_single_#{System.unique_integer()}",
+        stripe_status: "active",
+        name: "Single Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+      })
+
+    {:ok, _subscription_item} =
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_price_id: single_plan.stripe_price_id,
+        stripe_product_id: "prod_single_#{System.unique_integer()}",
+        stripe_id: "si_single_#{System.unique_integer()}",
+        quantity: 1
+      })
+
+    Accounts.get_user!(user.id, [:subscriptions])
+  end
+
+  # Stale invite left over after the primary switched Family → Single.
+  # create_invite/2 refuses Single-plan hosts, so insert the row directly.
+  defp create_stale_single_plan_invite(attrs \\ %{}) do
+    primary_user = create_user_with_single_membership()
+    token = FamilyInvite.build_token()
+
+    invite_attrs =
+      Enum.into(attrs, %{
+        email: unique_user_email(),
+        token: token,
+        primary_user_id: primary_user.id,
+        created_by_user_id: primary_user.id
+      })
+
+    {:ok, invite} =
+      %FamilyInvite{}
+      |> FamilyInvite.changeset(invite_attrs)
+      |> Repo.insert()
+
+    invite = Repo.preload(invite, [:primary_user, :created_by_user])
+    {invite, primary_user}
+  end
+
   # Helper to create a valid family invite
   defp create_family_invite(attrs \\ %{}) do
     primary_user = create_user_with_family_membership()
@@ -463,6 +516,30 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
       assert has_element?(view, "form#accept-invite-form")
     end
+
+    test "refuses new-account signup when the inviter only has a Single plan",
+         %{conn: conn} do
+      {invite, _primary} = create_stale_single_plan_invite()
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      view
+      |> form("#accept-invite-form",
+        user: %{
+          email: invite.email,
+          first_name: "Orphan",
+          last_name: "Invitee",
+          date_of_birth: Date.to_iso8601(child_birth_date()),
+          password: "securepassword123",
+          password_confirmation: "securepassword123"
+        }
+      )
+      |> render_submit()
+
+      flash = assert_redirected(view, "/")
+      assert flash["error"] =~ "not a family or lifetime plan"
+      refute Accounts.get_user_by_email(invite.email)
+    end
   end
 
   describe "mount/3 — wrong account logged in" do
@@ -756,6 +833,28 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
 
       assert Repo.get!(User, invited_user.id).primary_user_id ==
                invite.primary_user_id
+    end
+
+    test "refuses to link when the inviter only has a Single plan", %{
+      conn: conn
+    } do
+      {invite, _primary} = create_stale_single_plan_invite()
+
+      invited_user =
+        user_fixture(%{email: invite.email, date_of_birth: child_birth_date()})
+
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      view
+      |> element("#link-existing-button")
+      |> render_click()
+
+      flash = assert_redirected(view, "/")
+      assert flash["error"] =~ "not a family or lifetime plan"
+
+      assert is_nil(Repo.get!(User, invited_user.id).primary_user_id)
     end
   end
 

@@ -1526,6 +1526,44 @@ defmodule Ysc.TicketsTest do
 
       assert updated.payment_intent_id == "pi_updated_123"
     end
+
+    test "does not attach a PaymentIntent after the order is cancelled", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:ok, cancelled} =
+               Tickets.cancel_ticket_order(order, "started a new checkout")
+
+      assert {:error, :order_not_pending} =
+               Tickets.update_payment_intent(cancelled, "pi_stale_#{order.id}")
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :cancelled
+      assert is_nil(reloaded.payment_intent_id)
+    end
+
+    test "does not attach a PaymentIntent after the order is expired", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:ok, expired} = Tickets.expire_ticket_order(order)
+      assert expired.status == :expired
+
+      assert {:error, :order_not_pending} =
+               Tickets.update_payment_intent(expired, "pi_expired_#{order.id}")
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :expired
+      assert is_nil(reloaded.payment_intent_id)
+    end
   end
 
   describe "calculate_event_and_donation_amounts/1" do
@@ -1836,6 +1874,119 @@ defmodule Ysc.TicketsTest do
       assert loaded_ticket.registration.email == "ada@example.com"
 
       assert loaded_ticket.registration.answers["abc"]["value"] == "Vegan"
+    end
+  end
+
+  describe "get_user_ticket_order_for_qr/2" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns the owner's order with QR preloads", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      found = Tickets.get_user_ticket_order_for_qr(user.id, order.id)
+
+      assert found.id == order.id
+      assert found.reference_id == order.reference_id
+      refute Ecto.assoc_loaded?(found.user)
+      refute Ecto.assoc_loaded?(found.payment)
+      assert Ecto.assoc_loaded?(found.event)
+      refute Ecto.assoc_loaded?(found.event.agendas)
+      assert Ecto.assoc_loaded?(found.tickets)
+
+      assert Enum.all?(found.tickets, fn ticket ->
+               Ecto.assoc_loaded?(ticket.ticket_tier) and
+                 Ecto.assoc_loaded?(ticket.registration)
+             end)
+    end
+
+    test "returns nil for another user", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      refute Tickets.get_user_ticket_order_for_qr(
+               user_fixture_unique().id,
+               order.id
+             )
+    end
+
+    test "omits event HTML, purchaser secrets, and unused tier columns", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, _tier1} =
+        Events.update_ticket_tier(tier1, %{
+          description: "toast copy QR must not load"
+        })
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>event body html</p>",
+        rendered_details: "<p>event body html</p>"
+      })
+      |> Repo.update!()
+
+      user
+      |> Ecto.Changeset.change(%{
+        board_bio: "board bio QR must not load"
+      })
+      |> Repo.update!()
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      [ticket] = tickets_for_order(order.id)
+
+      {:ok, _} =
+        Events.create_ticket_details([
+          %{
+            ticket_id: ticket.id,
+            first_name: "Ada",
+            last_name: "Lovelace",
+            email: "ada@example.com"
+          }
+        ])
+
+      order
+      |> Ecto.Changeset.change(%{
+        admin_grant_notes: "grant notes QR must not load",
+        cancellation_reason: "cancel copy QR must not load"
+      })
+      |> Repo.update!()
+
+      {_found, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_user_ticket_order_for_qr(user.id, order.id) end,
+          pattern:
+            ~r/hashed_password|board_bio|raw_details|rendered_details|admin_grant_notes|cancellation_reason/i,
+          caller_pids: [self()]
+        )
+
+      found = Tickets.get_user_ticket_order_for_qr(user.id, order.id)
+      loaded_ticket = hd(found.tickets)
+
+      assert fat_cols == 0
+      refute Ecto.assoc_loaded?(found.user)
+      assert found.event.title == event.title
+      assert found.event.raw_details == nil
+      assert found.event.rendered_details == nil
+      assert found.admin_grant_notes == nil
+      assert loaded_ticket.ticket_tier.name == "General Admission"
+      assert loaded_ticket.ticket_tier.description == nil
+      assert loaded_ticket.registration.first_name == "Ada"
+      assert loaded_ticket.registration.last_name == "Lovelace"
+      assert loaded_ticket.registration.email == nil
     end
   end
 
