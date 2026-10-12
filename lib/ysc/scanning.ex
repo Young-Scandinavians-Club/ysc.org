@@ -22,9 +22,10 @@ defmodule Ysc.Scanning do
   alias Ysc.Scanning.{QrToken, ScanSession, ScanRecord, SessionCheckIn}
   alias Ysc.MessagePassingEvents
 
-  # Display fields for the admin event check-in list and QR scan path.
-  # Omits hashed_password, board_bio, event HTML, order notes, tier
-  # descriptions, and other columns those screens never render.
+  # Display fields for the admin event check-in list, QR scan path,
+  # session-history lists, and CSV exports. Omits hashed_password,
+  # board_bio, event HTML, order notes, tier descriptions, and other
+  # columns those screens never render.
   @checkin_ticket_fields [
     :id,
     :event_id,
@@ -47,6 +48,8 @@ defmodule Ysc.Scanning do
   ]
   @checkin_ticket_tier_fields [:id, :name]
   @checkin_ticket_order_fields [:id, :reference_id]
+  # Event-session CSV only needs the printed ticket reference.
+  @scan_record_ticket_fields [:id, :reference_id]
   # Scanner session lists only render event title and creator name.
   @session_event_fields [:id, :title]
 
@@ -811,12 +814,25 @@ defmodule Ysc.Scanning do
     |> Repo.insert()
   end
 
+  @doc """
+  Lists scan records for a session, newest first.
+
+  Struct-selects member name/email for the session-history table. Skips
+  ticket preload — that page never renders a ticket reference. CSV export
+  loads a slim ticket `reference_id` separately.
+  """
   def list_scan_records(session_id) do
-    ScanRecord
-    |> where([r], r.scan_session_id == ^session_id)
-    |> order_by([r], desc: r.inserted_at, desc: r.id)
-    |> preload([:user, :ticket])
+    session_id
+    |> list_scan_records_query()
     |> Repo.all()
+  end
+
+  defp list_scan_records_query(session_id) do
+    from(r in ScanRecord,
+      where: r.scan_session_id == ^session_id,
+      order_by: [desc: r.inserted_at, desc: r.id],
+      preload: [user: ^checkin_user_query()]
+    )
   end
 
   def count_scan_records(session_id) do
@@ -830,10 +846,8 @@ defmodule Ysc.Scanning do
 
   def export_session_csv(session_id) do
     records =
-      ScanRecord
-      |> where([r], r.scan_session_id == ^session_id)
-      |> order_by([r], asc: r.inserted_at)
-      |> preload([:user, :ticket])
+      session_id
+      |> scan_records_for_csv_query()
       |> Repo.all()
 
     session = get_session!(session_id)
@@ -907,6 +921,23 @@ defmodule Ysc.Scanning do
     |> IO.iodata_to_binary()
   end
 
+  # Oldest-first for a stable CSV. Slim user name/email + ticket reference
+  # — skip hashed_password and unused ticket check-in columns.
+  defp scan_records_for_csv_query(session_id) do
+    from(r in ScanRecord,
+      where: r.scan_session_id == ^session_id,
+      order_by: [asc: r.inserted_at],
+      preload: [
+        user: ^checkin_user_query(),
+        ticket: ^scan_record_ticket_query()
+      ]
+    )
+  end
+
+  defp scan_record_ticket_query do
+    from(t in Ticket, select: struct(t, ^@scan_record_ticket_fields))
+  end
+
   @doc """
   Exports a membership check-in session's SessionCheckIn records as a CSV string.
   Each row contains the checked-in member's name, email, membership status,
@@ -914,10 +945,8 @@ defmodule Ysc.Scanning do
   """
   def export_membership_checkins_csv(session_id) do
     check_ins =
-      SessionCheckIn
-      |> where([sc], sc.scan_session_id == ^session_id)
-      |> order_by([sc], asc: sc.inserted_at)
-      |> preload([:user, :checked_in_by])
+      session_id
+      |> membership_checkins_for_csv_query()
       |> Repo.all()
 
     headers = [
@@ -960,6 +989,14 @@ defmodule Ysc.Scanning do
     |> CSV.encode()
     |> Enum.to_list()
     |> IO.iodata_to_binary()
+  end
+
+  defp membership_checkins_for_csv_query(session_id) do
+    from(sc in SessionCheckIn,
+      where: sc.scan_session_id == ^session_id,
+      order_by: [asc: sc.inserted_at],
+      preload: ^membership_check_in_preloads()
+    )
   end
 
   # --- Manual Check-in View ---
@@ -1293,33 +1330,61 @@ defmodule Ysc.Scanning do
   Results are ordered by check-in time (most recent first).
   """
   def list_membership_check_ins(session_id, search \\ nil) do
-    alias Ysc.Accounts.User
+    session_id
+    |> list_membership_check_ins_query(search)
+    |> Repo.all()
+  end
 
-    base =
-      from(sc in SessionCheckIn,
-        where: sc.scan_session_id == ^session_id,
-        join: u in User,
-        on: u.id == sc.user_id,
-        preload: [:user, :checked_in_by],
-        order_by: [desc: sc.inserted_at]
-      )
+  # Desk list + CSV: member and operator name/email only. Search uses
+  # EXISTS so a JOIN cannot pull hashed_password / bios into the parent
+  # SELECT the way `join + preload([:user, :checked_in_by])` did.
+  defp list_membership_check_ins_query(session_id, search) do
+    from(sc in SessionCheckIn,
+      as: :check_in,
+      where: sc.scan_session_id == ^session_id,
+      preload: ^membership_check_in_preloads(),
+      order_by: [desc: sc.inserted_at]
+    )
+    |> filter_membership_check_in_search(search)
+  end
 
-    query =
-      if search && String.trim(search) != "" do
-        term = "%#{String.trim(search)}%"
+  defp membership_check_in_preloads do
+    [
+      user: checkin_user_query(),
+      checked_in_by: checkin_user_query()
+    ]
+  end
 
-        from([sc, u] in base,
-          where:
-            ilike(u.first_name, ^term) or
-              ilike(u.last_name, ^term) or
-              ilike(u.email, ^term) or
-              ilike(fragment("? || ' ' || ?", u.first_name, u.last_name), ^term)
+  defp filter_membership_check_in_search(query, search)
+       when search in [nil, ""],
+       do: query
+
+  defp filter_membership_check_in_search(query, search)
+       when is_binary(search) do
+    trimmed = String.trim(search)
+
+    if trimmed == "" do
+      query
+    else
+      term = "%#{trimmed}%"
+
+      where(
+        query,
+        exists(
+          from(u in User,
+            where: u.id == parent_as(:check_in).user_id,
+            where:
+              ilike(u.first_name, ^term) or
+                ilike(u.last_name, ^term) or
+                ilike(u.email, ^term) or
+                ilike(
+                  fragment("? || ' ' || ?", u.first_name, u.last_name),
+                  ^term
+                )
+          )
         )
-      else
-        base
-      end
-
-    Repo.all(query)
+      )
+    end
   end
 
   @doc """
@@ -1466,17 +1531,28 @@ defmodule Ysc.Scanning do
 
   @doc false
   def ci_query_explain_query do
-    alias Ysc.Ci.QueryExplain.Fixtures
-
-    session_id = Fixtures.ulid()
-
-    from(sc in SessionCheckIn,
-      where: sc.scan_session_id == ^session_id,
-      join: u in User,
-      on: u.id == sc.user_id,
-      preload: [:user, :checked_in_by],
-      order_by: [desc: sc.inserted_at]
+    list_membership_check_ins_query(
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      nil
     )
+  end
+
+  @doc false
+  def ci_query_explain_list_membership_check_ins_search_query do
+    list_membership_check_ins_query(
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      "Ada"
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_scan_records_query do
+    list_scan_records_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_scan_records_for_csv_query do
+    scan_records_for_csv_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false
