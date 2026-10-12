@@ -31,4 +31,13 @@ defmodule QueryConsole.Runner.CellsTest do
     assert Cells.serialize([1, "a", nil]) == [1, "a", nil]
     assert Cells.serialize(%{"a" => 1, :b => "x"}) == %{"a" => 1, "b" => "x"}
   end
+
+  test "serializes Decimal cells as Jason-safe strings" do
+    amount = Decimal.new("10.50")
+    serialized = Cells.serialize(amount)
+
+    assert serialized == Decimal.to_string(amount)
+    assert is_binary(serialized)
+    assert {:ok, _} = Jason.encode(%{"amount" => serialized})
+  end
 end

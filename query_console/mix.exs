@@ -49,6 +49,13 @@ defmodule QueryConsole.MixProject do
       # or the :comment option. Public query APIs and BinaryExtension are
       # unchanged. Pin the patched floor.
       {:postgrex, "~> 0.22.4"},
+      # GHSA-6c27-994x-c52f / CVE-2026-97853: Decimal < 3.1.2 (DoS via
+      # unbounded Decimal.round/3 places). 3.2.0 includes that fix plus
+      # faster arithmetic. Query Console serializes Postgrex numeric
+      # cells with Decimal.to_string/1 (unchanged in 3.2.0). We do not
+      # call round/3, compare NaN, or pass a custom Context. ecto and
+      # postgrex still list ~> 3.0, so pin the patched floor.
+      {:decimal, "~> 3.2.0", override: true},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1.0"},
