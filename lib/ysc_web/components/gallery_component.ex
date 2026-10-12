@@ -21,7 +21,7 @@ defmodule YscWeb.Components.GalleryComponent do
           <button
             phx-click={JS.navigate(~p"/admin/media/upload/#{image.id}")}
             id={id}
-            class="mb-4 group relative w-full rounded-lg aspect-square border border-zinc-200 cursor-pointer hover:border-zinc-400 hover:shadow-md transition-all duration-200 overflow-hidden"
+            class="mb-4 group relative w-full rounded-lg aspect-square border border-zinc-200 cursor-pointer hover:border-zinc-400 hover:shadow-md transition duration-200 overflow-hidden"
           >
             <canvas
               id={"blur-hash-image-#{image.id}"}

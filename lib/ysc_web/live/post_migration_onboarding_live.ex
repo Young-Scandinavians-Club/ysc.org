@@ -240,7 +240,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         class="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 space-y-4"
       >
         <div>
-          <h3 class="text-base font-semibold text-zinc-900">Profile photo</h3>
+          <h3 class="text-base text-zinc-900 type-subhead">Profile photo</h3>
           <p class="text-sm text-zinc-500 mt-1">
             Optional — helps other members recognize you at events.
           </p>
@@ -301,7 +301,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                     class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
                   >
                     <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
-                      <h3 class="text-lg font-semibold text-zinc-900">
+                      <h3 class="text-lg text-zinc-900 type-subhead">
                         Crop your photo
                       </h3>
                       <div
@@ -337,7 +337,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               <div class="flex items-center gap-3">
                 <div class="w-full bg-zinc-200 rounded-full h-2">
                   <div
-                    class="bg-blue-600 h-2 rounded-full transition-all"
+                    class="bg-blue-600 h-2 rounded-full transition-[width]"
                     style={"width: #{entry.progress}%"}
                   >
                   </div>
@@ -387,7 +387,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                       id={"onboarding-avatar-#{avatar.id}"}
                       disabled={@selecting_avatar_id == avatar.id}
                       class={[
-                        "w-12 h-12 rounded-full border-2 transition-all hover:scale-105 cursor-pointer overflow-hidden",
+                        "w-12 h-12 rounded-full border-2 transition hover:scale-105 cursor-pointer overflow-hidden",
                         if(@user.current_avatar_id == avatar.id,
                           do: "border-blue-600 ring-2 ring-blue-200",
                           else: "border-zinc-200 hover:border-zinc-400"
@@ -536,7 +536,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             class="h-5 w-5 text-blue-500 shrink-0 mt-0.5"
           />
           <div>
-            <h3 class="text-sm font-semibold text-blue-800">
+            <h3 class="text-sm text-blue-800 type-subhead">
               <%= if @primary_user do %>
                 Membership shared through {@primary_user.first_name} {@primary_user.last_name}
               <% else %>
@@ -939,7 +939,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <%= for {form, idx} <- Enum.with_index(@family_members_forms) do %>
           <div class="p-4 border border-zinc-200 rounded-lg space-y-3">
             <div class="flex items-center justify-between">
-              <h4 class="text-sm font-semibold text-zinc-700">
+              <h4 class="text-sm text-zinc-700 type-subhead">
                 Family Member {idx + 1}
                 <span
                   :if={family_member_form_id(form) != ""}
@@ -1035,7 +1035,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     ~H"""
     <div class="text-center py-8">
       <.icon name="hero-check-circle" class="w-16 h-16 text-green-500 mx-auto mb-4" />
-      <h2 class="text-2xl font-semibold text-zinc-800 mb-2">You're all set!</h2>
+      <h2 class="text-2xl text-zinc-800 mb-2 type-title">You're all set!</h2>
       <p class="text-zinc-500 mb-8">
         Your account is fully up to date. Welcome to the Young Scandinavians Club!
       </p>

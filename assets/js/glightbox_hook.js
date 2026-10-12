@@ -36,16 +36,19 @@ const GLightboxHook = {
             if (!img) return;
 
             const link = fig.querySelector("a[href]");
-            const href = cleanImageHref(
+            const href = safeLightboxHref(
                 (link && link.getAttribute("href")) ||
                     img.getAttribute("src") ||
                     attachmentUrl(fig)
             );
             if (!href) return;
 
+            // Finding 84: GLightbox assigns title via innerHTML. Captions come from
+            // figcaption textContent (entity-decoded), so HTML-looking caption text
+            // must be escaped before it becomes a lightbox title.
             const cap = fig.querySelector("figcaption")?.textContent?.trim() || "";
             const entry = { href, type: "image" };
-            if (cap) entry.title = cap;
+            if (cap) entry.title = escapeHtml(cap);
 
             elements.push(entry);
             const target = link || img;
@@ -72,16 +75,20 @@ const GLightboxHook = {
                 const caption = extractCaption(link, img);
                 restructureImageLink(link, img, caption);
 
-                const cleanHref = cleanImageHref(href);
+                const cleanHref = safeLightboxHref(href);
+                if (!cleanHref) return;
                 link.setAttribute("href", cleanHref);
                 link.classList.add("glightbox");
                 if (caption) link.dataset.glightboxCaption = caption;
                 link.dataset.glightboxReady = "true";
             }
 
-            const entry = { href: link.getAttribute("href"), type: "image" };
+            const readyHref = safeLightboxHref(link.getAttribute("href"));
+            if (!readyHref) return;
+
+            const entry = { href: readyHref, type: "image" };
             const caption = link.dataset.glightboxCaption || "";
-            if (caption) entry.title = caption;
+            if (caption) entry.title = escapeHtml(caption);
 
             elements.push(entry);
             clickTargets.push(link);
@@ -128,6 +135,16 @@ const GLightboxHook = {
     },
 };
 
+// GLightbox writes `title` with innerHTML. Escape so caption text cannot become markup.
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 function cleanImageHref(href) {
     if (!href) return "";
     try {
@@ -144,12 +161,30 @@ function cleanImageHref(href) {
     }
 }
 
+// Only http(s) absolute URLs or same-origin relative paths may enter the lightbox.
+// Blocks javascript:/data: values persisted in data-trix-attachment JSON.
+function safeLightboxHref(href) {
+    const cleaned = cleanImageHref(href);
+    if (!cleaned) return "";
+
+    try {
+        const url = new URL(cleaned, window.location.origin);
+        if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+        if (/^https?:\/\//i.test(cleaned)) return cleaned;
+        if (cleaned.startsWith("/")) return cleaned;
+        return "";
+    } catch (_) {
+        return "";
+    }
+}
+
 function attachmentUrl(fig) {
     const raw = fig.getAttribute("data-trix-attachment");
     if (!raw) return null;
     try {
         const meta = JSON.parse(raw.replace(/&quot;/g, '"'));
-        return meta.url || meta.href || null;
+        const candidate = meta.url || meta.href || null;
+        return safeLightboxHref(candidate) || null;
     } catch (_) {
         return null;
     }

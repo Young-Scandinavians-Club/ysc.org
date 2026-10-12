@@ -107,6 +107,25 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLiveTest do
                ~p"/family-invite/#{invite.token}/accept"
     end
 
+    test "sends an already-linked invited user back to the accept page", %{
+      conn: conn
+    } do
+      invite = create_family_invite()
+      other_primary = user_fixture()
+
+      invited_user =
+        user_fixture(%{email: invite.email})
+        |> Ecto.Changeset.change(%{primary_user_id: other_primary.id})
+        |> Repo.update!()
+
+      conn = log_in_user(conn, invited_user)
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               live(conn, ~p"/family-invite/#{invite.token}/logout-required")
+
+      assert to == ~p"/family-invite/#{invite.token}/accept"
+    end
+
     test "logout form posts to log-out with redirect_to hidden field", %{
       conn: conn
     } do

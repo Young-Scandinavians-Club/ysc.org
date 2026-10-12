@@ -19,7 +19,7 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
       id="communication-timeline"
       class="rounded-sm p-6 border border-zinc-200"
     >
-      <h2 class="text-lg font-bold text-zinc-800 mb-6">Communication History</h2>
+      <h2 class="text-lg text-zinc-800 mb-6 type-subhead">Communication History</h2>
 
       <p :if={@entries == []} class="text-sm text-zinc-500">
         No communications sent yet. Updates and automated emails will appear here.
@@ -42,7 +42,7 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
             <.icon name={entry.icon} class={["w-4 h-4", entry_icon_color(entry)]} />
           </span>
 
-          <h3 class="flex flex-wrap items-center gap-2 mb-1 text-sm font-semibold text-zinc-900 min-w-0">
+          <h3 class="flex flex-wrap items-center gap-2 mb-1 text-sm text-zinc-900 min-w-0 type-subhead">
             {entry.title}
             <span
               :for={badge <- entry.badges}

@@ -50,7 +50,9 @@ defmodule YscWeb.NewsletterArchiveLive do
         <% else %>
           <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-6 py-8 text-center">
             <.icon name="hero-envelope" class="w-8 h-8 mx-auto mb-3 text-blue-600" />
-            <h2 class="text-lg font-bold text-zinc-900 mb-1">Stay in the loop</h2>
+            <h2 class="text-lg text-zinc-900 mb-1 type-subhead">
+              Stay in the loop
+            </h2>
             <p class="text-sm text-zinc-500 mb-6">
               Sign up to receive future newsletters directly in your inbox.
             </p>
@@ -100,10 +102,10 @@ defmodule YscWeb.NewsletterArchiveLive do
             >
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">
+                  <p class="text-xs text-blue-600 mb-2 type-eyebrow">
                     {format_sent_date(edition.sent_at)}
                   </p>
-                  <h2 class="text-xl font-bold text-zinc-900 group-hover:text-blue-600 transition-colors leading-snug">
+                  <h2 class="text-xl text-zinc-900 group-hover:text-blue-600 transition-colors type-subhead">
                     {edition.title}
                   </h2>
                   <p
@@ -114,7 +116,7 @@ defmodule YscWeb.NewsletterArchiveLive do
                   </p>
                 </div>
                 <div class="shrink-0 mt-1">
-                  <span class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 group-hover:gap-2 transition-all">
+                  <span class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 group-hover:gap-2 transition-[gap]">
                     Read <.icon name="hero-arrow-right" class="w-4 h-4" />
                   </span>
                 </div>
@@ -164,10 +166,10 @@ defmodule YscWeb.NewsletterArchiveLive do
         </div>
 
         <div :if={@async_data_loaded && @edition} class="mt-6 mb-2">
-          <p class="text-xs font-bold text-blue-600 uppercase tracking-widest mb-2">
+          <p class="text-xs text-blue-600 mb-2 type-eyebrow">
             {format_sent_date(@edition.sent_at)}
           </p>
-          <h1 class="text-3xl md:text-4xl font-black text-zinc-900 tracking-tight">
+          <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
             {@edition.title}
           </h1>
         </div>

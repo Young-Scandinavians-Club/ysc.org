@@ -211,11 +211,11 @@ defmodule YscWeb.BookingReceiptLive do
           <%= if @booking.status == :canceled do %>
             <div class="flex items-center gap-2 text-red-600 mb-2">
               <.icon name="hero-x-circle" class="w-6 h-6" />
-              <span class="font-bold uppercase tracking-wider text-sm">
+              <span class="text-sm type-eyebrow">
                 Booking Cancelled
               </span>
             </div>
-            <h1 class="text-4xl font-bold text-zinc-900">
+            <h1 class="text-4xl text-zinc-900 type-display">
               Booking Cancelled
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
@@ -243,13 +243,13 @@ defmodule YscWeb.BookingReceiptLive do
           <% else %>
             <div class="flex items-center gap-2 text-green-600 mb-2">
               <.icon name="hero-check-circle-solid" class="w-6 h-6" />
-              <span class="font-bold uppercase tracking-wider text-sm">
+              <span class="text-sm type-eyebrow">
                 {if @show_reservation_updated,
                   do: "Booking Updated",
                   else: "Booking Confirmed"}
               </span>
             </div>
-            <h1 class="text-4xl font-bold text-zinc-900">
+            <h1 class="text-4xl text-zinc-900 type-display">
               <%= cond do %>
                 <% @show_reservation_updated -> %>
                   Your booking has been updated, {@user_first_name}!
@@ -278,7 +278,7 @@ defmodule YscWeb.BookingReceiptLive do
           <% end %>
         </div>
         <div class="text-left md:text-right">
-          <p class="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+          <p class="text-xs text-zinc-400 type-eyebrow">
             Booking Reference
           </p>
           <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
@@ -310,7 +310,7 @@ defmodule YscWeb.BookingReceiptLive do
                     )
                   ]}
                 />
-                <h2 class="text-2xl font-bold">Your Door Code</h2>
+                <h2 class="text-2xl type-title">Your Door Code</h2>
               </div>
               <p class={[
                 "text-sm md:text-base",
@@ -327,9 +327,9 @@ defmodule YscWeb.BookingReceiptLive do
               </p>
             </div>
             <div class="shrink-0">
-              <div class="bg-white/20 backdrop-blur-xs rounded-lg px-8 py-6 border-2 border-white/30">
+              <div class="bg-white/20 rounded-lg px-8 py-6 border-2 border-white/30">
                 <p class={[
-                  "text-xs font-bold uppercase tracking-widest mb-2 text-center",
+                  "text-xs mb-2 text-center type-eyebrow",
                   if(@booking.property == :clear_lake,
                     do: "text-teal-200",
                     else: "text-blue-200"
@@ -337,7 +337,7 @@ defmodule YscWeb.BookingReceiptLive do
                 ]}>
                   Door Code
                 </p>
-                <p class="text-5xl font-mono font-black text-white text-center tracking-wider">
+                <p class="text-5xl font-mono font-bold text-white text-center tracking-wider">
                   {@door_code.code}
                 </p>
               </div>
@@ -358,7 +358,7 @@ defmodule YscWeb.BookingReceiptLive do
                   class="w-8 h-8 text-red-600 shrink-0 mt-1"
                 />
                 <div class="flex-1">
-                  <h3 class="text-lg font-bold text-red-900 mb-2">
+                  <h3 class="text-lg text-red-900 mb-2 type-subhead">
                     This Booking Has Been Cancelled
                   </h3>
                   <p class="text-sm text-red-800 leading-relaxed">
@@ -392,7 +392,7 @@ defmodule YscWeb.BookingReceiptLive do
               <%= if @booking.status == :canceled do %>
                 <div class="absolute inset-0 bg-red-500/20 flex items-center justify-center">
                   <div class="bg-white/90 rounded-lg px-6 py-3 shadow-lg">
-                    <p class="text-red-700 font-bold text-lg uppercase tracking-wider">
+                    <p class="text-red-700 font-bold text-lg">
                       Cancelled
                     </p>
                   </div>
@@ -401,7 +401,7 @@ defmodule YscWeb.BookingReceiptLive do
               <div class="absolute inset-0 bg-linear-to-t from-black/40 to-transparent flex items-end p-6">
                 <div class="flex items-center justify-between w-full">
                   <h2 class={[
-                    "text-xl font-bold flex items-center gap-2",
+                    "text-xl flex items-center gap-2 type-subhead",
                     if(@booking.status == :canceled,
                       do: "text-zinc-300 line-through",
                       else: "text-white"
@@ -428,7 +428,7 @@ defmodule YscWeb.BookingReceiptLive do
             <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
               <div>
                 <p class={[
-                  "text-xs font-bold uppercase mb-1",
+                  "text-xs mb-1 type-eyebrow",
                   if(@booking.status == :canceled,
                     do: "text-zinc-500",
                     else: "text-zinc-400"
@@ -460,7 +460,7 @@ defmodule YscWeb.BookingReceiptLive do
               </div>
               <div>
                 <p class={[
-                  "text-xs font-bold uppercase mb-1",
+                  "text-xs mb-1 type-eyebrow",
                   if(@booking.status == :canceled,
                     do: "text-zinc-500",
                     else: "text-zinc-400"
@@ -492,7 +492,7 @@ defmodule YscWeb.BookingReceiptLive do
               </div>
               <div>
                 <p class={[
-                  "text-xs font-bold uppercase mb-1",
+                  "text-xs mb-1 type-eyebrow",
                   if(@booking.status == :canceled,
                     do: "text-zinc-500",
                     else: "text-zinc-400"
@@ -546,7 +546,7 @@ defmodule YscWeb.BookingReceiptLive do
             ]}>
               <div class="p-8">
                 <h2 class={[
-                  "text-xl font-bold mb-6 flex items-center gap-2",
+                  "text-xl mb-6 flex items-center gap-2 type-subhead",
                   if(@booking.status == :canceled,
                     do: "text-zinc-500 line-through",
                     else: "text-zinc-900"
@@ -584,7 +584,7 @@ defmodule YscWeb.BookingReceiptLive do
                       <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
                           <h3 class={[
-                            "font-semibold",
+                            "type-subhead",
                             if(@booking.status == :canceled,
                               do: "text-zinc-500 line-through",
                               else: "text-zinc-900"
@@ -621,7 +621,7 @@ defmodule YscWeb.BookingReceiptLive do
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <!-- Cabin Access -->
               <div class="p-6 bg-white border border-zinc-200 rounded-lg">
-                <h3 class="font-bold text-zinc-900 mb-3 flex items-center gap-2">
+                <h3 class="text-zinc-900 mb-3 flex items-center gap-2 type-subhead">
                   <.icon name="hero-key" class="w-5 h-5" /> Cabin Access
                 </h3>
                 <p id="cabin-access-timing" class="text-sm text-zinc-600 mb-4">
@@ -641,7 +641,7 @@ defmodule YscWeb.BookingReceiptLive do
               </div>
               <!-- Cabin Rules -->
               <div class="p-6 bg-white border border-zinc-200 rounded-lg">
-                <h3 class="font-bold text-zinc-900 mb-3 flex items-center gap-2">
+                <h3 class="text-zinc-900 mb-3 flex items-center gap-2 type-subhead">
                   <.icon name="hero-document-check" class="w-5 h-5" /> Cabin Rules
                 </h3>
                 <p class="text-sm text-zinc-600 mb-4">
@@ -690,7 +690,7 @@ defmodule YscWeb.BookingReceiptLive do
               )
             ]}>
               <h3 class={[
-                "text-xs font-bold uppercase tracking-widest mb-6",
+                "text-xs mb-6 type-eyebrow",
                 if(@booking.status == :canceled,
                   do: "text-red-700",
                   else: "text-zinc-400"
@@ -960,10 +960,8 @@ defmodule YscWeb.BookingReceiptLive do
                   >
                     <p class={
                       if(@booking.status == :canceled,
-                        do:
-                          "text-xs font-semibold text-zinc-600 uppercase tracking-wider",
-                        else:
-                          "text-xs font-semibold text-zinc-500 uppercase tracking-wider"
+                        do: "text-xs text-zinc-600 type-eyebrow",
+                        else: "text-xs text-zinc-500 type-eyebrow"
                       )
                     }>
                       Payments
@@ -1064,7 +1062,7 @@ defmodule YscWeb.BookingReceiptLive do
                     <% end %>
                     <%= if @refund_data.processed_refunds && length(@refund_data.processed_refunds) > 0 do %>
                       <div class="border-t border-red-200 pt-4 space-y-2">
-                        <p class="text-xs font-semibold text-zinc-600 uppercase tracking-wider">
+                        <p class="text-xs text-zinc-600 type-eyebrow">
                           Refund Details
                         </p>
                         <%= for refund <- @refund_data.processed_refunds do %>

@@ -210,6 +210,67 @@ defmodule YscWeb.UserAuthTest do
       assert conn.assigns.impersonating? == true
       assert conn.assigns.original_admin_id == admin.id
     end
+
+    test "does not impersonate after the admin session token is revoked", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "Victim"})
+      user_token = Accounts.generate_user_session_token(admin)
+      Accounts.delete_user_session_token(user_token)
+
+      conn =
+        conn
+        |> put_session(:user_token, user_token)
+        |> put_session(:impersonated_user_id, target.id)
+        |> put_session(:original_admin_id, admin.id)
+        |> UserAuth.fetch_current_user([])
+
+      refute conn.assigns.current_user
+      refute conn.assigns.impersonating?
+      refute get_session(conn, :impersonated_user_id)
+      refute get_session(conn, :original_admin_id)
+    end
+
+    test "does not impersonate after the admin is demoted from full admin", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: "admin"})
+      actor = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "Victim"})
+      user_token = Accounts.generate_user_session_token(admin)
+
+      {:ok, _} = Accounts.update_user(admin, %{"role" => "member"}, actor)
+
+      conn =
+        conn
+        |> put_session(:user_token, user_token)
+        |> put_session(:impersonated_user_id, target.id)
+        |> put_session(:original_admin_id, admin.id)
+        |> UserAuth.fetch_current_user([])
+
+      assert conn.assigns.current_user.id == admin.id
+      refute conn.assigns.impersonating?
+      refute get_session(conn, :impersonated_user_id)
+    end
+
+    test "does not impersonate when original_admin_id does not match the session user",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      other_admin = user_fixture(%{role: "admin"})
+      target = user_fixture()
+      user_token = Accounts.generate_user_session_token(admin)
+
+      conn =
+        conn
+        |> put_session(:user_token, user_token)
+        |> put_session(:impersonated_user_id, target.id)
+        |> put_session(:original_admin_id, other_admin.id)
+        |> UserAuth.fetch_current_user([])
+
+      assert conn.assigns.current_user.id == admin.id
+      refute conn.assigns.impersonating?
+    end
   end
 
   describe "on_mount: mount_current_user" do
@@ -296,6 +357,51 @@ defmodule YscWeb.UserAuthTest do
       assert updated_socket.assigns.real_current_user.id == admin.id
       assert updated_socket.assigns.impersonating? == true
       assert updated_socket.assigns.original_admin_id == admin.id
+    end
+
+    test "does not impersonate on LiveView mount after the admin session is revoked",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "Victim"})
+      user_token = Accounts.generate_user_session_token(admin)
+      Accounts.delete_user_session_token(user_token)
+
+      session =
+        conn
+        |> put_session(:user_token, user_token)
+        |> put_session(:impersonated_user_id, target.id)
+        |> put_session(:original_admin_id, admin.id)
+        |> get_session()
+
+      {:cont, updated_socket} =
+        UserAuth.on_mount(:mount_current_user, %{}, session, %LiveView.Socket{})
+
+      refute updated_socket.assigns.current_user
+      refute updated_socket.assigns.impersonating?
+    end
+
+    test "does not impersonate on LiveView mount after the admin is demoted", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: "admin"})
+      actor = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "Victim"})
+      user_token = Accounts.generate_user_session_token(admin)
+
+      {:ok, _} = Accounts.update_user(admin, %{"role" => "member"}, actor)
+
+      session =
+        conn
+        |> put_session(:user_token, user_token)
+        |> put_session(:impersonated_user_id, target.id)
+        |> put_session(:original_admin_id, admin.id)
+        |> get_session()
+
+      {:cont, updated_socket} =
+        UserAuth.on_mount(:mount_current_user, %{}, session, %LiveView.Socket{})
+
+      assert updated_socket.assigns.current_user.id == admin.id
+      refute updated_socket.assigns.impersonating?
     end
 
     test "assigns real_current_user and impersonating? when not impersonating",

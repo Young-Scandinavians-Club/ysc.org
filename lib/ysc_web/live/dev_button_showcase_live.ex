@@ -29,7 +29,7 @@ defmodule YscWeb.DevButtonShowcaseLive do
     <div class="min-h-screen bg-zinc-50">
       <div class="max-w-5xl mx-auto px-4 py-10 space-y-12">
         <div>
-          <h1 class="text-2xl font-bold text-zinc-900">
+          <h1 class="text-2xl text-zinc-900 type-display">
             Button component showcase
           </h1>
           <p class="mt-2 text-sm text-zinc-600 leading-relaxed">
@@ -46,7 +46,7 @@ defmodule YscWeb.DevButtonShowcaseLive do
         </div>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+          <h2 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
             Solid variant
           </h2>
           <.showcase_table>
@@ -80,7 +80,7 @@ defmodule YscWeb.DevButtonShowcaseLive do
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+          <h2 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
             Outline variant
           </h2>
           <.showcase_table>
@@ -116,7 +116,7 @@ defmodule YscWeb.DevButtonShowcaseLive do
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+          <h2 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
             Link-style buttons (navigate / patch / href)
           </h2>
           <.showcase_table>
@@ -178,7 +178,7 @@ defmodule YscWeb.DevButtonShowcaseLive do
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+          <h2 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
             type="submit" (structured loading)
           </h2>
           <.showcase_table>
@@ -221,7 +221,7 @@ defmodule YscWeb.DevButtonShowcaseLive do
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+          <h2 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
             Custom loading label
           </h2>
           <div class="flex flex-wrap gap-4 items-center">
@@ -243,7 +243,7 @@ defmodule YscWeb.DevButtonShowcaseLive do
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+          <h2 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
             Disabled
           </h2>
           <div class="flex flex-wrap gap-4 items-center">
@@ -263,7 +263,7 @@ defmodule YscWeb.DevButtonShowcaseLive do
         </section>
 
         <section class="space-y-4">
-          <h2 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+          <h2 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
             No LiveView binding (no structured loading)
           </h2>
           <p class="text-sm text-zinc-600">
@@ -289,7 +289,7 @@ defmodule YscWeb.DevButtonShowcaseLive do
     ~H"""
     <div class="overflow-x-auto rounded-lg border border-zinc-200">
       <table class="min-w-full text-left">
-        <thead class="bg-zinc-50 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+        <thead class="bg-zinc-50 text-xs text-zinc-500 type-eyebrow">
           <tr>
             <th class="py-2 px-3">Variant / case</th>
             <th class="py-2 px-3">Interactive (slow)</th>

@@ -270,7 +270,7 @@ defmodule YscWeb.ReauthComponent do
         >
           <%!-- Password section --%>
           <div :if={@user_has_password} class="space-y-4">
-            <h3 class="font-semibold text-zinc-900">Verify with your password</h3>
+            <h3 class="text-zinc-900 type-subhead">Verify with your password</h3>
             <.simple_form
               for={@reauth_form}
               id="reauth_password_form"
@@ -309,7 +309,7 @@ defmodule YscWeb.ReauthComponent do
               OR
             </.labeled_divider>
 
-            <h3 class="font-semibold text-zinc-900">
+            <h3 class="text-zinc-900 type-subhead">
               {if @user_has_password,
                 do: "Verify with a passkey",
                 else: "Verify with your passkey"}

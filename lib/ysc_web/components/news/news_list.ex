@@ -39,7 +39,7 @@ defmodule YscWeb.NewsListLive do
             </div>
 
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
-              <h3 class="text-lg font-semibold text-zinc-900 hover:text-blue-600 transition-colors mb-2">
+              <h3 class="text-lg text-zinc-900 hover:text-blue-600 transition-colors mb-2 type-subhead">
                 {post.title}
               </h3>
             </.link>

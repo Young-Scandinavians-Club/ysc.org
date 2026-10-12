@@ -1246,7 +1246,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         "The entire cabin isn't available in winter. You can still book individual rooms."
 
       assigns[:selected_booking_mode] == :buyout ->
-        "Another member has already booked this date. Choose different dates, or book rooms or a shared stay instead of the whole cabin."
+        "Another member has already booked this date. Choose different dates, or book rooms or a shared stay instead of the entire cabin."
 
       true ->
         "Another member has already booked this date. Try different dates, or choose a shared stay if that's available."

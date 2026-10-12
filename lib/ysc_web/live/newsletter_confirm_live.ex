@@ -44,10 +44,10 @@ defmodule YscWeb.NewsletterConfirmLive do
     ~H"""
     <div class="py-16 lg:py-24 max-w-xl mx-auto px-4" id="newsletter-confirm-page">
       <div class="text-center">
-        <h1 :if={@subscriber} class="text-2xl font-bold text-zinc-900">
+        <h1 :if={@subscriber} class="text-2xl text-zinc-900 type-display">
           You're subscribed!
         </h1>
-        <h1 :if={!@subscriber} class="text-2xl font-bold text-zinc-900">
+        <h1 :if={!@subscriber} class="text-2xl text-zinc-900 type-display">
           This link no longer works
         </h1>
 

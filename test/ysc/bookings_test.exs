@@ -6692,6 +6692,40 @@ defmodule Ysc.BookingsTest do
         Application.put_env(:ysc, :stripe_client, previous_client)
       end
     end
+
+    test "refuses to replace a previous PaymentIntent that already succeeded" do
+      booking = booking_fixture(%{status: :hold})
+
+      assert {:ok, booking} =
+               Bookings.attach_payment_intent(booking, "pi_paid")
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn "pi_paid", _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of succeeded",
+             extra: %{}
+           }}
+        end)
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn "pi_paid", _opts ->
+          {:ok, %Stripe.PaymentIntent{id: "pi_paid", status: "succeeded"}}
+        end)
+
+        assert {:error, {:hold_payment_already_succeeded, "pi_paid"}} =
+                 Bookings.attach_payment_intent(booking, "pi_new")
+
+        assert Repo.reload!(booking).payment_intent_id == "pi_paid"
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
   end
 
   describe "attach_modification_payment_intent/2" do

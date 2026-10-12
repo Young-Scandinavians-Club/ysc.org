@@ -332,20 +332,23 @@ defmodule YscWeb.UserAuth do
       user_token && Accounts.get_user_by_session_token(user_token)
 
     impersonated_user_id = get_session(conn, :impersonated_user_id)
+    original_admin_id = get_session(conn, :original_admin_id)
 
-    {current_user, conn} =
-      if impersonated_user_id do
-        impersonated = Accounts.get_user(impersonated_user_id)
-        conn = assign(conn, :real_current_user, user_from_token)
-        {impersonated, assign(conn, :current_user, impersonated)}
-      else
-        {user_from_token, assign(conn, :current_user, user_from_token)}
-      end
+    {current_user, impersonating?, conn} =
+      apply_impersonation(
+        conn,
+        user_from_token,
+        impersonated_user_id,
+        original_admin_id
+      )
 
     conn =
       conn
-      |> assign(:impersonating?, impersonated_user_id != nil)
-      |> assign(:original_admin_id, get_session(conn, :original_admin_id))
+      |> assign(:impersonating?, impersonating?)
+      |> assign(
+        :original_admin_id,
+        if(impersonating?, do: get_session(conn, :original_admin_id))
+      )
 
     if current_user do
       active_membership = MembershipCache.get_active_membership(current_user)
@@ -591,6 +594,14 @@ defmodule YscWeb.UserAuth do
       if is_binary(user_token), do: Base.encode64(user_token), else: nil
 
     impersonated_user_id = session["impersonated_user_id"]
+    original_admin_id = session["original_admin_id"]
+
+    {current_user, impersonating?} =
+      resolve_impersonation(
+        user_from_token,
+        impersonated_user_id,
+        original_admin_id
+      )
 
     socket =
       socket
@@ -598,24 +609,79 @@ defmodule YscWeb.UserAuth do
         user_from_token
       end)
       |> Phoenix.Component.assign_new(:current_user, fn ->
-        if impersonated_user_id do
-          Accounts.get_user(impersonated_user_id)
-        else
-          user_from_token
-        end
+        current_user
       end)
       |> Phoenix.Component.assign_new(:current_session_id, fn ->
         current_session_id
       end)
       |> Phoenix.Component.assign_new(:impersonating?, fn ->
-        impersonated_user_id != nil
+        impersonating?
       end)
       |> Phoenix.Component.assign_new(:original_admin_id, fn ->
-        session["original_admin_id"]
+        if impersonating?, do: original_admin_id
       end)
 
     socket
   end
+
+  # Finding 87: impersonation keys live in the signed session cookie, not the
+  # DB token. After session revoke, suspend, or demotion, `user_from_token` is
+  # nil or no longer a full admin — applying `:impersonated_user_id` anyway
+  # would keep the cookie acting as the victim with no way to stop.
+  defp apply_impersonation(
+         conn,
+         user_from_token,
+         impersonated_user_id,
+         original_admin_id
+       ) do
+    case resolve_impersonation(
+           user_from_token,
+           impersonated_user_id,
+           original_admin_id
+         ) do
+      {impersonated, true} ->
+        conn = assign(conn, :real_current_user, user_from_token)
+        {impersonated, true, assign(conn, :current_user, impersonated)}
+
+      {user, false} ->
+        conn =
+          if impersonated_user_id do
+            conn
+            |> delete_session(:impersonated_user_id)
+            |> delete_session(:original_admin_id)
+          else
+            conn
+          end
+
+        {user, false, assign(conn, :current_user, user)}
+    end
+  end
+
+  defp resolve_impersonation(real_user, impersonated_user_id, original_admin_id) do
+    cond do
+      is_nil(impersonated_user_id) ->
+        {real_user, false}
+
+      not impersonation_permitted?(real_user, original_admin_id) ->
+        {real_user, false}
+
+      true ->
+        case Accounts.get_user(impersonated_user_id) do
+          %{id: _} = impersonated -> {impersonated, true}
+          nil -> {real_user, false}
+        end
+    end
+  end
+
+  defp impersonation_permitted?(
+         %{role: :admin, id: admin_id},
+         original_admin_id
+       )
+       when not is_nil(original_admin_id) do
+    to_string(admin_id) == to_string(original_admin_id)
+  end
+
+  defp impersonation_permitted?(_real_user, _original_admin_id), do: false
 
   defp mount_current_membership(socket, _session) do
     socket =

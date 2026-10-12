@@ -519,7 +519,6 @@ body:not(:has(#rootNavbar))
   height: 18px;
   position: relative;
   transform: rotate(0deg);
-  transition: 0.5s ease-in-out;
   cursor: pointer;
 }
 
@@ -533,7 +532,12 @@ body:not(:has(#rootNavbar))
   opacity: 1;
   left: 0;
   transform: rotate(0deg);
-  transition: 0.25s ease-in-out;
+  transition:
+    transform 250ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 250ms cubic-bezier(0.32, 0.72, 0, 1),
+    top 250ms cubic-bezier(0.32, 0.72, 0, 1),
+    left 250ms cubic-bezier(0.32, 0.72, 0, 1),
+    width 250ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .nav-icon span:nth-child(1) {
@@ -681,11 +685,11 @@ body:not(:has(#rootNavbar))
     white
   );
   transition:
-    transform 0.25s ease-in-out,
-    opacity 0.25s ease-in-out,
-    top 0.25s ease-in-out,
-    left 0.25s ease-in-out,
-    width 0.25s ease-in-out !important;
+    transform 250ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 250ms cubic-bezier(0.32, 0.72, 0, 1),
+    top 250ms cubic-bezier(0.32, 0.72, 0, 1),
+    left 250ms cubic-bezier(0.32, 0.72, 0, 1),
+    width 250ms cubic-bezier(0.32, 0.72, 0, 1) !important;
 }
 
 #site-header.hero-mode .hamburger-btn:hover {
@@ -3894,4 +3898,321 @@ cropper-canvas {
 
 .avatar-identity-badge img {
   display: block;
+}
+
+/* =============================================
+   TYPE TOKENS
+   Weight, tracking and leading travel together, because they are one decision
+   per size: large type wants tighter tracking and tighter leading, small type
+   wants looser. Size stays with the element (responsive text-* classes) so a
+   token never fights a breakpoint.
+
+     type-display   hero / page titles          700, -0.022em, 1.05
+     type-title     section headings            700, -0.015em, 1.15
+     type-subhead   card titles, sub-sections   600, -0.010em, 1.25
+     type-body      running text                400,  0,       1.6
+     type-eyebrow   the one tracked-caps tier   600, +0.050em, 1.3 (+ uppercase)
+
+   Uppercase is reserved for type-eyebrow; use it at text-xs/text-sm only.
+   Heavy weights (font-black) are not part of the system outside signage.
+   ============================================= */
+
+@utility type-display {
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+@utility type-title {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+@utility type-subhead {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+@utility type-body {
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.6;
+}
+
+@utility type-eyebrow {
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+/* One-shot attention ring for a badge that has just become relevant (e.g. an
+   event happening today). Plays once on appearance; never loops. */
+
+@keyframes attention-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--attention-color, #e11d48) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--attention-color, #e11d48) 0%, transparent);
+  }
+}
+
+.animate-attention-once {
+  animation: attention-ring 900ms ease-out 1;
+}
+
+/* =============================================
+   PRESS FEEDBACK
+   Respond on pointer-down: the pressed state applies instantly (no transition
+   on :active) and eases back on release. Custom :hover rules above also stick
+   on touch screens, so :active is the only reliable touch feedback here.
+   ============================================= */
+
+.nav-link:active,
+.hamburger-btn:active {
+  scale: 0.97;
+  transition: none;
+}
+
+/* Cards, rows, tiles and icon buttons.
+   Rather than tag every template, match the elements that already have a hover
+   treatment (hover:bg/border/shadow/ring, or a `group` that styles children on
+   hover) and no pressed state of their own. Tailwind class names are literal in
+   the DOM, so this also covers dynamically built class lists. Excluded: things
+   with their own press rule (buttons, nav links, dropdown items, mobile menu),
+   disabled controls, and table rows, which should not shrink. Inline text
+   links are unaffected: scale does not apply to non-replaced inline boxes. */
+
+:is(a[href], button, label, [role="button"]):is(
+    [class*="hover:bg-"],
+    [class*="hover:border-"],
+    [class*="hover:shadow"],
+    [class*="hover:ring"],
+    [class*="hover:-translate"],
+    [class~="group"]
+  ):not(
+    [class*="active:"],
+    [class*="nav-link"],
+    [class*="hamburger-btn"],
+    [disabled],
+    [aria-disabled="true"],
+    [class*="pointer-events-none"],
+    [class*="cursor-not-allowed"],
+    table *,
+    .dropdown-panel *,
+    .mobile-menu-panel *
+  ) {
+  /* Every property a hover or press can change, including scale, so letting go
+     eases back instead of snapping. Duration follows an authored duration-*
+     class when there is one. */
+  transition-property:
+    color, background-color, border-color, outline-color, text-decoration-color,
+    fill, stroke, opacity, box-shadow, translate, scale, rotate, filter;
+  transition-duration: var(--tw-duration, 200ms);
+  transition-timing-function: var(--tw-ease, cubic-bezier(0.32, 0.72, 0, 1));
+}
+
+:is(a[href], button, label, [role="button"]):is(
+    [class*="hover:bg-"],
+    [class*="hover:border-"],
+    [class*="hover:shadow"],
+    [class*="hover:ring"],
+    [class*="hover:-translate"],
+    [class~="group"]
+  ):not(
+    [class*="active:"],
+    [class*="nav-link"],
+    [class*="hamburger-btn"],
+    [disabled],
+    [aria-disabled="true"],
+    [class*="pointer-events-none"],
+    [class*="cursor-not-allowed"],
+    table *,
+    .dropdown-panel *,
+    .mobile-menu-panel *
+  ):active {
+  scale: 0.98;
+  transition-duration: 0ms;
+}
+
+/* Small round icon buttons: 2% of a 32px button is invisible, so press harder. */
+
+:is(a[href], button, [role="button"])[class~="rounded-full"]:is(
+    [class~="w-6"], [class~="w-7"], [class~="w-8"], [class~="w-9"],
+    [class~="w-10"], [class~="w-11"], [class~="w-12"],
+    [class~="size-8"], [class~="size-9"], [class~="size-10"]
+  ):is(
+    [class*="hover:bg-"],
+    [class*="hover:border-"],
+    [class*="hover:shadow"],
+    [class~="group"]
+  ):not([class*="active:"], [disabled], [aria-disabled="true"]):active {
+  scale: 0.92;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No shrink; a slight fade still confirms the press. */
+  :is(a[href], button, label, [role="button"]):is(
+      [class*="hover:bg-"],
+      [class*="hover:border-"],
+      [class*="hover:shadow"],
+      [class*="hover:ring"],
+      [class*="hover:-translate"],
+      [class~="group"]
+    ):not([class*="active:"], [class*="nav-link"], [disabled], table *, .dropdown-panel *, .mobile-menu-panel *):active {
+    scale: none;
+    opacity: 0.8;
+  }
+}
+
+/* Dropdown items: the nav "Club Info" panel, the avatar menu and the mobile
+   accordion all carry .dropdown-panel. Pressing an item highlights and
+   shrinks it at once; letting go eases it back on a settle curve. */
+
+.dropdown-panel a,
+.dropdown-panel button,
+.dropdown-panel [role="menuitem"] {
+  transition:
+    scale 220ms cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.dropdown-panel :is(a, button, [role="menuitem"]):active {
+  scale: 0.97;
+  background-color: var(--color-zinc-200);
+  color: var(--color-zinc-900);
+  transition: none;
+}
+
+/* The mobile menu's hover rules are !important (they have to beat hero-mode
+   colours), and a tap counts as a hover, so its pressed state must be too. */
+
+.mobile-menu-panel .nav-link:active,
+#site-header.hero-mode .mobile-menu-panel .nav-link:active,
+.mobile-menu-panel .dropdown-content a:active,
+#site-header.hero-mode .mobile-menu-panel .dropdown-content a:active {
+  background-color: var(--color-zinc-200) !important;
+  color: var(--color-zinc-900) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-panel :is(a, button, [role="menuitem"]):active {
+    scale: none;
+  }
+}
+
+/* =============================================
+   USER PREFERENCES
+   Reduced motion, reduced transparency, increased contrast.
+   Unlayered on purpose: it must beat Tailwind's @layer utilities.
+   Reduced motion means gentler motion, not none: slides and zooms become
+   cross-fades, and state changes keep their opacity/color feedback.
+   Loading spinners (animate-spin) are status indicators and stay.
+   ============================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* Decorative looping motion becomes static. */
+  .animate-pulse,
+  .animate-bounce,
+  .animate-ping,
+  .animate-attention-once,
+  .availability-updated,
+  .group:hover .animate-badge-shine-slate,
+  .group:hover .animate-badge-shine-slate::before,
+  .group:hover .animate-badge-shine-emerald,
+  .group:hover .animate-badge-shine-emerald::before,
+  .group:hover .animate-badge-shine-orange,
+  .group:hover .animate-badge-shine-orange::before {
+    animation: none;
+  }
+
+  /* Modals: fade only (no rise or scale). */
+  .modal-panel {
+    translate: none;
+    scale: none;
+  }
+
+  /* Mobile menu: cross-fade instead of sliding in from the edge. The closed
+     panel is also hidden from focus/AT, which the offscreen slide never did. */
+  .mobile-menu-panel {
+    transition:
+      opacity 200ms ease,
+      visibility 200ms;
+  }
+
+  .mobile-menu-panel.-translate-x-full {
+    translate: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  /* Mobile nav: stay put instead of sliding away on scroll-down. */
+  #rootNavbar.nav-mobile-hidden {
+    transform: none;
+  }
+
+  /* Hover zoom on photos is decorative; skip it. */
+  .group:hover img[class*="group-hover:scale"] {
+    scale: none;
+  }
+}
+
+/*
+ * Translucent surfaces: drop the blur and swap to a solid fill. Tailwind gives
+ * us no hook for "the current background colour", so the fills are matched by
+ * the opacity-suffixed utility the surface already uses. When adding a new
+ * blurred surface, use one of these colour families or extend this block.
+ */
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  /* Light chrome: sticky bars, modal scrims, popover buttons. */
+  [class*="backdrop-blur"]:is(
+      [class*="bg-white/8"],
+      [class*="bg-white/9"],
+      [class*="bg-zinc-100/"]
+    ) {
+    background-color: #fff;
+  }
+
+  /* Dark chrome. */
+  [class*="backdrop-blur"]:is(
+      [class*="bg-zinc-800/"],
+      [class*="bg-zinc-900/"],
+      [class*="bg-zinc-950/"]
+    ) {
+    background-color: #18181b;
+  }
+
+  /* Frosted glass over photos/video/dark sections: needs a real backing. */
+  [class*="backdrop-blur"]:is(
+      [class*="bg-white/5"],
+      [class*="bg-white/1"],
+      [class*="bg-white/2"]
+    ) {
+    background-color: rgb(24 24 27 / 0.88);
+  }
+}
+
+@media (prefers-contrast: more) {
+  /* Defined edge on formerly translucent surfaces; outline so layout never
+     shifts. Full-viewport scrims (inset-0) don't get one. */
+  [class*="backdrop-blur"]:not([class*="inset-0"]) {
+    outline: 1px solid rgb(24 24 27 / 0.6);
+    outline-offset: -1px;
+  }
 }

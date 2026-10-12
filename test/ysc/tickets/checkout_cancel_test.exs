@@ -332,6 +332,70 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
                )
     end
 
+    test "returns {:cancel, payment_intent} when the succeeded PaymentIntent is fully refunded" do
+      payment_intent_id = "pi_abandon_fully_refunded"
+
+      order = order_struct(payment_intent_id: payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: 2500,
+           latest_charge: %Stripe.Charge{
+             id: "ch_#{payment_intent_id}",
+             amount: 2500,
+             amount_refunded: 2500,
+             refunded: true
+           }
+         }}
+      end)
+
+      assert {:cancel, %Stripe.PaymentIntent{status: "succeeded"}} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 order
+               )
+    end
+
+    test "returns {:already_succeeded, payment_intent} for a partial refund on a succeeded PaymentIntent" do
+      payment_intent_id = "pi_abandon_partial_refund"
+
+      order = order_struct(payment_intent_id: payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: 2500,
+           latest_charge: %Stripe.Charge{
+             id: "ch_#{payment_intent_id}",
+             amount: 2500,
+             amount_refunded: 500,
+             refunded: false
+           }
+         }}
+      end)
+
+      assert {:already_succeeded, %Stripe.PaymentIntent{status: "succeeded"}} =
+               CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                 order
+               )
+    end
+
     test "returns {:already_succeeded, payment_intent} when Stripe refuses because payment succeeded" do
       payment_intent_id = "pi_abandon_succeeded"
 

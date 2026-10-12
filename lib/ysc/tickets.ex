@@ -547,17 +547,64 @@ defmodule Ysc.Tickets do
   @doc """
   Gets a ticket order for the QR check-in page.
 
-  Skips agendas, payment, and user preloads that the QR view does not render.
+  Struct-selects order identity, event card copy, slim tiers, and
+  registration names — not event body HTML, payment, purchaser, agendas,
+  or unused tier/registration columns.
   """
   def get_user_ticket_order_for_qr(user_id, order_id) do
+    user_id
+    |> ticket_order_for_qr_query(order_id)
+    |> Repo.one()
+  end
+
+  # Member QR page: event title/when/where, ticket cards, and holder names.
+  # Skip event HTML, payment, grant notes, and tier description / questions.
+  @qr_ticket_order_fields [:id, :reference_id, :status, :user_id, :event_id]
+  @qr_event_fields [
+    :id,
+    :title,
+    :start_date,
+    :start_time,
+    :end_date,
+    :end_time,
+    :location_name,
+    :address
+  ]
+  @qr_ticket_fields [
+    :id,
+    :reference_id,
+    :status,
+    :ticket_tier_id,
+    :ticket_order_id,
+    :user_id
+  ]
+  @qr_ticket_tier_fields [:id, :name, :type]
+  @qr_registration_fields [:id, :ticket_id, :first_name, :last_name]
+
+  defp ticket_order_for_qr_query(user_id, order_id) do
+    event_query =
+      from(e in Event, select: struct(e, ^@qr_event_fields))
+
+    tier_query =
+      from(tt in TicketTier, select: struct(tt, ^@qr_ticket_tier_fields))
+
+    registration_query =
+      from(td in TicketDetail, select: struct(td, ^@qr_registration_fields))
+
+    ticket_query =
+      from(t in Ticket,
+        select: struct(t, ^@qr_ticket_fields),
+        preload: [ticket_tier: ^tier_query, registration: ^registration_query]
+      )
+
     from(to in TicketOrder,
       where: to.id == ^order_id and to.user_id == ^user_id,
+      select: struct(to, ^@qr_ticket_order_fields),
       preload: [
-        :event,
-        tickets: [:ticket_tier, :registration]
+        event: ^event_query,
+        tickets: ^ticket_query
       ]
     )
-    |> Repo.one()
   end
 
   @doc """
@@ -991,11 +1038,40 @@ defmodule Ysc.Tickets do
 
   @doc """
   Updates a ticket order's payment intent ID.
+
+  Only pending orders are updated. Deferred checkout (#1532) can create a
+  Stripe PaymentIntent after another tab, admin grant, or `create_ticket_order/4`
+  has already cancelled this cart. Attaching anyway lets the member pay a
+  `:cancelled` order; `process_ticket_order_payment/2` then returns
+  `:cannot_complete_order` and `maybe_refund_unfulfilled_ticket_payment/3`
+  does not refund (only `:amount_mismatch` on pending/expired carts).
   """
-  def update_payment_intent(ticket_order, payment_intent_id) do
-    ticket_order
-    |> TicketOrder.payment_changeset(%{payment_intent_id: payment_intent_id})
-    |> Repo.update()
+  def update_payment_intent(ticket_order, payment_intent_id)
+      when is_binary(payment_intent_id) do
+    require Ysc.Logging
+
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {count, _} =
+      from(to in TicketOrder,
+        where: to.id == ^ticket_order.id and to.status == :pending
+      )
+      |> Repo.update_all(
+        set: [payment_intent_id: payment_intent_id, updated_at: now]
+      )
+
+    if count == 1 do
+      {:ok,
+       %{ticket_order | payment_intent_id: payment_intent_id, updated_at: now}}
+    else
+      Ysc.Logging.warning(
+        "Refusing to attach PaymentIntent to non-pending ticket order",
+        ticket_order_id: ticket_order.id,
+        payment_intent_id: payment_intent_id
+      )
+
+      {:error, :order_not_pending}
+    end
   end
 
   @doc """
@@ -3686,6 +3762,12 @@ defmodule Ysc.Tickets do
   def ci_query_explain_ticket_order_for_confirmation_query do
     ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
     ticket_order_for_confirmation_query(ulid, ulid)
+  end
+
+  @doc false
+  def ci_query_explain_ticket_order_for_qr_query do
+    ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
+    ticket_order_for_qr_query(ulid, ulid)
   end
 
   @doc false

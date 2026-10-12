@@ -34,7 +34,7 @@ defmodule YscWeb.DevAvatarShowcaseLive do
     <div class="min-h-screen bg-zinc-50">
       <div class="max-w-6xl mx-auto px-4 py-10 space-y-14">
         <div>
-          <h1 class="text-2xl font-bold text-zinc-900">
+          <h1 class="text-2xl text-zinc-900 type-display">
             Nordic avatar identity showcase
           </h1>
           <p class="mt-2 text-sm text-zinc-600 leading-relaxed max-w-3xl">
@@ -48,14 +48,14 @@ defmodule YscWeb.DevAvatarShowcaseLive do
         <%= for {variant, title, description} <- @variants do %>
           <section class="space-y-6" id={"variant-#{variant}"}>
             <div>
-              <h2 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+              <h2 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
                 {title}
               </h2>
               <p class="mt-2 text-sm text-zinc-600">{description}</p>
             </div>
 
             <div class="space-y-3">
-              <h3 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
+              <h3 class="text-sm text-zinc-700 type-eyebrow">
                 Default country images
               </h3>
               <.showcase_grid>
@@ -70,7 +70,7 @@ defmodule YscWeb.DevAvatarShowcaseLive do
             </div>
 
             <div class="space-y-3">
-              <h3 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
+              <h3 class="text-sm text-zinc-700 type-eyebrow">
                 Custom photo + country cue
               </h3>
               <p class="text-xs text-zinc-500">
@@ -89,7 +89,7 @@ defmodule YscWeb.DevAvatarShowcaseLive do
             </div>
 
             <div :if={variant == :ring} class="space-y-3">
-              <h3 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
+              <h3 class="text-sm text-zinc-700 type-eyebrow">
                 Ring + semantic status rings
               </h3>
               <p class="text-xs text-zinc-500">
@@ -116,7 +116,7 @@ defmodule YscWeb.DevAvatarShowcaseLive do
         <% end %>
 
         <section class="space-y-4 border-t border-zinc-200 pt-8">
-          <h2 class="text-lg font-semibold text-zinc-800">Flag color palette</h2>
+          <h2 class="text-lg text-zinc-800 type-subhead">Flag color palette</h2>
           <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <%= for country <- @countries do %>
               <div class="rounded-lg border border-zinc-200 bg-white p-4 space-y-3">

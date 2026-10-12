@@ -58,6 +58,9 @@ defmodule YscWeb.DevEmailPreviewController do
     end
   end
 
+  # Newsletter intro is stored as HTML in the sample config; mark it safe for MJML.
+  # 0.16 XSS.Raw also flags this Phoenix.HTML.raw/1 (same skip as NotificationSamples).
+  # sobelow_skip ["XSS.Raw"]
   defp prepare_mailbox_assigns("newsletter_edition", assigns) do
     case Map.get(assigns, :intro_text) do
       html when is_binary(html) ->

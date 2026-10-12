@@ -1395,7 +1395,7 @@ defmodule YscWeb.ExpenseReportLive do
           <div class="text-green-500 mb-4">
             <.icon name="hero-check-circle" class="w-16 h-16 mx-auto" />
           </div>
-          <h1 class="text-3xl font-bold text-zinc-900 mb-2">
+          <h1 class="text-3xl text-zinc-900 mb-2 type-display">
             Expense Report Submitted!
           </h1>
           <p class="text-zinc-600">
@@ -1408,7 +1408,7 @@ defmodule YscWeb.ExpenseReportLive do
           <!-- Expense Report Summary Card -->
           <div class="bg-white rounded-lg shadow-xs border border-zinc-200 mb-6">
             <div class="px-6 py-4 border-b border-zinc-200">
-              <h2 class="text-lg font-semibold text-zinc-900">
+              <h2 class="text-lg text-zinc-900 type-subhead">
                 Expense Report Summary
               </h2>
             </div>
@@ -1471,7 +1471,7 @@ defmodule YscWeb.ExpenseReportLive do
           <!-- Expense Items Card -->
           <div class="bg-white rounded-lg shadow-xs border border-zinc-200 mb-6">
             <div class="px-6 py-4 border-b border-zinc-200">
-              <h2 class="text-lg font-semibold text-zinc-900">Expense Items</h2>
+              <h2 class="text-lg text-zinc-900 type-subhead">Expense Items</h2>
             </div>
             <div class="px-6 py-4">
               <div class="space-y-4">
@@ -1550,7 +1550,7 @@ defmodule YscWeb.ExpenseReportLive do
           <%= if not Enum.empty?(@expense_report.income_items) do %>
             <div class="bg-white rounded-lg shadow-xs border border-zinc-200 mb-6">
               <div class="px-6 py-4 border-b border-zinc-200">
-                <h2 class="text-lg font-semibold text-zinc-900">
+                <h2 class="text-lg text-zinc-900 type-subhead">
                   Money already received
                 </h2>
               </div>
@@ -1612,7 +1612,7 @@ defmodule YscWeb.ExpenseReportLive do
           <!-- Totals Card -->
           <div class="bg-white rounded-lg shadow-xs border border-zinc-200 mb-6 print-no-break">
             <div class="px-6 py-4 border-b border-zinc-200">
-              <h2 class="text-lg font-semibold text-zinc-900">Totals</h2>
+              <h2 class="text-lg text-zinc-900 type-subhead">Totals</h2>
             </div>
             <div class="px-6 py-4">
               <div class="space-y-3">
@@ -1646,7 +1646,7 @@ defmodule YscWeb.ExpenseReportLive do
                 <.icon name="hero-envelope" class="w-5 h-5 text-blue-600" />
               </div>
               <div class="ml-3">
-                <h3 class="text-sm font-medium text-blue-800">
+                <h3 class="text-sm text-blue-800 type-subhead">
                   Confirmation Email
                 </h3>
                 <div class="mt-2 text-sm text-blue-700">
@@ -1730,7 +1730,7 @@ defmodule YscWeb.ExpenseReportLive do
         <!-- Header -->
         <div class="flex items-center justify-between gap-4 mb-6">
           <div>
-            <h1 class="text-2xl font-bold text-zinc-900">My Expense Reports</h1>
+            <h1 class="text-2xl text-zinc-900 type-display">My Expense Reports</h1>
             <p class="text-sm text-zinc-500 mt-1">
               {list_summary_line(@drafts, @submitted)}
             </p>
@@ -1744,7 +1744,7 @@ defmodule YscWeb.ExpenseReportLive do
           <div class="bg-white rounded-lg border border-zinc-200 p-12 text-center">
             <div class="flex flex-col items-center max-w-md mx-auto">
               <.icon name="hero-document-text" class="w-14 h-14 text-zinc-300 mb-4" />
-              <h3 class="text-lg font-semibold text-zinc-900 mb-2">
+              <h3 class="text-lg text-zinc-900 mb-2 type-subhead">
                 No expense reports yet
               </h3>
               <p class="text-sm text-zinc-600 mb-6">
@@ -1757,7 +1757,7 @@ defmodule YscWeb.ExpenseReportLive do
           </div>
         <% else %>
           <div :if={@drafts != []} id="expense-report-drafts" class="mb-8">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2">
+            <h2 class="text-xs text-amber-700 mb-2 type-eyebrow">
               Drafts · not yet submitted
             </h2>
             <ul class="divide-y divide-amber-100 rounded-lg border border-amber-200 bg-amber-50/50 overflow-hidden">
@@ -1810,7 +1810,7 @@ defmodule YscWeb.ExpenseReportLive do
           <div :if={@submitted != []}>
             <h2
               :if={@drafts != []}
-              class="text-xs font-semibold uppercase tracking-wide text-zinc-400 mb-2"
+              class="text-xs text-zinc-400 mb-2 type-eyebrow"
             >
               Submitted
             </h2>
@@ -1837,7 +1837,7 @@ defmodule YscWeb.ExpenseReportLive do
                     </p>
                   </div>
                   <div class="shrink-0 text-right">
-                    <p class="text-[11px] uppercase tracking-wide text-zinc-400">
+                    <p class="text-[11px] text-zinc-400 type-eyebrow">
                       Reimburse
                     </p>
                     <p class="font-semibold text-zinc-900 tabular-nums">
@@ -1924,7 +1924,7 @@ defmodule YscWeb.ExpenseReportLive do
           <div class="mb-8">
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
               <div class="flex-1">
-                <h1 class="text-3xl font-bold text-zinc-900">Expense Report</h1>
+                <h1 class="text-3xl text-zinc-900 type-display">Expense Report</h1>
               </div>
               <.button
                 navigate={~p"/expensereports"}
@@ -2074,7 +2074,7 @@ defmodule YscWeb.ExpenseReportLive do
                   <.inputs_for :let={expense_f} field={@form[:expense_items]}>
                     <div class="bg-zinc-50/70 ring-1 ring-zinc-100 rounded-lg p-4 mb-4 space-y-4">
                       <div class="flex justify-between items-start">
-                        <h4 class="text-md font-medium text-zinc-700">
+                        <h4 class="text-md text-zinc-700 type-subhead">
                           Expense Item {expense_f.index + 1}
                         </h4>
                         <.button
@@ -2669,7 +2669,7 @@ defmodule YscWeb.ExpenseReportLive do
                   <.inputs_for :let={income_f} field={@form[:income_items]}>
                     <div class="bg-zinc-50/70 ring-1 ring-zinc-100 rounded-lg p-4 mb-4 space-y-4">
                       <div class="flex justify-between items-start">
-                        <h4 class="text-md font-medium text-zinc-700">
+                        <h4 class="text-md text-zinc-700 type-subhead">
                           Amount received {income_f.index + 1}
                         </h4>
                         <.button
@@ -3034,7 +3034,7 @@ defmodule YscWeb.ExpenseReportLive do
                     :if={@form[:reimbursement_method].value == "check"}
                     class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200"
                   >
-                    <h4 class="font-semibold text-zinc-900 mb-2">
+                    <h4 class="text-zinc-900 mb-2 type-subhead">
                       Check Mailing Address
                     </h4>
                     <p :if={@billing_address} class="text-sm text-zinc-700 mb-2">
@@ -3086,7 +3086,7 @@ defmodule YscWeb.ExpenseReportLive do
                     :if={@form[:reimbursement_method].value == "bank_transfer"}
                     class="mt-4"
                   >
-                    <h4 class="font-semibold text-zinc-900 mb-2">Bank Account</h4>
+                    <h4 class="text-zinc-900 mb-2 type-subhead">Bank Account</h4>
                     <div :if={length(@bank_accounts) > 0} class="space-y-3">
                       <.input
                         field={@form[:bank_account_id]}
@@ -3253,7 +3253,7 @@ defmodule YscWeb.ExpenseReportLive do
                 </div>
                 <!-- Desktop: Sticky sidebar -->
                 <div class="hidden lg:block bg-white rounded-xl border border-zinc-100 p-6 shadow-xs">
-                  <h3 class="text-lg font-semibold text-zinc-900 mb-4">Summary</h3>
+                  <h3 class="text-lg text-zinc-900 mb-4 type-subhead">Summary</h3>
                   <div class="space-y-3">
                     <div class="flex justify-between items-center">
                       <span class="text-sm text-zinc-600">Total Expenses</span>
@@ -3276,7 +3276,7 @@ defmodule YscWeb.ExpenseReportLive do
                         <span class="text-base font-semibold text-zinc-900">
                           Amount we will reimburse
                         </span>
-                        <span class="text-2xl font-bold text-blue-700">
+                        <span class="text-2xl text-blue-700 type-title">
                           {Ysc.MoneyHelper.format_money!(@totals.net_total)}
                         </span>
                       </div>
@@ -3301,7 +3301,7 @@ defmodule YscWeb.ExpenseReportLive do
                       else: 0 %>
                   <div class="mt-6 pt-6 border-t border-zinc-100">
                     <div class="flex items-center justify-between mb-2">
-                      <h4 class="text-sm font-semibold text-zinc-900">
+                      <h4 class="text-sm text-zinc-900 type-subhead">
                         Readiness Checklist
                       </h4>
                       <span class="text-xs text-zinc-500">
@@ -3317,7 +3317,7 @@ defmodule YscWeb.ExpenseReportLive do
                       aria-label="Readiness checklist progress"
                     >
                       <div
-                        class="h-full rounded-full bg-blue-600 transition-all duration-300"
+                        class="h-full rounded-full bg-blue-600 transition-[width] duration-300"
                         style={"width: #{checklist_pct}%"}
                       >
                       </div>
@@ -3382,13 +3382,13 @@ defmodule YscWeb.ExpenseReportLive do
               </span>
 
               <div
-                class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
+                class="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
                 phx-click-away="close-bank-account-modal"
                 phx-click="noop"
               >
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-medium leading-6 text-zinc-900">
+                    <h3 class="text-lg text-zinc-900 type-subhead">
                       Add Bank Account
                     </h3>
                     <button
@@ -4005,7 +4005,7 @@ defmodule YscWeb.ExpenseReportLive do
   defp timeline_section(assigns) do
     ~H"""
     <div class="reimbursement-timeline bg-white rounded-lg shadow-xs border border-zinc-200 mb-6 p-6">
-      <h2 class="text-lg font-semibold text-zinc-900 mb-4">
+      <h2 class="text-lg text-zinc-900 mb-4 type-subhead">
         Reimbursement Timeline
       </h2>
       <%= if @expense_report.status == "rejected" do %>
@@ -4107,7 +4107,7 @@ defmodule YscWeb.ExpenseReportLive do
               <.icon name="hero-check" class="w-5 h-5 text-white" />
             </div>
           <% :active -> %>
-            <div class="w-8 h-8 rounded-full bg-blue-100 border-2 border-blue-400 flex items-center justify-center animate-pulse">
+            <div class="w-8 h-8 rounded-full bg-blue-100 border-2 border-blue-400 flex items-center justify-center">
               <.icon name={@icon} class="w-5 h-5 text-blue-600" />
             </div>
           <% :rejected -> %>
@@ -4457,7 +4457,7 @@ defmodule YscWeb.ExpenseReportLive do
           {@step}
         </span>
         <div class="min-w-0">
-          <h2 class="text-xl font-semibold text-zinc-900">{@title}</h2>
+          <h2 class="text-xl text-zinc-900 type-subhead">{@title}</h2>
           <p :if={@subtitle} class="text-sm text-zinc-500 mt-1">{@subtitle}</p>
         </div>
       </div>

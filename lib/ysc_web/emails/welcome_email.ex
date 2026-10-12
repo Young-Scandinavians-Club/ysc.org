@@ -15,12 +15,12 @@ defmodule YscWeb.Emails.WelcomeEmail do
 
   import YscWeb.Emails.Helpers,
     only: [
-      member_greeting_name: 1,
       event_cover_image_url: 1,
       event_url: 1,
       absolute_url: 1,
       upcoming_events_url: 0,
       format_event_start_datetime: 2,
+      membership_greeting_assigns: 1,
       tahoe_booking_url: 0
     ]
 
@@ -29,17 +29,14 @@ defmodule YscWeb.Emails.WelcomeEmail do
   def get_subject(), do: "Getting started at YSC"
 
   def prepare_email_data(user) do
-    if is_nil(user) do
-      raise ArgumentError, "User cannot be nil"
-    end
-
-    %{
-      first_name: member_greeting_name(user),
+    user
+    |> membership_greeting_assigns()
+    |> Map.merge(%{
       events: upcoming_event_cards(),
       events_url: upcoming_events_url(),
       tahoe_url: tahoe_booking_url(),
       clear_lake_url: absolute_url("/bookings/clear-lake")
-    }
+    })
     |> Map.merge(tahoe_season_copy())
   end
 

@@ -36,7 +36,11 @@ export default {
         this.video.addEventListener("play", this.updateButtonState);
         this.video.addEventListener("pause", this.updateButtonState);
 
-        this.safePlay();
+        // Reduced motion: leave the hero video paused on its poster frame; the
+        // visible play button lets the user opt in.
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            this.safePlay();
+        }
         this.updateButtonState();
     },
 

@@ -11,8 +11,7 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
       "templates/membership_renewal_payment_method_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers,
-    only: [member_greeting_name: 1, format_date: 1]
+  import YscWeb.Emails.Helpers, only: [membership_renewal_assigns: 2]
 
   def membership_url(), do: YscWeb.Emails.Helpers.membership_url()
 
@@ -27,26 +26,8 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminder do
   end
 
   def prepare_email_data(user, subscription) do
-    # Validate input
-    if is_nil(user) do
-      raise ArgumentError, "User cannot be nil"
-    end
-
-    if is_nil(subscription) do
-      raise ArgumentError, "Subscription cannot be nil"
-    end
-
-    # Ensure user has required fields
-    # Handle both nil and empty string cases
-    first_name = member_greeting_name(user)
-
-    renewal_date = format_date(subscription.current_period_end)
-
-    %{
-      first_name: first_name,
-      renewal_date: renewal_date,
-      payment_methods_url: payment_methods_url(),
-      membership_url: membership_url()
-    }
+    user
+    |> membership_renewal_assigns(subscription)
+    |> Map.put(:payment_methods_url, payment_methods_url())
   end
 end

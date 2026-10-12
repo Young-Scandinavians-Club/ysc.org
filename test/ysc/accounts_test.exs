@@ -1669,15 +1669,14 @@ defmodule Ysc.AccountsTest do
              } = errors_on(changeset)
     end
 
-    test "validates maximum values for email and password for security" do
+    test "validates maximum values for email for security" do
       too_long = String.duplicate("db", 100)
 
       {:error, changeset} =
         Accounts.register_user(%{email: too_long, password: too_long})
 
       assert "should be at most 160 character(s)" in errors_on(changeset).email
-
-      assert "should be at most 72 character(s)" in errors_on(changeset).password
+      refute Map.has_key?(errors_on(changeset), :password)
     end
 
     test "validates email uniqueness" do
@@ -1833,21 +1832,27 @@ defmodule Ysc.AccountsTest do
       assert user.email == "john.doe+test@example.com"
     end
 
-    test "registers users with a hashed password" do
+    test "does not persist a client-supplied password (Finding 85)" do
       email = unique_user_email()
 
       {:ok, user} =
         Accounts.register_user(
           valid_user_attributes(%{
             email: email,
-            phone_number: "+14159098268"
+            phone_number: "+14159098268",
+            password: "attacker-chosen-password"
           })
         )
 
       assert user.email == email
-      assert is_binary(user.hashed_password)
+      assert is_nil(user.hashed_password)
       assert is_nil(user.confirmed_at)
       assert is_nil(user.password)
+
+      refute Accounts.get_user_by_email_and_password(
+               email,
+               "attacker-chosen-password"
+             )
     end
   end
 
@@ -2915,6 +2920,25 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "drop_unconfirmed_password/1" do
+    test "clears hashed_password when password_set_at is nil" do
+      user = user_fixture(%{phone_number: "+14159098319"})
+      assert is_binary(user.hashed_password)
+      assert is_nil(user.password_set_at)
+
+      assert {:ok, updated} = Accounts.drop_unconfirmed_password(user)
+      assert is_nil(updated.hashed_password)
+    end
+
+    test "keeps hashed_password when password_set_at is set" do
+      user = user_fixture(%{phone_number: "+14159098320"})
+      {:ok, user} = Accounts.mark_password_set(user)
+
+      assert {:ok, updated} = Accounts.drop_unconfirmed_password(user)
+      assert is_binary(updated.hashed_password)
+    end
+  end
+
   describe "mark_email_verified/1, mark_phone_verified/1, mark_password_set/1" do
     test "sets verification and password timestamps" do
       user = user_fixture(%{phone_number: "+14159098309"})
@@ -3037,6 +3061,13 @@ defmodule Ysc.AccountsTest do
       notes = Accounts.list_user_notes(subject.id)
       assert length(notes) == 1
       assert hd(notes).id == note.id
+
+      author = hd(notes).created_by
+      assert author.id == admin.id
+      assert author.first_name == admin.first_name
+      assert author.last_name == admin.last_name
+      assert author.email == admin.email
+      assert is_nil(author.hashed_password)
 
       assert {:ok, _} =
                Accounts.create_user_note(
@@ -4099,35 +4130,41 @@ defmodule Ysc.AccountsTest do
       assert Accounts.has_active_membership?(sub)
     end
 
-    test "has_active_membership?/1 is true for sub-account when primary has active subscription" do
-      primary = user_fixture(%{phone_number: unique_user_phone()})
+    test "has_active_membership?/1 is true for sub-account when primary has family subscription" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
 
-      {:ok, subscription} =
-        Subscriptions.create_subscription(%{
-          user_id: primary.id,
-          stripe_id:
-            "sub_primary_subacct_#{System.unique_integer([:positive])}",
-          stripe_status: "active",
-          name: "Membership",
-          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
-        })
+      if family_plan do
+        primary =
+          user_with_family_subscription(%{phone_number: unique_user_phone()})
 
-      assert {:ok, _} =
-               Subscriptions.create_subscription_item(%{
-                 subscription_id: subscription.id,
-                 stripe_price_id: "price_primary_subacct",
-                 stripe_product_id: "prod_primary_subacct",
-                 stripe_id:
-                   "si_primary_subacct_#{System.unique_integer([:positive])}",
-                 quantity: 1
-               })
+        sub =
+          user_fixture(%{phone_number: unique_user_phone()})
+          |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+          |> Repo.update!()
 
-      sub =
-        user_fixture(%{phone_number: unique_user_phone()})
-        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
-        |> Repo.update!()
+        assert Accounts.has_active_membership?(sub)
+      end
+    end
 
-      assert Accounts.has_active_membership?(sub)
+    test "has_active_membership?/1 is false for sub-account when primary only has single subscription" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      if single_plan do
+        primary =
+          user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+        sub =
+          user_fixture(%{phone_number: unique_user_phone()})
+          |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+          |> Repo.update!()
+
+        # Family→Single leftover: dependents may still be linked, but must not
+        # inherit unpaid membership from a Single plan.
+        refute Accounts.has_active_membership?(sub)
+        refute Accounts.family_membership_host?(primary)
+      end
     end
 
     test "get_primary_user/1 returns nil for a primary account" do

@@ -8,10 +8,13 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
     mjml_template: "templates/membership_payment_failure.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  alias YscWeb.MembershipHelpers
-
   import YscWeb.Emails.Helpers,
-    only: [absolute_url: 1, member_greeting_name: 1, membership_url: 0]
+    only: [
+      absolute_url: 1,
+      membership_member_assigns: 2,
+      membership_url: 0,
+      require_user!: 1
+    ]
 
   def get_template_name() do
     "membership_payment_failure"
@@ -38,16 +41,7 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
         is_renewal \\ false,
         invoice_id \\ nil
       ) do
-    # Validate input
-    if is_nil(user) do
-      raise ArgumentError, "User cannot be nil"
-    end
-
-    # Ensure user has required fields
-    first_name = member_greeting_name(user)
-
-    membership_type_name =
-      MembershipHelpers.membership_type_name(membership_type)
+    user = require_user!(user)
 
     retry_url =
       if invoice_id do
@@ -56,14 +50,14 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
         nil
       end
 
-    %{
-      first_name: first_name,
+    user
+    |> membership_member_assigns(membership_type)
+    |> Map.merge(%{
       email: user.email,
-      membership_type: membership_type_name,
       is_renewal: is_renewal,
       invoice_id: invoice_id,
       pay_membership_url: pay_membership_url(),
       retry_payment_url: retry_url
-    }
+    })
   end
 end

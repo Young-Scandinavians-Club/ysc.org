@@ -29,7 +29,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
         <p class="history-serif text-zinc-500 italic text-sm mt-4 tracking-wide">
           Established 1950
         </p>
-        <p class="text-zinc-400 uppercase tracking-[0.25em] text-xs mt-2">
+        <p class="text-zinc-400 text-xs mt-2 type-eyebrow">
           San Francisco, California
         </p>
       </.page_masthead>
@@ -269,7 +269,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
         <h3
           :if={@title}
           class={[
-            "text-zinc-900 mb-4 leading-snug",
+            "text-zinc-900 mb-4 type-subhead",
             if(@type in [:milestone, :featured],
               do: "text-2xl md:text-3xl font-medium history-serif",
               else: "text-xl md:text-2xl font-medium"
@@ -289,7 +289,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
   def timeline_tag(assigns) do
     ~H"""
-    <span class="px-2.5 py-0.5 text-xs uppercase tracking-wide text-zinc-500 border border-zinc-300 rounded-sm">
+    <span class="px-2.5 py-0.5 text-xs text-zinc-500 border border-zinc-300 rounded-sm type-eyebrow">
       {format_tag(@label)}
     </span>
     """
@@ -379,10 +379,10 @@ defmodule YscWeb.Components.History.HistoryComponents do
       <div :if={@icon} class="absolute top-2 right-2">
         <.icon name={@icon} class="w-4 h-4 text-zinc-400" />
       </div>
-      <span class="text-xs font-medium text-zinc-500 uppercase mb-2 tracking-wide">
+      <span class="text-xs text-zinc-500 mb-2 type-eyebrow">
         {@years}
       </span>
-      <h4 class="font-medium text-zinc-900 text-sm mb-1 leading-tight">
+      <h4 class="text-zinc-900 text-sm mb-1 type-subhead">
         {@name}
       </h4>
       <span
@@ -399,10 +399,10 @@ defmodule YscWeb.Components.History.HistoryComponents do
     ~H"""
     <div class="p-4 rounded-xl border-2 border-dashed border-zinc-300 bg-stone-50 flex flex-col items-center text-center justify-center min-h-32">
       <.icon name="hero-user-plus" class="w-5 h-5 text-zinc-400 mb-2" />
-      <span class="text-xs font-medium text-zinc-500 uppercase mb-2 tracking-wide">
+      <span class="text-xs text-zinc-500 mb-2 type-eyebrow">
         The Next Chapter
       </span>
-      <h4 class="font-medium text-zinc-900 text-sm mb-2 leading-tight">
+      <h4 class="text-zinc-900 text-sm mb-2 type-subhead">
         Could you be our next president?
       </h4>
       <p class="text-xs text-zinc-500 leading-relaxed mb-3">

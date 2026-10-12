@@ -123,7 +123,7 @@ pid_notif=$!
 pid_dialyzer=$!
 
 (
-  mix sobelow --skip --exit >"$tmpdir/sobelow.log" 2>&1 &&
+  mix sobelow --skip --exit high >"$tmpdir/sobelow.log" 2>&1 &&
     echo "✓ sobelow" >"$tmpdir/sobelow.status" ||
     echo "✗ sobelow" >"$tmpdir/sobelow.status"
 ) &

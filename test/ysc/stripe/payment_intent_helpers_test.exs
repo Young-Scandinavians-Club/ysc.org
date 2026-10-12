@@ -113,4 +113,74 @@ defmodule Ysc.Stripe.PaymentIntentHelpersTest do
       assert PaymentIntentHelpers.charge_id(%{}) == nil
     end
   end
+
+  describe "fully_refunded?/1" do
+    test "is true when the expanded charge is marked refunded" do
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_refunded_flag",
+        status: "succeeded",
+        latest_charge: %Stripe.Charge{
+          id: "ch_refunded_flag",
+          amount: 10_000,
+          amount_refunded: 10_000,
+          refunded: true
+        }
+      }
+
+      assert PaymentIntentHelpers.fully_refunded?(payment_intent)
+    end
+
+    test "is true when amount_refunded covers the charge amount" do
+      payment_intent = %{
+        "latest_charge" => %{
+          "id" => "ch_refunded_amount",
+          "amount" => 2500,
+          "amount_refunded" => 2500,
+          "refunded" => false
+        }
+      }
+
+      assert PaymentIntentHelpers.fully_refunded?(payment_intent)
+    end
+
+    test "is false for a captured charge with no refund" do
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_captured",
+        status: "succeeded",
+        latest_charge: %Stripe.Charge{
+          id: "ch_captured",
+          amount: 10_000,
+          amount_refunded: 0,
+          refunded: false
+        }
+      }
+
+      refute PaymentIntentHelpers.fully_refunded?(payment_intent)
+    end
+
+    test "is false for a partial refund" do
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_partial",
+        status: "succeeded",
+        latest_charge: %Stripe.Charge{
+          id: "ch_partial",
+          amount: 10_000,
+          amount_refunded: 4000,
+          refunded: false
+        }
+      }
+
+      refute PaymentIntentHelpers.fully_refunded?(payment_intent)
+    end
+
+    test "is false when latest_charge is only an id string" do
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_unexpanded",
+        status: "succeeded",
+        latest_charge: "ch_unexpanded"
+      }
+
+      refute PaymentIntentHelpers.fully_refunded?(payment_intent)
+    end
+  end
 end

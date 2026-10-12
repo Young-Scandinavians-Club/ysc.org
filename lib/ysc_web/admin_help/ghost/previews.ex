@@ -234,12 +234,12 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
         <%!-- Left: editor (cover, fields, pickers) --%>
         <div id="ghost-newsletter-editor-panel" class="space-y-4">
           <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-            <h2 class="text-base font-semibold text-zinc-800 mb-3">Cover photo</h2>
+            <h2 class="text-base text-zinc-800 mb-3 type-subhead">Cover photo</h2>
             <.admin_ghost_image ratio="aspect-video" class="rounded-lg" />
           </div>
 
           <div class="border border-zinc-200 rounded-lg p-4 bg-white space-y-3">
-            <h2 class="text-base font-semibold text-zinc-800">
+            <h2 class="text-base text-zinc-800 type-subhead">
               Headline & subject
             </h2>
             <div class="space-y-1">
@@ -254,7 +254,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
 
           <div class="border border-zinc-200 rounded-lg overflow-hidden bg-white">
             <div class="px-4 pt-4 pb-2">
-              <h2 class="text-base font-semibold text-zinc-800">Intro text</h2>
+              <h2 class="text-base text-zinc-800 type-subhead">Intro text</h2>
               <p class="text-sm text-zinc-500 mt-1">
                 Opening section. Use the toolbar for bold, links, lists, and more.
               </p>
@@ -274,7 +274,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
             id="ghost-newsletter-post-picker"
             class="border border-zinc-200 rounded-lg p-4 bg-white"
           >
-            <h2 class="text-base font-semibold text-zinc-800 mb-1">
+            <h2 class="text-base text-zinc-800 mb-1 type-subhead">
               Latest news (posts)
             </h2>
             <p class="text-sm text-zinc-500 mb-3">
@@ -293,7 +293,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
             id="ghost-newsletter-event-picker"
             class="border border-zinc-200 rounded-lg p-4 bg-white"
           >
-            <h2 class="text-base font-semibold text-zinc-800 mb-1">
+            <h2 class="text-base text-zinc-800 mb-1 type-subhead">
               Upcoming events
             </h2>
             <p class="text-sm text-zinc-500 mb-3">
@@ -473,13 +473,13 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
           id="ghost-event-date-section"
           title="Date and Location"
         >
-          <h3 class="text-base font-medium text-zinc-800">Date and Time</h3>
+          <h3 class="text-base text-zinc-800 type-subhead">Date and Time</h3>
           <div class="flex flex-wrap gap-3">
             <.admin_ghost_bar width="w-36" height="h-10" rounded="rounded-lg" />
             <.admin_ghost_bar width="w-28" height="h-10" rounded="rounded-lg" />
             <.admin_ghost_bar width="w-28" height="h-10" rounded="rounded-lg" />
           </div>
-          <h3 class="text-base font-medium text-zinc-800 pt-2">Location</h3>
+          <h3 class="text-base text-zinc-800 pt-2 type-subhead">Location</h3>
           <.admin_ghost_bar width="w-full" height="h-10" rounded="rounded-lg" />
           <.admin_ghost_bar width="w-full" height="h-10" rounded="rounded-lg" />
           <.admin_ghost_image ratio="aspect-2/1" class="rounded-lg" />
@@ -556,7 +556,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
           class="border border-zinc-200 rounded-lg p-4 sm:p-6 bg-white space-y-4"
         >
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h3 class="text-lg font-semibold text-zinc-900">Ticket Tiers</h3>
+            <h3 class="text-lg text-zinc-900 type-subhead">Ticket Tiers</h3>
             <.button id="ghost-add-ticket-tier">
               <.icon name="hero-plus" class="w-4 h-4 me-1" /> Add Ticket Tier
             </.button>
@@ -646,7 +646,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
 
         <aside id="ghost-event-communication-timeline" class="lg:col-span-5">
           <div class="rounded-xl border border-zinc-200 bg-white p-4 space-y-4">
-            <h3 class="text-sm font-semibold text-zinc-800">
+            <h3 class="text-sm text-zinc-800 type-subhead">
               Communication timeline
             </h3>
             <div :for={idx <- 1..2} class="flex gap-3">

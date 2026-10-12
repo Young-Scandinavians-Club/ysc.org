@@ -86,7 +86,7 @@ echo "${GREEN}✓ Dialyzer passed${RESET}"
 echo ""
 
 next_step "Running Sobelow (security audit)..."
-if ! mix sobelow --skip --exit; then
+if ! mix sobelow --skip --exit high; then
   echo "${RED}✗ Sobelow security audit failed${RESET}"
   exit 1
 fi

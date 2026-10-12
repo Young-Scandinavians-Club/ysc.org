@@ -263,6 +263,36 @@ defmodule Ysc.Tickets.StripeServiceTest do
       assert message =~ "couldn't set up payment"
       refute message =~ "initialization"
     end
+
+    test "does not attach a PaymentIntent to a cart cancelled during Stripe create",
+         %{ticket_order: ticket_order} do
+      stale_pending = ticket_order
+      payment_intent_id = "pi_cancelled_cart_#{ticket_order.id}"
+
+      assert {:ok, cancelled} =
+               Ysc.Tickets.cancel_ticket_order(
+                 ticket_order,
+                 "started a new checkout"
+               )
+
+      assert cancelled.status == :cancelled
+
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "requires_payment_method",
+           amount: params.amount
+         }}
+      end)
+
+      assert {:error, :order_not_pending} =
+               StripeService.create_payment_intent(stale_pending)
+
+      reloaded = Ysc.Tickets.get_ticket_order(ticket_order.id)
+      assert reloaded.status == :cancelled
+      assert is_nil(reloaded.payment_intent_id)
+    end
   end
 
   describe "cancel_payment_intent/1" do

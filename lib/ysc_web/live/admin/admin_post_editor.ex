@@ -164,7 +164,7 @@ defmodule YscWeb.AdminPostEditorLive do
                   field={@form[:title]}
                   phx-debounce="500"
                   growing_field_size="large"
-                  class="input-element block border-none font-extrabold text-2xl leading-7 text-zinc-900 outline-hidden focus:border focus:border focus:border-zinc-200 focus:border-zinc-400 focus:outline-solid focus:outline-zinc-200 focus:ring-0 sm:text-3xl sm:leading-8 rounded-sm"
+                  class="input-element block border-none text-2xl text-zinc-900 type-title outline-hidden focus:border focus:border focus:border-zinc-200 focus:border-zinc-400 focus:outline-solid focus:outline-zinc-200 focus:ring-0 sm:text-3xl rounded-sm"
                 />
               </div>
 

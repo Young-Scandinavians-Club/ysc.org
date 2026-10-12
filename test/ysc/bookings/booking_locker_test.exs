@@ -3953,6 +3953,55 @@ defmodule Ysc.Bookings.BookingLockerTest do
       end
     end
 
+    test "releases a sibling hold when Stripe cancel reveals a succeeded but fully refunded payment",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {first_hold, second_hold, payment_intent_id, entitlement} =
+        sibling_hold_with_entitlement(user, 39)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(second_hold.total_price)
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_sibling_cancel_refused(payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             latest_charge: %Stripe.Charge{
+               id: "ch_#{payment_intent_id}",
+               amount: amount_cents,
+               amount_refunded: amount_cents,
+               refunded: true
+             },
+             metadata: %{
+               "booking_id" => second_hold.id,
+               "user_id" => user.id
+             }
+           }}
+        end)
+
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+        assert confirmed.status == :complete
+
+        sibling = Repo.reload!(second_hold)
+        assert sibling.status == :canceled
+        assert is_nil(sibling.applied_booking_entitlement_id)
+
+        still_active = Entitlements.get_entitlement(entitlement.id)
+        assert still_active.status == :active
+        refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
     test "keeps a sibling hold when its PaymentIntent is still processing", %{
       user: user
     } do

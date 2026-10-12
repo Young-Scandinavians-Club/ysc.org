@@ -257,7 +257,7 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute BookingUserMessages.property_unavailable_error() =~ "reserve"
 
     assert BookingUserMessages.property_unavailable_error() =~
-             "book the whole cabin"
+             "book the entire cabin"
 
     assert BookingUserMessages.insufficient_capacity_summary() =~
              "Not enough space"

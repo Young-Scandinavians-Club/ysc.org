@@ -230,7 +230,7 @@ defmodule YscWeb.EventPhotoUploadLive do
                       <% true -> %>
                         <div class="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
                           <div
-                            class="h-full rounded-full bg-blue-400 transition-all duration-150"
+                            class="h-full rounded-full bg-blue-400 transition-[width] duration-150"
                             style={"width: #{entry.progress}%"}
                           />
                         </div>
@@ -484,11 +484,11 @@ defmodule YscWeb.EventPhotoUploadLive do
       id="event-photo-thanks-intro"
       class="rounded-2xl border border-zinc-200 bg-white px-6 py-8 text-center shadow-xs"
     >
-      <p class="text-sm font-medium uppercase tracking-wide text-blue-700">
+      <p class="text-sm text-blue-700 type-eyebrow">
         Thank you for being there
       </p>
 
-      <h1 class="mt-3 text-2xl font-semibold text-zinc-900 leading-tight">
+      <h1 class="mt-3 text-2xl text-zinc-900 type-display">
         <%= if @variant == :success do %>
           Tusen tack! (Thank you so much!)
         <% else %>

@@ -1543,12 +1543,67 @@ defmodule Ysc.ScanningTest do
       assert csv =~ member.email
     end
 
+    test "does not SELECT user password hashes or unused ticket columns" do
+      session = scan_session_fixture()
+
+      user =
+        make_active_member()
+        |> Ecto.Changeset.change(%{
+          first_name: "CsvSlim",
+          last_name: "Member",
+          board_bio: "bio CSV export must not load"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, _} =
+        Scanning.process_scan(session, QrToken.sign_membership(user.id))
+
+      {csv, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.export_session_csv(session.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert csv =~ user.email
+      assert csv =~ "CsvSlim"
+      assert password_cols == 0
+
+      {_csv, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.export_session_csv(session.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert bio_cols == 0
+    end
+
     test "exports empty session as headers only" do
       session = scan_session_fixture()
       csv = Scanning.export_session_csv(session.id)
 
       lines = String.split(String.trim(csv), "\n")
       assert length(lines) == 1
+    end
+
+    test "neutralizes spreadsheet formulas in member names" do
+      session = scan_session_fixture()
+
+      user =
+        user_fixture(%{first_name: "=HYPERLINK(1)", last_name: "Doe"})
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      token = QrToken.sign_membership(user.id)
+      Scanning.process_scan(session, token)
+
+      csv = Scanning.export_session_csv(session.id)
+      refute csv =~ ~r/(^|,)=HYPERLINK/
+      assert csv =~ "'=HYPERLINK(1) Doe"
     end
   end
 
@@ -1594,6 +1649,46 @@ defmodule Ysc.ScanningTest do
       Scanning.process_scan(session1, QrToken.sign_membership(user.id))
 
       assert Scanning.list_scan_records(session2.id) == []
+    end
+
+    test "preloads slim member name/email without password hashes or tickets" do
+      session = scan_session_fixture()
+
+      user =
+        make_active_member()
+        |> Ecto.Changeset.change(%{
+          first_name: "ScanHist",
+          last_name: "Member",
+          board_bio: "bio the session history must not load"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, _} =
+        Scanning.process_scan(session, QrToken.sign_membership(user.id))
+
+      {records, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_scan_records(session.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      [record] = records
+      assert record.user.first_name == "ScanHist"
+      assert record.user.email == user.email
+      assert is_nil(record.user.hashed_password)
+      assert is_nil(record.user.board_bio)
+      assert %Ecto.Association.NotLoaded{} = record.ticket
+      assert password_cols == 0
+
+      {_records, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_scan_records(session.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert bio_cols == 0
     end
   end
 
@@ -2289,6 +2384,56 @@ defmodule Ysc.ScanningTest do
 
       assert Scanning.list_membership_check_ins(session.id, "   ") != []
     end
+
+    test "preloads slim member and operator names without password hashes", %{
+      session: session,
+      admin: admin
+    } do
+      admin =
+        admin
+        |> Ecto.Changeset.change(
+          first_name: "DeskSlim",
+          last_name: "Op",
+          board_bio: "operator bio the desk list must not load"
+        )
+        |> Ysc.Repo.update!()
+
+      user =
+        make_active_member()
+        |> Ecto.Changeset.change(%{
+          first_name: "DeskHist",
+          last_name: "Member",
+          board_bio: "member bio the desk list must not load"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      {check_ins, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_membership_check_ins(session.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      [check_in] = check_ins
+      assert check_in.user.first_name == "DeskHist"
+      assert check_in.user.email == user.email
+      assert check_in.checked_in_by.first_name == "DeskSlim"
+      assert is_nil(check_in.user.hashed_password)
+      assert is_nil(check_in.checked_in_by.hashed_password)
+      assert is_nil(check_in.user.board_bio)
+      assert password_cols == 0
+
+      {_check_ins, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.list_membership_check_ins(session.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert bio_cols == 0
+    end
   end
 
   describe "membership_check_in_count/1 and member_checked_in?/2" do
@@ -2400,6 +2545,50 @@ defmodule Ysc.ScanningTest do
       assert csv =~ "Desk Admin"
     end
 
+    test "does not SELECT user password hashes or bios" do
+      admin =
+        user_fixture(%{
+          role: "admin",
+          first_name: "CsvDesk",
+          last_name: "Admin",
+          board_bio: "operator bio CSV must not load"
+        })
+
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+
+      user =
+        make_active_member()
+        |> Ecto.Changeset.change(%{
+          first_name: "CsvMember",
+          last_name: "Guest",
+          board_bio: "member bio CSV must not load"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      {csv, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.export_membership_checkins_csv(session.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert csv =~ user.email
+      assert csv =~ "CsvDesk Admin"
+      assert password_cols == 0
+
+      {_csv, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.export_membership_checkins_csv(session.id) end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert bio_cols == 0
+    end
+
     test "returns just the header row when there are no check-ins" do
       admin = user_fixture(%{role: "admin"})
       event = event_fixture(%{organizer_id: admin.id})
@@ -2408,6 +2597,28 @@ defmodule Ysc.ScanningTest do
       csv = Scanning.export_membership_checkins_csv(session.id)
       assert csv =~ "Name,Email,Membership Status,Membership Type"
       refute csv =~ "@"
+    end
+
+    test "neutralizes spreadsheet formulas in member names" do
+      admin =
+        user_fixture(%{role: "admin", first_name: "Desk", last_name: "Admin"})
+
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+
+      user =
+        user_fixture(%{first_name: "=cmd|'/C calc'!A0", last_name: "Doe"})
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      csv = Scanning.export_membership_checkins_csv(session.id)
+      refute csv =~ ~r/(^|,)=cmd/
+      assert csv =~ "'=cmd|'/C calc'!A0 Doe"
     end
   end
 

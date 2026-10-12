@@ -50,7 +50,7 @@ defmodule YscWeb.DevNotificationsLive do
     <div class="h-screen flex flex-col bg-zinc-100 overflow-hidden">
       <header class="shrink-0 border-b border-zinc-200 bg-white px-4 py-3 flex flex-wrap items-center gap-4 justify-between">
         <div>
-          <h1 class="text-lg font-semibold text-zinc-900">Notification previews</h1>
+          <h1 class="text-lg text-zinc-900 type-subhead">Notification previews</h1>
           <p class="text-xs text-zinc-500 mt-0.5">
             Dev-only · sample data from
             <code class="bg-zinc-100 px-1 rounded-sm">{NotificationSamples.samples_path()}</code>
@@ -127,7 +127,7 @@ defmodule YscWeb.DevNotificationsLive do
             <%= if @tab == :email do %>
               <%= for {category, items} <- filtered_email_groups(@email_groups, @filter) do %>
                 <div>
-                  <h2 class="px-2 mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                  <h2 class="px-2 mb-1 text-[11px] text-zinc-400 type-eyebrow">
                     {category_label(category)}
                   </h2>
                   <ul class="space-y-0.5">
@@ -157,7 +157,7 @@ defmodule YscWeb.DevNotificationsLive do
             <% else %>
               <%= for {category, items} <- filtered_sms_groups(@sms_groups, @filter) do %>
                 <div>
-                  <h2 class="px-2 mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                  <h2 class="px-2 mb-1 text-[11px] text-zinc-400 type-eyebrow">
                     {category_label(category)}
                   </h2>
                   <ul class="space-y-0.5">
@@ -196,7 +196,7 @@ defmodule YscWeb.DevNotificationsLive do
               </div>
             <% @tab == :email -> %>
               <div class="shrink-0 border-b border-zinc-200 bg-white px-4 py-3">
-                <p class="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                <p class="text-xs text-zinc-500 type-eyebrow">
                   {@selected_name}
                 </p>
                 <p class="text-sm font-semibold text-zinc-900 mt-0.5">
@@ -211,7 +211,7 @@ defmodule YscWeb.DevNotificationsLive do
               />
             <% true -> %>
               <div class="shrink-0 border-b border-zinc-200 bg-white px-4 py-3">
-                <p class="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                <p class="text-xs text-zinc-500 type-eyebrow">
                   {@selected_name}
                 </p>
                 <p class="text-sm text-zinc-600 mt-0.5">

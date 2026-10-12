@@ -198,7 +198,7 @@ defmodule YscWeb.AdminMembershipReportLive do
                 <.icon name="hero-arrow-left" class="w-4 h-4" /> Memberships
               </.link>
             </div>
-            <h1 class="text-3xl font-black text-zinc-900 tracking-tight">
+            <h1 class="text-3xl text-zinc-900 type-display">
               Membership Report
             </h1>
             <p class="text-sm text-zinc-500 mt-1">
@@ -462,7 +462,7 @@ defmodule YscWeb.AdminMembershipReportLive do
       class="bg-white rounded-lg shadow-xs border border-zinc-200 overflow-hidden"
     >
       <div class="px-6 py-4 border-b border-zinc-100">
-        <h2 class="text-lg font-bold text-zinc-900">
+        <h2 class="text-lg text-zinc-900 type-subhead">
           {@title}
           <span class="ml-2 text-sm font-normal text-zinc-400">({@count})</span>
         </h2>

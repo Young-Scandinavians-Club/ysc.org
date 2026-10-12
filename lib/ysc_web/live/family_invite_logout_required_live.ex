@@ -43,28 +43,35 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
          |> redirect(to: ~p"/")}
 
       true ->
-        # If the invite email already has an account, we want the user to
-        # log out and then log in with that email. Otherwise, we send them
-        # to the invite acceptance page with the invite token preserved.
-        existing_user = Accounts.get_user_by_email(invite.email)
+        invite_email_matches_current_user? =
+          String.downcase(String.trim(current_user.email)) ==
+            String.downcase(String.trim(invite.email))
 
-        redirect_to =
-          if existing_user do
-            "/users/log-in?redirect_to=/family-invite/#{token}/accept"
-          else
-            # Send to invite acceptance page so they get the same flow as when
-            # opening the link logged out (create-account form, no "choose membership" step)
-            "/family-invite/#{token}/accept"
-          end
+        # Matching email belongs on the accept page (join, or leave-family
+        # instructions if they are already a linked family member).
+        if invite_email_matches_current_user? do
+          {:ok, push_navigate(socket, to: ~p"/family-invite/#{token}/accept")}
+        else
+          existing_user = Accounts.get_user_by_email(invite.email)
 
-        {:ok,
-         socket
-         |> assign(:invite, invite)
-         |> assign(:current_user, current_user)
-         |> assign(:existing_user, existing_user)
-         |> assign(:logout_redirect_url, ~p"/users/log-out")
-         |> assign(:redirect_to, redirect_to)
-         |> assign(:page_title, "Sign out to accept this invitation")}
+          redirect_to =
+            if existing_user do
+              "/users/log-in?redirect_to=/family-invite/#{token}/accept"
+            else
+              # Send to invite acceptance page so they get the same flow as when
+              # opening the link logged out (create-account form, no "choose membership" step)
+              "/family-invite/#{token}/accept"
+            end
+
+          {:ok,
+           socket
+           |> assign(:invite, invite)
+           |> assign(:current_user, current_user)
+           |> assign(:existing_user, existing_user)
+           |> assign(:logout_redirect_url, ~p"/users/log-out")
+           |> assign(:redirect_to, redirect_to)
+           |> assign(:page_title, "Sign out to accept this invitation")}
+        end
     end
   end
 
@@ -74,7 +81,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
     <div class="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-zinc-50">
       <div class="max-w-lg w-full">
         <div class="bg-white rounded-xl shadow-xs border border-zinc-200 p-8">
-          <h1 class="text-2xl font-semibold text-zinc-900 mb-4">
+          <h1 class="text-2xl text-zinc-900 mb-4 type-display">
             Sign out to accept this invitation
           </h1>
           <p class="text-zinc-600 mb-6">

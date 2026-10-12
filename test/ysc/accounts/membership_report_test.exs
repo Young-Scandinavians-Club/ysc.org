@@ -733,5 +733,29 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert csv =~ "I was born in Scandinavia"
       assert csv =~ "I am a citizen of a Scandinavian country"
     end
+
+    test "neutralizes spreadsheet formulas in applicant-controlled fields" do
+      user = user_fixture(%{first_name: "=HYPERLINK(1)", last_name: "Doe"})
+
+      signup_application_fixture(user, %{
+        completed: ~U[2026-04-01 09:00:00Z],
+        review_outcome: nil,
+        occupation: "=cmd|'/C calc'!A0",
+        city: "+1+1",
+        link_to_scandinavia: "@SUM(A1)"
+      })
+
+      report = MembershipReport.generate(~D[2026-04-01], ~D[2026-04-30])
+      csv = MembershipReport.to_csv(report)
+
+      refute csv =~ ~r/(^|,)=HYPERLINK/
+      refute csv =~ ~r/(^|,)=cmd/
+      refute csv =~ ~r/(^|,)\+1\+1/
+      refute csv =~ ~r/(^|,)@SUM/
+      assert csv =~ "'=HYPERLINK(1) Doe"
+      assert csv =~ "'=cmd|'/C calc'!A0"
+      assert csv =~ "'+1+1"
+      assert csv =~ "'@SUM(A1)"
+    end
   end
 end

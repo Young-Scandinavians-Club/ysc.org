@@ -890,138 +890,27 @@ defmodule Ysc.Stripe.WebhookHandler do
           end
         end)
       else
-        # Build update attrs from Stripe subscription.
-        # CRITICAL: When a subscription is attached to a schedule (e.g. scheduled downgrade),
-        # Stripe sends null for current_period_start and current_period_end. We must NOT
-        # overwrite existing values with nil, or active?/1 will incorrectly return false
-        # (nil current_period_end is treated as inactive), causing "no membership" for users.
-        #
-        # CRITICAL: Don't downgrade an active subscription to "incomplete".
-        # This covers (1) upgrade proration invoices and (2) ACH Direct Debit while
-        # the PaymentIntent is still processing — we may have persisted local status
-        # as active on activate so the member has access before settlement.
-        # If we save "incomplete" to the DB, preload_active_subscriptions_for_auth
-        # (which filters by stripe_status IN ('active','trialing')) will find nothing
-        # and the user will see a "No membership" banner until the follow-up "active"
-        # webhook arrives. We still update subscription items so plan changes apply.
-        attrs =
-          if event.status == "incomplete" and
-               subscription.stripe_status in ["active", "trialing"] do
-            Ysc.Logging.debug(
-              "Skipping incomplete status for active subscription (upgrade or ACH processing)",
-              subscription_id: subscription.id,
-              stripe_subscription_id: event.id,
-              current_stripe_status: subscription.stripe_status
-            )
-
-            %{}
-          else
-            %{stripe_status: event.status}
-          end
-
-        attrs =
-          maybe_put_datetime(attrs, :start_date, event.start_date)
-
-        attrs =
-          maybe_put_datetime(
-            attrs,
-            :current_period_start,
-            Ysc.Stripe.SubscriptionHelpers.current_period_start(event)
+        # CRITICAL: Do not resurrect a locally-terminal subscription from a
+        # stale/out-of-order subscription.updated (status still active/etc.).
+        # Admin cancel-and-refund (`CancelAndRefund` / `cancel_immediately`)
+        # marks the row cancelled while Stripe is already canceled; a delayed
+        # or retried "active" update within the 5-minute webhook age window
+        # would otherwise restore membership access for the rest of the period
+        # even though Stripe will never charge again. A real new membership is
+        # always a new Stripe subscription id (created/recreate paths).
+        if terminal_local_subscription_status?(subscription.stripe_status) and
+             non_terminal_stripe_subscription_status?(event.status) do
+          Ysc.Logging.warning(
+            "Skipping subscription.updated that would resurrect a terminal subscription",
+            subscription_id: subscription.id,
+            stripe_subscription_id: event.id,
+            local_stripe_status: subscription.stripe_status,
+            event_status: event.status
           )
 
-        attrs =
-          maybe_put_datetime(
-            attrs,
-            :current_period_end,
-            Ysc.Stripe.SubscriptionHelpers.current_period_end(event)
-          )
-
-        attrs = maybe_put_datetime(attrs, :trial_ends_at, event.trial_end)
-        attrs = maybe_put_datetime(attrs, :ends_at, event.ended_at)
-
-        # Add cancellation info if present
-        attrs =
-          if event.cancel_at do
-            Map.put(attrs, :ends_at, DateTime.from_unix!(event.cancel_at))
-          else
-            attrs
-          end
-
-        # Sync cancel_at_period_end while the subscription is still active.
-        # Once terminal, preserve the local voluntary-lapse marker so Stripe
-        # clearing cancel_at_period_end after cancel does not drop it.
-        attrs =
-          cond do
-            event.cancel_at_period_end == true ->
-              Map.put(attrs, :cancel_at_period_end, true)
-
-            event.status in ["active", "trialing"] ->
-              Map.put(attrs, :cancel_at_period_end, false)
-
-            true ->
-              attrs
-          end
-
-        # CRITICAL: Wrap subscription update and items update in transaction
-        result =
-          Repo.transaction(fn ->
-            case Subscriptions.update_subscription(subscription, attrs) do
-              {:ok, updated_subscription} ->
-                # Update subscription items in the same transaction
-                update_subscription_items(
-                  updated_subscription,
-                  event.items.data
-                )
-
-                # Check if subscription is now expired or cancelled after update
-                # This handles edge cases where status might be "active" but period has ended
-                if Subscriptions.cancelled?(updated_subscription) or
-                     not Subscriptions.active?(updated_subscription) do
-                  # Invalidate membership cache to ensure immediate access revocation
-                  if updated_subscription.user_id do
-                    Ysc.Accounts.MembershipCache.invalidate_user(
-                      updated_subscription.user_id
-                    )
-
-                    Ysc.Logging.info(
-                      "Subscription expired/cancelled via webhook, cache invalidated",
-                      subscription_id: updated_subscription.id,
-                      user_id: updated_subscription.user_id,
-                      stripe_status: updated_subscription.stripe_status,
-                      current_period_end:
-                        updated_subscription.current_period_end,
-                      ends_at: updated_subscription.ends_at
-                    )
-                  end
-                end
-
-                updated_subscription
-
-              {:error, changeset} ->
-                Ysc.Logging.error("Failed to update subscription",
-                  subscription_id: subscription.id,
-                  errors: inspect(changeset.errors)
-                )
-
-                Repo.rollback(:failed_to_update_subscription)
-            end
-          end)
-
-        case result do
-          {:ok, updated_subscription} ->
-            maybe_update_google_wallet_membership(updated_subscription, attrs)
-            :ok
-
-          {:error, reason} ->
-            Ysc.Logging.error("Subscription update transaction failed",
-              subscription_id: subscription.id,
-              stripe_subscription_id: event.id,
-              error: inspect(reason)
-            )
-
-            # Don't raise - webhook will be marked as failed by outer transaction
-            # but Stripe should not retry as this is likely a data issue
-            :ok
+          :ok
+        else
+          apply_subscription_updated(subscription, event)
         end
       end
     end
@@ -2513,6 +2402,153 @@ defmodule Ysc.Stripe.WebhookHandler do
       {:single, :family} -> true
       {:family, :single} -> false
       _ -> nil
+    end
+  end
+
+  # Local spellings: mark_as_cancelled/1 writes "cancelled"; Stripe webhooks
+  # write "canceled". Treat both as terminal.
+  defp terminal_local_subscription_status?(status)
+       when status in ["cancelled", "canceled"],
+       do: true
+
+  defp terminal_local_subscription_status?(_), do: false
+
+  defp non_terminal_stripe_subscription_status?(status)
+       when status in [
+              "active",
+              "trialing",
+              "past_due",
+              "unpaid",
+              "paused",
+              "incomplete"
+            ],
+       do: true
+
+  defp non_terminal_stripe_subscription_status?(_), do: false
+
+  defp apply_subscription_updated(subscription, event) do
+    # Build update attrs from Stripe subscription.
+    # CRITICAL: When a subscription is attached to a schedule (e.g. scheduled downgrade),
+    # Stripe sends null for current_period_start and current_period_end. We must NOT
+    # overwrite existing values with nil, or active?/1 will incorrectly return false
+    # (nil current_period_end is treated as inactive), causing "no membership" for users.
+    #
+    # CRITICAL: Don't downgrade an active subscription to "incomplete".
+    # This covers (1) upgrade proration invoices and (2) ACH Direct Debit while
+    # the PaymentIntent is still processing — we may have persisted local status
+    # as active on activate so the member has access before settlement.
+    # If we save "incomplete" to the DB, preload_active_subscriptions_for_auth
+    # (which filters by stripe_status IN ('active','trialing')) will find nothing
+    # and the user will see a "No membership" banner until the follow-up "active"
+    # webhook arrives. We still update subscription items so plan changes apply.
+    attrs =
+      if event.status == "incomplete" and
+           subscription.stripe_status in ["active", "trialing"] do
+        Ysc.Logging.debug(
+          "Skipping incomplete status for active subscription (upgrade or ACH processing)",
+          subscription_id: subscription.id,
+          stripe_subscription_id: event.id,
+          current_stripe_status: subscription.stripe_status
+        )
+
+        %{}
+      else
+        %{stripe_status: event.status}
+      end
+
+    attrs = maybe_put_datetime(attrs, :start_date, event.start_date)
+
+    attrs =
+      maybe_put_datetime(
+        attrs,
+        :current_period_start,
+        Ysc.Stripe.SubscriptionHelpers.current_period_start(event)
+      )
+
+    attrs =
+      maybe_put_datetime(
+        attrs,
+        :current_period_end,
+        Ysc.Stripe.SubscriptionHelpers.current_period_end(event)
+      )
+
+    attrs = maybe_put_datetime(attrs, :trial_ends_at, event.trial_end)
+    attrs = maybe_put_datetime(attrs, :ends_at, event.ended_at)
+
+    attrs =
+      if event.cancel_at do
+        Map.put(attrs, :ends_at, DateTime.from_unix!(event.cancel_at))
+      else
+        attrs
+      end
+
+    # Sync cancel_at_period_end while the subscription is still active.
+    # Once terminal, preserve the local voluntary-lapse marker so Stripe
+    # clearing cancel_at_period_end after cancel does not drop it.
+    attrs =
+      cond do
+        event.cancel_at_period_end == true ->
+          Map.put(attrs, :cancel_at_period_end, true)
+
+        event.status in ["active", "trialing"] ->
+          Map.put(attrs, :cancel_at_period_end, false)
+
+        true ->
+          attrs
+      end
+
+    result =
+      Repo.transaction(fn ->
+        case Subscriptions.update_subscription(subscription, attrs) do
+          {:ok, updated_subscription} ->
+            update_subscription_items(
+              updated_subscription,
+              event.items.data
+            )
+
+            if Subscriptions.cancelled?(updated_subscription) or
+                 not Subscriptions.active?(updated_subscription) do
+              if updated_subscription.user_id do
+                Ysc.Accounts.MembershipCache.invalidate_user(
+                  updated_subscription.user_id
+                )
+
+                Ysc.Logging.info(
+                  "Subscription expired/cancelled via webhook, cache invalidated",
+                  subscription_id: updated_subscription.id,
+                  user_id: updated_subscription.user_id,
+                  stripe_status: updated_subscription.stripe_status,
+                  current_period_end: updated_subscription.current_period_end,
+                  ends_at: updated_subscription.ends_at
+                )
+              end
+            end
+
+            updated_subscription
+
+          {:error, changeset} ->
+            Ysc.Logging.error("Failed to update subscription",
+              subscription_id: subscription.id,
+              errors: inspect(changeset.errors)
+            )
+
+            Repo.rollback(:failed_to_update_subscription)
+        end
+      end)
+
+    case result do
+      {:ok, updated_subscription} ->
+        maybe_update_google_wallet_membership(updated_subscription, attrs)
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.error("Subscription update transaction failed",
+          subscription_id: subscription.id,
+          stripe_subscription_id: event.id,
+          error: inspect(reason)
+        )
+
+        :ok
     end
   end
 

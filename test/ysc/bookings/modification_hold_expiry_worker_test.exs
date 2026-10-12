@@ -97,6 +97,57 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorkerTest do
     assert Bookings.modification_ledger_recorded?(booking.id, payment_intent_id)
   end
 
+  test "releases the hold when Stripe cancel reveals a succeeded but fully refunded payment",
+       %{user: user} do
+    {booking, _extended_checkout, preview} =
+      expired_modification_hold_with_preview!(user)
+
+    payment_intent_id =
+      "pi_mod_hold_expiry_refunded_#{System.unique_integer([:positive])}"
+
+    amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+    assert {:ok, _} =
+             Bookings.attach_modification_payment_intent(
+               booking.id,
+               payment_intent_id
+             )
+
+    booking = expire_modification_hold!(Repo.get!(Booking, booking.id))
+    original_checkout = booking.checkout_date
+
+    expect_cancel_refused(payment_intent_id)
+
+    expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: payment_intent_id,
+         status: "succeeded",
+         amount: amount_cents,
+         latest_charge: %Stripe.Charge{
+           id: "ch_#{payment_intent_id}",
+           amount: amount_cents,
+           amount_refunded: amount_cents,
+           refunded: true
+         },
+         metadata: %{
+           "booking_id" => to_string(booking.id),
+           "user_id" => to_string(user.id),
+           "modification" => "true"
+         }
+       }}
+    end)
+
+    ModificationHoldExpiryWorker.expire_expired_modification_holds()
+
+    released = Repo.get!(Booking, booking.id)
+    assert released.checkout_date == original_checkout
+    assert is_nil(released.modification_hold_expires_at)
+    assert released.modification_hold_attrs
+    refute Bookings.modification_ledger_recorded?(booking.id, payment_intent_id)
+  end
+
   test "skips expiry while the modification PaymentIntent is still processing",
        %{user: user} do
     {booking, _extended_checkout} = expired_modification_hold!(user)

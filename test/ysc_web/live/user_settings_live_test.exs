@@ -12,6 +12,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
   alias Money
   alias Ysc.Accounts
+  alias Ysc.Accounts.FamilyInvite
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Avatars
@@ -1620,6 +1621,93 @@ defmodule YscWeb.UserSettingsLiveTest do
     end
   end
 
+  describe "select_membership Stripe error handling" do
+    test "already-active subscription shows info toast and does not create another Stripe subscription",
+         %{conn: conn} do
+      user = active_user_with_default_payment_method("alreadysub")
+
+      {:ok, _existing_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_alreadysub_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Existing Active Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params ->
+        flunk("must not create a second Stripe subscription")
+      end)
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "select_membership", %{"membership_type" => "single"})
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+
+      assert Phoenix.Flash.get(flash, :info) =~
+               "Your membership is already set up"
+
+      refute Phoenix.Flash.get(flash, :error)
+    end
+
+    test "card decline shows the declined-card toast instead of generic payment failure",
+         %{conn: conn} do
+      user = active_user_with_default_payment_method("carderr")
+
+      stub(Stripe.SubscriptionMock, :create, fn _params ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :card_error,
+           message: "Your card was declined.",
+           request_id: nil,
+           extra: %{},
+           user_message: nil
+         }}
+      end)
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "select_membership", %{"membership_type" => "single"})
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "declined"
+      assert error =~ "try a different card"
+      refute error =~ "couldn't process your payment"
+    end
+
+    test "generic Stripe error still shows the payment-failed toast", %{
+      conn: conn
+    } do
+      user = active_user_with_default_payment_method("genericerr")
+
+      MembershipCache.invalidate_user(user.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "select_membership", %{"membership_type" => "single"})
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "couldn't process your payment"
+      refute error =~ "already set up"
+    end
+  end
+
   describe "membership plan change (stubbed Subscriptions callback)" do
     test "change-membership upgrade shows success when callback returns ok", %{
       conn: conn
@@ -1857,6 +1945,89 @@ defmodule YscWeb.UserSettingsLiveTest do
       after
         Application.delete_env(:ysc, :change_membership_plan_stripe_callback)
       end
+    end
+  end
+
+  describe "membership plan change banner copy" do
+    test "selecting Single says Switch to, not Downgrade", %{conn: conn} do
+      user = user_fixture(%{state: :active})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_switchcopy_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(plans, &(&1.id == :family))
+      assert family_plan
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_switchcopy_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_switchcopy_#{System.unique_integer()}",
+          stripe_product_id: "prod_family",
+          stripe_price_id: family_plan.stripe_price_id,
+          quantity: 1
+        })
+
+      {:ok, _} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_switchcopy_default",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      MembershipCache.invalidate_user(user.id)
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      assert has_element?(view, "#membership_form")
+
+      html = render(view)
+
+      assert html =~
+               "You can switch between Single and Family. Switching to Family starts right away"
+
+      render_change(view, "validate_membership", %{
+        "membership_type" => "single"
+      })
+
+      assert has_element?(view, "#plan-change-info-banner")
+      assert has_element?(view, "#plan-change-banner-heading")
+
+      heading =
+        view
+        |> element("#plan-change-banner-heading")
+        |> render()
+
+      assert heading =~ "Switch to Single Membership"
+      refute heading =~ "Downgrade"
+
+      banner =
+        view
+        |> element("#plan-change-info-banner")
+        |> render()
+
+      assert banner =~ "Your membership will switch at your next renewal date"
+      assert banner =~ "No immediate charges or credits will apply"
     end
   end
 
@@ -2499,6 +2670,39 @@ defmodule YscWeb.UserSettingsLiveTest do
       render_click(view, "accept-family-invite", %{"token" => invite.token})
 
       assert render(view) =~ "18 or older"
+      assert is_nil(Repo.get!(Ysc.Accounts.User, invitee.id).primary_user_id)
+    end
+
+    test "accept-family-invite refuses when the inviter only has a Single plan",
+         %{conn: conn} do
+      primary = primary_user_with_single_membership_for_stale_invite()
+      invite_email = unique_user_email()
+
+      {:ok, invite} =
+        %FamilyInvite{}
+        |> FamilyInvite.changeset(%{
+          email: invite_email,
+          token: FamilyInvite.build_token(),
+          primary_user_id: primary.id,
+          created_by_user_id: primary.id,
+          relationship: :child
+        })
+        |> Repo.insert()
+
+      invitee =
+        user_fixture(%{
+          email: invite_email,
+          date_of_birth: Date.shift(Date.utc_today(), year: -10)
+        })
+
+      conn = log_in_user(conn, invitee)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "accept-family-invite", %{"token" => invite.token})
+
+      assert render(view) =~ "not a family or lifetime plan"
       assert is_nil(Repo.get!(Ysc.Accounts.User, invitee.id).primary_user_id)
     end
   end
@@ -3376,6 +3580,59 @@ defmodule YscWeb.UserSettingsLiveTest do
         DateTime.utc_now() |> DateTime.truncate(:second)
     })
     |> Repo.update!()
+  end
+
+  defp primary_user_with_single_membership_for_stale_invite(attrs \\ %{}) do
+    user = user_fixture(Map.merge(%{state: :active}, attrs))
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+    single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+    assert single_plan,
+           "membership_plans must include :single (another test may have cleared Application env)"
+
+    {:ok, subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_single_#{System.unique_integer()}",
+        stripe_status: "active",
+        name: "Single Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+      })
+
+    {:ok, _} =
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_price_id: single_plan.stripe_price_id,
+        stripe_product_id: "prod_single_#{System.unique_integer()}",
+        stripe_id: "si_single_#{System.unique_integer()}",
+        quantity: 1
+      })
+
+    Accounts.get_user!(user.id, [:subscriptions])
+  end
+
+  defp active_user_with_default_payment_method(prefix) do
+    user = user_fixture(%{state: :active})
+
+    {:ok, user} =
+      user
+      |> Ecto.Changeset.change(%{
+        stripe_id: "cus_#{prefix}_#{System.unique_integer([:positive])}"
+      })
+      |> Repo.update()
+
+    {:ok, _} =
+      Payments.insert_payment_method(%{
+        user_id: user.id,
+        provider: :stripe,
+        provider_id: "pm_#{prefix}_#{System.unique_integer([:positive])}",
+        provider_customer_id: user.stripe_id,
+        type: :card,
+        provider_type: "card",
+        is_default: true
+      })
+
+    user
   end
 
   defp profile_form_attrs(%Ysc.Accounts.User{} = user, overrides)

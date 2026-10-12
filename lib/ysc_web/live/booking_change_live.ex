@@ -458,7 +458,7 @@ defmodule YscWeb.BookingChangeLive do
         </.link>
       </div>
 
-      <h1 class="text-3xl font-bold text-zinc-900 mb-2">Change Booking</h1>
+      <h1 class="text-3xl text-zinc-900 mb-2 type-display">Change Booking</h1>
       <p class="text-zinc-600 mb-6">
         Booking {@booking.reference_id} · {property_label(@booking.property)}
       </p>
@@ -508,7 +508,7 @@ defmodule YscWeb.BookingChangeLive do
           >
             <%= if @booking.rooms != [] do %>
               <div>
-                <h2 class="text-sm font-semibold text-zinc-700 mb-1">
+                <h2 class="text-sm text-zinc-700 mb-1 type-subhead">
                   Your rooms
                 </h2>
                 <p class="text-sm text-zinc-500 mb-2">
@@ -599,7 +599,7 @@ defmodule YscWeb.BookingChangeLive do
                 aria-hidden="true"
               />
               <div class="min-w-0">
-                <h3 class="text-sm font-semibold text-amber-900 mb-1">
+                <h3 class="text-sm text-amber-900 mb-1 type-subhead">
                   {YscWeb.BookingUserMessages.modification_forfeiture_title()}
                 </h3>
                 <p class="text-sm text-amber-800 leading-relaxed mb-4">
@@ -1769,7 +1769,7 @@ defmodule YscWeb.BookingChangeLive do
     <div id="modification-payment-step" class="space-y-6">
       <div class="flex items-center justify-between gap-4">
         <div>
-          <h2 class="text-lg font-semibold text-zinc-900">
+          <h2 class="text-lg text-zinc-900 type-subhead">
             Complete payment
           </h2>
           <p class="mt-1 text-sm text-zinc-600">
@@ -1854,7 +1854,7 @@ defmodule YscWeb.BookingChangeLive do
       id="modification-price-preview"
       class="p-6 rounded-xl bg-zinc-50 border border-zinc-200"
     >
-      <h2 class="text-base font-semibold text-zinc-900 mb-4">
+      <h2 class="text-base text-zinc-900 mb-4 type-subhead">
         Price Summary
       </h2>
 
@@ -1863,7 +1863,7 @@ defmodule YscWeb.BookingChangeLive do
         class="flex items-center justify-between gap-4 pb-4 border-b border-zinc-200"
       >
         <div id="modification-previous-price" class="min-w-0 space-y-1">
-          <p class="text-xs font-medium uppercase tracking-wider text-zinc-500">
+          <p class="text-xs text-zinc-500 type-eyebrow">
             Previous
           </p>
           <p class="text-sm text-zinc-600">
@@ -1879,7 +1879,7 @@ defmodule YscWeb.BookingChangeLive do
         </div>
 
         <div id="modification-new-price" class="min-w-0 space-y-1 text-right">
-          <p class="text-xs font-medium uppercase tracking-wider text-zinc-500">
+          <p class="text-xs text-zinc-500 type-eyebrow">
             New
           </p>
           <p class="text-sm text-zinc-900 font-medium">

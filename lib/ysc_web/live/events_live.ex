@@ -60,7 +60,7 @@ defmodule YscWeb.EventsLive do
               </.link>
             </.feature_card>
             <div class="p-6 md:p-8 bg-white rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 md:mb-4">
+              <h4 class="text-sm text-zinc-500 mb-3 md:mb-4 type-eyebrow">
                 Stay Connected
               </h4>
               <p class="text-base text-zinc-600 leading-relaxed mb-4">
@@ -81,7 +81,7 @@ defmodule YscWeb.EventsLive do
                   }
                   class="border-t border-zinc-100 pt-3"
                 >
-                  <p class="text-sm text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
+                  <p class="text-sm text-zinc-500 mb-2 type-eyebrow">
                     Events & Community
                   </p>
                   <div class="flex flex-col gap-2">
@@ -152,11 +152,11 @@ defmodule YscWeb.EventsLive do
       <%= if @async_data_loaded && @past_events_exist do %>
         <section class="mt-20 md:mt-32 py-12 md:py-16 border-t border-zinc-100">
           <div class="max-w-(--breakpoint-xl) mx-auto px-4">
-            <h2 class="text-3xl font-black text-zinc-800 tracking-tighter italic mb-12 group relative inline-block">
-              <span class="inline-block transition-all duration-500 ease-in-out group-hover:-translate-y-full group-hover:opacity-0">
+            <h2 class="text-3xl text-zinc-800 italic mb-12 group relative inline-block type-title">
+              <span class="inline-block transition duration-500 ease-in-out group-hover:-translate-y-full group-hover:opacity-0">
                 {random_past_events_title()}
               </span>
-              <span class="absolute left-0 top-0 inline-block transition-all duration-500 ease-in-out translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 whitespace-nowrap">
+              <span class="absolute left-0 top-0 inline-block transition duration-500 ease-in-out translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100 whitespace-nowrap">
                 What Was
               </span>
             </h2>
@@ -168,7 +168,7 @@ defmodule YscWeb.EventsLive do
               <div
                 :for={{id, event} <- @streams.past_events}
                 id={id}
-                class="group relative aspect-video overflow-hidden rounded-xl opacity-80 hover:opacity-100 grayscale hover:grayscale-0 transition-all duration-300 ring-1 ring-zinc-200 hover:ring-2 hover:ring-blue-500 bg-white p-1"
+                class="group relative aspect-video overflow-hidden rounded-xl opacity-80 hover:opacity-100 grayscale hover:grayscale-0 transition duration-300 ring-1 ring-zinc-200 hover:ring-2 hover:ring-blue-500 bg-white p-1"
               >
                 <.link
                   navigate={~p"/events/#{event.id}"}
@@ -187,7 +187,7 @@ defmodule YscWeb.EventsLive do
                     <div class="absolute inset-0 z-2 bg-linear-to-t from-zinc-900/70 via-zinc-900/20 to-transparent">
                     </div>
                     <div class="absolute bottom-0 left-0 right-0 z-3 p-3">
-                      <h4 class="text-white text-sm font-black leading-tight line-clamp-2">
+                      <h4 class="text-white text-sm line-clamp-2 type-subhead">
                         {event.title}
                       </h4>
                       <p

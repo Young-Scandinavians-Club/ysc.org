@@ -80,6 +80,16 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       %{conn: log_in_user(conn, user), user: user, booking: booking}
     end
 
+    test "falls back to Pacific time instead of crashing on an invalid browser timezone",
+         %{conn: conn, booking: booking} do
+      conn = put_connect_params(conn, %{"timezone" => "Not/A/Real/Zone"})
+
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert html =~ "Complete Your Booking"
+      assert has_element?(view, "#checkout-next-steps")
+    end
+
     test "renders checkout page", %{conn: conn, booking: booking} do
       {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "Complete Your Booking"
@@ -93,11 +103,31 @@ defmodule YscWeb.BookingCheckoutLiveTest do
                "Enter your payment details in the payment section to complete your booking"
     end
 
+    test "paints booking details before the Stripe PaymentIntent is ready", %{
+      conn: conn,
+      booking: booking
+    } do
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert html =~ "Complete Your Booking"
+      assert html =~ "Booking Summary"
+      assert html =~ ~s(id="checkout-payment-loading")
+      assert html =~ ~s(id="checkout-payment-loading-cancel")
+      refute html =~ ~s(id="stripe-payment-container")
+
+      render(view)
+
+      refute has_element?(view, "#checkout-payment-loading")
+      assert has_element?(view, "#stripe-payment-container")
+      assert Repo.reload!(booking).payment_intent_id == "pi_test_123"
+    end
+
     test "persists the PaymentIntent id on the hold", %{
       conn: conn,
       booking: booking
     } do
-      {:ok, _view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      render(view)
 
       assert Repo.reload!(booking).payment_intent_id == "pi_test_123"
     end
@@ -110,8 +140,9 @@ defmodule YscWeb.BookingCheckoutLiveTest do
           property: :clear_lake
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "Clear Lake"
+      render(view)
     end
 
     test "shows children count in summary when present", %{
@@ -125,8 +156,9 @@ defmodule YscWeb.BookingCheckoutLiveTest do
           children_count: 2
         })
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "children"
+      render(view)
     end
 
     test "redirects if not owner", %{conn: conn, booking: booking} do
@@ -259,6 +291,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
            booking: booking
          } do
       {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      render(view)
 
       assert has_element?(view, "#stripe-payment-container")
       html_before = render(view)
@@ -761,7 +794,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
          }}
       end)
 
-      {:ok, _view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      render(view)
 
       synced_booking = Repo.get!(Booking, booking.id)
       refute Money.equal?(synced_booking.total_price, stale_total)
@@ -785,6 +819,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       end)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      render(view)
 
       assert has_element?(
                view,
@@ -1035,9 +1070,10 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         |> change(%{applied_booking_entitlement_id: ent.id})
         |> Repo.update!()
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
 
       assert html =~ "$5.00 off stay"
+      render(view)
     end
 
     test "select-guest-attendee without index is ignored", %{
@@ -1075,6 +1111,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
                )
 
       {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      render(view)
 
       pi_id = "pi_checkout_cancel_#{System.unique_integer([:positive])}"
 
@@ -1142,6 +1179,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         |> Repo.update!()
 
       {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      render(view)
 
       pi_id = "pi_checkout_cancel_ent_#{System.unique_integer([:positive])}"
 
@@ -1193,6 +1231,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
                )
 
       {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      render(view)
 
       pi_id = "pi_checkout_cancel_proc_#{System.unique_integer([:positive])}"
 
@@ -1241,6 +1280,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
                )
 
       {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      render(view)
 
       pi_id = "pi_checkout_cancel_timeout_#{System.unique_integer([:positive])}"
 

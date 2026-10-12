@@ -360,6 +360,114 @@ defmodule YscWeb.Emails.HelpersTest do
     end
   end
 
+  describe "require_user!/1" do
+    test "returns the user when present" do
+      user = %{first_name: "Anna"}
+      assert Helpers.require_user!(user) == user
+    end
+
+    test "raises when the user is nil" do
+      assert_raise ArgumentError, "User cannot be nil", fn ->
+        Ysc.Test.Invoke.call(Helpers, :require_user!, [nil])
+      end
+    end
+  end
+
+  describe "require_subscription!/1" do
+    test "returns the subscription when present" do
+      subscription = %{current_period_end: ~D[2026-05-01]}
+      assert Helpers.require_subscription!(subscription) == subscription
+    end
+
+    test "raises when the subscription is nil" do
+      assert_raise ArgumentError, "Subscription cannot be nil", fn ->
+        Ysc.Test.Invoke.call(Helpers, :require_subscription!, [nil])
+      end
+    end
+  end
+
+  describe "membership_greeting_assigns/1" do
+    test "returns a first_name assign" do
+      assert Helpers.membership_greeting_assigns(%{first_name: "Anna"}) == %{
+               first_name: "Anna"
+             }
+    end
+
+    test "uses Valued Member when the name is blank" do
+      assert Helpers.membership_greeting_assigns(%{first_name: ""}) == %{
+               first_name: "Valued Member"
+             }
+    end
+
+    test "raises when the user is nil" do
+      assert_raise ArgumentError, "User cannot be nil", fn ->
+        Ysc.Test.Invoke.call(Helpers, :membership_greeting_assigns, [nil])
+      end
+    end
+  end
+
+  describe "membership_member_assigns/2" do
+    test "includes greeting and membership type name" do
+      assert Helpers.membership_member_assigns(%{first_name: "Anna"}, :family) ==
+               %{
+                 first_name: "Anna",
+                 membership_type: "Family"
+               }
+
+      assert Helpers.membership_member_assigns(%{first_name: "Bo"}, "single") ==
+               %{
+                 first_name: "Bo",
+                 membership_type: "Single"
+               }
+    end
+
+    test "falls back to Membership for unknown types" do
+      assert Helpers.membership_member_assigns(%{first_name: "Anna"}, :lifetime) ==
+               %{
+                 first_name: "Anna",
+                 membership_type: "Membership"
+               }
+    end
+
+    test "raises when the user is nil" do
+      assert_raise ArgumentError, "User cannot be nil", fn ->
+        Ysc.Test.Invoke.call(Helpers, :membership_member_assigns, [nil, :single])
+      end
+    end
+  end
+
+  describe "membership_renewal_assigns/2" do
+    test "includes greeting, formatted renewal date, and membership URL" do
+      origin = YscWeb.Endpoint.url()
+      user = %{first_name: "Anna"}
+      subscription = %{current_period_end: ~D[2026-05-01]}
+
+      assert Helpers.membership_renewal_assigns(user, subscription) == %{
+               first_name: "Anna",
+               renewal_date: "May 01, 2026",
+               membership_url: origin <> "/users/membership"
+             }
+    end
+
+    test "raises when the user is nil" do
+      assert_raise ArgumentError, "User cannot be nil", fn ->
+        Ysc.Test.Invoke.call(Helpers, :membership_renewal_assigns, [
+          nil,
+          %{current_period_end: ~D[2026-05-01]}
+        ])
+      end
+    end
+
+    test "raises when the subscription is nil" do
+      assert_raise ArgumentError, "Subscription cannot be nil", fn ->
+        Ysc.Test.Invoke.call(Helpers, :membership_renewal_assigns, [
+          %{first_name: "Anna"},
+          nil
+        ])
+      end
+    end
+  end
+
   describe "membership_payment_reminder_data/1" do
     test "builds reminder assigns for a user" do
       origin = YscWeb.Endpoint.url()

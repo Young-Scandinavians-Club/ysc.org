@@ -12,13 +12,11 @@ defmodule YscWeb.Emails.BookingRefundProcessed do
     only: [
       booking_receipt_url: 1,
       ensure_booking: 1,
-      member_greeting_name: 1,
-      format_date: 1,
       format_datetime: 1,
       format_money: 1
     ]
 
-  alias Ysc.Bookings.PropertyDisplay
+  alias YscWeb.Emails.BookingHelpers
 
   def get_template_name() do
     "booking_refund_processed"
@@ -47,43 +45,22 @@ defmodule YscWeb.Emails.BookingRefundProcessed do
     end
 
     booking = ensure_booking(booking)
-
-    # Format dates
-    checkin_date = format_date(booking.checkin_date)
-    checkout_date = format_date(booking.checkout_date)
     refund_date = format_datetime(refund.inserted_at)
-
-    # Format money amounts
     refund_amount = format_money(refund.amount)
-    original_amount = if payment, do: format_money(payment.amount), else: "N/A"
 
-    # Get property name
-    property_name = PropertyDisplay.short_name(booking.property)
-
-    %{
-      first_name: member_greeting_name(booking.user),
-      booking: %{
-        reference_id: booking.reference_id,
-        property: property_name,
-        checkin_date: checkin_date,
-        checkout_date: checkout_date,
-        guests_count: booking.guests_count,
-        children_count: booking.children_count || 0
-      },
+    booking
+    |> BookingHelpers.member_links()
+    |> Map.merge(%{
+      booking: BookingHelpers.booking_summary(booking),
       refund: %{
         reference_id: refund.reference_id,
         amount: refund_amount,
         reason: refund.reason || "Refund issued",
         refund_date: refund_date
       },
-      payment: %{
-        reference_id: if(payment, do: payment.reference_id, else: "N/A"),
-        amount: original_amount
-      },
+      payment: BookingHelpers.payment_summary(payment),
       refund_date: refund_date,
-      refund_amount: refund_amount,
-      booking_url: booking_url(booking.id),
-      cabin_email: Ysc.EmailConfig.booking_reply_to(booking.property)
-    }
+      refund_amount: refund_amount
+    })
   end
 end

@@ -439,7 +439,7 @@ defmodule YscWeb.AdminNewslettersLive do
                   class="block"
                 >
                   <div class="flex items-center gap-1.5 min-w-0">
-                    <h3 class="text-base font-semibold text-zinc-900 truncate min-w-0">
+                    <h3 class="text-base text-zinc-900 truncate min-w-0 type-subhead">
                       {edition.title}
                     </h3>
                     <.presence_avatars editors={
@@ -622,7 +622,7 @@ defmodule YscWeb.AdminNewslettersLive do
             on_cancel={JS.push("close-add-subscriber-modal")}
             show
           >
-            <h2 class="text-lg font-semibold text-zinc-800 mb-4">Add subscriber</h2>
+            <h2 class="text-lg text-zinc-800 mb-4 type-subhead">Add subscriber</h2>
             <.form
               for={@add_subscriber_form}
               id="add-subscriber-form"
@@ -922,7 +922,7 @@ defmodule YscWeb.AdminNewslettersLive do
                 phx-value-id={notice.id}
                 class="block w-full text-left"
               >
-                <h3 class="text-base font-semibold text-zinc-900 truncate">
+                <h3 class="text-base text-zinc-900 truncate type-subhead">
                   {notice.name}
                 </h3>
                 <p class="text-sm text-zinc-500 mt-1">

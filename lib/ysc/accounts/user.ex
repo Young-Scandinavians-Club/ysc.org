@@ -171,6 +171,10 @@ defmodule Ysc.Accounts.User do
 
     * `:require_password` - Requires password validation during registration.
       Defaults to `false` for application-only registration.
+
+  Public membership signup (`Accounts.register_user/1`) strips password
+  fields before calling this changeset. Do not persist a client-supplied
+  password on that path (Finding 85).
   """
   def registration_changeset(user, attrs, opts \\ []) do
     require_password = Keyword.get(opts, :require_password, false)

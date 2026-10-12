@@ -40,7 +40,7 @@ defmodule YscWeb.Components.Events.EventCard do
 
     ~H"""
     <div class={[
-      "group flex flex-col rounded-xl border transition-all duration-300 relative hover:ring-2 hover:ring-blue-500 p-2",
+      "group flex flex-col rounded-xl border transition duration-300 relative hover:ring-2 hover:ring-blue-500 p-2",
       if(@variant == "dark",
         do: "bg-zinc-800 border-zinc-700",
         else: "bg-white border-zinc-100"
@@ -64,7 +64,7 @@ defmodule YscWeb.Components.Events.EventCard do
         <div class="absolute top-6 left-6 flex gap-2 z-2 flex-wrap pointer-events-none">
           <%= for badge <- @badges do %>
             <span class={[
-              "px-3 py-1.5 rounded-sm text-xs font-black uppercase tracking-widest pointer-events-auto",
+              "px-3 py-1.5 rounded-sm text-xs pointer-events-auto type-eyebrow",
               badge_class(badge),
               if(badge.text == "Going Fast!",
                 do: "animate-badge-shine-emerald",
@@ -85,7 +85,7 @@ defmodule YscWeb.Components.Events.EventCard do
       <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
         <div class="flex items-center gap-2 mb-4">
           <span class={[
-            "text-sm font-black px-2.5 py-1 rounded-sm uppercase tracking-[0.2em]",
+            "text-sm px-2.5 py-1 rounded-sm type-eyebrow",
             if(@variant == "dark",
               do: "text-zinc-300 bg-zinc-800",
               else: "text-zinc-900 bg-zinc-100"
@@ -96,7 +96,7 @@ defmodule YscWeb.Components.Events.EventCard do
           <span
             :if={@event.start_time && @event.start_time != ""}
             class={[
-              "text-sm font-bold uppercase tracking-widest",
+              "text-sm type-eyebrow",
               if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-600")
             ]}
           >
@@ -105,7 +105,7 @@ defmodule YscWeb.Components.Events.EventCard do
         </div>
         <.link navigate={~p"/events/#{@event.id}"} class="block">
           <h3 class={[
-            "text-2xl font-black tracking-tight leading-tight mb-3 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-16",
+            "text-2xl mb-3 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-16 type-subhead",
             if(@variant == "dark", do: "text-white", else: "text-zinc-900")
           ]}>
             {@event.title}
@@ -137,7 +137,7 @@ defmodule YscWeb.Components.Events.EventCard do
           </div>
           <div class="flex items-center justify-between gap-3">
             <span class={[
-              "px-3 py-1.5 rounded-sm text-sm font-black border",
+              "px-3 py-1.5 rounded-sm text-sm font-bold border",
               if(@variant == "dark",
                 do: "bg-zinc-900 text-zinc-100 border-zinc-700",
                 else: "bg-zinc-50 text-zinc-900 border-zinc-200"
@@ -149,7 +149,7 @@ defmodule YscWeb.Components.Events.EventCard do
             <.icon
               name="hero-arrow-right"
               class={[
-                "w-5 h-5 group-hover:text-blue-600 group-hover:translate-x-1 transition-all shrink-0",
+                "w-5 h-5 group-hover:text-blue-600 group-hover:translate-x-1 transition shrink-0",
                 if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-300")
               ]}
             />

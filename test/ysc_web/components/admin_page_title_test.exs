@@ -7,7 +7,7 @@ defmodule YscWeb.AdminPageTitleTest do
   import YscWeb.AdminComponents
 
   describe "admin_page_title/1" do
-    test "default variant renders h1 with semibold admin title classes" do
+    test "default variant renders h1 with admin title type token" do
       assigns = %{}
 
       html =
@@ -16,7 +16,7 @@ defmodule YscWeb.AdminPageTitleTest do
         """)
 
       assert html =~
-               ~s(<h1 class="text-2xl font-semibold leading-8 text-zinc-800")
+               ~s(<h1 class="text-2xl text-zinc-800 type-display")
 
       assert html =~ "Dashboard"
     end
@@ -30,12 +30,12 @@ defmodule YscWeb.AdminPageTitleTest do
         """)
 
       assert html =~
-               ~s(<h2 class="text-2xl font-semibold leading-8 text-zinc-800")
+               ~s(<h2 class="text-2xl text-zinc-800 type-display")
 
       assert html =~ "Section"
     end
 
-    test "emphasis variant uses bold zinc-900 styling" do
+    test "emphasis variant uses zinc-900 styling" do
       assigns = %{}
 
       html =
@@ -43,7 +43,7 @@ defmodule YscWeb.AdminPageTitleTest do
         <.admin_page_title level={2} variant={:emphasis}>Review</.admin_page_title>
         """)
 
-      assert html =~ ~s(<h2 class="text-2xl font-bold text-zinc-900")
+      assert html =~ ~s(<h2 class="text-2xl text-zinc-900 type-display")
       assert html =~ "Review"
     end
 
@@ -102,7 +102,7 @@ defmodule YscWeb.AdminPageTitleTest do
       assert html =~ ~s(class="flex items-center gap-2")
 
       assert html =~
-               ~s(<h1 class="text-2xl font-semibold leading-8 text-zinc-800")
+               ~s(<h1 class="text-2xl text-zinc-800 type-display")
 
       assert html =~ "Posts"
       assert html =~ ~s(id="admin-help-link-posts-publish")

@@ -542,10 +542,10 @@ defmodule YscWeb.ClearLakeBookingLive do
         <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-16 pointer-events-none">
           <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
             <div class="flex items-center gap-4 px-4">
-              <h1 class="text-3xl sm:text-4xl md:text-5xl font-black text-white drop-shadow-lg">
+              <h1 class="text-3xl sm:text-4xl md:text-5xl text-white drop-shadow-lg type-display">
                 Clear Lake Cabin
               </h1>
-              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs font-black uppercase tracking-[0.2em] rounded-sm backdrop-blur-xs">
+              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs rounded-sm type-eyebrow">
                 Member Access
               </span>
             </div>
@@ -562,7 +562,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <% @sleeping_mode == :winter -> %>
                   <span class="text-xl shrink-0">🛏️</span>
                   <div>
-                    <p class="text-xs font-black text-teal-400 uppercase">
+                    <p class="text-xs text-teal-400 type-eyebrow">
                       Beds set up
                     </p>
                     <p class="text-xs font-bold leading-tight">
@@ -572,7 +572,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <% @sleeping_mode == :mixed -> %>
                   <span class="text-xl shrink-0">⛺</span>
                   <div>
-                    <p class="text-xs font-black text-teal-400 uppercase">
+                    <p class="text-xs text-teal-400 type-eyebrow">
                       Sleeping
                     </p>
                     <p class="text-xs font-bold leading-tight">
@@ -582,7 +582,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <% true -> %>
                   <span class="text-xl shrink-0">⛺</span>
                   <div>
-                    <p class="text-xs font-black text-teal-400 uppercase">
+                    <p class="text-xs text-teal-400 type-eyebrow">
                       Sleeping
                     </p>
                     <p class="text-xs font-bold leading-tight">
@@ -594,7 +594,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl shrink-0">🚫</span>
               <div>
-                <p class="text-xs font-black text-zinc-400 uppercase">
+                <p class="text-xs text-zinc-400 type-eyebrow">
                   House rules
                 </p>
                 <p class="text-xs font-bold leading-tight">No pets or smoking</p>
@@ -603,7 +603,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl shrink-0">⚓</span>
               <div>
-                <p class="text-xs font-black text-amber-400 uppercase">
+                <p class="text-xs text-amber-400 type-eyebrow">
                   Access
                 </p>
                 <p class="text-xs font-bold leading-tight">
@@ -614,7 +614,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             <div class="flex items-center gap-3">
               <span class="text-xl shrink-0">🧹</span>
               <div>
-                <p class="text-xs font-black text-zinc-400 uppercase">
+                <p class="text-xs text-zinc-400 type-eyebrow">
                   Community
                 </p>
                 <p class="text-xs font-bold leading-tight">
@@ -625,7 +625,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           </div>
           <!-- Active Bookings -->
           <div :if={length(@active_bookings) > 0} class="space-y-4">
-            <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+            <h2 class="text-sm text-zinc-400 type-eyebrow">
               Your bookings
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -695,7 +695,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       role="radiogroup"
                     >
                       <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition-all",
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
                         if(
                           @selected_booking_mode == :day ||
                             @selected_booking_mode == nil,
@@ -755,7 +755,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </p>
                       </label>
                       <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition-all",
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
                         if(@selected_booking_mode == :buyout,
                           do: "border-teal-600 bg-teal-50 shadow-xs",
                           else:
@@ -804,7 +804,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Book the whole cabin
+                            {BookingModeDisplay.stay_type_label(:buyout)}
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
@@ -817,7 +817,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           }
                           class="text-xs text-amber-600 mt-2 ml-9 font-medium"
                         >
-                          Whole-cabin booking unavailable: Other members have already booked spots on these dates.
+                          Entire cabin isn't available: Other members have already booked spots on these dates.
                         </p>
                       </label>
                     </div>
@@ -841,7 +841,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Shared cabin stays are not available for the selected dates. Try different dates or book the whole cabin if that option is open.
+                      Shared cabin stays are not available for the selected dates. Try different dates or book the entire cabin if that option is open.
                     </span>
                     <span
                       :if={
@@ -851,7 +851,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Booking the whole cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
+                      Booking the entire cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
                     </span>
                   </p>
                 </div>
@@ -951,7 +951,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                                   phx-click="increase-guests"
                                   phx-click-stop
                                   aria-label="Increase number of guests"
-                                  class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold border-teal-600 bg-teal-600 hover:bg-teal-700 hover:border-teal-700 text-white"
+                                  class="w-10 h-10 rounded-full border-2 flex items-center justify-center transition duration-200 font-semibold border-teal-600 bg-teal-600 hover:bg-teal-700 hover:border-teal-700 text-white"
                                 >
                                   <.icon name="hero-plus" class="w-5 h-5" />
                                 </button>
@@ -1009,7 +1009,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </div>
                   <div class="mb-4">
                     <p class="text-sm font-medium text-zinc-800 mb-2">
-                      The calendar shows which dates are available for booking the whole cabin.
+                      The calendar shows which dates are available for booking the entire cabin.
                     </p>
                     <p class="text-xs text-zinc-600">
                       Click on a date to start your selection, then click another date to complete your range.
@@ -1163,7 +1163,7 @@ defmodule YscWeb.ClearLakeBookingLive do
             <aside class="lg:sticky lg:top-24 lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto">
               <div class="bg-white rounded-xl border-2 border-teal-600 overflow-hidden">
                 <div class="bg-teal-600 p-4 text-white text-center">
-                  <h3 class="text-lg font-bold">Booking Summary</h3>
+                  <h3 class="text-lg type-subhead">Booking Summary</h3>
                 </div>
                 <div class="p-6 space-y-4">
                   <!-- Dates -->
@@ -1207,7 +1207,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     }
                     class="space-y-2"
                   >
-                    <p class="text-xs font-bold text-zinc-400 uppercase">
+                    <p class="text-xs text-zinc-400 type-eyebrow">
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
@@ -1221,7 +1221,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     }
                     class="space-y-2"
                   >
-                    <p class="text-xs font-bold text-zinc-400 uppercase">
+                    <p class="text-xs text-zinc-400 type-eyebrow">
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
@@ -1241,7 +1241,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         />
                       </div>
                       <div class="flex-1">
-                        <h4 class="text-xs font-semibold text-amber-800 mb-1">
+                        <h4 class="text-xs text-amber-800 mb-1 type-subhead">
                           Availability Issue
                         </h4>
                         <p class="text-xs text-amber-700 leading-relaxed">
@@ -1403,13 +1403,13 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <div class="text-right">
                           <span
                             :if={!@availability_error}
-                            class="text-2xl font-black text-teal-600"
+                            class="text-2xl text-teal-600 type-title"
                           >
                             {MoneyHelper.format_money!(@calculated_price)}
                           </span>
                           <span
                             :if={@availability_error}
-                            class="text-2xl font-bold text-zinc-400"
+                            class="text-2xl text-zinc-400 type-title"
                           >
                             —
                           </span>
@@ -1512,8 +1512,8 @@ defmodule YscWeb.ClearLakeBookingLive do
             <div class="max-w-(--breakpoint-xl) mx-auto flex items-center justify-between gap-4">
               <div class="flex-1">
                 <div :if={@calculated_price} class="text-right">
-                  <p class="text-xs text-zinc-500 uppercase">Total</p>
-                  <p class="text-xl font-black text-teal-600">
+                  <p class="text-xs text-zinc-500 type-eyebrow">Total</p>
+                  <p class="text-xl font-bold text-teal-600">
                     {MoneyHelper.format_money!(@calculated_price)}
                   </p>
                 </div>
@@ -1564,6 +1564,13 @@ defmodule YscWeb.ClearLakeBookingLive do
             id="information-section"
             class="mt-12 max-w-(--breakpoint-xl) mx-auto"
           >
+            <% browse_rooms =
+              YscWeb.Components.RoomBrowser.browsable_rooms(:clear_lake) %>
+            <% info_tab =
+              effective_info_tab(
+                Map.get(assigns, :info_tab, :general),
+                browse_rooms
+              ) %>
             <!-- Tab Navigation (Sticky) -->
             <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-zinc-200 mb-8 -mx-4 px-4 py-2">
               <nav class="flex gap-2 overflow-x-auto" role="tablist">
@@ -1571,8 +1578,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                   phx-click="switch-info-tab"
                   phx-value-tab="general"
                   class={[
-                    "px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap",
-                    if(Map.get(assigns, :info_tab, :general) == :general,
+                    "px-4 py-2 text-sm font-bold rounded-md transition whitespace-nowrap",
+                    if(info_tab == :general,
                       do: "bg-teal-50 text-teal-600 border border-teal-100",
                       else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
                     )
@@ -1584,8 +1591,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                   phx-click="switch-info-tab"
                   phx-value-tab="rules"
                   class={[
-                    "px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap",
-                    if(Map.get(assigns, :info_tab, :general) == :rules,
+                    "px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap",
+                    if(info_tab == :rules,
                       do: "bg-teal-50 text-teal-600 border border-teal-100",
                       else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
                     )
@@ -1593,19 +1600,34 @@ defmodule YscWeb.ClearLakeBookingLive do
                 >
                   📜 Cabin & Booking Rules
                 </button>
+                <button
+                  :if={browse_rooms != []}
+                  id="info-tab-rooms"
+                  phx-click="switch-info-tab"
+                  phx-value-tab="rooms"
+                  class={[
+                    "px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap",
+                    if(info_tab == :rooms,
+                      do: "bg-teal-50 text-teal-600 border border-teal-100",
+                      else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                    )
+                  ]}
+                >
+                  🛏️ Rooms
+                </button>
               </nav>
             </div>
             <!-- Tab Content -->
             <div class="space-y-16">
               <!-- General Information Tab -->
               <div
-                :if={Map.get(assigns, :info_tab, :general) == :general}
+                :if={info_tab == :general}
                 class="space-y-16"
               >
                 <!-- Welcome Header -->
                 <section>
                   <div class="prose prose-zinc max-w-none mb-10">
-                    <h1 class="text-3xl font-black tracking-tight text-zinc-900 mb-4">
+                    <h1 class="text-3xl text-zinc-900 mb-4 type-display">
                       Welcome to the YSC Clear Lake Cabin
                     </h1>
                     <p class="text-lg text-zinc-600 leading-relaxed">
@@ -1717,7 +1739,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <ul class="space-y-2 text-zinc-700">
                     <li>
                       Use the <strong>booking form above</strong>
-                      to choose shared vs whole cabin, dates, and guests, then pay on this site.
+                      to choose Shared cabin vs Entire cabin, dates, and guests, then pay on this site.
                     </li>
                     <li>
                       You'll get a confirmation email with a link to view and manage your booking.
@@ -1740,7 +1762,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <div class="grid md:grid-cols-2 gap-8 items-start">
                     <div>
                       <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-6">
-                        <p class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-2">
+                        <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                           Address
                         </p>
                         <p class="text-xl font-medium text-zinc-900 mb-6">
@@ -1754,7 +1776,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         >
                           <.icon name="hero-map-pin" class="w-4 h-4" /> Open in Maps
                         </a>
-                        <h3 class="font-bold text-zinc-900 mb-3 mt-6">
+                        <h3 class="text-zinc-900 mb-3 mt-6 type-subhead">
                           From the Bay Area
                         </h3>
                         <p class="text-base text-zinc-600 mb-4">
@@ -1955,7 +1977,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   >
                     <div class="flex items-center gap-3 mb-6">
                       <div class="p-2 bg-white/20 rounded-md">🔑</div>
-                      <h2 class="text-xl font-bold text-white">
+                      <h2 class="text-xl text-white type-subhead">
                         Door Code & Access
                       </h2>
                     </div>
@@ -1983,7 +2005,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     id="pre-arrival-checklist"
                     class="bg-zinc-900 rounded-xl p-8 text-white"
                   >
-                    <h2 class="text-xl font-bold mb-6">Pre-Arrival Checklist</h2>
+                    <h2 class="text-xl mb-6 type-subhead">Pre-Arrival Checklist</h2>
                     <ul class="space-y-4">
                       <li class="flex items-center gap-3">
                         <input
@@ -2037,7 +2059,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   class="p-8 rounded-xl bg-teal-50 border border-teal-100 flex flex-col md:flex-row items-center justify-between gap-6"
                 >
                   <div>
-                    <h4 class="text-xl font-bold text-teal-900">
+                    <h4 class="text-xl text-teal-900 type-subhead">
                       Ready to reserve?
                     </h4>
                     <p class="text-teal-700">{raw(@booking_disabled_reason)}</p>
@@ -2160,7 +2182,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   ]}
                 >
                   <h2 class={[
-                    "text-lg font-bold mb-3 flex items-center gap-2",
+                    "text-lg mb-3 flex items-center gap-2 type-subhead",
                     if(@sleeping_mode == :winter,
                       do: "text-amber-900",
                       else: "text-teal-900"
@@ -2268,9 +2290,19 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </p>
                 </div>
               </div>
+              <!-- Rooms Tab -->
+              <div :if={info_tab == :rooms and browse_rooms != []}>
+                <YscWeb.Components.RoomBrowser.room_browser
+                  id="property-room-browser"
+                  rooms={browse_rooms}
+                  property_name="YSC Clear Lake Cabin"
+                  accent={:teal}
+                  intro="You don't pick a specific room when you book. Shared cabin stays share the house with other members. Entire cabin stays include every room."
+                />
+              </div>
               <!-- Tab Content: Cabin & Booking Rules -->
               <div
-                :if={Map.get(assigns, :info_tab, :general) == :rules}
+                :if={info_tab == :rules}
                 id="cabin-rules"
                 class="flex flex-col gap-16"
               >
@@ -2322,7 +2354,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <!-- Your Stay, Your Way - Accordions -->
                 <section class="bg-zinc-50 rounded-xl p-8 lg:p-12">
                   <div class="max-w-3xl">
-                    <h2 class="text-3xl font-bold text-zinc-900 mb-4">
+                    <h2 class="text-3xl text-zinc-900 mb-4 type-title">
                       Your Stay, Your Way
                     </h2>
                     <p class="text-zinc-600 mb-10 leading-relaxed">
@@ -2330,7 +2362,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     </p>
 
                     <div class="space-y-4">
-                      <details class="group bg-white border border-zinc-200 rounded-xl transition-all">
+                      <details class="group bg-white border border-zinc-200 rounded-xl transition">
                         <summary class="p-5 cursor-pointer font-bold flex justify-between items-center list-none hover:text-teal-700">
                           <span class="flex items-center gap-3">
                             <span class="text-xl">🌊</span>
@@ -2361,7 +2393,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </div>
                       </details>
 
-                      <details class="group bg-white border border-zinc-200 rounded-xl transition-all">
+                      <details class="group bg-white border border-zinc-200 rounded-xl transition">
                         <summary class="p-5 cursor-pointer font-bold flex justify-between items-center list-none hover:text-teal-700">
                           <span class="flex items-center gap-3">
                             <span class="text-xl">⚓</span>
@@ -2416,7 +2448,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </.icon_heading>
                   <div class="space-y-4">
                     <div class="p-5 bg-zinc-50 rounded-xl border border-zinc-200">
-                      <h3 class="font-semibold text-zinc-900 mb-2">
+                      <h3 class="text-zinc-900 mb-2 type-subhead">
                         Booking requirements
                       </h3>
                       <ul class="list-disc list-inside space-y-2 text-zinc-700">
@@ -2545,7 +2577,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </div>
                     </div>
                     <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
-                      <h3 class="font-semibold text-blue-900 mb-3">
+                      <h3 class="text-blue-900 mb-3 type-subhead">
                         Cancellation Policy Summary
                       </h3>
                       <div class="space-y-4 text-sm text-blue-900">
@@ -2622,10 +2654,10 @@ defmodule YscWeb.ClearLakeBookingLive do
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-20 pointer-events-none">
           <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
-            <p class="text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-3 md:mb-4 drop-shadow-md">
+            <p class="text-sm text-blue-400 mb-3 md:mb-4 drop-shadow-md type-eyebrow">
               A Legacy for All Seasons
             </p>
-            <h1 class="text-4xl md:text-7xl font-black text-white drop-shadow-lg mb-4">
+            <h1 class="text-4xl md:text-7xl text-white drop-shadow-lg mb-4 type-display">
               Clear Lake Cabin
             </h1>
             <p class="text-base md:text-xl text-zinc-100 max-w-2xl font-normal drop-shadow-md">
@@ -3144,6 +3176,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       case tab do
         "general" -> :general
         "rules" -> :rules
+        "rooms" -> :rooms
         _ -> :general
       end
 
@@ -3444,7 +3477,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp format_booking_error(:invalid_booking_mode),
     do:
-      "We couldn't book with the option you selected for these dates. Try different dates, or switch between Shared cabin and Book the whole cabin."
+      "We couldn't book with the option you selected for these dates. Try different dates, or switch between Shared cabin and Entire cabin."
 
   defp format_booking_error(:membership_required),
     do: YscWeb.BookingUserMessages.membership_required_plain_message()
@@ -3682,10 +3715,15 @@ defmodule YscWeb.ClearLakeBookingLive do
     end
   end
 
+  # The Rooms tab only exists for properties with individually bookable rooms.
+  defp effective_info_tab(:rooms, []), do: :general
+  defp effective_info_tab(info_tab, _browse_rooms), do: info_tab
+
   defp parse_info_tab_from_params(params) do
     case Map.get(params, "info_tab") do
       "general" -> :general
       "rules" -> :rules
+      "rooms" -> :rooms
       _ -> nil
     end
   end
@@ -3936,10 +3974,10 @@ defmodule YscWeb.ClearLakeBookingLive do
           YscWeb.BookingUserMessages.clear_lake_blackout_date(date_str)
 
         day_availability && assigns[:selected_booking_mode] == :day ->
-          "The date #{date_str} isn't available for a shared cabin stay — another member may already have the whole cabin booked that day."
+          "The date #{date_str} isn't available for a shared cabin stay — another member may already have the entire cabin booked that day."
 
         day_availability && assigns[:selected_booking_mode] == :buyout ->
-          "The date #{date_str} isn't available for booking the whole cabin — there are existing shared-stay bookings or another whole-cabin booking."
+          "The date #{date_str} isn't available for booking the entire cabin — another member already has a shared stay or the entire cabin booked."
 
         true ->
           "The date #{date_str} is unavailable for your selected number of guests."
@@ -4060,10 +4098,10 @@ defmodule YscWeb.ClearLakeBookingLive do
        ) do
     cond do
       booking_mode == :day && !day_booking_allowed ->
-        "Shared cabin stays are not available for the selected dates. Try different dates or book the whole cabin if that option is open."
+        "Shared cabin stays are not available for the selected dates. Try different dates or book the entire cabin if that option is open."
 
       booking_mode == :buyout && !buyout_booking_allowed ->
-        "Booking the whole cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open."
+        "Booking the entire cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open."
 
       true ->
         nil

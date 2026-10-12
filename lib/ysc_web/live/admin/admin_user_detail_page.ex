@@ -99,7 +99,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               class="w-24 h-24 rounded-full shrink-0"
             />
             <details class="group pt-2">
-              <summary class="list-none cursor-pointer flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-800 select-none transition-colors [&::-webkit-details-marker]:hidden">
+              <summary class="list-none cursor-pointer flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 select-none transition-colors [&::-webkit-details-marker]:hidden type-eyebrow">
                 View Account Activity
                 <.icon
                   name="hero-chevron-down"
@@ -219,7 +219,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           >
             <!-- Personal Information -->
             <div class="space-y-4">
-              <h3 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+              <h3 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
                 Personal Information
               </h3>
               <div class="relative">
@@ -256,7 +256,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
             <!-- Contact Information -->
             <div class="space-y-4">
-              <h3 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+              <h3 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
                 Contact Information
               </h3>
               <div class="relative">
@@ -287,7 +287,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
             <!-- Account Settings -->
             <div class="space-y-4">
-              <h3 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+              <h3 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
                 Account Settings
               </h3>
               <.input
@@ -355,7 +355,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
             <!-- Address Information -->
             <div class="space-y-4">
-              <h3 class="text-lg font-semibold text-zinc-800 border-b border-zinc-200 pb-2">
+              <h3 class="text-lg text-zinc-800 border-b border-zinc-200 pb-2 type-subhead">
                 Address Information
               </h3>
               <.inputs_for :let={address_form} field={@form[:billing_address]}>
@@ -390,7 +390,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         </div>
 
         <div :if={@live_action == :orders} class="max-w-full py-8 px-2">
-          <h2 class="text-xl font-semibold text-zinc-800 mb-4">Ticket Orders</h2>
+          <h2 class="text-xl text-zinc-800 mb-4 type-subhead">Ticket Orders</h2>
           <.admin_table_skeleton
             :if={is_nil(@ticket_orders_meta)}
             rows={6}
@@ -485,7 +485,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         </div>
 
         <div :if={@live_action == :bookings} class="max-w-full py-8 px-2">
-          <h2 class="text-xl font-semibold text-zinc-800 mb-4">Bookings</h2>
+          <h2 class="text-xl text-zinc-800 mb-4 type-subhead">Bookings</h2>
           <.admin_table_skeleton :if={is_nil(@bookings_meta)} rows={6} columns={6} />
           <div
             :if={show_bookings_table?(@bookings_meta)}
@@ -652,7 +652,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </p>
 
               <div class="rounded-lg border border-zinc-200 p-4 bg-white">
-                <h3 class="text-sm font-semibold text-zinc-800 mb-3">
+                <h3 class="text-sm text-zinc-800 mb-3 type-subhead">
                   Grant new benefit
                 </h3>
                 <.form
@@ -675,7 +675,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
               <div class="overflow-x-auto rounded-lg border border-zinc-200">
                 <table class="min-w-full text-sm">
-                  <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
+                  <thead class="bg-zinc-50 text-left text-xs text-zinc-600 type-eyebrow">
                     <tr>
                       <th class="px-4 py-3">Status</th>
                       <th class="px-4 py-3">Benefit</th>
@@ -872,7 +872,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               id="admin-application-rejection-notes"
               class="pt-6 border-t border-zinc-200"
             >
-              <h3 class="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-3">
+              <h3 class="text-sm text-zinc-400 mb-3 type-eyebrow">
                 Rejection notes
               </h3>
               <div class="space-y-4">
@@ -918,7 +918,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               :if={@primary_user != nil}
               class="border border-zinc-200 rounded-lg p-6"
             >
-              <h3 class="text-lg font-semibold text-zinc-800 mb-1">
+              <h3 class="text-lg text-zinc-800 mb-1 type-subhead">
                 Membership via Primary Account
               </h3>
               <p class="text-sm text-zinc-500 mb-4">
@@ -955,7 +955,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               :if={@has_lifetime_membership}
               class="bg-blue-50 border border-blue-200 rounded-lg p-4"
             >
-              <h3 class="text-lg font-semibold text-blue-900 mb-3">
+              <h3 class="text-lg text-blue-900 mb-3 type-subhead">
                 Lifetime Membership
               </h3>
               <div class="space-y-2 text-sm text-blue-800">
@@ -997,7 +997,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 </p>
               </div>
               <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-                <h3 class="text-lg font-semibold text-zinc-800 mb-2">
+                <h3 class="text-lg text-zinc-800 mb-2 type-subhead">
                   Create membership (paid elsewhere)
                 </h3>
                 <p class="text-sm text-zinc-600 mb-4">
@@ -1037,7 +1037,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                       />
                     </div>
                     <div class="ml-3">
-                      <h3 class="text-sm font-medium text-amber-800">
+                      <h3 class="text-sm text-amber-800 type-subhead">
                         Downgrade Scheduled
                       </h3>
                       <p class="mt-1 text-sm text-amber-700">
@@ -1055,7 +1055,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               <% end %>
 
               <div>
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Current Membership
                 </h3>
                 <div class="space-y-2 text-sm text-zinc-800">
@@ -1149,7 +1149,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
 
               <div class="border-t border-zinc-200 pt-6">
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Change Membership Type
                 </h3>
                 <p class="text-sm text-zinc-600 mb-4">
@@ -1178,7 +1178,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
 
               <div class="border-t border-zinc-200 pt-6">
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Override Membership Length
                 </h3>
                 <p class="text-sm text-zinc-600 mb-4">
@@ -1219,7 +1219,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 id="cancel-refund-membership-section"
                 class="border-t border-zinc-200 pt-6"
               >
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Cancel &amp; Refund Membership
                 </h3>
                 <p class="text-sm text-zinc-600 mb-4">
@@ -1264,7 +1264,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
 
               <div class="border-t border-zinc-200 pt-6">
-                <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+                <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Payment History
                 </h3>
 
@@ -1282,19 +1282,19 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <table class="min-w-full divide-y divide-zinc-200">
                     <thead class="bg-zinc-50">
                       <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Date
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Amount
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Status
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Invoice ID
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Payment Method
                         </th>
                       </tr>
@@ -1347,7 +1347,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </div>
 
             <div class="border-t border-zinc-200 pt-6">
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+              <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                 Lifetime Membership Management
               </h3>
               <p class="text-sm text-zinc-600 mb-4">
@@ -1403,7 +1403,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <div class="border border-zinc-200 rounded-lg p-6">
                   <div class="flex justify-between items-start mb-4">
                     <div>
-                      <h3 class="text-lg font-semibold text-zinc-900">
+                      <h3 class="text-lg text-zinc-900 type-subhead">
                         Account ending in ••••{bank_account.account_number_last_4}
                       </h3>
                       <p class="text-sm text-zinc-600 mt-1">
@@ -1439,7 +1439,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   >
                     <div class="grid grid-cols-2 gap-4">
                       <div>
-                        <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
+                        <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                           Routing Number
                         </p>
                         <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm">
@@ -1447,7 +1447,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         </p>
                       </div>
                       <div>
-                        <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">
+                        <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                           Account Number
                         </p>
                         <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm">
@@ -1479,7 +1479,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           >
             <summary class="list-none cursor-pointer px-6 py-4 flex items-center justify-between gap-4 select-none transition-colors hover:bg-zinc-50 [&::-webkit-details-marker]:hidden">
               <div>
-                <h2 class="text-lg font-semibold text-zinc-800">
+                <h2 class="text-lg text-zinc-800 type-subhead">
                   Notification preferences
                 </h2>
                 <p class="text-sm text-zinc-500 mt-1">
@@ -1504,19 +1504,19 @@ defmodule YscWeb.AdminUserDetailsLive do
                       <tr>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow"
                         >
                           Category
                         </th>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
                         >
                           Email
                         </th>
                         <th
                           scope="col"
-                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
                         >
                           SMS
                         </th>
@@ -1711,7 +1711,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 end
               }
             >
-              <h2 class="text-xl font-semibold text-zinc-800 mb-4">
+              <h2 class="text-xl text-zinc-800 mb-4 type-subhead">
                 Sent notifications
               </h2>
               <div class="w-full">
@@ -1735,16 +1735,16 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <table class="min-w-full divide-y divide-zinc-200">
                     <thead class="bg-zinc-50">
                       <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Sent
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Type
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Template
                         </th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
                           Recipient
                         </th>
                       </tr>
@@ -1859,7 +1859,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   class="flex-1 min-h-0 overflow-y-auto p-6 space-y-6"
                 >
                   <div>
-                    <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">
+                    <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                       Message
                     </p>
                     <div class="bg-zinc-50 rounded-lg border border-zinc-200 overflow-hidden">
@@ -1900,7 +1900,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     @selected_notification.params &&
                       map_size(@selected_notification.params) > 0
                   }>
-                    <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">
+                    <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                       Parameters
                     </p>
                     <div class="bg-zinc-50 rounded-lg p-4 border border-zinc-200">
@@ -1917,7 +1917,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           <div class="space-y-6">
             <%!-- Associated Users (unified for both primary and sub-account views) --%>
             <div class="border border-zinc-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-zinc-800 mb-1">
+              <h3 class="text-lg text-zinc-800 mb-1 type-subhead">
                 Associated Users
               </h3>
               <p class="text-sm text-zinc-500 mb-4">
@@ -2015,7 +2015,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 :if={@can_manage_family && @pending_invites != []}
                 class="mt-6 pt-6 border-t border-zinc-200"
               >
-                <h4 class="text-sm font-semibold text-zinc-800 mb-3">
+                <h4 class="text-sm text-zinc-800 mb-3 type-subhead">
                   Pending invites
                 </h4>
                 <div class="space-y-2">
@@ -2055,7 +2055,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 :if={@can_manage_family}
                 class="mt-6 pt-6 border-t border-zinc-200"
               >
-                <h4 class="text-sm font-semibold text-zinc-800 mb-3">
+                <h4 class="text-sm text-zinc-800 mb-3 type-subhead">
                   Add user to membership
                 </h4>
                 <p class="text-xs text-zinc-500 mb-3">
@@ -2161,7 +2161,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               :if={length(@family_members) > 0}
               class="border border-zinc-200 rounded-lg p-6"
             >
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">
+              <h3 class="text-lg text-zinc-800 mb-4 type-subhead">
                 Family Members ({length(@family_members)})
               </h3>
               <div class="space-y-3">
@@ -2212,10 +2212,10 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :logs} class="max-w-full py-8 px-2">
           <div class="flex flex-col gap-6">
-            <h2 class="text-xl font-semibold text-zinc-800">User Notes</h2>
+            <h2 class="text-xl text-zinc-800 type-subhead">User Notes</h2>
 
             <div class="bg-white border border-zinc-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">Add Note</h3>
+              <h3 class="text-lg text-zinc-800 mb-4 type-subhead">Add Note</h3>
               <.simple_form
                 for={@note_form}
                 phx-change="validate_note"
@@ -2243,8 +2243,11 @@ defmodule YscWeb.AdminUserDetailsLive do
               </.simple_form>
             </div>
 
-            <div class="bg-white border border-zinc-200 rounded-lg p-6">
-              <h3 class="text-lg font-semibold text-zinc-800 mb-4">Timeline</h3>
+            <div
+              id="admin-user-notes-timeline"
+              class="bg-white border border-zinc-200 rounded-lg p-6"
+            >
+              <h3 class="text-lg text-zinc-800 mb-4 type-subhead">Timeline</h3>
               <div :if={length(@user_notes) == 0} class="text-center py-12">
                 <p class="text-zinc-500">
                   No notes yet. Add a note above to get started.
@@ -2325,7 +2328,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           <div>
             <h2
               id="rejection-override-modal-title"
-              class="text-lg font-semibold text-zinc-900"
+              class="text-lg text-zinc-900 type-subhead"
             >
               Override Rejection Decision
             </h2>
@@ -2380,7 +2383,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           <div>
             <h2
               id="confirm-delete-user-modal-title"
-              class="text-lg font-semibold text-zinc-900"
+              class="text-lg text-zinc-900 type-subhead"
             >
               Delete this user?
             </h2>
@@ -2419,13 +2422,11 @@ defmodule YscWeb.AdminUserDetailsLive do
   def mount(%{"id" => id} = _params, _session, socket) do
     current_user = socket.assigns[:current_user]
 
-    connect_params = get_connect_params(socket) || %{}
-    timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     today_max =
       timezone
-      |> DateTime.now!()
-      |> DateTime.to_date()
+      |> YscWeb.TimeZone.today()
       |> Date.to_iso8601()
 
     connected_remount? =
@@ -2521,7 +2522,9 @@ defmodule YscWeb.AdminUserDetailsLive do
             :membership ->
               selected_user = socket.assigns.selected_user
 
-              start_async(socket, :load_family, fn ->
+              socket
+              |> maybe_assign_membership_tab_data()
+              |> start_async(:load_family, fn ->
                 fetch_family_assigns(selected_user)
               end)
 
@@ -2531,7 +2534,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               end)
 
             :application ->
-              start_async(socket, :load_rejection_notes, fn ->
+              socket
+              |> maybe_assign_application_tab_data()
+              |> start_async(:load_rejection_notes, fn ->
                 Accounts.list_user_notes_by_category(user_id, :rejection)
               end)
 
@@ -2810,7 +2815,9 @@ defmodule YscWeb.AdminUserDetailsLive do
   def handle_event("save", %{"user" => user_params}, socket) do
     current_user = socket.assigns[:current_user]
     assigned = socket.assigns[:selected_user]
-    application = socket.assigns[:selected_user_application]
+
+    application =
+      application_for_activation(socket, assigned, user_params, current_user)
 
     activating_rejected_user? =
       user_params["state"] == "active" &&
@@ -4202,10 +4209,122 @@ defmodule YscWeb.AdminUserDetailsLive do
     end
   end
 
-  defp fetch_application(user_id, current_user) do
+  defp maybe_assign_membership_tab_data(socket) do
+    if socket.assigns[:membership_data_loaded?] ||
+         is_nil(socket.assigns[:selected_user]) do
+      socket
+    else
+      assign_membership_tab_data(socket)
+    end
+  end
+
+  defp assign_membership_tab_data(socket) do
+    selected_user = socket.assigns.selected_user
+
+    [sub_result, board_member, default_payment_method] =
+      [
+        fn -> fetch_subscription_data(selected_user) end,
+        fn -> Accounts.household_board_member(selected_user) end,
+        fn -> Payments.get_default_payment_method(selected_user) end
+      ]
+      |> async_stream_with_repo(& &1.(), timeout: :infinity, ordered: true)
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    {active_subscription, subscription_payments} = sub_result
+    has_lifetime = Accounts.has_lifetime_membership?(selected_user)
+
+    membership_cs =
+      %{
+        period_end_date:
+          active_subscription && active_subscription.current_period_end
+      }
+      |> membership_changeset()
+
+    lifetime_cs =
+      %{
+        has_lifetime: has_lifetime,
+        awarded_at:
+          selected_user.lifetime_membership_awarded_at || DateTime.utc_now()
+      }
+      |> lifetime_membership_changeset()
+
+    membership_type_cs =
+      %{
+        membership_type:
+          get_current_membership_type_from_subscription(active_subscription)
+      }
+      |> membership_type_changeset()
+
+    socket =
+      socket
+      |> assign(:membership_data_loaded?, true)
+      |> assign(:active_subscription, active_subscription)
+      |> assign(:subscription_payments, subscription_payments)
+      |> assign(
+        :cancel_refund_preview,
+        cancel_refund_preview(subscription_payments)
+      )
+      |> assign(:default_payment_method, default_payment_method)
+      |> assign(:has_lifetime_membership, has_lifetime)
+      |> assign(:membership_paused_by_board, board_member)
+      |> assign(:membership_form, to_form(membership_cs, as: "membership"))
+      |> assign(
+        :membership_type_form,
+        to_form(membership_type_cs, as: "membership_type")
+      )
+      |> assign(:lifetime_form, to_form(lifetime_cs, as: "lifetime"))
+
+    if active_subscription do
+      start_async(socket, :load_downgrade_info, fn ->
+        Subscriptions.get_scheduled_downgrade_info(active_subscription)
+      end)
+    else
+      socket
+    end
+  end
+
+  defp maybe_assign_application_tab_data(socket) do
+    if socket.assigns[:application_loaded?] do
+      socket
+    else
+      assign_application_tab_data(socket)
+    end
+  end
+
+  defp assign_application_tab_data(socket) do
+    application =
+      fetch_application(socket.assigns.user_id, socket.assigns.current_user)
+
+    socket
+    |> assign(:application_loaded?, true)
+    |> assign(:selected_user_application, application)
+  end
+
+  # Profile save needs review_outcome only when activating a rejected user.
+  # Don't preload the reviewer card on that rare path.
+  defp application_for_activation(socket, assigned, user_params, current_user) do
+    cond do
+      socket.assigns[:application_loaded?] ->
+        socket.assigns.selected_user_application
+
+      assigned.state == :rejected && user_params["state"] == "active" ->
+        fetch_application(assigned.id, current_user, [])
+
+      true ->
+        socket.assigns[:selected_user_application]
+    end
+  end
+
+  defp fetch_application(
+         user_id,
+         current_user,
+         preloads \\ [reviewed_by: :current_avatar]
+       ) do
     try do
-      Accounts.get_signup_application_from_user_id!(user_id, current_user,
-        reviewed_by: :current_avatar
+      Accounts.get_signup_application_from_user_id!(
+        user_id,
+        current_user,
+        preloads
       )
     rescue
       Ecto.NoResultsError -> nil
@@ -4715,6 +4834,8 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:active_page, :members)
     |> assign(:selected_user, nil)
     |> assign(:selected_user_application, nil)
+    |> assign(:application_loaded?, false)
+    |> assign(:membership_data_loaded?, false)
     |> assign(:active_subscription, nil)
     |> assign(:subscription_payments, [])
     |> assign(:cancel_refund_preview, nil)
@@ -4798,13 +4919,13 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:last_activity_at, nil)
   end
 
-  defp load_user_detail(socket, id, current_user) do
+  defp load_user_detail(socket, id, _current_user) do
+    # Profile header + form only need the user row, billing address, and
+    # avatar. Family, membership, and application data are loaded when those
+    # tabs are opened so profile/notifications/tickets don't pay for them.
     selected_user =
       Accounts.get_user!(id, [
-        :family_members,
         :billing_address,
-        {:primary_user, [:current_avatar, :family_members, :sub_accounts]},
-        {:sub_accounts, :current_avatar},
         :current_avatar
       ])
 
@@ -4814,87 +4935,19 @@ defmodule YscWeb.AdminUserDetailsLive do
     user_form = to_form(user_changeset, as: "user")
     original_form_data = extract_form_data(user_form)
 
-    socket =
-      socket
-      |> assign(:loading_user_detail?, false)
-      |> assign(:first_name, selected_user.first_name)
-      |> assign(:last_name, selected_user.last_name)
-      |> assign(:role, selected_user.role)
-      |> assign(:selected_user, selected_user)
-      |> assign(:original_form_data, original_form_data)
-      |> assign(:form, user_form)
+    {last_login_at, last_activity_at} =
+      Accounts.get_user_login_activity_datetimes(selected_user)
 
-    [
-      sub_result,
-      has_lifetime,
-      application,
-      board_member,
-      {last_login_at, last_activity_at},
-      default_payment_method
-    ] =
-      [
-        fn -> fetch_subscription_data(selected_user) end,
-        fn -> Accounts.has_lifetime_membership?(selected_user) end,
-        fn -> fetch_application(id, current_user) end,
-        fn -> Accounts.household_board_member(selected_user) end,
-        fn -> Accounts.get_user_login_activity_datetimes(selected_user) end,
-        fn -> Payments.get_default_payment_method(selected_user) end
-      ]
-      |> async_stream_with_repo(& &1.(), timeout: :infinity, ordered: true)
-      |> Enum.map(fn {:ok, result} -> result end)
-
-    {active_subscription, subscription_payments} = sub_result
-
-    membership_cs =
-      %{
-        period_end_date:
-          active_subscription && active_subscription.current_period_end
-      }
-      |> membership_changeset()
-
-    lifetime_cs =
-      %{
-        has_lifetime: has_lifetime,
-        awarded_at:
-          selected_user.lifetime_membership_awarded_at || DateTime.utc_now()
-      }
-      |> lifetime_membership_changeset()
-
-    membership_type_cs =
-      %{
-        membership_type:
-          get_current_membership_type_from_subscription(active_subscription)
-      }
-      |> membership_type_changeset()
-
-    socket =
-      socket
-      |> assign(:selected_user_application, application)
-      |> assign(:active_subscription, active_subscription)
-      |> assign(:subscription_payments, subscription_payments)
-      |> assign(
-        :cancel_refund_preview,
-        cancel_refund_preview(subscription_payments)
-      )
-      |> assign(:default_payment_method, default_payment_method)
-      |> assign(:has_lifetime_membership, has_lifetime)
-      |> assign(:membership_paused_by_board, board_member)
-      |> assign(:membership_form, to_form(membership_cs, as: "membership"))
-      |> assign(
-        :membership_type_form,
-        to_form(membership_type_cs, as: "membership_type")
-      )
-      |> assign(:lifetime_form, to_form(lifetime_cs, as: "lifetime"))
-      |> assign(:last_login_at, last_login_at)
-      |> assign(:last_activity_at, last_activity_at)
-
-    if active_subscription do
-      start_async(socket, :load_downgrade_info, fn ->
-        Subscriptions.get_scheduled_downgrade_info(active_subscription)
-      end)
-    else
-      socket
-    end
+    socket
+    |> assign(:loading_user_detail?, false)
+    |> assign(:first_name, selected_user.first_name)
+    |> assign(:last_name, selected_user.last_name)
+    |> assign(:role, selected_user.role)
+    |> assign(:selected_user, selected_user)
+    |> assign(:original_form_data, original_form_data)
+    |> assign(:form, user_form)
+    |> assign(:last_login_at, last_login_at)
+    |> assign(:last_activity_at, last_activity_at)
   rescue
     Ecto.NoResultsError ->
       socket

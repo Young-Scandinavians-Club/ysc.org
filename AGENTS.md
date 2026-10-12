@@ -5,6 +5,16 @@ This is a web application written using the Phoenix web framework.
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
 - Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
 
+### Typography
+
+Type tokens are defined in `assets/css/app.css` (search "TYPE TOKENS"). Each carries weight, tracking and leading together; size stays on the element via responsive `text-*` classes.
+
+- Headings use one token: `type-display` (hero / page title), `type-title` (section heading), `type-subhead` (card title / sub-section). Running text may use `type-body`.
+- **Do not** set `font-*` weight, `tracking-*` or `leading-*` by hand on headings; the token owns them.
+- Uppercase is reserved for the eyebrow tier: use `type-eyebrow` at `text-xs`/`text-sm` for labels, badges and table-column captions. **Never** add a bare `uppercase` class, and never uppercase headings, body text or anything at `text-base` or larger (signage in `event_tv_poster.ex` is the only exception).
+- No `font-black` or `font-extrabold` outside signage; use the tokens or `font-bold`.
+- No `transition-all`; use `transition`, `transition-colors`, or an explicit `transition-[...]`.
+
 ### Phoenix guidelines
 
 - Out of the box, `core_components.ex` imports an `<.icon name="hero-x-mark" class="w-5 h-5"/>` component for for hero icons. **Always** use the `<.icon>` component for icons, **never** use `Heroicons` modules or similar

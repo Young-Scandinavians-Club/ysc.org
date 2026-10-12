@@ -11,6 +11,7 @@ defmodule YscWeb.Workers.UserExporter do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
+  alias Ysc.Csv
   alias Ysc.Accounts.User
   alias Ysc.Accounts
   alias Ysc.Subscriptions
@@ -143,7 +144,9 @@ defmodule YscWeb.Workers.UserExporter do
         |> Stream.flat_map(&preload_users_for_export/1)
         |> Stream.with_index()
         |> Stream.map(fn {entry, index} ->
-          build_csv_row(entry, index, fields, job_pid, total_count)
+          entry
+          |> build_csv_row(index, fields, job_pid, total_count)
+          |> Csv.sanitize_row()
         end)
         |> CSV.encode(headers: true)
         |> Enum.each(&IO.write(file, &1))

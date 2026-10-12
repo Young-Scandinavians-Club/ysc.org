@@ -267,14 +267,19 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       html = FamilyMemberAgedOutPrimary.render(assigns)
       assert html =~ "John"
       assert html =~ "Jane Doe"
+      assert html =~ "A family member turned 18"
       assert html =~ "children under 18"
       assert html =~ "View your family"
       assert html =~ "https://example.com/users/settings/family"
+      refute html =~ "aged out"
 
       assert FamilyMemberAgedOutPrimary.get_template_name() ==
                "family_member_aged_out_primary"
 
-      assert FamilyMemberAgedOutPrimary.get_subject() =~ "aged out"
+      assert FamilyMemberAgedOutPrimary.get_subject() ==
+               "A family member turned 18 and is no longer on your YSC membership"
+
+      refute FamilyMemberAgedOutPrimary.get_subject() =~ "aged out"
 
       assert FamilyMemberAgedOutPrimary.family_management_url() =~
                "/users/settings/family"

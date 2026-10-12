@@ -756,7 +756,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
           <!-- Payments Section -->
           <div class="pt-4 border-t border-zinc-200">
-            <h3 class="text-sm font-semibold text-zinc-700 mb-3">Payments</h3>
+            <h3 class="text-sm text-zinc-700 mb-3 type-subhead">Payments</h3>
             <div :if={length(@booking_payments) > 0} class="space-y-3">
               <%= for payment <- @booking_payments do %>
                 <div class="bg-zinc-50 rounded-lg p-3 border border-zinc-200 min-w-0">
@@ -827,7 +827,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
           <!-- Refunds Section -->
           <div class="pt-4 border-t border-zinc-200">
-            <h3 class="text-sm font-semibold text-zinc-700 mb-3">Refunds</h3>
+            <h3 class="text-sm text-zinc-700 mb-3 type-subhead">Refunds</h3>
             <div :if={length(@booking_refunds) > 0} class="space-y-3">
               <%= for refund <- @booking_refunds do %>
                 <div class="bg-zinc-50 rounded-lg p-3 border border-zinc-200 min-w-0">
@@ -904,7 +904,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
           <!-- Check-in Section -->
           <div class="pt-4 border-t border-zinc-200">
-            <h3 class="text-sm font-semibold text-zinc-700 mb-3">
+            <h3 class="text-sm text-zinc-700 mb-3 type-subhead">
               Check-in Details
             </h3>
             <div
@@ -1369,7 +1369,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
           <!-- Existing Rules -->
           <div>
-            <h3 class="text-md font-semibold text-zinc-800 mb-3">Current Rules</h3>
+            <h3 class="text-md text-zinc-800 mb-3 type-subhead">Current Rules</h3>
             <div
               :if={@refund_policy_rules == []}
               class="text-sm text-zinc-500 italic py-4"
@@ -1410,7 +1410,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
           <!-- Add New Rule Form -->
           <div class="border-t border-zinc-200 pt-4">
-            <h3 class="text-md font-semibold text-zinc-800 mb-3">Add New Rule</h3>
+            <h3 class="text-md text-zinc-800 mb-3 type-subhead">Add New Rule</h3>
             <.simple_form
               for={@refund_policy_rule_form}
               id="refund-policy-rule-form"
@@ -1965,7 +1965,7 @@ defmodule YscWeb.AdminBookingsLive do
         <div class="bg-white rounded-sm border p-3 sm:p-6">
           <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-4 sm:mb-6 gap-4">
             <div>
-              <h2 class="text-base sm:text-lg font-semibold text-zinc-800">
+              <h2 class="text-base sm:text-lg text-zinc-800 type-subhead">
                 Calendar Overview
               </h2>
               <p class="text-xs sm:text-sm text-zinc-500 mt-1">
@@ -2409,7 +2409,7 @@ defmodule YscWeb.AdminBookingsLive do
         <div class="bg-white rounded-sm border p-3 sm:p-6">
           <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-4 sm:mb-6 gap-4">
             <div>
-              <h2 class="text-base sm:text-lg font-semibold text-zinc-800">
+              <h2 class="text-base sm:text-lg text-zinc-800 type-subhead">
                 All Reservations
               </h2>
               <p class="text-xs sm:text-sm text-zinc-500 mt-1">
@@ -2660,7 +2660,7 @@ defmodule YscWeb.AdminBookingsLive do
       <!-- Pending Refunds Section -->
       <div :if={@current_section == :pending_refunds} class="space-y-6 pb-16">
         <div class="bg-white rounded-lg border border-zinc-200 p-6">
-          <h2 class="text-xl font-semibold text-zinc-900 mb-4">Pending Refunds</h2>
+          <h2 class="text-xl text-zinc-900 mb-4 type-subhead">Pending Refunds</h2>
           <p class="text-sm text-zinc-600 mb-6">
             Review and process refunds for cancelled bookings that require admin approval.
           </p>
@@ -2791,7 +2791,7 @@ defmodule YscWeb.AdminBookingsLive do
         <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
-              <h2 class="text-lg font-semibold text-zinc-800">Door Codes</h2>
+              <h2 class="text-lg text-zinc-800 type-subhead">Door Codes</h2>
               <p class="text-sm text-zinc-500">
                 Manage door codes for {titleize(@selected_property)}
               </p>
@@ -2824,7 +2824,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
           <!-- New Door Code Form -->
           <div class="mb-6">
-            <h3 class="text-md font-semibold text-zinc-800 mb-3">
+            <h3 class="text-md text-zinc-800 mb-3 type-subhead">
               Set New Door Code
             </h3>
             <.simple_form
@@ -2877,7 +2877,7 @@ defmodule YscWeb.AdminBookingsLive do
           </div>
           <!-- Previous Door Codes List -->
           <div>
-            <h3 class="text-md font-semibold text-zinc-800 mb-3">
+            <h3 class="text-md text-zinc-800 mb-3 type-subhead">
               Previous Door Codes
             </h3>
             <div :if={@door_codes == []} class="text-sm text-zinc-500 italic py-4">
@@ -2934,7 +2934,7 @@ defmodule YscWeb.AdminBookingsLive do
         <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
-              <h2 class="text-lg font-semibold text-zinc-800">Seasons</h2>
+              <h2 class="text-lg text-zinc-800 type-subhead">Seasons</h2>
               <p class="text-sm text-zinc-500">
                 Seasons automatically recur every year based on month/day patterns
               </p>
@@ -3025,7 +3025,7 @@ defmodule YscWeb.AdminBookingsLive do
         <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
-              <h2 class="text-lg font-semibold text-zinc-800">Pricing Rules</h2>
+              <h2 class="text-lg text-zinc-800 type-subhead">Pricing Rules</h2>
               <p class="text-sm text-zinc-500">
                 Pricing rules use hierarchical specificity (room → category → property)
               </p>
@@ -3089,14 +3089,14 @@ defmodule YscWeb.AdminBookingsLive do
                   </td>
                   <td class="py-3 pr-6 font-semibold text-zinc-800">
                     {if rule.amount do
-                      format_price(rule.amount)
+                      MoneyHelper.format_price(rule.amount)
                     else
                       "$0.00"
                     end}
                   </td>
                   <td class="py-3 pr-6 text-zinc-600 text-xs">
                     {if rule.children_amount do
-                      format_price(rule.children_amount)
+                      MoneyHelper.format_price(rule.children_amount)
                     else
                       "-"
                     end}
@@ -3126,7 +3126,7 @@ defmodule YscWeb.AdminBookingsLive do
         <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
-              <h2 class="text-lg font-semibold text-zinc-800">Refund Policies</h2>
+              <h2 class="text-lg text-zinc-800 type-subhead">Refund Policies</h2>
               <p class="text-sm text-zinc-500">
                 Configure cancellation and refund policies for bookings
               </p>
@@ -3233,7 +3233,7 @@ defmodule YscWeb.AdminBookingsLive do
         <div class="bg-white rounded-sm border p-6">
           <div class="flex justify-between items-center mb-4">
             <div>
-              <h2 class="text-lg font-semibold text-zinc-800">Rooms</h2>
+              <h2 class="text-lg text-zinc-800 type-subhead">Rooms</h2>
               <p class="text-sm text-zinc-500">
                 Configure rooms for {titleize(@selected_property)}
               </p>
@@ -3387,14 +3387,7 @@ defmodule YscWeb.AdminBookingsLive do
     # Parse query parameters (may be malformed if URL is double-encoded)
     parsed_params = parse_mount_params(params)
 
-    # Get timezone from connect params
-    connect_params =
-      case get_connect_params(socket) do
-        nil -> %{}
-        v -> v
-      end
-
-    timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
+    timezone = YscWeb.TimeZone.from_connect_params(socket)
 
     # Read property from params if available, otherwise default to :tahoe
     selected_property =
@@ -3419,7 +3412,7 @@ defmodule YscWeb.AdminBookingsLive do
         :calendar
       end
 
-    today = today_in_timezone(timezone)
+    today = YscWeb.TimeZone.today(timezone)
 
     # Read calendar dates from params if available, otherwise default to current month
     {calendar_start, calendar_end} =
@@ -4598,14 +4591,14 @@ defmodule YscWeb.AdminBookingsLive do
     start_date =
       socket.assigns[:calendar_start_date] ||
         Date.add(
-          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          YscWeb.TimeZone.today(socket.assigns[:timezone]),
           -2
         )
 
     end_date =
       socket.assigns[:calendar_end_date] ||
         Date.add(
-          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          YscWeb.TimeZone.today(socket.assigns[:timezone]),
           14
         )
 
@@ -4695,14 +4688,14 @@ defmodule YscWeb.AdminBookingsLive do
     start_date =
       socket.assigns[:calendar_start_date] ||
         Date.add(
-          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          YscWeb.TimeZone.today(socket.assigns[:timezone]),
           -2
         )
 
     end_date =
       socket.assigns[:calendar_end_date] ||
         Date.add(
-          today_in_timezone(socket.assigns[:timezone] || "America/Los_Angeles"),
+          YscWeb.TimeZone.today(socket.assigns[:timezone]),
           14
         )
 
@@ -4742,11 +4735,11 @@ defmodule YscWeb.AdminBookingsLive do
 
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(tz), -2)
+          Date.add(YscWeb.TimeZone.today(tz), -2)
 
       calendar_end =
         socket.assigns[:calendar_end_date] ||
-          Date.add(today_in_timezone(tz), 14)
+          Date.add(YscWeb.TimeZone.today(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -4793,11 +4786,11 @@ defmodule YscWeb.AdminBookingsLive do
 
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(tz), -2)
+          Date.add(YscWeb.TimeZone.today(tz), -2)
 
       calendar_end =
         socket.assigns[:calendar_end_date] ||
-          Date.add(today_in_timezone(tz), 14)
+          Date.add(YscWeb.TimeZone.today(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -4846,11 +4839,11 @@ defmodule YscWeb.AdminBookingsLive do
 
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(tz), -2)
+          Date.add(YscWeb.TimeZone.today(tz), -2)
 
       calendar_end =
         socket.assigns[:calendar_end_date] ||
-          Date.add(today_in_timezone(tz), 14)
+          Date.add(YscWeb.TimeZone.today(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -4904,11 +4897,11 @@ defmodule YscWeb.AdminBookingsLive do
 
       calendar_start =
         socket.assigns[:calendar_start_date] ||
-          Date.add(today_in_timezone(tz), -2)
+          Date.add(YscWeb.TimeZone.today(tz), -2)
 
       calendar_end =
         socket.assigns[:calendar_end_date] ||
-          Date.add(today_in_timezone(tz), 14)
+          Date.add(YscWeb.TimeZone.today(tz), 14)
 
       query_params = [
         property: socket.assigns.selected_property,
@@ -7324,13 +7317,6 @@ defmodule YscWeb.AdminBookingsLive do
     end
   end
 
-  defp format_price(%Money{} = money) do
-    formatted = MoneyHelper.format_money!(money)
-    "#{formatted}"
-  end
-
-  defp format_price(_), do: "$0.00"
-
   defp format_datetime(%DateTime{} = datetime, timezone) do
     datetime
     |> DateTime.shift_zone!(timezone)
@@ -7721,13 +7707,13 @@ defmodule YscWeb.AdminBookingsLive do
   # Default date range: today - 3 days to today + 30 days (current bookings visible with minimal scrolling)
   defp default_date_range(timezone)
        when is_binary(timezone) and timezone != "" do
-    today = today_in_timezone(timezone)
+    today = YscWeb.TimeZone.today(timezone)
     start_date = Date.add(today, -3)
     end_date = Date.add(today, 30)
     {start_date, end_date}
   end
 
-  defp default_date_range(_), do: default_date_range("America/Los_Angeles")
+  defp default_date_range(_), do: default_date_range(YscWeb.TimeZone.default())
 
   # Inventory is [checkin, checkout). Same-day check-in/check-out is 0 nights
   # and would previously feed Date.range/2 a descending bound.
@@ -7738,15 +7724,6 @@ defmodule YscWeb.AdminBookingsLive do
       {checkin_date, Date.add(checkin_date, 1)}
     end
   end
-
-  defp today_in_timezone(timezone) when is_binary(timezone) do
-    DateTime.now!(timezone) |> DateTime.to_date()
-  rescue
-    _ -> DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-  end
-
-  defp today_in_timezone(_),
-    do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
   # Step size for prev/next calendar navigation (shift window by this many days)
   defp calendar_shift_days, do: 30

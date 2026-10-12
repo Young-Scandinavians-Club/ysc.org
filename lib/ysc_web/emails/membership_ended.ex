@@ -15,10 +15,11 @@ defmodule YscWeb.Emails.MembershipEnded do
 
   import YscWeb.Emails.Helpers,
     only: [
-      member_greeting_name: 1,
+      format_date: 1,
+      membership_greeting_assigns: 1,
       membership_url: 0,
-      upcoming_events_url: 0,
-      format_date: 1
+      require_subscription!: 1,
+      upcoming_events_url: 0
     ]
 
   alias YscWeb.Emails.Notifier
@@ -35,22 +36,15 @@ defmodule YscWeb.Emails.MembershipEnded do
   Builds template assigns for a user and ended subscription.
   """
   def prepare_email_data(user, subscription) do
-    if is_nil(user) do
-      raise ArgumentError, "User cannot be nil"
-    end
+    subscription = require_subscription!(subscription)
 
-    if is_nil(subscription) do
-      raise ArgumentError, "Subscription cannot be nil"
-    end
-
-    end_date = end_date_for(subscription)
-
-    %{
-      first_name: member_greeting_name(user),
-      end_date: format_date(end_date),
+    user
+    |> membership_greeting_assigns()
+    |> Map.merge(%{
+      end_date: format_date(end_date_for(subscription)),
       membership_url: membership_url(),
       upcoming_events_url: upcoming_events_url()
-    }
+    })
   end
 
   @doc """

@@ -48,6 +48,28 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   @doc """
+  Copy shown when the invited person is already a linked family member on
+  another membership and must leave before joining this one.
+
+  Membership (`/users/membership`) is the top item in the signed-in name menu
+  and already has a **Leave family membership** button for linked members.
+  """
+  def already_on_family_message do
+    "You can only be on one family membership at a time. Open Membership and choose Leave family membership. Then return here to accept this invitation."
+  end
+
+  @doc """
+  Copy shown when a family membership holder tries to join another family
+  while they still have linked members on their own account.
+
+  Linked members are removed on the Family page
+  (`/users/settings/family`), labeled **Family** in Account Settings.
+  """
+  def has_dependent_family_members_message do
+    "You already manage linked family members on your own account. Open Family and remove each linked member before joining another family membership."
+  end
+
+  @doc """
   Returns true when someone born on `birth_date` is #{@adult_age} or older on `today`.
 
   Children who are adults cannot join a family membership; they need their own
@@ -218,10 +240,12 @@ defmodule Ysc.Accounts.FamilyInvites do
     primary_user_id = invite.primary_user_id
     relationship = invite.relationship || :child
 
-    nested_primary_id =
+    # Lock the primary row and load fields needed for nested-tree and
+    # family-host checks. Accept must fail closed if the inviter no longer
+    # hosts Family/Lifetime (e.g. Family→Single downgrade already applied).
+    primary_user =
       from(u in User,
         where: u.id == ^primary_user_id,
-        select: u.primary_user_id,
         lock: "FOR UPDATE"
       )
       |> repo.one!()
@@ -229,11 +253,14 @@ defmodule Ysc.Accounts.FamilyInvites do
     cond do
       # Finding 83: nested invites must not be accepted even if they were
       # persisted before create_invite started refusing sub-accounts.
-      not is_nil(nested_primary_id) ->
+      not is_nil(primary_user.primary_user_id) ->
         {:error, :not_primary_user}
 
       not FamilyInvite.valid?(invite) ->
         {:error, :invite_expired_or_used}
+
+      not Ysc.Accounts.family_membership_host?(primary_user) ->
+        {:error, :invalid_membership_type}
 
       count_sub_accounts_by_primary_id(primary_user_id) >= @max_sub_accounts ->
         {:error, :max_sub_accounts_reached}
@@ -829,7 +856,7 @@ defmodule Ysc.Accounts.FamilyInvites do
       Ysc.Accounts.sub_account?(user) ->
         {:error, :not_primary_user}
 
-      not has_family_or_lifetime_membership?(user) ->
+      not Ysc.Accounts.family_membership_host?(user) ->
         {:error, :invalid_membership_type}
 
       reserved_sub_account_slots(user) >= @max_sub_accounts ->
@@ -851,46 +878,6 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   # Private functions
-
-  defp has_family_or_lifetime_membership?(user) do
-    if Ysc.Accounts.has_lifetime_membership?(user) do
-      true
-    else
-      # Check if user has family membership
-      subscriptions =
-        case user.subscriptions do
-          %Ecto.Association.NotLoaded{} ->
-            Ysc.Subscriptions.list_subscriptions(user)
-
-          subscriptions when is_list(subscriptions) ->
-            subscriptions
-
-          _ ->
-            []
-        end
-
-      active_subscriptions =
-        Enum.filter(subscriptions, fn sub ->
-          Ysc.Subscriptions.valid?(sub)
-        end)
-
-      Enum.any?(active_subscriptions, fn subscription ->
-        subscription = Ysc.Repo.preload(subscription, :subscription_items)
-
-        case subscription.subscription_items do
-          [item | _] ->
-            membership_plans = Application.get_env(:ysc, :membership_plans, [])
-
-            Enum.any?(membership_plans, fn plan ->
-              plan.stripe_price_id == item.stripe_price_id && plan.id == :family
-            end)
-
-          _ ->
-            false
-        end
-      end)
-    end
-  end
 
   defp count_sub_accounts(primary_user) do
     count_sub_accounts_by_primary_id(primary_user.id)

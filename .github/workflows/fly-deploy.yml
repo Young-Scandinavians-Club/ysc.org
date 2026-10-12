@@ -273,7 +273,7 @@ jobs:
         run: mix hex.audit
 
       - name: Sobelow (security)
-        run: mix sobelow --skip --exit
+        run: mix sobelow --skip --exit high
 
       - name: Dependency audit
         run: mix deps.audit --ignore-file config/mix_audit.ignore

@@ -229,13 +229,36 @@ defmodule Ysc.BookingsFixtures do
 
   @doc """
   Returns buyout dates starting after `after_date`, separated by at least `gap_days`.
+
+  Prefers a stay whose check-in is at least `gap_days` after `after_date`. When the
+  remaining Tahoe buyout window is too short for that gap (late summer: Winter
+  nights are rooms-only, so only a couple of Monday stays may remain), wrapping
+  to `buyout_monday_stay_at_index(0)` can return the same stay the caller already
+  has. Fall back to any later Monday, then any different stay, so modification
+  tests do not get `{:error, :no_changes}`.
   """
   def locker_buyout_dates_after(%Date{} = after_date, gap_days \\ 7) do
+    stays = enumerate_buyout_monday_stays()
     min_checkin = Date.add(after_date, gap_days)
 
-    Enum.find(enumerate_buyout_monday_stays(), fn {checkin, _} ->
-      Date.compare(checkin, min_checkin) != :lt
-    end) || buyout_monday_stay_at_index(0)
+    later_with_gap =
+      Enum.find(stays, fn {checkin, _} ->
+        Date.compare(checkin, min_checkin) != :lt
+      end)
+
+    later_any =
+      Enum.find(stays, fn {checkin, _} ->
+        Date.compare(checkin, after_date) == :gt
+      end)
+
+    different_stay =
+      Enum.find(stays, fn {checkin, checkout} ->
+        Date.compare(checkin, after_date) != :eq and
+          Date.compare(checkout, after_date) != :eq
+      end)
+
+    later_with_gap || later_any || different_stay ||
+      buyout_monday_stay_at_index(0)
   end
 
   defp first_monday_on_or_after(date) do

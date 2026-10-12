@@ -11,10 +11,12 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
     mjml_template: "templates/membership_payment_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  alias YscWeb.MembershipHelpers
-
   import YscWeb.Emails.Helpers,
-    only: [member_greeting_name: 1, format_date: 1, format_membership_money: 1]
+    only: [
+      format_date: 1,
+      format_membership_money: 1,
+      membership_member_assigns: 2
+    ]
 
   def get_template_name() do
     "membership_payment_confirmation"
@@ -31,25 +33,14 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
         payment_date,
         opts \\ []
       ) do
-    if is_nil(user) do
-      raise ArgumentError, "User cannot be nil"
-    end
-
     paid_elsewhere = Keyword.get(opts, :paid_elsewhere, false)
-    first_name = member_greeting_name(user)
 
-    membership_type_name =
-      MembershipHelpers.membership_type_name(membership_type)
-
-    amount_str = format_membership_money(amount)
-    payment_date_str = format_date(payment_date)
-
-    %{
-      first_name: first_name,
-      membership_type: membership_type_name,
-      amount: amount_str,
-      payment_date: payment_date_str,
+    user
+    |> membership_member_assigns(membership_type)
+    |> Map.merge(%{
+      amount: format_membership_money(amount),
+      payment_date: format_date(payment_date),
       paid_elsewhere: paid_elsewhere
-    }
+    })
   end
 end

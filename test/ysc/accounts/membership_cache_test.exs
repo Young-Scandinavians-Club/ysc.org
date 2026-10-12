@@ -40,6 +40,44 @@ defmodule Ysc.Accounts.MembershipCacheTest do
       assert membership.user_id == primary.id
     end
 
+    test "sub-account does not inherit Single-plan membership from primary" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      assert single_plan
+
+      primary = user_fixture()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: primary.id,
+          stripe_id: "sub_single_cache_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: single_plan.stripe_price_id,
+          stripe_product_id: "prod_single_cache_#{System.unique_integer()}",
+          stripe_id: "si_single_cache_#{System.unique_integer()}",
+          quantity: 1
+        })
+
+      sub =
+        user_fixture()
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Ysc.Repo.update!()
+
+      MembershipCache.invalidate_user(primary.id)
+      MembershipCache.invalidate_user(sub.id)
+
+      assert MembershipCache.get_active_membership(sub) == nil
+      assert MembershipCache.get_membership_plan_type(sub) == nil
+    end
+
     test "returns lifetime membership struct for user with lifetime membership" do
       user =
         user_fixture()

@@ -489,13 +489,17 @@ defmodule Ysc.Accounts do
   Checks if a user has an active membership.
   Includes lifetime membership which never expires.
 
-  For sub-accounts, checks the primary user's membership.
+  For sub-accounts, membership is inherited only when the primary hosts a
+  family or lifetime plan. A Single plan must never grant access to linked
+  members (e.g. after a Family→Single scheduled downgrade completes while
+  dependents remain linked).
   """
   def has_active_membership?(user) do
-    # If user is a sub-account, check primary user's membership
     if sub_account?(user) do
-      primary_user = get_primary_user(user)
-      if primary_user, do: has_active_membership?(primary_user), else: false
+      case get_primary_user(user) do
+        nil -> false
+        primary_user -> family_membership_host?(primary_user)
+      end
     else
       check_primary_user_membership(user)
     end
@@ -534,6 +538,52 @@ defmodule Ysc.Accounts do
   """
   def has_lifetime_membership?(user) do
     not is_nil(user.lifetime_membership_awarded_at)
+  end
+
+  @doc """
+  True when this user may host family sub-accounts: lifetime membership or a
+  currently valid family-plan subscription.
+
+  Used for invite mint/accept and for sub-account membership inheritance so a
+  Single plan cannot leave unpaid nested members with access.
+  """
+  def family_membership_host?(user) do
+    has_lifetime_membership?(user) or has_valid_family_subscription?(user)
+  end
+
+  defp has_valid_family_subscription?(user) do
+    user
+    |> loaded_subscriptions_for_membership()
+    |> Enum.filter(&Ysc.Subscriptions.valid?/1)
+    |> Enum.any?(&family_plan_subscription?/1)
+  end
+
+  defp loaded_subscriptions_for_membership(user) do
+    case user.subscriptions do
+      %Ecto.Association.NotLoaded{} ->
+        Ysc.Subscriptions.list_subscriptions(user)
+
+      subscriptions when is_list(subscriptions) ->
+        subscriptions
+
+      _ ->
+        []
+    end
+  end
+
+  defp family_plan_subscription?(subscription) do
+    subscription = Repo.preload(subscription, :subscription_items)
+    membership_plans = Application.get_env(:ysc, :membership_plans, [])
+
+    case subscription.subscription_items do
+      [item | _] ->
+        Enum.any?(membership_plans, fn plan ->
+          plan.stripe_price_id == item.stripe_price_id and plan.id == :family
+        end)
+
+      _ ->
+        false
+    end
   end
 
   def get_signup_application_from_user_id!(id, current_user, preloads \\ []) do
@@ -716,10 +766,24 @@ defmodule Ysc.Accounts do
     reviewed_at review_outcome reviewed_by_user_id
   )a
 
+  # Public membership applications never collect a password. The UI sets one
+  # later in account setup. Drop client-supplied password fields so they cannot
+  # be hashed onto a pending account and used after OAuth auto-verifies email
+  # (Finding 85).
+  @registration_user_client_drop_keys ~w(
+    password password_confirmation hashed_password
+  )a
+
   defp sanitize_registration_attrs(attrs) when is_map(attrs) do
     attrs
+    |> drop_registration_user_client_keys()
     |> sanitize_registration_form_attrs()
     |> sanitize_family_members_attrs()
+  end
+
+  defp drop_registration_user_client_keys(attrs) do
+    string_keys = Enum.map(@registration_user_client_drop_keys, &to_string/1)
+    Map.drop(attrs, @registration_user_client_drop_keys ++ string_keys)
   end
 
   defp sanitize_registration_form_attrs(attrs) do
@@ -3545,6 +3609,31 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Removes a password that was stored before the owner completed password setup.
+
+  Public registration must not persist a password. If `hashed_password` is
+  present but `password_set_at` is nil, the credential never went through
+  account setup and must not survive OAuth auto-verification (Finding 85).
+  """
+  def drop_unconfirmed_password(
+        %User{hashed_password: hash, password_set_at: nil} = user
+      )
+      when is_binary(hash) do
+    case user
+         |> Ecto.Changeset.change(%{hashed_password: nil})
+         |> Repo.update() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
+  end
+
+  def drop_unconfirmed_password(%User{} = user), do: {:ok, user}
+
+  @doc """
   Marks a user's email as verified by setting the email_verified_at timestamp.
   """
   def mark_email_verified(user) do
@@ -3928,7 +4017,7 @@ defmodule Ysc.Accounts do
       count_sub_accounts_for_primary(user_to_link.id) > 0 ->
         {:error, :has_dependent_family_members}
 
-      not has_family_or_lifetime_membership?(primary_user) ->
+      not family_membership_host?(primary_user) ->
         {:error, :primary_must_have_family_or_lifetime}
 
       relationship == :spouse ->
@@ -3944,50 +4033,6 @@ defmodule Ysc.Accounts do
       true ->
         do_admin_link_user(primary_user, user_to_link, relationship)
     end
-  end
-
-  defp has_family_or_lifetime_membership?(user) do
-    has_lifetime_membership?(user) or
-      case user.subscriptions do
-        %Ecto.Association.NotLoaded{} ->
-          subs = Ysc.Subscriptions.list_subscriptions(user)
-
-          Enum.any?(subs, fn s ->
-            s = Repo.preload(s, :subscription_items)
-
-            case s.subscription_items do
-              [item | _] ->
-                plans = Application.get_env(:ysc, :membership_plans, [])
-
-                Enum.any?(plans, fn p ->
-                  p.stripe_price_id == item.stripe_price_id and p.id == :family
-                end)
-
-              _ ->
-                false
-            end
-          end)
-
-        subs when is_list(subs) ->
-          Enum.any?(subs, fn s ->
-            s = Repo.preload(s, :subscription_items)
-
-            case s.subscription_items do
-              [item | _] ->
-                plans = Application.get_env(:ysc, :membership_plans, [])
-
-                Enum.any?(plans, fn p ->
-                  p.stripe_price_id == item.stripe_price_id and p.id == :family
-                end)
-
-              _ ->
-                false
-            end
-          end)
-
-        _ ->
-          false
-      end
   end
 
   defp count_spouses(primary_user) do
@@ -5257,6 +5302,11 @@ defmodule Ysc.Accounts do
 
   ## User Notes
 
+  # Notes UI only shows the author's name and email — skip hashed_password,
+  # bios, Stripe ids, and other User columns that `preload([:created_by])`
+  # would SELECT.
+  @user_note_author_fields [:id, :first_name, :last_name, :email]
+
   @doc """
   Creates a new note for a user.
 
@@ -5282,7 +5332,8 @@ defmodule Ysc.Accounts do
   @doc """
   Lists all notes for a user, ordered by most recent first.
 
-  Preloads the `created_by` association to show which admin created each note.
+  Preloads a slim `created_by` (name + email) to show which admin created
+  each note.
 
   ## Examples
 
@@ -5290,26 +5341,39 @@ defmodule Ysc.Accounts do
       [%UserNote{...}, ...]
   """
   def list_user_notes(user_id) do
+    list_user_notes_query(user_id) |> Repo.all()
+  end
+
+  @doc false
+  def list_user_notes_query(user_id) do
     from(n in UserNote,
       where: n.user_id == ^user_id,
       order_by: [desc: n.inserted_at],
-      preload: [:created_by]
+      preload: [created_by: ^user_note_author_query()]
     )
-    |> Repo.all()
   end
 
   @doc """
   Lists user notes filtered by category (e.g. :rejection).
 
-  Returns notes ordered by most recent first, with created_by preloaded.
+  Returns notes ordered by most recent first, with a slim `created_by`
+  preloaded.
   """
   def list_user_notes_by_category(user_id, category) do
+    list_user_notes_by_category_query(user_id, category) |> Repo.all()
+  end
+
+  @doc false
+  def list_user_notes_by_category_query(user_id, category) do
     from(n in UserNote,
       where: n.user_id == ^user_id and n.category == ^category,
       order_by: [desc: n.inserted_at],
-      preload: [:created_by]
+      preload: [created_by: ^user_note_author_query()]
     )
-    |> Repo.all()
+  end
+
+  defp user_note_author_query do
+    from(u in User, select: struct(u, ^@user_note_author_fields))
   end
 
   ## Post-migration onboarding
@@ -5568,6 +5632,24 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_pending_approval_users_query do
     pending_approval_users_query()
+  end
+
+  @doc false
+  def ci_query_explain_list_user_notes_query do
+    list_user_notes_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_list_user_notes_by_category_query do
+    list_user_notes_by_category_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id,
+      :rejection
+    )
+  end
+
+  @doc false
+  def ci_query_explain_user_note_author_query do
+    user_note_author_query()
   end
 
   defp membership_ytd_windows(%DateTime{} = now) do

@@ -198,7 +198,7 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
         </.admin_page_title>
 
         <div class="rounded-lg border border-zinc-200 p-4 bg-white max-w-4xl">
-          <h2 class="text-sm font-semibold text-zinc-800 mb-3">
+          <h2 class="text-sm text-zinc-800 mb-3 type-subhead">
             Grant new benefit
           </h2>
           <.form
@@ -262,7 +262,7 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
 
         <div class="overflow-x-auto rounded-lg border border-zinc-200">
           <table class="min-w-full text-sm">
-            <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
+            <thead class="bg-zinc-50 text-left text-xs text-zinc-600 type-eyebrow">
               <tr>
                 <th class="px-4 py-3">Member</th>
                 <th class="px-4 py-3">Benefit</th>

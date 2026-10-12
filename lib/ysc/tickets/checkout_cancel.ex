@@ -10,6 +10,7 @@ defmodule Ysc.Tickets.CheckoutCancel do
   require Ysc.Logging
 
   alias Ysc.Repo
+  alias Ysc.Stripe.PaymentIntentHelpers
   alias Ysc.Tickets.TicketOrder
 
   @blocked_pi_statuses ~w(requires_action processing requires_confirmation succeeded)
@@ -145,17 +146,16 @@ defmodule Ysc.Tickets.CheckoutCancel do
          owner_id,
          context
        ) do
-    case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{
+           expand: ["latest_charge"]
+         }) do
       {:ok, %{status: "succeeded"} = payment_intent} ->
-        Ysc.Logging.warning(
-          "Payment succeeded before checkout-abandonment cancel reached Stripe; fulfilling instead of orphaning it",
-          context: context,
-          payment_intent_id: payment_intent_id,
-          ticket_order_id: owner_id,
-          booking_id: owner_id
+        resolve_succeeded_payment_intent(
+          payment_intent,
+          payment_intent_id,
+          owner_id,
+          context
         )
-
-        {:already_succeeded, payment_intent}
 
       {:ok, %{status: "canceled"} = payment_intent} ->
         {:cancel, payment_intent}
@@ -173,6 +173,39 @@ defmodule Ysc.Tickets.CheckoutCancel do
         )
 
         {:error, reason}
+    end
+  end
+
+  # A full refund leaves PaymentIntent.status as "succeeded". Callers of
+  # `{:already_succeeded, _}` confirm the stay / fulfill tickets, which would
+  # grant inventory after `maybe_refund_unfulfilled_*` already returned the
+  # money (cabin Cancel / HoldExpiry / modification Back).
+  defp resolve_succeeded_payment_intent(
+         payment_intent,
+         payment_intent_id,
+         owner_id,
+         context
+       ) do
+    if PaymentIntentHelpers.fully_refunded?(payment_intent) do
+      Ysc.Logging.info(
+        "PaymentIntent is succeeded but fully refunded; abandoning checkout instead of fulfilling",
+        context: context,
+        payment_intent_id: payment_intent_id,
+        ticket_order_id: owner_id,
+        booking_id: owner_id
+      )
+
+      {:cancel, payment_intent}
+    else
+      Ysc.Logging.warning(
+        "Payment succeeded before checkout-abandonment cancel reached Stripe; fulfilling instead of orphaning it",
+        context: context,
+        payment_intent_id: payment_intent_id,
+        ticket_order_id: owner_id,
+        booking_id: owner_id
+      )
+
+      {:already_succeeded, payment_intent}
     end
   end
 

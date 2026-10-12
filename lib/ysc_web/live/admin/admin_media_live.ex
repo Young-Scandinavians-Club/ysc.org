@@ -41,7 +41,7 @@ defmodule YscWeb.AdminMediaLive do
                   phx-click="select-image-version"
                   phx-value-version="optimized"
                   class={[
-                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition-all rounded-t",
+                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition rounded-t",
                     if(@selected_image_version == :optimized,
                       do: "border-blue-500 text-blue-600 bg-blue-50",
                       else:
@@ -64,7 +64,7 @@ defmodule YscWeb.AdminMediaLive do
                   phx-click="select-image-version"
                   phx-value-version="thumbnail"
                   class={[
-                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition-all rounded-t",
+                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition rounded-t",
                     if(@selected_image_version == :thumbnail,
                       do: "border-blue-500 text-blue-600 bg-blue-50",
                       else:
@@ -87,7 +87,7 @@ defmodule YscWeb.AdminMediaLive do
                   phx-click="select-image-version"
                   phx-value-version="raw"
                   class={[
-                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition-all rounded-t",
+                    "flex flex-col items-center py-2 px-3 border-b-2 font-medium text-xs transition rounded-t",
                     if(@selected_image_version == :raw,
                       do: "border-blue-500 text-blue-600 bg-blue-50",
                       else:
@@ -441,7 +441,7 @@ defmodule YscWeb.AdminMediaLive do
               class="mt-5 overflow-hidden rounded-full bg-zinc-100 ring-1 ring-zinc-200"
             >
               <div
-                class="h-2 rounded-full bg-blue-600 transition-all duration-300"
+                class="h-2 rounded-full bg-blue-600 transition-[width] duration-300"
                 style={"width: #{upload_progress(@uploads.media_drop_uploads.entries)}%"}
               >
               </div>
@@ -486,13 +486,13 @@ defmodule YscWeb.AdminMediaLive do
             :if={@media_count > 0 and length(@timeline) > 1}
             id="year-scrubber"
             phx-hook="YearScrubber"
-            class="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1 py-2 px-1.5 bg-white/95 backdrop-blur-xs rounded-lg shadow-lg border border-zinc-200 transition-all duration-200 hover:shadow-xl"
+            class="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-1 py-2 px-1.5 bg-white/95 backdrop-blur-xs rounded-lg shadow-lg border border-zinc-200 transition duration-200 hover:shadow-xl"
           >
             <%!-- All / reset button --%>
             <button
               phx-click="show-all-years"
               class={[
-                "w-9 h-9 flex items-center justify-center rounded-sm transition-all duration-150 relative group",
+                "w-9 h-9 flex items-center justify-center rounded-sm transition duration-150 relative group",
                 if(is_nil(@selected_year),
                   do: "bg-zinc-800 text-white opacity-100",
                   else:
@@ -512,7 +512,7 @@ defmodule YscWeb.AdminMediaLive do
                 data-year-item={item.year}
                 phx-click="jump-to-year"
                 phx-value-year={item.year}
-                class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded-sm transition-all duration-150 opacity-60 hover:opacity-100 relative group"
+                class="w-9 h-9 flex items-center justify-center text-xs font-semibold text-zinc-600 hover:text-zinc-900 rounded-sm transition duration-150 opacity-60 hover:opacity-100 relative group"
                 title={"#{item.year} (#{item.count} images)"}
               >
                 <span class="group-hover:hidden flex items-center justify-center w-full h-full">
@@ -1473,7 +1473,7 @@ defmodule YscWeb.AdminMediaLive do
                     }
                     id={"image-#{item.id}"}
                     class={[
-                      "group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-hidden focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
+                      "group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-hidden focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition duration-200 overflow-hidden",
                       if(@layout_mode == :square,
                         do: "aspect-square",
                         else: "media-masonry-card bg-zinc-100"

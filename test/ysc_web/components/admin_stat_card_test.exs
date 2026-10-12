@@ -21,8 +21,8 @@ defmodule YscWeb.AdminStatCardTest do
       assert html =~ "Total Memberships"
       assert html =~ "128"
       assert html =~ "Active primary accounts"
-      assert html =~ "tracking-[0.2em]"
-      assert html =~ "text-3xl font-black text-zinc-900"
+      assert html =~ "type-eyebrow"
+      assert html =~ "text-3xl type-title text-zinc-900"
     end
 
     test "omits subtitle paragraph when not provided" do

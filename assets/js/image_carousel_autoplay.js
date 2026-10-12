@@ -30,8 +30,19 @@ export default {
             }
         };
 
-        // Start autoplay
+        // True while a keyboard user has focus inside the carousel. Only
+        // :focus-visible counts: clicking a dot with a mouse also focuses its
+        // radio, and that must not freeze the carousel until the next click.
+        const keyboardFocusInside = () => container.querySelector(':focus-visible') !== null;
+
+        // Start autoplay. Never for users who asked for reduced motion (they can
+        // still step through slides with the controls), and never while the
+        // pointer is over the carousel or keyboard focus is inside it. The check
+        // lives here, not in each caller, because several callers restart
+        // autoplay on a delay and would otherwise resume under a focused user.
         const startAutoplay = () => {
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            if (container.matches(':hover') || keyboardFocusInside()) return;
             if (autoplayInterval) return; // Already running
             autoplayInterval = setInterval(nextSlide, autoplayDelay);
         };
@@ -53,6 +64,16 @@ export default {
             startAutoplay();
         };
 
+        // Pause while keyboard focus is inside; resume once it leaves.
+        const handleFocusIn = (event) => {
+            if (event.target.matches(':focus-visible')) stopAutoplay();
+        };
+
+        const handleFocusOut = () => {
+            // Focus has not settled on its next element yet; check on the next tick.
+            setTimeout(startAutoplay, 0);
+        };
+
         // Pause when user clicks navigation
         const handleInteraction = () => {
             stopAutoplay();
@@ -67,6 +88,8 @@ export default {
         // Attach event listeners
         container.addEventListener('mouseenter', handleMouseEnter);
         container.addEventListener('mouseleave', handleMouseLeave);
+        container.addEventListener('focusin', handleFocusIn);
+        container.addEventListener('focusout', handleFocusOut);
 
         // Listen for navigation clicks (buttons and dots)
         const navButtons = container.querySelectorAll('.carousel-nav, .carousel-dot, label[for^="slide-"]');
@@ -93,6 +116,8 @@ export default {
             stopAutoplay();
             container.removeEventListener('mouseenter', handleMouseEnter);
             container.removeEventListener('mouseleave', handleMouseLeave);
+            container.removeEventListener('focusin', handleFocusIn);
+            container.removeEventListener('focusout', handleFocusOut);
             navButtons.forEach(button => {
                 button.removeEventListener('click', handleInteraction);
             });
