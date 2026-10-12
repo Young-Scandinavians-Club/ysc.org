@@ -378,6 +378,110 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
     end
   end
 
+  describe "payment-success after Stripe.js reports a charge" do
+    @fulfillment_lost_toast "Your payment went through, but we couldn't finish saving your tickets right away."
+
+    test "shows do-not-pay-again toast when fulfillment cannot retrieve the PaymentIntent",
+         %{conn: conn, user: user} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {event, order, payment_intent_id} = pending_paid_checkout_order(user)
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:ok,
+           build_payment_intent(%{
+             id: payment_intent_id,
+             amount: money_to_cents(order.total_amount)
+           })}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=payment&order_id=#{order.id}"
+          )
+
+        view = wait_for_async(view)
+        assert has_element?(view, "#payment-modal")
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn _id, _opts ->
+          {:error, :network}
+        end)
+
+        render_click(view, "payment-success", %{
+          "payment_intent_id" => payment_intent_id
+        })
+
+        flash = :sys.get_state(view.pid).socket.assigns.flash
+        error = Phoenix.Flash.get(flash, :error)
+
+        assert error =~ @fulfillment_lost_toast
+        assert error =~ "do not pay again"
+        refute has_element?(view, "#payment-modal")
+        assert Tickets.get_ticket_order(order.id).status == :pending
+      end)
+    end
+
+    test "cancels the cart and shows do-not-pay-again toast on amount mismatch",
+         %{conn: conn, user: user} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {event, order, payment_intent_id} = pending_paid_checkout_order(user)
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:ok,
+           build_payment_intent(%{
+             id: payment_intent_id,
+             amount: money_to_cents(order.total_amount)
+           })}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=payment&order_id=#{order.id}"
+          )
+
+        view = wait_for_async(view)
+        assert has_element?(view, "#payment-modal")
+
+        mismatched_intent =
+          struct(Stripe.PaymentIntent, %{
+            id: payment_intent_id,
+            status: "succeeded",
+            amount: 1,
+            latest_charge: "ch_event_mismatch_#{order.id}",
+            metadata: %{
+              "ticket_order_id" => order.id,
+              "user_id" => order.user_id
+            }
+          })
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:ok, mismatched_intent}
+        end)
+
+        render_click(view, "payment-success", %{
+          "payment_intent_id" => payment_intent_id
+        })
+
+        flash = :sys.get_state(view.pid).socket.assigns.flash
+        error = Phoenix.Flash.get(flash, :error)
+
+        assert error =~ @fulfillment_lost_toast
+        assert error =~ "do not pay again"
+        refute has_element?(view, "#payment-modal")
+
+        reloaded = Tickets.get_ticket_order(order.id)
+        assert reloaded.status == :cancelled
+        assert reloaded.cancellation_reason == "Payment amount mismatch"
+        assert Enum.all?(reloaded.tickets, &(&1.status == :cancelled))
+        refute Enum.any?(reloaded.tickets, &(&1.status == :confirmed))
+      end)
+    end
+  end
+
   describe "duplicate checkout while payment is in flight" do
     test "proceed-to-checkout shows processing toast when another payment is in flight" do
       order = ticket_order_fixture()
@@ -1568,6 +1672,23 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       [el | _] -> Floki.attribute(el, "disabled") != []
       [] -> false
     end
+  end
+
+  defp pending_paid_checkout_order(user) do
+    event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+
+    order =
+      ticket_order_fixture(%{user: user, event: event, status: :pending})
+      |> stabilize_pending_ticket_order!()
+
+    payment_intent_id = "pi_event_fulfill_#{order.id}"
+
+    order =
+      order
+      |> Ecto.Changeset.change(%{payment_intent_id: payment_intent_id})
+      |> Repo.update!()
+
+    {event, order, payment_intent_id}
   end
 
   defp stabilize_pending_ticket_order!(order) do
