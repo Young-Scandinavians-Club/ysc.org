@@ -252,8 +252,8 @@ defmodule Ysc.Forms.ContactFormTest do
 
       retrieved = Repo.get(ContactForm, contact_form.id)
 
-      assert retrieved.name == "Test User"
-      assert retrieved.email == "test@example.com"
+      assert retrieved.name == "#{user.first_name} #{user.last_name}"
+      assert retrieved.email == user.email
       assert retrieved.subject == "Test Subject"
       assert retrieved.message == "This is a test message that is long enough."
       assert retrieved.user_id == user.id
