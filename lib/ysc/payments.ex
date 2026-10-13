@@ -57,10 +57,44 @@ defmodule Ysc.Payments do
   Gets the default payment method for a user.
   """
   def get_default_payment_method(user) do
-    from(pm in PaymentMethod,
-      where: pm.user_id == ^user.id and pm.is_default == true
-    )
+    user.id
+    |> default_payment_method_for_user_query()
     |> Repo.one()
+  end
+
+  @doc """
+  Returns the user ids in `user_ids` that currently have a default card or
+  bank account on file.
+
+  One `IN (...)` lookup instead of `get_default_payment_method/1` per member
+  in the daily renewal reminder workers.
+  """
+  def user_ids_with_default_payment_method(user_ids) when is_list(user_ids) do
+    user_ids = user_ids |> Enum.uniq() |> Enum.reject(&is_nil/1)
+
+    if user_ids == [] do
+      MapSet.new()
+    else
+      user_ids
+      |> user_ids_with_default_payment_method_query()
+      |> Repo.all()
+      |> MapSet.new()
+    end
+  end
+
+  defp default_payment_method_for_user_query(user_id) do
+    from(pm in PaymentMethod,
+      where: pm.user_id == ^user_id and pm.is_default == true
+    )
+  end
+
+  defp user_ids_with_default_payment_method_query(user_ids) do
+    user_ids = user_ids |> Enum.uniq() |> Enum.reject(&is_nil/1)
+
+    from(pm in PaymentMethod,
+      where: pm.user_id in ^user_ids and pm.is_default == true,
+      select: pm.user_id
+    )
   end
 
   @doc """
@@ -1008,10 +1042,11 @@ defmodule Ysc.Payments do
 
   @doc false
   def ci_query_explain_query do
-    user = Fixtures.user()
+    default_payment_method_for_user_query(Fixtures.user().id)
+  end
 
-    from(pm in PaymentMethod,
-      where: pm.user_id == ^user.id and pm.is_default == true
-    )
+  @doc false
+  def ci_query_explain_user_ids_with_default_payment_method_query do
+    user_ids_with_default_payment_method_query([Fixtures.ulid()])
   end
 end

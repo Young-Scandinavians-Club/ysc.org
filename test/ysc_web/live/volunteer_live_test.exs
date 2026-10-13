@@ -423,6 +423,38 @@ defmodule YscWeb.VolunteerLiveTest do
       refute volunteer.user_id == victim.id
     end
 
+    test "ignores forged name and email from a signed-in submitter", %{
+      conn: conn
+    } do
+      attacker =
+        user_fixture(%{
+          first_name: "Real",
+          last_name: "Volunteer",
+          email: "real.volunteer.#{System.unique_integer()}@example.com"
+        })
+
+      conn = log_in_user(conn, attacker)
+
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
+
+      render_submit(view, "save", %{
+        "volunteer" => %{
+          "name" => "Forged Victim",
+          "email" => "forged.victim.#{System.unique_integer()}@example.com",
+          "interest_events" => "true"
+        }
+      })
+
+      volunteer =
+        Repo.one!(
+          from v in Volunteer, order_by: [desc: v.inserted_at], limit: 1
+        )
+
+      assert volunteer.user_id == attacker.id
+      assert volunteer.email == attacker.email
+      assert volunteer.name == "Real Volunteer"
+    end
+
     test "validate event updates form on change", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/volunteer")
 

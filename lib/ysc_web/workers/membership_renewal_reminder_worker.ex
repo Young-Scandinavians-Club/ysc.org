@@ -30,8 +30,15 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
       "Found #{length(subscriptions)} subscriptions renewing within #{@reminder_window_days} days"
     )
 
+    user_ids_with_pm =
+      subscriptions
+      |> Enum.map(& &1.user_id)
+      |> Payments.user_ids_with_default_payment_method()
+
     results =
-      Enum.map(subscriptions, fn s -> maybe_send_reminder_email(s.user, s) end)
+      Enum.map(subscriptions, fn s ->
+        maybe_send_reminder_email(s.user, s, user_ids_with_pm)
+      end)
 
     success_count = Enum.count(results, fn r -> r == :ok end)
 
@@ -87,18 +94,24 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
   end
 
   defp maybe_send_reminder_email(user, subscription) do
-    case Payments.get_default_payment_method(user) do
-      nil ->
-        Ysc.Logging.debug(
-          "Skipping renewal reminder — user has no payment method on file",
-          user_id: user.id,
-          subscription_id: subscription.id
-        )
+    maybe_send_reminder_email(
+      user,
+      subscription,
+      Payments.user_ids_with_default_payment_method([user.id])
+    )
+  end
 
-        :skipped
+  defp maybe_send_reminder_email(user, subscription, user_ids_with_pm) do
+    if MapSet.member?(user_ids_with_pm, user.id) do
+      send_reminder_email(user, subscription)
+    else
+      Ysc.Logging.debug(
+        "Skipping renewal reminder — user has no payment method on file",
+        user_id: user.id,
+        subscription_id: subscription.id
+      )
 
-      _payment_method ->
-        send_reminder_email(user, subscription)
+      :skipped
     end
   end
 

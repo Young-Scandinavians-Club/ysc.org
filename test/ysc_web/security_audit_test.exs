@@ -82,6 +82,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 85 (HIGH)     Public registration accepted a hidden `password` param, hashed it, then OAuth auto-verified the squatted email so the attacker could sign in and lock the victim out
   Finding 86 (HIGH)     After Family→Single (scheduled downgrade or stale invite), linked sub-accounts still inherited membership via has_active_membership?/1 because any valid primary subscription counted. Accept also did not re-check that the primary still hosts Family/Lifetime.
   Finding 87 (HIGH)     Impersonation ignored whether the admin session token still authenticated a full admin. After suspend/revoke/demotion the signed cookie still had `:impersonated_user_id`, so fetch_current_user/LiveView mount kept acting as the victim. Stop impersonation is full-admin-only, so the leftover session could not even be ended.
+  Finding 88 (MEDIUM)   Finding 44 bound `user_id` on public forms but volunteer/conduct (and contact via `put_submitter` alone) still trusted client name/email/phone. Signed-in members skip Turnstile, so they could send YSC confirmation mail to arbitrary inboxes and spoof identity on board CoC notifications.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -5798,6 +5799,48 @@ defmodule YscWeb.SecurityAuditTest do
       assert conn.assigns.current_user.id == admin.id
       refute conn.assigns.impersonating?
       refute get_session(conn, :impersonated_user_id)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 88 (MEDIUM): Signed-in public forms must not trust client identity
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 88: signed-in public forms overwrite client identity" do
+    test "put_submitter overwrites volunteer and conduct identity fields" do
+      user =
+        user_fixture(%{
+          first_name: "Session",
+          last_name: "Owner",
+          email: "session.owner.#{System.unique_integer()}@example.com",
+          phone_number: "+14155559876"
+        })
+
+      volunteer =
+        %Ysc.Forms.Volunteer{}
+        |> Ysc.Forms.Volunteer.changeset(%{
+          name: "Forged Name",
+          email: "forged@example.com"
+        })
+        |> Ysc.Forms.put_submitter(user)
+
+      report =
+        %Ysc.Forms.ConductViolationReport{}
+        |> Ysc.Forms.ConductViolationReport.changeset(%{
+          first_name: "Forged",
+          last_name: "Identity",
+          email: "forged@example.com",
+          phone: "555-0100",
+          summary: "Finding 88 identity overwrite"
+        })
+        |> Ysc.Forms.put_submitter(user)
+
+      assert Ecto.Changeset.get_field(volunteer, :email) == user.email
+      assert Ecto.Changeset.get_field(volunteer, :name) == "Session Owner"
+      assert Ecto.Changeset.get_field(report, :email) == user.email
+      assert Ecto.Changeset.get_field(report, :first_name) == "Session"
+      assert Ecto.Changeset.get_field(report, :last_name) == "Owner"
+      assert Ecto.Changeset.get_field(report, :phone) == user.phone_number
     end
   end
 

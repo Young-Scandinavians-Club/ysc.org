@@ -184,15 +184,14 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                   </p>
                   <p class="text-xs text-zinc-400 mt-0.5">
                     Checked in
-                    <span
+                    <.admin_local_time
                       id={"checkin-time-#{dom_id}"}
-                      phx-hook="LocalTime"
-                      data-utc-time={DateTime.to_iso8601(check_in.inserted_at)}
+                      datetime={check_in.inserted_at}
                     >
                       {DateTimeDisplay.format_utc_datetime_short(
                         check_in.inserted_at
                       )}
-                    </span>
+                    </.admin_local_time>
                     by {check_in.checked_in_by.first_name} {check_in.checked_in_by.last_name}
                   </p>
                 </div>

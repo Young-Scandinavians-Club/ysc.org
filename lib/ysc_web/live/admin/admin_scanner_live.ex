@@ -141,13 +141,12 @@ defmodule YscWeb.AdminScannerLive do
               </span>
               <span>
                 <.icon name="hero-clock" class="w-4 h-4 inline -mt-0.5" />
-                <span
+                <.admin_local_time
                   id={"session-list-time-#{session.id}"}
-                  phx-hook="LocalTime"
-                  data-utc-time={DateTime.to_iso8601(session.inserted_at)}
+                  datetime={session.inserted_at}
                 >
                   {DateTimeDisplay.format_utc_datetime(session.inserted_at)}
-                </span>
+                </.admin_local_time>
               </span>
             </div>
           </div>
@@ -223,14 +222,13 @@ defmodule YscWeb.AdminScannerLive do
                 {@detail_session.created_by.first_name} {@detail_session.created_by.last_name}
               </span>
               on
-              <span
+              <.admin_local_time
                 id="detail-session-time"
-                phx-hook="LocalTime"
-                data-utc-time={DateTime.to_iso8601(@detail_session.inserted_at)}
+                datetime={@detail_session.inserted_at}
                 class="whitespace-nowrap"
               >
                 {DateTimeDisplay.format_utc_datetime_at(@detail_session.inserted_at)}
-              </span>
+              </.admin_local_time>
             </div>
             <.button
               phx-click="export-csv"
@@ -275,13 +273,12 @@ defmodule YscWeb.AdminScannerLive do
                 <%!-- Row 3: time + optional status/type badges --%>
                 <div class="flex items-center flex-wrap gap-2">
                   <span class="text-xs text-zinc-400">
-                    <span
+                    <.admin_local_time
                       id={"record-time-#{record.id}"}
-                      phx-hook="LocalTime"
-                      data-utc-time={DateTime.to_iso8601(record.inserted_at)}
+                      datetime={record.inserted_at}
                     >
                       {DateTimeDisplay.format_utc_time(record.inserted_at)}
-                    </span>
+                    </.admin_local_time>
                   </span>
                   <span
                     :if={@detail_session.type == :membership}
@@ -361,13 +358,12 @@ defmodule YscWeb.AdminScannerLive do
                       {if record.user, do: record.user.email, else: "—"}
                     </td>
                     <td class="px-4 py-3 text-sm text-zinc-500 whitespace-nowrap">
-                      <span
+                      <.admin_local_time
                         id={"record-time-#{record.id}-desktop"}
-                        phx-hook="LocalTime"
-                        data-utc-time={DateTime.to_iso8601(record.inserted_at)}
+                        datetime={record.inserted_at}
                       >
                         {DateTimeDisplay.format_utc_time(record.inserted_at)}
-                      </span>
+                      </.admin_local_time>
                     </td>
                     <td
                       :if={@detail_session.type == :membership}
@@ -470,15 +466,14 @@ defmodule YscWeb.AdminScannerLive do
                     <span :if={session.event}>
                       {session.event.title} &middot;
                     </span>
-                    <span
+                    <.admin_local_time
                       id={"open-session-time-#{session.id}"}
-                      phx-hook="LocalTime"
-                      data-utc-time={DateTime.to_iso8601(session.inserted_at)}
+                      datetime={session.inserted_at}
                     >
                       {DateTimeDisplay.format_utc_datetime_short(
                         session.inserted_at
                       )}
-                    </span>
+                    </.admin_local_time>
                   </div>
                 </div>
                 <%= if session.type == :event_membership do %>
@@ -532,15 +527,14 @@ defmodule YscWeb.AdminScannerLive do
                     <span>
                       by {session.created_by.first_name} {session.created_by.last_name} &middot;
                     </span>
-                    <span
+                    <.admin_local_time
                       id={"joinable-session-time-#{session.id}"}
-                      phx-hook="LocalTime"
-                      data-utc-time={DateTime.to_iso8601(session.inserted_at)}
+                      datetime={session.inserted_at}
                     >
                       {DateTimeDisplay.format_utc_datetime_short(
                         session.inserted_at
                       )}
-                    </span>
+                    </.admin_local_time>
                   </div>
                 </div>
                 <.link
@@ -1236,13 +1230,12 @@ defmodule YscWeb.AdminScannerLive do
       </div>
       <p class="text-sm text-amber-100 bg-white/15 rounded-2xl px-4 py-3 mb-4">
         Originally checked in at:
-        <span
+        <.admin_local_time
           id="already-scanned-time"
-          phx-hook="LocalTime"
-          data-utc-time={DateTime.to_iso8601(@scan_result.checked_in_at)}
+          datetime={@scan_result.checked_in_at}
         >
           {DateTimeDisplay.format_utc_datetime_long(@scan_result.checked_in_at)}
-        </span>
+        </.admin_local_time>
       </p>
       <div class="flex gap-3 mb-0">
         <button

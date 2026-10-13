@@ -58,6 +58,50 @@ defmodule Ysc.FormsTest do
       assert Ecto.Changeset.get_field(report, :user_id) == user.id
     end
 
+    test "overwrites client identity fields from the session user", %{
+      user: user
+    } do
+      display_name = "#{user.first_name} #{user.last_name}"
+
+      contact =
+        %ContactForm{}
+        |> ContactForm.changeset(%{
+          name: "Forged Name",
+          email: "forged@example.com",
+          subject: "Hello",
+          message: "This is a test message."
+        })
+        |> Forms.put_submitter(user)
+
+      volunteer =
+        %Volunteer{}
+        |> Volunteer.changeset(%{
+          name: "Forged Name",
+          email: "forged@example.com"
+        })
+        |> Forms.put_submitter(user)
+
+      report =
+        %ConductViolationReport{}
+        |> ConductViolationReport.changeset(%{
+          first_name: "Forged",
+          last_name: "Identity",
+          email: "forged@example.com",
+          phone: "555-0100",
+          summary: "Shared submitter helper should bind the reporter."
+        })
+        |> Forms.put_submitter(user)
+
+      assert Ecto.Changeset.get_field(contact, :email) == user.email
+      assert Ecto.Changeset.get_field(contact, :name) == display_name
+      assert Ecto.Changeset.get_field(volunteer, :email) == user.email
+      assert Ecto.Changeset.get_field(volunteer, :name) == display_name
+      assert Ecto.Changeset.get_field(report, :email) == user.email
+      assert Ecto.Changeset.get_field(report, :first_name) == user.first_name
+      assert Ecto.Changeset.get_field(report, :last_name) == user.last_name
+      assert Ecto.Changeset.get_field(report, :phone) == user.phone_number
+    end
+
     test "leaves user_id unset for guests and non-user values" do
       volunteer_changeset =
         Volunteer.changeset(%Volunteer{}, %{

@@ -50,8 +50,11 @@ defmodule Ysc.Forms.VolunteerTest do
         |> Ysc.Forms.put_submitter(user)
 
       assert changeset.valid?
-      assert changeset.changes.email == "volunteer@example.com"
-      assert changeset.changes.name == "Jane Doe"
+      assert Ecto.Changeset.get_field(changeset, :email) == user.email
+
+      assert Ecto.Changeset.get_field(changeset, :name) ==
+               "#{user.first_name} #{user.last_name}"
+
       assert changeset.changes.interest_events == true
       assert changeset.changes.interest_activities == true
       assert changeset.changes.interest_clear_lake == false
@@ -219,8 +222,8 @@ defmodule Ysc.Forms.VolunteerTest do
 
       retrieved = Repo.get(Volunteer, volunteer.id)
 
-      assert retrieved.email == "test@example.com"
-      assert retrieved.name == "Test Volunteer"
+      assert retrieved.email == user.email
+      assert retrieved.name == "#{user.first_name} #{user.last_name}"
       assert retrieved.interest_events == true
       assert retrieved.interest_activities == false
       assert retrieved.interest_clear_lake == true

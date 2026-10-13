@@ -594,6 +594,9 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ ~s(phx-value-ticket-id="99")
       assert html =~ "Undo check-in"
       assert html =~ "checkin-time-99"
+      assert html =~ ~s(phx-hook="LocalTime")
+      assert html =~ ~s(data-utc-time="2026-06-24T14:30:00Z")
+      assert html =~ ~s(phx-update="ignore")
       assert html =~ "Jun 24, 14:30 UTC"
       assert html =~ "hero-clock"
     end
