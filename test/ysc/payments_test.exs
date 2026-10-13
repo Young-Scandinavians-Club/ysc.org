@@ -79,6 +79,67 @@ defmodule Ysc.PaymentsTest do
     end
   end
 
+  describe "user_ids_with_default_payment_method/1" do
+    test "returns ids that currently have a default payment method" do
+      with_default = user_fixture()
+      without_default = user_fixture()
+      non_default_only = user_fixture()
+
+      create_payment_method_fixture(%{
+        user_id: with_default.id,
+        is_default: true
+      })
+
+      create_payment_method_fixture(%{
+        user_id: non_default_only.id,
+        is_default: false
+      })
+
+      ids =
+        Payments.user_ids_with_default_payment_method([
+          with_default.id,
+          without_default.id,
+          non_default_only.id,
+          with_default.id,
+          nil
+        ])
+
+      assert MapSet.equal?(ids, MapSet.new([with_default.id]))
+    end
+
+    test "returns an empty set without querying when given no user ids" do
+      {_result, count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Payments.user_ids_with_default_payment_method([]) end,
+          pattern: ~r/FROM "payment_methods"/i,
+          caller_pids: [self()]
+        )
+
+      assert count == 0
+      assert Payments.user_ids_with_default_payment_method([]) == MapSet.new()
+    end
+
+    test "uses one IN query for many users" do
+      users = Enum.map(1..3, fn _ -> user_fixture() end)
+
+      Enum.each(users, fn user ->
+        create_payment_method_fixture(%{user_id: user.id, is_default: true})
+      end)
+
+      user_ids = Enum.map(users, & &1.id)
+
+      {ids, count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Payments.user_ids_with_default_payment_method(user_ids) end,
+          pattern: ~r/FROM "payment_methods"/i,
+          caller_pids: [self()]
+        )
+
+      assert count == 1
+      assert MapSet.equal?(ids, MapSet.new(user_ids))
+    end
+  end
+
   describe "insert_payment_method/1" do
     test "creates a payment method" do
       user = user_fixture()
@@ -2035,6 +2096,13 @@ defmodule Ysc.PaymentsTest do
   describe "ci_query_explain_query/0" do
     test "returns a valid Ecto query usable for query-explain tooling" do
       assert %Ecto.Query{} = Payments.ci_query_explain_query()
+    end
+  end
+
+  describe "ci_query_explain_user_ids_with_default_payment_method_query/0" do
+    test "returns a valid Ecto query usable for query-explain tooling" do
+      assert %Ecto.Query{} =
+               Payments.ci_query_explain_user_ids_with_default_payment_method_query()
     end
   end
 

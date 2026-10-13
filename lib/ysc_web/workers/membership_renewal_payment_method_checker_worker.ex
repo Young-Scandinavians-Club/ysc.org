@@ -33,10 +33,14 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
       "Found #{length(subscriptions)} subscriptions renewing in 14 days"
     )
 
-    # Check each subscription for missing payment method
+    user_ids_with_pm =
+      subscriptions
+      |> Enum.map(& &1.user_id)
+      |> Payments.user_ids_with_default_payment_method()
+
     results =
       Enum.map(subscriptions, fn subscription ->
-        check_and_notify_subscription(subscription)
+        check_and_notify_subscription(subscription, user_ids_with_pm)
       end)
 
     success_count = Enum.count(results, fn r -> r == :ok end)
@@ -57,29 +61,24 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
     :ok
   end
 
-  defp check_and_notify_subscription(subscription) do
+  defp check_and_notify_subscription(subscription, user_ids_with_pm) do
     user = subscription.user
 
-    # Check if user has a payment method
-    case Payments.get_default_payment_method(user) do
-      nil ->
-        # No payment method on file, send reminder
-        Ysc.Logging.info("User has no payment method, sending reminder",
-          user_id: user.id,
-          subscription_id: subscription.id,
-          renewal_date: subscription.current_period_end
-        )
+    if MapSet.member?(user_ids_with_pm, user.id) do
+      Ysc.Logging.debug("User has payment method on file, skipping reminder",
+        user_id: user.id,
+        subscription_id: subscription.id
+      )
 
-        send_reminder_email(user, subscription)
+      :ok
+    else
+      Ysc.Logging.info("User has no payment method, sending reminder",
+        user_id: user.id,
+        subscription_id: subscription.id,
+        renewal_date: subscription.current_period_end
+      )
 
-      _payment_method ->
-        # User has payment method, no need to send reminder
-        Ysc.Logging.debug("User has payment method on file, skipping reminder",
-          user_id: user.id,
-          subscription_id: subscription.id
-        )
-
-        :ok
+      send_reminder_email(user, subscription)
     end
   end
 
