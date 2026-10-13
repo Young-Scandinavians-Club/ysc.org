@@ -12,7 +12,7 @@ defmodule YscWeb.AgendaEditComponent do
 
   def render(assigns) do
     ~H"""
-    <div>
+    <div id={"agenda-edit-#{@agenda_id}"}>
       <div
         :if={@chronological_warning}
         class="relative z-10 mb-4 rounded-md bg-amber-50 p-3 border border-amber-200"

@@ -574,6 +574,141 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert id == agenda_b.id
     end
 
+    test "reposition of another event's agenda track is refused", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_a =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Track A"})
+
+      event_b =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Track B"})
+
+      {:ok, agenda_b} =
+        Agendas.create_agenda(event_b, %{title: "Victim Track"})
+
+      original_position = agenda_b.position
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event_a.id}/edit")
+
+      assert is_binary(
+               render_click(view, "reposition", %{
+                 "id" => agenda_b.id,
+                 "new" => 0,
+                 "old" => 0
+               })
+             )
+
+      reloaded = Agendas.get_agenda!(agenda_b.id)
+      assert reloaded.event_id == event_b.id
+      assert reloaded.position == original_position
+      assert Agendas.list_agendas_for_event(event_a.id) == []
+    end
+
+    test "Sortable move of an item onto another event's agenda is refused", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_a =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Item Move A"})
+
+      event_b =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Item Move B"})
+
+      {:ok, agenda_a} = Agendas.create_agenda(event_a, %{title: "Day A"})
+      {:ok, agenda_b} = Agendas.create_agenda(event_b, %{title: "Day B"})
+
+      {:ok, item} =
+        Agendas.create_agenda_item(event_a.id, agenda_a, %{title: "Keep me"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event_a.id}/edit")
+
+      assert has_element?(view, "#agenda-edit-#{agenda_a.id}")
+      assert has_element?(view, "#form-#{agenda_a.id}-#{item.id}")
+
+      view
+      |> with_target("#agenda-edit-#{agenda_a.id}")
+      |> render_hook("reposition", %{
+        "id" => item.id,
+        "new" => 0,
+        "old" => 0,
+        "to" => %{"agenda_id" => agenda_b.id}
+      })
+
+      reloaded = Agendas.get_agenda_item!(item.id)
+      assert reloaded.agenda_id == agenda_a.id
+      assert Agendas.get_agenda!(agenda_b.id).agenda_items == []
+      assert has_element?(view, "#form-#{agenda_a.id}-#{item.id}")
+    end
+
+    test "Sortable move of another event's item onto this agenda is refused", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_a =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Item Steal A"})
+
+      event_b =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Item Steal B"})
+
+      {:ok, agenda_a} = Agendas.create_agenda(event_a, %{title: "Day A"})
+      {:ok, agenda_b} = Agendas.create_agenda(event_b, %{title: "Day B"})
+
+      {:ok, item_b} =
+        Agendas.create_agenda_item(event_b.id, agenda_b, %{title: "Stay put"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event_a.id}/edit")
+
+      assert has_element?(view, "#agenda-edit-#{agenda_a.id}")
+
+      view
+      |> with_target("#agenda-edit-#{agenda_a.id}")
+      |> render_hook("reposition", %{
+        "id" => item_b.id,
+        "new" => 0,
+        "old" => 0,
+        "to" => %{"agenda_id" => agenda_a.id}
+      })
+
+      reloaded = Agendas.get_agenda_item!(item_b.id)
+      assert reloaded.agenda_id == agenda_b.id
+      assert Agendas.get_agenda!(agenda_a.id).agenda_items == []
+    end
+
+    test "saving an agenda item ignores a forged agenda_id", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_a =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Save A"})
+
+      event_b =
+        event_fixture(%{organizer_id: admin.id, title: "Agenda Save B"})
+
+      {:ok, agenda_a} = Agendas.create_agenda(event_a, %{title: "Day A"})
+      {:ok, agenda_b} = Agendas.create_agenda(event_b, %{title: "Day B"})
+
+      {:ok, item} =
+        Agendas.create_agenda_item(event_a.id, agenda_a, %{title: "Talk"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event_a.id}/edit")
+
+      view
+      |> with_target("#agenda-edit-#{agenda_a.id}")
+      |> render_click("save", %{
+        "id" => item.id,
+        "agenda_item" => %{
+          "title" => "Talk updated",
+          "agenda_id" => agenda_b.id
+        }
+      })
+
+      reloaded = Agendas.get_agenda_item!(item.id)
+      assert reloaded.agenda_id == agenda_a.id
+      assert reloaded.title == "Talk updated"
+      assert Agendas.get_agenda!(agenda_b.id).agenda_items == []
+    end
+
     test "shows Hosts section on edit tab", %{conn: conn, admin: admin} do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
