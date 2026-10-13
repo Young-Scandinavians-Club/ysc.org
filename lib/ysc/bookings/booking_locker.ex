@@ -2237,7 +2237,13 @@ defmodule Ysc.Bookings.BookingLocker do
           error: inspect(reason)
         )
 
-        :skip
+        # Same dead-end as HoldExpiryWorker: a paid sibling that cannot confirm
+        # will never be reclaimed. Refund then release.
+        Bookings.release_after_unfulfilled_checkout_refund(
+          booking,
+          payment_intent,
+          :booking_confirmation_failed
+        )
     end
   end
 
@@ -2416,7 +2422,13 @@ defmodule Ysc.Bookings.BookingLocker do
           error: inspect(reason)
         )
 
-        :skip
+        # Cancel/draft cannot confirm a captured PI (e.g. entitlement consumed).
+        # Refund then release — returning :skip leaves payment_in_progress forever.
+        Bookings.release_after_unfulfilled_checkout_refund(
+          booking,
+          payment_intent,
+          :booking_confirmation_failed
+        )
     end
   end
 

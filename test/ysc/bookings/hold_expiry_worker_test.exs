@@ -787,24 +787,25 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
       refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
     end
 
-    test "skips expiry when payment succeeded but booking confirmation fails",
+    test "refunds and releases when payment succeeded but booking confirmation fails",
          %{user: user} do
       alias Ysc.Bookings.Entitlements
 
       {booking, payment_intent_id, entitlement} =
         expired_hold_with_entitlement(user, 506)
 
-      # Consume will fail (entitlement no longer active) while inventory is
-      # still held, so a mistaken :release would cancel the hold. Skip must
-      # leave seats and the applied entitlement attached for checkout/receipt.
+      # Consume fails (entitlement no longer active) while inventory is still
+      # held. Checkout cannot remount after expiry; refund then release.
       assert {:ok, _} = Entitlements.revoke_entitlement(entitlement)
 
       amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
 
       expect_cancel_refused(payment_intent_id)
 
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                          _opts ->
+      # CheckoutCancel retrieve + create_stripe_refund retrieve. If the worker
+      # skips the refund, Mox fails because the second retrieve never happens.
+      expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
+                                                             _opts ->
         {:ok,
          succeeded_payment_intent(
            payment_intent_id,
@@ -816,9 +817,47 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
 
       HoldExpiryWorker.expire_expired_holds()
 
+      released = Repo.get!(Booking, booking.id)
+      assert released.status == :canceled
+      assert is_nil(released.applied_booking_entitlement_id)
+      refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+    end
+
+    test "keeps the hold when confirm-fail refund fails so cron can retry",
+         %{user: user} do
+      alias Ysc.Bookings.Entitlements
+
+      {booking, payment_intent_id, entitlement} =
+        expired_hold_with_entitlement(user, 510)
+
+      assert {:ok, _} = Entitlements.revoke_entitlement(entitlement)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
+
+      expect_cancel_refused(payment_intent_id)
+
+      # No latest_charge → create_stripe_refund fails before the test stub.
+      expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
+                                                             _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           latest_charge: nil,
+           metadata: %{
+             "booking_id" => booking.id,
+             "user_id" => user.id
+           }
+         }}
+      end)
+
+      HoldExpiryWorker.expire_expired_holds()
+
       reloaded = Repo.get!(Booking, booking.id)
       assert reloaded.status == :hold
       assert reloaded.applied_booking_entitlement_id == entitlement.id
+      assert reloaded.payment_intent_id == payment_intent_id
       refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
     end
 
