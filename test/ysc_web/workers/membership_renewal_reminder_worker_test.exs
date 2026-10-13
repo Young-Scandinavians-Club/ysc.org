@@ -53,6 +53,29 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       assert_email_sent(subject: "Your YSC Membership Renews in 7 Days")
     end
 
+    test "looks up default payment methods in one query for many renewing members" do
+      renewal_at =
+        Date.utc_today()
+        |> Date.add(3)
+        |> then(&DateTime.new!(&1, ~T[12:00:00], "Etc/UTC"))
+        |> DateTime.truncate(:second)
+
+      Enum.each(1..3, fn _ ->
+        user = user_fixture()
+        insert_subscription(user, renewal_at)
+        insert_payment_method(user)
+      end)
+
+      {_result, pm_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipRenewalReminderWorker.perform(job()) end,
+          pattern: ~r/FROM "payment_methods"/i,
+          caller_pids: [self()]
+        )
+
+      assert pm_queries == 1
+    end
+
     test "sends reminder with Tomorrow subject when renewal is one day out" do
       user = user_fixture()
 

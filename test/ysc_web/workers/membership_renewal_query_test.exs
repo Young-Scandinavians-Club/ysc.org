@@ -55,6 +55,53 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
 
       assert Enum.map(results, & &1.id) == [matching.id]
       assert hd(results).user.id == user.id
+      assert hd(results).user.email == user.email
+      assert hd(results).user.first_name == user.first_name
+    end
+
+    test "struct-selects user id/email/first_name and skips password hashes" do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(%{
+          board_bio: "bio renewal query must not load"
+        })
+        |> Repo.update!()
+
+      renewal_date = ~D[2026-07-26]
+
+      renewal_at =
+        DateTime.new!(renewal_date, ~T[12:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      insert_subscription(user, renewal_at)
+
+      {results, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date)
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      {_results, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date)
+          end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      loaded = hd(results).user
+
+      assert password_cols == 0
+      assert bio_cols == 0
+      assert loaded.id == user.id
+      assert loaded.email == user.email
+      assert loaded.first_name == user.first_name
+      assert loaded.hashed_password == nil
+      assert loaded.board_bio == nil
     end
 
     test "includes WP-migrated trialing subscriptions renewing on the given day" do
@@ -208,6 +255,12 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
 
       assert MembershipRenewalQuery.list_subscriptions_renewing_within_days(7) ==
                []
+    end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "returns a valid Ecto query usable for query-explain tooling" do
+      assert %Ecto.Query{} = MembershipRenewalQuery.ci_query_explain_query()
     end
   end
 

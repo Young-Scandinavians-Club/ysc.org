@@ -14,9 +14,15 @@ defmodule YscWeb.Workers.MembershipRenewalQuery do
 
   import Ecto.Query
 
+  alias Ysc.Accounts.User
+  alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.Newsletter.Subscriber
   alias Ysc.Repo
   alias Ysc.Subscriptions.Subscription
+
+  # Reminder emails greet by first name and send to `user.email`. Skip
+  # hashed_password, bios, Stripe ids that `preload([:user])` would SELECT.
+  @renewal_user_fields [:id, :email, :first_name]
 
   @wp_migration_source "wp_migration"
 
@@ -72,13 +78,18 @@ defmodule YscWeb.Workers.MembershipRenewalQuery do
   falls on the given calendar day (UTC).
   """
   def list_subscriptions_renewing_on(%Date{} = date) do
+    date
+    |> list_subscriptions_renewing_on_query()
+    |> Repo.all()
+  end
+
+  defp list_subscriptions_renewing_on_query(%Date{} = date) do
     {day_start, day_end} = utc_day_bounds(date)
 
     renewing_subscriptions_query()
     |> where([s], s.current_period_end >= ^day_start)
     |> where([s], s.current_period_end <= ^day_end)
-    |> preload([:user])
-    |> Repo.all()
+    |> preload_renewal_user()
   end
 
   @doc """
@@ -107,8 +118,13 @@ defmodule YscWeb.Workers.MembershipRenewalQuery do
     renewing_subscriptions_query()
     |> where([s], s.current_period_end >= ^day_start)
     |> where([s], s.current_period_end <= ^day_end)
-    |> preload([:user])
+    |> preload_renewal_user()
     |> Repo.all()
+  end
+
+  defp preload_renewal_user(query) do
+    user_query = from(u in User, select: struct(u, ^@renewal_user_fields))
+    preload(query, user: ^user_query)
   end
 
   defp renewing_subscriptions_query do
@@ -125,5 +141,10 @@ defmodule YscWeb.Workers.MembershipRenewalQuery do
                )
              ))
     )
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    list_subscriptions_renewing_on_query(Fixtures.today())
   end
 end

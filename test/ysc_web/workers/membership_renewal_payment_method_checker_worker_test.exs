@@ -98,6 +98,27 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorkerTest do
       assert :ok = MembershipRenewalPaymentMethodCheckerWorker.perform(job)
     end
 
+    test "looks up default payment methods in one query for many renewing members" do
+      renewal_date = DateTime.utc_now() |> DateTime.add(14, :day)
+
+      Enum.each(1..3, fn _ ->
+        user = user_fixture()
+        insert_subscription(user, renewal_date)
+        insert_payment_method(user, is_default: true)
+      end)
+
+      {_result, pm_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            MembershipRenewalPaymentMethodCheckerWorker.perform(build_job())
+          end,
+          pattern: ~r/FROM "payment_methods"/i,
+          caller_pids: [self()]
+        )
+
+      assert pm_queries == 1
+    end
+
     test "runs successfully when user has payment method" do
       user = user_fixture()
       renewal_date = DateTime.utc_now() |> DateTime.add(14, :day)
