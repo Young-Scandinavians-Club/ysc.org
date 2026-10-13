@@ -14,6 +14,7 @@ defmodule YscWeb.EventDetailsLive do
 
   alias Ysc.Events.{
     AttendeeInfo,
+    DateTimeFormatter,
     EventPricingCache,
     MemberOnlyTickets,
     PricingDisplay,
@@ -506,8 +507,8 @@ defmodule YscWeb.EventDetailsLive do
                     Duration
                   </p>
                   <p class="font-bold text-xl text-zinc-900 tracking-tight leading-none">
-                    {case {format_time(@event.start_time),
-                           format_time(@event.end_time)} do
+                    {case {DateTimeFormatter.parse_time(@event.start_time),
+                           DateTimeFormatter.parse_time(@event.end_time)} do
                       {%Time{} = start_time, %Time{} = end_time} ->
                         duration_minutes = Time.diff(end_time, start_time, :minute)
                         hours = div(duration_minutes, 60)
@@ -692,7 +693,7 @@ defmodule YscWeb.EventDetailsLive do
                       <div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
                         <div class="w-36 shrink-0">
                           <span class="text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-sm whitespace-nowrap group-hover:bg-blue-600 group-hover:text-white transition-colors type-eyebrow">
-                            {format_start_end(
+                            {DateTimeFormatter.format_time_range(
                               agenda_item.start_time,
                               agenda_item.end_time
                             )}
@@ -1257,26 +1258,14 @@ defmodule YscWeb.EventDetailsLive do
                         <p class="sm:hidden text-xs text-zinc-400 truncate type-eyebrow">
                           {format_start_date_short(@event.start_date)}
                           <%= if @event.start_time != nil do %>
-                            • {case format_time(@event.start_time) do
-                              %Time{} = time ->
-                                Timex.format!(time, "{h12}:{m} {AM}")
-
-                              _ ->
-                                ""
-                            end}
+                            • {DateTimeFormatter.format_time(@event.start_time)}
                           <% end %>
                         </p>
                         <%!-- Desktop: Full format (Wednesday, December 25) --%>
                         <p class="hidden sm:block text-xs text-zinc-400 truncate type-eyebrow">
                           {format_start_date(@event.start_date)}
                           <%= if @event.start_time != nil do %>
-                            • {case format_time(@event.start_time) do
-                              %Time{} = time ->
-                                Timex.format!(time, "{h12}:{m} {AM}")
-
-                              _ ->
-                                ""
-                            end}
+                            • {DateTimeFormatter.format_time(@event.start_time)}
                           <% end %>
                         </p>
                       <% end %>
@@ -6204,10 +6193,7 @@ defmodule YscWeb.EventDetailsLive do
   defp format_event_when_time_subline(%{start_time: nil}), do: nil
 
   defp format_event_when_time_subline(event) do
-    case format_start_end(event.start_time, event.end_time) do
-      nil -> nil
-      time_label -> time_label
-    end
+    DateTimeFormatter.format_time_range(event.start_time, event.end_time)
   end
 
   defp format_event_when_weekday_range(start, finish) do
@@ -6249,37 +6235,6 @@ defmodule YscWeb.EventDetailsLive do
 
   defp default_active_agenda([]), do: nil
   defp default_active_agenda(agendas), do: hd(agendas).id
-
-  defp format_time(nil), do: nil
-  defp format_time(""), do: nil
-
-  defp format_time(time) when is_binary(time) do
-    case Timex.parse(time, "%H:%M:%S", :strftime) do
-      {:ok, time} -> time
-      {:error, _} -> Timex.parse!(time, "%H:%M", :strftime)
-    end
-  end
-
-  defp format_time(time), do: time
-
-  defp format_start_end(start_time, end_time) do
-    start_time = format_time(start_time)
-    end_time = format_time(end_time)
-
-    case {start_time, end_time} do
-      {nil, nil} ->
-        nil
-
-      {nil, _} ->
-        end_time
-
-      {_, nil} ->
-        Timex.format!(start_time, "{h12}:{m} {AM}")
-
-      {start_time, end_time} ->
-        "#{Timex.format!(start_time, "{h12}:{m} {AM}")} - #{Timex.format!(end_time, "{h12}:{m} {AM}")}"
-    end
-  end
 
   def date_for_add_to_cal(nil), do: nil
 

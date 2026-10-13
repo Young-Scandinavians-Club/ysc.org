@@ -11,6 +11,7 @@ defmodule YscWeb.Components.Events.EventCard do
     router: YscWeb.Router,
     statics: YscWeb.static_paths()
 
+  alias Ysc.Events.DateTimeFormatter
   alias YscWeb.{DateDisplay, EventBadgeHelpers, PlainText}
 
   attr :event, :any, required: true
@@ -100,7 +101,7 @@ defmodule YscWeb.Components.Events.EventCard do
               if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-600")
             ]}
           >
-            {format_start_time(@event.start_time)}
+            {DateTimeFormatter.format_time(@event.start_time)}
           </span>
         </div>
         <.link navigate={~p"/events/#{@event.id}"} class="block">
@@ -158,14 +159,6 @@ defmodule YscWeb.Components.Events.EventCard do
       </div>
     </div>
     """
-  end
-
-  defp format_start_time(time) when is_binary(time) do
-    format_start_time(Timex.parse!(time, "{h12}:{m} {AM}"))
-  end
-
-  defp format_start_time(time) do
-    Timex.format!(time, "{h12}:{m} {AM}")
   end
 
   defp format_event_date(event) do

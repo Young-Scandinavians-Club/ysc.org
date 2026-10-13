@@ -218,4 +218,18 @@ defmodule YscWeb.Components.Events.EventCardTest do
       assert html =~ "Going Fast!"
     end
   end
+
+  describe "start time" do
+    test "formats the event start time for display", %{conn: conn} do
+      event =
+        base_event(%{
+          start_time: ~T[19:00:00],
+          published_at: DateTime.add(DateTime.utc_now(), -72, :hour)
+        })
+
+      html = render_card(conn, event)
+
+      assert html =~ "7:00 PM"
+    end
+  end
 end

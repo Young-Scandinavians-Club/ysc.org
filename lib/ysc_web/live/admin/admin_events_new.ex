@@ -11,6 +11,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias Ysc.EventPhotos
   alias Ysc.Events
   alias Ysc.Events.CabinBlackout
+  alias Ysc.Events.DateTimeFormatter
   alias Ysc.Events.Event
   alias Ysc.Events.EventUpdate
   alias Ysc.ExpenseReports
@@ -103,11 +104,11 @@ defmodule YscWeb.AdminEventsNewLive do
                 >
                   <.icon name="hero-calendar-days" class="shrink-0 text-zinc-600" />
                   <p class="text-sm text-zinc-600">
-                    {Ysc.Events.DateTimeFormatter.format_datetime(%{
+                    {DateTimeFormatter.format_datetime(%{
                       start_date: format_date(@start_date),
-                      start_time: format_time(@start_time),
+                      start_time: DateTimeFormatter.parse_time(@start_time),
                       end_date: format_date(@end_date),
-                      end_time: format_time(@end_time)
+                      end_time: DateTimeFormatter.parse_time(@end_time)
                     })}
                   </p>
                 </div>
@@ -3574,18 +3575,6 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   defp format_date(dt), do: dt
-
-  defp format_time(nil), do: nil
-  defp format_time(""), do: nil
-
-  defp format_time(time) when is_binary(time) do
-    case Timex.parse(time, "%H:%M:%S", :strftime) do
-      {:ok, time} -> time
-      {:error, _} -> Timex.parse!(time, "%H:%M", :strftime)
-    end
-  end
-
-  defp format_time(time), do: time
 
   defp can_publish?(start_date, title) do
     start_date not in [nil, ""] and title not in [nil, ""]

@@ -7,6 +7,7 @@ defmodule YscWeb.TicketQrLive do
   alias Ysc.Scanning.QrToken
   alias Ysc.AppleWallet
   alias Ysc.GoogleWallet
+  alias Ysc.Events.DateTimeFormatter
   alias YscWeb.UserAuth
   alias YscWeb.WalletPlatform
 
@@ -605,10 +606,9 @@ defmodule YscWeb.TicketQrLive do
   defp format_event_date(start_date, start_time) do
     date_str = Calendar.strftime(start_date, "%A, %B %-d, %Y")
 
-    if start_time do
-      "#{date_str} at #{Calendar.strftime(start_time, "%-I:%M %p")}"
-    else
-      date_str
+    case DateTimeFormatter.format_time(start_time) do
+      nil -> date_str
+      time -> "#{date_str} at #{time}"
     end
   end
 
