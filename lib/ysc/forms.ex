@@ -49,10 +49,16 @@ defmodule Ysc.Forms do
   end
 
   @doc """
-  Applies the submitting user's id after public params are validated.
+  Binds a signed-in submission to the session user after public params are
+  validated.
 
-  `user_id` is never taken from client params. Shared by contact, volunteer,
-  and conduct-violation forms.
+  `user_id` is never taken from client params. Identity fields that exist on
+  the schema (`email`, `name`, `first_name`, `last_name`, `phone`) are
+  overwritten from the session user so a signed-in member cannot send
+  confirmation mail to someone else or spoof their name on a board
+  notification (Finding 88, leftover of Finding 44). Guests are unchanged.
+
+  Shared by contact, volunteer, and conduct-violation forms.
 
   ## Examples
 
@@ -60,11 +66,35 @@ defmodule Ysc.Forms do
       |> ContactForm.changeset(params)
       |> Forms.put_submitter(socket.assigns[:current_user])
   """
-  def put_submitter(changeset, %User{id: user_id}) do
-    Ecto.Changeset.put_change(changeset, :user_id, user_id)
+  def put_submitter(changeset, %User{} = user) do
+    changeset
+    |> Ecto.Changeset.put_change(:user_id, user.id)
+    |> put_submitter_identity(user)
   end
 
   def put_submitter(changeset, _), do: changeset
+
+  defp put_submitter_identity(changeset, user) do
+    changeset
+    |> maybe_put_submitter_field(:email, user.email)
+    |> maybe_put_submitter_field(:name, submitter_display_name(user))
+    |> maybe_put_submitter_field(:first_name, user.first_name)
+    |> maybe_put_submitter_field(:last_name, user.last_name)
+    |> maybe_put_submitter_field(:phone, user.phone_number)
+  end
+
+  defp maybe_put_submitter_field(changeset, field, value) do
+    if Map.has_key?(changeset.data, field) do
+      Ecto.Changeset.put_change(changeset, field, value)
+    else
+      changeset
+    end
+  end
+
+  defp submitter_display_name(user) do
+    "#{user.first_name} #{user.last_name}"
+    |> String.trim()
+  end
 
   defp format_datetime_for_email(datetime) do
     # Convert UTC datetime to PST timezone

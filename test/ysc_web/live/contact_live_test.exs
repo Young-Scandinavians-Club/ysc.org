@@ -365,6 +365,39 @@ defmodule YscWeb.ContactLiveTest do
       refute form.user_id == victim.id
     end
 
+    test "binds name and email to the session user, not client params", %{
+      conn: conn
+    } do
+      attacker =
+        user_fixture(%{
+          first_name: "Real",
+          last_name: "Sender",
+          email: "real.sender.#{System.unique_integer()}@example.com"
+        })
+
+      conn = log_in_user(conn, attacker)
+
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      render_submit(view, "save", %{
+        "contact_form" => %{
+          "name" => "Forged Victim",
+          "email" => "forged.victim.#{System.unique_integer()}@example.com",
+          "subject" => "General Inquiry",
+          "message" => "Hello from LiveView test message body."
+        }
+      })
+
+      form =
+        Repo.one!(
+          from c in ContactForm, order_by: [desc: c.inserted_at], limit: 1
+        )
+
+      assert form.user_id == attacker.id
+      assert form.email == attacker.email
+      assert form.name == "Real Sender"
+    end
+
     test "keeps form visible when validation fails for logged-in user", %{
       conn: conn
     } do
