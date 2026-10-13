@@ -111,7 +111,8 @@ defmodule YscWeb.UserTicketsLiveTest do
       assert has_element?(view, "#ticket-orders-list")
       assert html =~ data.event.title
       assert has_element?(view, "button", "Cancel checkout")
-      assert html =~ "will go back on sale"
+      assert html =~ "will go back on sale so others can buy them"
+      refute html =~ "member discount"
       refute html =~ "will be released"
       assert html =~ "Complete payment in"
       refute html =~ "Complete payment within"
