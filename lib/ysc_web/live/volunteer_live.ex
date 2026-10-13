@@ -96,7 +96,6 @@ defmodule YscWeb.VolunteerLive do
                   label={card.label}
                   description={card.description}
                   hover_class={card.hover_class}
-                  phx-debounce="blur"
                 />
               </div>
             </div>
