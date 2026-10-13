@@ -510,8 +510,8 @@ defmodule YscWeb.FamilyManagementLive do
         </h2>
       </div>
 
-      <p class="text-sm text-zinc-500">
-        People on your family membership. Send an invite so they can create their own sign-in and use member benefits.
+      <p id="family-members-help" class="text-sm text-zinc-500">
+        People on your family membership. Send an invite so they can create their own sign-in and use member benefits. Children who are 18 or older need their own membership and cannot be invited.
       </p>
 
       <%= if @active_rows == [] do %>
@@ -1073,18 +1073,26 @@ defmodule YscWeb.FamilyManagementLive do
 
     roster_rows =
       Enum.map(family_members, fn member ->
+        adult? = adult_child?(member)
+
         subtitle =
           case member.birth_date do
             %Date{} = date ->
-              "Date of birth: #{DateDisplay.format_date_long(date)}"
+              dob = "Date of birth: #{DateDisplay.format_date_long(date)}"
+
+              if adult? do
+                "#{dob}. Family memberships cover children under 18."
+              else
+                dob
+              end
 
             _ ->
               "Details saved"
           end
 
         {status_label, badge_type, can_invite} =
-          if adult_child?(member) do
-            {"18+ needs own membership", "red", false}
+          if adult? do
+            {"Needs their own membership", "red", false}
           else
             {"No account yet", "yellow", true}
           end
