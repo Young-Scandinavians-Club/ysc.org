@@ -193,9 +193,15 @@ defmodule Ysc.Bookings.HoldExpiryWorker do
           error: inspect(reason)
         )
 
-        # Leave the hold in place so LiveView/receipt can reclaim or refund
-        # with the entitlement still attached. Do not release inventory.
-        :skip
+        # Checkout cannot remount after hold_expires_at; receipt only runs with
+        # Stripe redirect params; cabin payment_intent.succeeded is a no-op.
+        # Refund then release — same as amount-mismatch and modification expiry.
+        # Use :booking_confirmation_failed so nested confirm errors still refund.
+        Ysc.Bookings.release_after_unfulfilled_checkout_refund(
+          booking,
+          payment_intent,
+          :booking_confirmation_failed
+        )
     end
   end
 
