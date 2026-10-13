@@ -148,6 +148,47 @@ defmodule YscWeb.FamilyManagementLiveTest do
       assert html =~ "Date of birth: June 01, 2012"
       refute html =~ "DOB:"
       assert has_element?(view, "#active-family-members-table")
+      assert has_element?(view, "#family-members-help", "18 or older")
+    end
+
+    test "adult child roster row explains they need their own membership", %{
+      conn: conn
+    } do
+      user = lifetime_member()
+
+      member =
+        add_roster_member(user, %{
+          "first_name" => "Jordan",
+          "last_name" => "Berg",
+          "birth_date" => "2000-03-15",
+          "relationship" => "child"
+        })
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render_loaded(view)
+
+      row = "#family-member-row-#{member.id}"
+
+      assert has_element?(view, row, "Jordan Berg")
+      assert has_element?(view, row, "Needs their own membership")
+
+      assert has_element?(
+               view,
+               row,
+               "Family memberships cover children under 18"
+             )
+
+      assert has_element?(view, row, "Date of birth: March 15, 2000")
+      refute has_element?(view, row, "No account yet")
+      refute has_element?(view, row, "18+")
+      refute has_element?(view, "#invite-family-member-button-#{member.id}")
+
+      assert has_element?(
+               view,
+               "#family-members-help",
+               "Children who are 18 or older need their own membership and cannot be invited"
+             )
     end
 
     test "shows details saved subtitle for roster member without birth date", %{
