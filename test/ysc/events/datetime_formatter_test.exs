@@ -241,4 +241,79 @@ defmodule Ysc.Events.DateTimeFormatterTest do
       assert result == "Mar 5 – Mar 7, 2026"
     end
   end
+
+  describe "format_time/1" do
+    test "formats Time structs without a leading zero" do
+      assert DateTimeFormatter.format_time(~T[10:00:00]) == "10:00 AM"
+      assert DateTimeFormatter.format_time(~T[00:00:00]) == "12:00 AM"
+      assert DateTimeFormatter.format_time(~T[13:30:00]) == "1:30 PM"
+    end
+
+    test "formats DateTime and NaiveDateTime using the wall-clock time" do
+      assert DateTimeFormatter.format_time(~N[2024-12-01 19:00:00]) == "7:00 PM"
+
+      assert DateTimeFormatter.format_time(~U[2024-12-01 19:00:00Z]) ==
+               "7:00 PM"
+    end
+
+    test "parses 12-hour, 24-hour, and ISO time strings" do
+      assert DateTimeFormatter.format_time("10:00 AM") == "10:00 AM"
+      assert DateTimeFormatter.format_time("19:00:00") == "7:00 PM"
+      assert DateTimeFormatter.format_time("19:00") == "7:00 PM"
+      assert DateTimeFormatter.format_time(" 7:05 PM ") == "7:05 PM"
+    end
+
+    test "returns nil for missing or unparseable values" do
+      assert DateTimeFormatter.format_time(nil) == nil
+      assert DateTimeFormatter.format_time("") == nil
+      assert DateTimeFormatter.format_time("   ") == nil
+      assert DateTimeFormatter.format_time("not a time") == nil
+      assert DateTimeFormatter.format_time(:unknown) == nil
+    end
+  end
+
+  describe "format_time_range/2" do
+    test "joins start and end when both are present" do
+      assert DateTimeFormatter.format_time_range(~T[10:00:00], ~T[14:00:00]) ==
+               "10:00 AM - 2:00 PM"
+    end
+
+    test "returns the present side when the other is missing" do
+      assert DateTimeFormatter.format_time_range(~T[10:00:00], nil) ==
+               "10:00 AM"
+
+      assert DateTimeFormatter.format_time_range(nil, ~T[14:00:00]) == "2:00 PM"
+    end
+
+    test "returns nil when both sides are missing" do
+      assert DateTimeFormatter.format_time_range(nil, nil) == nil
+      assert DateTimeFormatter.format_time_range("", "") == nil
+    end
+  end
+
+  describe "parse_time/1" do
+    test "returns Time structs unchanged" do
+      assert DateTimeFormatter.parse_time(~T[19:00:00]) == ~T[19:00:00]
+    end
+
+    test "extracts time from datetime values" do
+      assert DateTimeFormatter.parse_time(~N[2024-12-01 19:00:00]) ==
+               ~T[19:00:00]
+
+      assert DateTimeFormatter.parse_time(~U[2024-12-01 19:00:00Z]) ==
+               ~T[19:00:00]
+    end
+
+    test "parses wall-clock strings" do
+      assert DateTimeFormatter.parse_time("7:00 PM") == ~T[19:00:00]
+      assert DateTimeFormatter.parse_time("19:00:00") == ~T[19:00:00]
+      assert DateTimeFormatter.parse_time("19:00") == ~T[19:00:00]
+    end
+
+    test "returns nil for missing or unparseable values" do
+      assert DateTimeFormatter.parse_time(nil) == nil
+      assert DateTimeFormatter.parse_time("") == nil
+      assert DateTimeFormatter.parse_time("nope") == nil
+    end
+  end
 end
