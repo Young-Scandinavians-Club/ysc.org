@@ -45,7 +45,7 @@ defmodule QueryConsole.DecimalUpgradeTest do
       lock = File.read!(@mix_lock)
       assert lock =~ ~s|"decimal": {:hex, :decimal, "3.2.0"|
       refute lock =~ ~s|"decimal": {:hex, :decimal, "3.1.1"|
-      assert lock =~ ~s|"req": {:hex, :req, "0.7.4"|
+      assert lock =~ ~s|"req": {:hex, :req, "0.7.5"|
       assert lock =~ ~s|"finch": {:hex, :finch, "0.23.0"|
     end
 
