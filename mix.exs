@@ -216,7 +216,11 @@ defmodule Ysc.MixProject do
       {:blurhash, path: "vendor/blurhash"},
       {:brotli, ">= 0.0.0", runtime: false},
       {:cachex, "~> 4.1"},
-      {:chromic_pdf, "~> 1.17"},
+      # 1.17.2: CloseTarget calls Target.disposeBrowserContext instead of
+      # relying on disposeOnDetach (orphaned Chrome after session close /
+      # BEAM exit; #349). Capture and print APIs are unchanged. We use
+      # ChromicPDF.capture_screenshot/2 for TV posters, not print_to_pdf.
+      {:chromic_pdf, "~> 1.17.2"},
       {:cloak_ecto, "~> 1.3"},
       # Official Hex cowlib 2.21.0 (cowboy 2.20 needs >= 2.21). Cowboy 2.20
       # requires OTP 27+ (we run OTP 27/28). Maintenance release: Cowlib
