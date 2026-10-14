@@ -5776,6 +5776,89 @@ defmodule YscWeb.SecurityAuditTest do
       refute conn.assigns.impersonating?
       refute get_session(conn, :impersonated_user_id)
     end
+
+    test "demoting an impersonating admin broadcasts disconnect for their live socket",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      actor = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "DemoteVictim"})
+
+      conn = log_in_user(conn, admin)
+      token = get_session(conn, :user_token)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+
+      {conn, csrf_token} = fetch_conn_csrf(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => csrf_token
+        })
+
+      {:ok, view, html} = live(conn, ~p"/users/settings")
+      assert html =~ "DemoteVictim"
+      assert Process.alive?(view.pid)
+
+      YscWeb.Endpoint.subscribe(live_socket_id)
+      {:ok, _} = Accounts.update_user(admin, %{"role" => "member"}, actor)
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      # Demotion keeps the session token; only impersonation must die.
+      assert Accounts.get_user_by_session_token(token).id == admin.id
+    end
+
+    test "revoke_all_user_sessions broadcasts LiveView disconnect for web sessions" do
+      admin = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(admin)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert :ok = Accounts.revoke_all_user_sessions(admin)
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      assert Accounts.get_user_by_session_token(token) == nil
+    end
+
+    test "suspending an impersonating admin broadcasts disconnect for their live socket",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin", state: :active})
+      actor = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "StickyVictim"})
+
+      conn = log_in_user(conn, admin)
+      token = get_session(conn, :user_token)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+
+      {conn, csrf_token} = fetch_conn_csrf(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => csrf_token
+        })
+
+      {:ok, view, html} = live(conn, ~p"/users/settings")
+      assert html =~ "StickyVictim"
+      assert html =~ "Stop Impersonating"
+      assert Process.alive?(view.pid)
+
+      # LiveViewTest's ClientProxy does not terminate on PubSub "disconnect"
+      # the way Phoenix.Socket does in production; assert the broadcast that
+      # production sockets listen for (see Phoenix.Socket.__info__/2).
+      YscWeb.Endpoint.subscribe(live_socket_id)
+      {:ok, _} = Accounts.update_user(admin, %{"state" => "suspended"}, actor)
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+    end
   end
 
   # ---------------------------------------------------------------------------
