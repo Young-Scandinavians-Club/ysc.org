@@ -155,14 +155,13 @@ defmodule YscWeb.NewsletterComponents do
             else: "Get news & updates in your inbox."}
         </p>
       </div>
-      <button
-        type="button"
+      <.section_link
         phx-click={@event}
         phx-disable-with="Saving..."
-        class="shrink-0 text-xs font-bold text-blue-600 hover:underline"
+        class="shrink-0"
       >
         {if @subscribed, do: "Unsubscribe", else: "Subscribe"}
-      </button>
+      </.section_link>
     </div>
     """
   end

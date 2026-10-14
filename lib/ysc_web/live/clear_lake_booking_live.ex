@@ -1207,7 +1207,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     }
                     class="space-y-2"
                   >
-                    <p class="text-xs text-zinc-400 type-eyebrow">
+                    <p class="text-xs text-zinc-500 type-eyebrow">
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
@@ -1221,7 +1221,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     }
                     class="space-y-2"
                   >
-                    <p class="text-xs text-zinc-400 type-eyebrow">
+                    <p class="text-xs text-zinc-500 type-eyebrow">
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
@@ -1409,7 +1409,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </span>
                           <span
                             :if={@availability_error}
-                            class="text-2xl text-zinc-400 type-title"
+                            class="text-2xl text-zinc-500 type-title"
                           >
                             —
                           </span>
@@ -2370,7 +2370,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </span>
                           <.icon
                             name="hero-chevron-down"
-                            class="w-5 h-5 text-zinc-400 chevron-icon transition-transform"
+                            class="w-5 h-5 text-zinc-500 chevron-icon transition-transform"
                           />
                         </summary>
                         <div class="px-5 pb-5 text-base text-zinc-600 space-y-3 border-t border-zinc-50 pt-4">
@@ -2401,7 +2401,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </span>
                           <.icon
                             name="hero-chevron-down"
-                            class="w-5 h-5 text-zinc-400 chevron-icon transition-transform"
+                            class="w-5 h-5 text-zinc-500 chevron-icon transition-transform"
                           />
                         </summary>
                         <div class="px-5 pb-5 text-sm text-zinc-600 space-y-4 border-t border-zinc-50 pt-4">
@@ -2429,7 +2429,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </span>
                         <.icon
                           name="hero-arrow-top-right-on-square"
-                          class="w-5 h-5 text-zinc-400"
+                          class="w-5 h-5 text-zinc-500"
                         />
                       </.link>
                     </div>
@@ -2531,7 +2531,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                                         RefundPolicyDisplay.refund_percentage_tier_class(
                                           buyout_rule.refund_percentage
                                         ),
-                                      else: "text-zinc-400"
+                                      else: "text-zinc-500"
                                     )
                                   ]}>
                                     <%= if buyout_rule && buyout_rule.refund_percentage do %>
@@ -2549,7 +2549,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                                         RefundPolicyDisplay.refund_percentage_tier_class(
                                           day_rule.refund_percentage
                                         ),
-                                      else: "text-zinc-400"
+                                      else: "text-zinc-500"
                                     )
                                   ]}>
                                     <%= if day_rule && day_rule.refund_percentage do %>

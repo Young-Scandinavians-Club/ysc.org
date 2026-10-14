@@ -94,7 +94,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                   do: "hero-chevron-right",
                   else: "hero-chevron-down"
               }
-              class="w-3.5 h-3.5 text-zinc-400 shrink-0"
+              class="w-3.5 h-3.5 text-zinc-500 shrink-0"
             />
             <.user_card
               user={group.order && group.order.user}
@@ -102,7 +102,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
               truncate
             />
             <div class="hidden md:flex items-center gap-1.5 text-xs font-semibold text-zinc-600 shrink-0">
-              <.icon name="hero-shopping-bag" class="w-3.5 h-3.5 text-zinc-400" />
+              <.icon name="hero-shopping-bag" class="w-3.5 h-3.5 text-zinc-500" />
               {order_reference(group.order)}
             </div>
             <span class="hidden sm:inline text-xs text-zinc-500 shrink-0">

@@ -51,7 +51,7 @@ defmodule YscWeb.PostLive do
               Club News
             </span>
             <span class="h-3 w-px bg-zinc-200"></span>
-            <span class="text-xs text-zinc-400 type-eyebrow">
+            <span class="text-xs text-zinc-500 type-eyebrow">
               {DateDisplay.format_date_in_zone(post_date(@post), @timezone)}
             </span>
           </div>

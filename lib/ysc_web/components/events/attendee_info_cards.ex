@@ -329,7 +329,7 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
           <legend class="block text-sm font-medium text-zinc-700">
             {@question.label}
             <span :if={@question.required} class="text-red-600">*</span>
-            <span :if={!@question.required} class="font-normal text-zinc-400">
+            <span :if={!@question.required} class="font-normal text-zinc-500">
               (optional)
             </span>
           </legend>
@@ -361,7 +361,7 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
         <label for={@field_id} class="block text-sm font-medium text-zinc-700">
           {@question.label}
           <span :if={@question.required} class="text-red-600">*</span>
-          <span :if={!@question.required} class="font-normal text-zinc-400">
+          <span :if={!@question.required} class="font-normal text-zinc-500">
             (optional)
           </span>
         </label>

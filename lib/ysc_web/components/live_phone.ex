@@ -412,7 +412,7 @@ defmodule LivePhone do
       <span class="live_phone-country-item-name text-zinc-600 inline-block text-sm px-2 whitespace-nowrap text-ellipsis overflow-hidden">
         {@country.name}
       </span>
-      <span class="live_phone-country-code text-sm text-zinc-400">
+      <span class="live_phone-country-code text-sm text-zinc-500">
         +{@country.region_code}
       </span>
     </li>

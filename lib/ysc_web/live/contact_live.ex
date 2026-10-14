@@ -105,7 +105,7 @@ defmodule YscWeb.ContactLive do
               <div class="flex items-start gap-4">
                 <.icon
                   name="hero-map-pin"
-                  class="w-6 h-6 text-zinc-400 shrink-0 mt-0.5"
+                  class="w-6 h-6 text-zinc-500 shrink-0 mt-0.5"
                 />
                 <div>
                   <p class="font-semibold text-zinc-900 mb-1">Mailing Address</p>
@@ -120,7 +120,7 @@ defmodule YscWeb.ContactLive do
               <div id="contact-attend-board-meeting" class="flex items-start gap-4">
                 <.icon
                   name="hero-calendar"
-                  class="w-6 h-6 text-zinc-400 shrink-0 mt-0.5"
+                  class="w-6 h-6 text-zinc-500 shrink-0 mt-0.5"
                 />
                 <div>
                   <p class="font-semibold text-zinc-900 mb-1">

@@ -1147,12 +1147,9 @@ defmodule YscWeb.HomeLive do
                   <h2 class="text-lg text-zinc-900 flex items-center gap-2 type-subhead">
                     <.icon name="hero-map-pin" class="w-5 h-5 text-blue-600" />Your Upcoming Stays
                   </h2>
-                  <.link
-                    navigate={~p"/users/payments"}
-                    class="text-xs font-bold text-blue-600 hover:underline"
-                  >
+                  <.section_link navigate={~p"/users/payments"}>
                     View payment history
-                  </.link>
+                  </.section_link>
                 </div>
 
                 <%!-- Loading skeleton sized to match empty-state card (avoids CLS) --%>
@@ -1177,7 +1174,7 @@ defmodule YscWeb.HomeLive do
                   class="bg-white rounded-xl shadow-xs border border-zinc-200 p-12 text-center min-h-70"
                 >
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <.icon name="hero-home" class="w-7 h-7 text-zinc-400" />
+                    <.icon name="hero-home" class="w-7 h-7 text-zinc-500" />
                   </div>
                   <h3 class="text-base text-zinc-900 mb-2 type-subhead">
                     No upcoming bookings
@@ -1232,18 +1229,18 @@ defmodule YscWeb.HomeLive do
                       </div>
                       <div class="p-8 flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
                         <div class="space-y-1 md:border-r border-zinc-100 pr-6">
-                          <p class="text-xs text-zinc-400 type-eyebrow">
+                          <p class="text-xs text-zinc-500 type-eyebrow">
                             Destination
                           </p>
                           <p class="text-2xl text-zinc-900 type-title">
                             {PropertyDisplay.medium_name(booking.property)}
                           </p>
-                          <p class="text-xs font-mono text-zinc-400">
+                          <p class="text-xs font-mono text-zinc-500">
                             {booking.reference_id}
                           </p>
                         </div>
                         <div class="space-y-2">
-                          <p class="text-xs text-zinc-400 type-eyebrow">
+                          <p class="text-xs text-zinc-500 type-eyebrow">
                             Dates
                           </p>
                           <p class="font-bold text-zinc-800">
@@ -1301,12 +1298,9 @@ defmodule YscWeb.HomeLive do
                     <.icon name="hero-ticket" class="w-5 h-5 text-purple-600" />
                     Event Tickets
                   </h2>
-                  <.link
-                    navigate={~p"/events"}
-                    class="text-xs font-bold text-blue-600 hover:underline"
-                  >
+                  <.section_link navigate={~p"/events"}>
                     Browse Events
-                  </.link>
+                  </.section_link>
                 </div>
 
                 <%!-- Loading skeleton sized to match empty-state card (avoids CLS) --%>
@@ -1327,7 +1321,7 @@ defmodule YscWeb.HomeLive do
                   class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-xs p-12 text-center min-h-64"
                 >
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-400" />
+                    <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-500" />
                   </div>
                   <h3 class="text-base text-zinc-900 mb-2 type-subhead">
                     No upcoming event tickets
@@ -1390,7 +1384,7 @@ defmodule YscWeb.HomeLive do
                         <div class="flex flex-wrap gap-1.5">
                           <%= for {tier_name, tickets} <- grouped_tiers do %>
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-zinc-100 text-zinc-600 rounded-full">
-                              <span class="text-zinc-400">{length(tickets)}×</span>{tier_name}
+                              <span class="text-zinc-500">{length(tickets)}×</span>{tier_name}
                             </span>
                           <% end %>
                         </div>
@@ -1411,7 +1405,7 @@ defmodule YscWeb.HomeLive do
                                 navigate={
                                   ~p"/orders/#{List.first(order_ids)}/confirmation"
                                 }
-                                class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
+                                class="inline-flex items-center min-h-11 -my-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
                               >
                                 View order & receipt
                               </.link>
@@ -1419,7 +1413,7 @@ defmodule YscWeb.HomeLive do
                               <%= if length(order_ids) > 1 do %>
                                 <.link
                                   navigate={~p"/users/tickets"}
-                                  class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
+                                  class="inline-flex items-center min-h-11 -my-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
                                 >
                                   View all tickets
                                 </.link>
@@ -1440,12 +1434,9 @@ defmodule YscWeb.HomeLive do
                     <.icon name="hero-calendar-days" class="w-5 h-5 text-blue-600" />
                     Upcoming Events
                   </h2>
-                  <.link
-                    navigate={~p"/events"}
-                    class="text-xs font-bold text-blue-600 hover:underline"
-                  >
+                  <.section_link navigate={~p"/events"}>
                     View All Events
-                  </.link>
+                  </.section_link>
                 </div>
 
                 <%!-- Loading skeleton: two cards (~one grid row) balances empty vs loaded CLS --%>
@@ -1470,7 +1461,7 @@ defmodule YscWeb.HomeLive do
                   class="bg-white rounded-xl shadow-xs border border-zinc-200 p-12 text-center min-h-88 flex flex-col items-center justify-center"
                 >
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <.icon name="hero-calendar" class="w-7 h-7 text-zinc-400" />
+                    <.icon name="hero-calendar" class="w-7 h-7 text-zinc-500" />
                   </div>
                   <h3 class="text-base text-zinc-900 mb-2 type-subhead">
                     No upcoming events
@@ -1692,7 +1683,7 @@ defmodule YscWeb.HomeLive do
 
               <%!-- Notifications --%>
               <section>
-                <h2 class="text-sm text-zinc-400 mb-6 type-eyebrow">
+                <h2 class="text-sm text-zinc-500 mb-6 type-eyebrow">
                   Notifications
                 </h2>
 
@@ -1755,25 +1746,21 @@ defmodule YscWeb.HomeLive do
                           else: "Turn on to hear about new events and reminders."}
                       </p>
                     </div>
-                    <button
-                      type="button"
+                    <.section_link
                       phx-click="toggle_event_notifications"
                       phx-disable-with="Saving..."
-                      class="shrink-0 text-xs font-bold text-blue-600 hover:underline"
+                      class="shrink-0"
                     >
                       {if @current_user.event_notifications,
                         do: "Turn off",
                         else: "Turn on"}
-                    </button>
+                    </.section_link>
                   </div>
 
-                  <.link
-                    navigate={~p"/newsletters"}
-                    class="flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"
-                  >
+                  <.section_link navigate={~p"/newsletters"}>
                     Browse newsletter archive
                     <.icon name="hero-arrow-right" class="w-3 h-3" />
-                  </.link>
+                  </.section_link>
                 </div>
               </section>
 
@@ -1783,15 +1770,12 @@ defmodule YscWeb.HomeLive do
                 id="home-family"
               >
                 <div class="flex items-center justify-between mb-6">
-                  <h2 class="text-sm text-zinc-400 type-eyebrow">
+                  <h2 class="text-sm text-zinc-500 type-eyebrow">
                     Your Family
                   </h2>
-                  <.link
-                    navigate={~p"/users/settings/family"}
-                    class="text-xs font-bold text-blue-600 hover:underline"
-                  >
+                  <.section_link navigate={~p"/users/settings/family"}>
                     Manage Family
-                  </.link>
+                  </.section_link>
                 </div>
                 <div class="flex flex-wrap gap-x-3 gap-y-4">
                   <%= for member <- @other_family_members do %>
@@ -1804,7 +1788,7 @@ defmodule YscWeb.HomeLive do
                       <span class="mt-1.5 text-xs font-semibold text-zinc-900 truncate w-full">
                         {member.first_name}
                       </span>
-                      <span class="text-[11px] text-zinc-400 truncate w-full">
+                      <span class="text-[11px] text-zinc-500 truncate w-full">
                         {FamilyDisplay.relationship_label(
                           member.family_relationship
                         )}
@@ -1816,7 +1800,7 @@ defmodule YscWeb.HomeLive do
 
               <%!-- Latest Updates Section --%>
               <section>
-                <h2 class="text-sm text-zinc-400 mb-6 type-eyebrow">
+                <h2 class="text-sm text-zinc-500 mb-6 type-eyebrow">
                   Latest Updates
                 </h2>
 

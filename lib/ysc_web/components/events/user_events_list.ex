@@ -85,7 +85,7 @@ defmodule YscWeb.UserEventsListLive do
 
       <div :if={@ticket_count == 0} class="text-center py-8">
         <div class="text-zinc-500">
-          <.icon name="hero-ticket" class="w-12 h-12 mx-auto mb-4 text-zinc-400" />
+          <.icon name="hero-ticket" class="w-12 h-12 mx-auto mb-4 text-zinc-500" />
           <p class="text-lg font-medium text-zinc-600">No upcoming events</p>
           <p class="text-sm text-zinc-500">
             You haven't registered for any events yet.

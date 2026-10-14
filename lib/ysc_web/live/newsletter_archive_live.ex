@@ -85,7 +85,7 @@ defmodule YscWeb.NewsletterArchiveLive do
         <%!-- Empty state — only shown once loaded --%>
         <p
           :if={@async_data_loaded && @editions_empty?}
-          class="text-center text-zinc-400 py-24 text-lg"
+          class="text-center text-zinc-500 py-24 text-lg"
         >
           No newsletters have been sent yet.
         </p>
@@ -207,7 +207,7 @@ defmodule YscWeb.NewsletterArchiveLive do
         :if={@async_data_loaded && @edition && !@edition.archived_html}
         class="max-w-(--breakpoint-lg) mx-auto px-4"
       >
-        <div class="rounded-xl border border-zinc-200 p-12 text-center text-zinc-400">
+        <div class="rounded-xl border border-zinc-200 p-12 text-center text-zinc-500">
           <.icon name="hero-envelope" class="w-10 h-10 mx-auto mb-4 text-zinc-300" />
           <p class="text-base">
             The rendered version of this newsletter is not available.

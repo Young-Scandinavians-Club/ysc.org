@@ -278,7 +278,7 @@ defmodule YscWeb.BookingReceiptLive do
           <% end %>
         </div>
         <div class="text-left md:text-right">
-          <p class="text-xs text-zinc-400 type-eyebrow">
+          <p class="text-xs text-zinc-500 type-eyebrow">
             Booking Reference
           </p>
           <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
@@ -431,7 +431,7 @@ defmodule YscWeb.BookingReceiptLive do
                   "text-xs mb-1 type-eyebrow",
                   if(@booking.status == :canceled,
                     do: "text-zinc-500",
-                    else: "text-zinc-400"
+                    else: "text-zinc-500"
                   )
                 ]}>
                   Check-in
@@ -450,7 +450,7 @@ defmodule YscWeb.BookingReceiptLive do
                   class={[
                     "text-sm",
                     if(@booking.status == :canceled,
-                      do: "text-zinc-400",
+                      do: "text-zinc-500",
                       else: "text-zinc-500"
                     )
                   ]}
@@ -463,7 +463,7 @@ defmodule YscWeb.BookingReceiptLive do
                   "text-xs mb-1 type-eyebrow",
                   if(@booking.status == :canceled,
                     do: "text-zinc-500",
-                    else: "text-zinc-400"
+                    else: "text-zinc-500"
                   )
                 ]}>
                   Check-out
@@ -482,7 +482,7 @@ defmodule YscWeb.BookingReceiptLive do
                   class={[
                     "text-sm",
                     if(@booking.status == :canceled,
-                      do: "text-zinc-400",
+                      do: "text-zinc-500",
                       else: "text-zinc-500"
                     )
                   ]}
@@ -495,7 +495,7 @@ defmodule YscWeb.BookingReceiptLive do
                   "text-xs mb-1 type-eyebrow",
                   if(@booking.status == :canceled,
                     do: "text-zinc-500",
-                    else: "text-zinc-400"
+                    else: "text-zinc-500"
                   )
                 ]}>
                   <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
@@ -525,7 +525,7 @@ defmodule YscWeb.BookingReceiptLive do
                   class={[
                     "text-sm",
                     if(@booking.status == :canceled,
-                      do: "text-zinc-400",
+                      do: "text-zinc-500",
                       else: "text-zinc-500"
                     )
                   ]}
