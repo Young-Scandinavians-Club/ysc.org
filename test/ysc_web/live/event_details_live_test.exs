@@ -386,7 +386,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert has_element?(
                view,
-               "p.text-xs.type-eyebrow.text-zinc-400",
+               "p.text-xs.type-eyebrow.text-zinc-500",
                "Duration"
              )
 
@@ -409,7 +409,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       refute has_element?(
                view,
-               "p.text-xs.type-eyebrow.text-zinc-400",
+               "p.text-xs.type-eyebrow.text-zinc-500",
                "Duration"
              )
     end
