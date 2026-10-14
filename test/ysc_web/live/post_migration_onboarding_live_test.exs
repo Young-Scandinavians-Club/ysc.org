@@ -508,6 +508,30 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       assert application.birth_date == birth_date
     end
 
+    test "points members to Membership, not account settings, for automatic renewal",
+         %{conn: conn} do
+      user =
+        user_needing_post_migration_onboarding(%{date_of_birth: ~D[1988-04-12]})
+
+      conn = log_in_user(conn, user)
+      view = live_onboarding_ready!(conn)
+      go_to_membership_selection!(view)
+      confirm_membership_plan!(view, "single")
+
+      html = render(view)
+
+      assert html =~ "Set up automatic renewal"
+
+      assert html =~
+               "add a payment method later from Membership (click your name in the top-right corner)"
+
+      assert html =~
+               "turn off automatic renewal anytime from Membership (click your name in the top-right corner)"
+
+      refute html =~ "in account settings"
+      refute html =~ "from your account settings"
+    end
+
     test "copies billing address onto new application when available", %{
       conn: conn
     } do

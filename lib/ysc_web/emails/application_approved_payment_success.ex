@@ -48,6 +48,8 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
         Your bank payment is processing and can take a few business days to settle.
         We'll email you a payment receipt once it clears.
 
+        Your membership renews automatically each year unless you turn off automatic renewal from your Membership page.
+
         Visit: #{YscWeb.Endpoint.url()}
 
         If you have any questions, please don't hesitate to contact us at memberships@ysc.org.
@@ -67,6 +69,8 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
         Your application has been approved and your membership is now active! 🎉
 
         Your membership is now active. Welcome to the Young Scandinavians Club!
+
+        Your membership renews automatically each year unless you turn off automatic renewal from your Membership page.
 
         Visit: #{YscWeb.Endpoint.url()}
 

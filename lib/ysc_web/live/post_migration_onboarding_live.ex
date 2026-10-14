@@ -806,7 +806,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Set up automatic renewal
           <:subtitle>
-            Add a payment method so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a payment method later in account settings.
+            Add a payment method so your membership can renew automatically each year. You are only charged when your renewal date arrives—or right away if that date has already passed. You can skip for now and add a payment method later from Membership (click your name in the top-right corner).
           </:subtitle>
         </.header>
 
@@ -816,7 +816,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             <div>
               <strong>Plan: {plan_name(@membership_plan)}</strong>
               <br />
-              You'll be billed once a year. You can turn off automatic renewal anytime from your account settings.
+              You'll be billed once a year. You can turn off automatic renewal anytime from Membership (click your name in the top-right corner).
             </div>
           </div>
         </div>

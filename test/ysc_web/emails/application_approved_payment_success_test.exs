@@ -30,6 +30,12 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
 
     assert text =~ user.first_name
     assert text =~ "has been charged"
+
+    assert text =~
+             "unless you turn off automatic renewal from your Membership page"
+
+    refute text =~ "until you cancel"
+    refute text =~ "account settings"
     refute text =~ "bank payment is processing"
   end
 
@@ -47,6 +53,12 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
 
     assert text =~ "bank payment is processing"
     assert text =~ "payment receipt"
+
+    assert text =~
+             "unless you turn off automatic renewal from your Membership page"
+
+    refute text =~ "until you cancel"
+    refute text =~ "account settings"
     refute text =~ "has been charged"
   end
 
@@ -57,9 +69,16 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
              args: %{
                "template" => "application_approved_payment_success",
                "idempotency_key" => "approved_payment_success_" <> _,
-               "params" => %{"bank_payment" => false}
+               "params" => %{"bank_payment" => false},
+               "text_body" => text_body
              }
            } = ApplicationApprovedPaymentSuccess.schedule(user)
+
+    assert text_body =~
+             "unless you turn off automatic renewal from your Membership page"
+
+    refute text_body =~ "until you cancel"
+    refute text_body =~ "account settings"
 
     assert_email_sent(
       subject: ApplicationApprovedPaymentSuccess.get_subject(),
