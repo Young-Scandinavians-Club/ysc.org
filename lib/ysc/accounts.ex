@@ -1787,6 +1787,12 @@ defmodule Ysc.Accounts do
             maybe_stop_comms_on_deleted_transition(previous_user, updated_user)
 
           revoke_sessions_if_blocked(updated_user)
+
+          disconnect_live_views_if_admin_privilege_lost(
+            previous_user,
+            updated_user
+          )
+
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
           Task.start(fn ->
@@ -1834,6 +1840,12 @@ defmodule Ysc.Accounts do
             maybe_stop_comms_on_deleted_transition(previous_user, updated_user)
 
           revoke_sessions_if_blocked(updated_user)
+
+          disconnect_live_views_if_admin_privilege_lost(
+            previous_user,
+            updated_user
+          )
+
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
           Task.start(fn ->
@@ -1897,6 +1909,7 @@ defmodule Ysc.Accounts do
             maybe_stop_comms_on_deleted_transition(user, updated_user)
 
           revoke_sessions_if_blocked(updated_user)
+          disconnect_live_views_if_admin_privilege_lost(user, updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
           Task.start(fn ->
@@ -1920,6 +1933,20 @@ defmodule Ysc.Accounts do
   end
 
   defp revoke_sessions_if_blocked(_user), do: :ok
+
+  # Demotion does not delete session tokens (the account can keep browsing as a
+  # member), but Finding 87's remount-only guard is not enough: an already-open
+  # impersonating LiveView keeps `current_user` as the victim until disconnect.
+  defp disconnect_live_views_if_admin_privilege_lost(
+         %User{role: :admin},
+         %User{role: role} = user
+       )
+       when role != :admin do
+    disconnect_user_live_views(user)
+  end
+
+  defp disconnect_live_views_if_admin_privilege_lost(_previous, _updated),
+    do: :ok
 
   # Audit-logs direct account-status edits (e.g. the admin Profile tab's
   # "Account Status" dropdown) the same way record_application_outcome/4
@@ -2474,16 +2501,46 @@ defmodule Ysc.Accounts do
   def receives_outbound_comms?(_), do: true
 
   @doc """
-  Deletes all session tokens for the given user.
+  Deletes all session tokens for the given user and disconnects LiveViews.
 
   Used when an account is suspended, rejected, or deleted so existing cookies
   and mobile bearer tokens stop working immediately instead of remaining valid
   for up to 60 days (web) / 90 days (mobile).
+
+  Finding 87 closed the HTTP/remount impersonation path after revoke, but
+  `UserAuth.mount_current_user/2` only runs on mount. Without a PubSub
+  `"disconnect"` (as `UserAuth.drop_user_session/1` and the Security page's
+  per-session revoke already send), an already-connected LiveView kept
+  `current_user` as the impersonation victim and continued handling events.
   """
   def revoke_all_user_sessions(%User{} = user) do
+    # Broadcast before delete so we can still read session token rows.
+    disconnect_user_live_views(user)
+
     Repo.delete_all(
       UserToken.by_user_and_contexts_query(user, ["session", "mobile_session"])
     )
+
+    :ok
+  end
+
+  # Force-close LiveViews for every web session token. Same topic shape as
+  # `UserAuth.put_token_in_session/2` / `drop_user_session/1`.
+  defp disconnect_user_live_views(%User{} = user) do
+    tokens =
+      Repo.all(
+        from t in UserToken,
+          where: t.user_id == ^user.id and t.context == "session",
+          select: t.token
+      )
+
+    Enum.each(tokens, fn token ->
+      YscWeb.Endpoint.broadcast(
+        "users_sessions:#{Base.url_encode64(token)}",
+        "disconnect",
+        %{}
+      )
+    end)
 
     :ok
   end
