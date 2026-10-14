@@ -57,7 +57,7 @@ defmodule YscWeb.UserRegistrationLive do
           method="post"
         >
           <div class="space-y-4 min-h-112">
-            <p class="text-right text-xs text-zinc-400">* Required fields</p>
+            <p class="text-right text-xs text-zinc-500">* Required fields</p>
             <.error :if={@check_errors}>
               Some required information is missing or incorrect. Check the highlighted fields on this page, then use
               <strong>Previous step</strong>

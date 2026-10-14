@@ -503,7 +503,7 @@ defmodule YscWeb.EventDetailsLive do
               </div>
               <%= if has_duration do %>
                 <div class="p-8 bg-zinc-50/30">
-                  <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
+                  <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                     Duration
                   </p>
                   <p class="font-bold text-xl text-zinc-900 tracking-tight leading-none">
@@ -732,7 +732,7 @@ defmodule YscWeb.EventDetailsLive do
                       >
                         {update.title}
                       </h4>
-                      <span class="shrink-0 text-sm text-zinc-400">
+                      <span class="shrink-0 text-sm text-zinc-500">
                         {format_relative_time(update.inserted_at)}
                       </span>
                     </div>
@@ -746,7 +746,7 @@ defmodule YscWeb.EventDetailsLive do
                         {raw(update.rendered_body)}
                       </div>
                     </article>
-                    <p :if={update.sent_by} class="mt-4 text-sm text-zinc-400">
+                    <p :if={update.sent_by} class="mt-4 text-sm text-zinc-500">
                       Posted by {update.sent_by.first_name} {update.sent_by.last_name}
                     </p>
                   </div>
@@ -830,7 +830,7 @@ defmodule YscWeb.EventDetailsLive do
                                 else: "tickets"}
                             </p>
                           <% true -> %>
-                            <p class="text-[10px] text-zinc-400 font-medium leading-tight">
+                            <p class="text-[10px] text-zinc-500 font-medium leading-tight">
                               {if is_host, do: "Host · ", else: ""}{ticket_count} {if ticket_count ==
                                                                                         1,
                                                                                       do:
@@ -854,7 +854,7 @@ defmodule YscWeb.EventDetailsLive do
                           +{overflow_count}
                         </span>
                       </div>
-                      <p class="text-xs font-bold text-zinc-400 group-hover:text-zinc-600 transition-colors leading-tight text-center">
+                      <p class="text-xs font-bold text-zinc-500 group-hover:text-zinc-600 transition-colors leading-tight text-center">
                         more
                       </p>
                     </button>
@@ -911,7 +911,7 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                 <% else %>
                   <div class="p-8 text-center bg-zinc-50/50 shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)]">
-                    <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
+                    <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                       Tickets
                     </p>
                     <p class={[
@@ -962,7 +962,7 @@ defmodule YscWeb.EventDetailsLive do
                               <p class="text-xs text-orange-600 type-eyebrow">
                                 Limited Availability
                               </p>
-                              <p class="text-xs font-mono text-zinc-400">
+                              <p class="text-xs font-mono text-zinc-500">
                                 {sold_percentage}% full
                               </p>
                             </div>
@@ -1036,7 +1036,7 @@ defmodule YscWeb.EventDetailsLive do
                           <%!-- Loading skeleton for availability --%>
                           <div
                             :if={!@async_data_loaded}
-                            class="flex items-center gap-3 text-sm text-zinc-400 font-medium animate-pulse"
+                            class="flex items-center gap-3 text-sm text-zinc-500 font-medium animate-pulse"
                           >
                             <div class="w-5 h-5 bg-zinc-200 rounded-sm"></div>
                             <div class="h-4 bg-zinc-200 rounded-sm w-32"></div>
@@ -1255,14 +1255,14 @@ defmodule YscWeb.EventDetailsLive do
                       </div>
                       <%= if @event.start_date != nil do %>
                         <%!-- Mobile: Short format (Wed, Dec 25) --%>
-                        <p class="sm:hidden text-xs text-zinc-400 truncate type-eyebrow">
+                        <p class="sm:hidden text-xs text-zinc-500 truncate type-eyebrow">
                           {format_start_date_short(@event.start_date)}
                           <%= if @event.start_time != nil do %>
                             • {DateTimeFormatter.format_time(@event.start_time)}
                           <% end %>
                         </p>
                         <%!-- Desktop: Full format (Wednesday, December 25) --%>
-                        <p class="hidden sm:block text-xs text-zinc-400 truncate type-eyebrow">
+                        <p class="hidden sm:block text-xs text-zinc-500 truncate type-eyebrow">
                           {format_start_date(@event.start_date)}
                           <%= if @event.start_time != nil do %>
                             • {DateTimeFormatter.format_time(@event.start_time)}
@@ -1737,7 +1737,7 @@ defmodule YscWeb.EventDetailsLive do
                           class={[
                             "w-12 text-center font-medium text-lg",
                             if(is_sold_out or is_sale_ended or is_pre_sale,
-                              do: "text-zinc-400",
+                              do: "text-zinc-500",
                               else: "text-zinc-900"
                             )
                           ]}
@@ -1907,11 +1907,11 @@ defmodule YscWeb.EventDetailsLive do
                   if(@checkout_pricing, do: "hidden", else: "")
                 ]}
               >
-                <div class="text-zinc-400 mb-2">
+                <div class="text-zinc-500 mb-2">
                   <.icon name="hero-shopping-cart" class="w-8 h-8 mx-auto" />
                 </div>
                 <p class="text-zinc-500 text-sm">No tickets selected</p>
-                <p class="hidden lg:block text-zinc-400 text-sm mt-1">
+                <p class="hidden lg:block text-zinc-500 text-sm mt-1">
                   Select tickets from the left to see your order
                 </p>
               </div>
@@ -2313,7 +2313,7 @@ defmodule YscWeb.EventDetailsLive do
                       )}
                     </.button>
                   </div>
-                  <p class="text-center text-xs text-zinc-400 flex items-center justify-center gap-1">
+                  <p class="text-center text-xs text-zinc-500 flex items-center justify-center gap-1">
                     <.icon name="hero-lock-closed" class="w-3 h-3" />
                     Secure, encrypted payment
                   </p>
@@ -2381,7 +2381,7 @@ defmodule YscWeb.EventDetailsLive do
                     <% end %>
                   <% else %>
                     <div class="text-center py-8">
-                      <div class="text-zinc-400 mb-2">
+                      <div class="text-zinc-500 mb-2">
                         <.icon name="hero-shopping-cart" class="w-8 h-8 mx-auto" />
                       </div>
                       <p class="text-zinc-500 text-sm">No tickets selected</p>

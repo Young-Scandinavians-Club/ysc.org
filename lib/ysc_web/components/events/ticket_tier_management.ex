@@ -111,20 +111,20 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     class="text-zinc-500 text-sm mb-3 min-h-10 lg:min-h-5"
                   >
                     {ticket_tier.description}
-                    <span class="text-zinc-400 italic text-xs">
+                    <span class="text-zinc-500 italic text-xs">
                       — {String.capitalize(to_string(ticket_tier.type))} Tier
                     </span>
                   </p>
                   <p
                     :if={!ticket_tier.description}
-                    class="text-zinc-400 text-sm italic mb-3 min-h-10 lg:min-h-5"
+                    class="text-zinc-500 text-sm italic mb-3 min-h-10 lg:min-h-5"
                   >
                     {String.capitalize(to_string(ticket_tier.type))} Tier
                   </p>
 
                   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                     <div>
-                      <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
+                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                         Price
                       </p>
                       <p class="text-sm font-bold text-zinc-800">
@@ -142,7 +142,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     </div>
 
                     <div>
-                      <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
+                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                         Sold
                       </p>
                       <div class="flex items-center gap-2">
@@ -150,10 +150,10 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                           <%= case ticket_tier.quantity do %>
                             <% nil -> %>
                               {ticket_tier.sold_tickets_count} /
-                              <span class="text-zinc-400">∞</span>
+                              <span class="text-zinc-500">∞</span>
                             <% 0 -> %>
                               {ticket_tier.sold_tickets_count} /
-                              <span class="text-zinc-400">∞</span>
+                              <span class="text-zinc-500">∞</span>
                             <% quantity -> %>
                               {"#{ticket_tier.sold_tickets_count}/#{quantity}"}
                           <% end %>
@@ -187,7 +187,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     </div>
 
                     <div>
-                      <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
+                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                         Sales Period
                       </p>
                       <p class="text-sm text-zinc-700 leading-tight">
@@ -199,7 +199,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     </div>
 
                     <div>
-                      <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
+                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                         Attendee info
                       </p>
                       <p

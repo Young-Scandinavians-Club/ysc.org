@@ -325,7 +325,7 @@ defmodule YscWeb.AccountSetupLive do
 
             <:actions>
               <.button
-                class="bg-transparent text-zinc-400 hover:text-zinc-600 hover:underline font-medium text-sm leading-6 py-2 px-3 rounded-sm transition duration-150 ease-in-out"
+                class="bg-transparent text-zinc-500 hover:text-zinc-600 hover:underline font-medium text-sm leading-6 py-2 px-3 rounded-sm transition duration-150 ease-in-out"
                 phx-click="skip_phone"
               >
                 Skip for now

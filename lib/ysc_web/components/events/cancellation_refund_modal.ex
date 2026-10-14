@@ -88,7 +88,7 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
               />
 
               <div class="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-zinc-600 shrink-0">
-                <.icon name="hero-shopping-bag" class="w-3.5 h-3.5 text-zinc-400" />
+                <.icon name="hero-shopping-bag" class="w-3.5 h-3.5 text-zinc-500" />
                 {entry.order.reference_id}
               </div>
 

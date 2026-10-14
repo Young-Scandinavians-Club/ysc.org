@@ -504,7 +504,7 @@ defmodule YscWeb.FamilyManagementLive do
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-zinc-900 text-xl type-subhead">
           Family Members
-          <span class="text-zinc-400 font-normal text-sm ml-2">
+          <span class="text-zinc-500 font-normal text-sm ml-2">
             ({length(@active_rows)})
           </span>
         </h2>
@@ -586,7 +586,7 @@ defmodule YscWeb.FamilyManagementLive do
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <h2 class="text-zinc-900 text-xl type-subhead">
         Pending Invitations
-        <span class="text-zinc-400 font-normal text-sm ml-2">
+        <span class="text-zinc-500 font-normal text-sm ml-2">
           ({length(@pending_invites)})
         </span>
       </h2>
@@ -596,7 +596,7 @@ defmodule YscWeb.FamilyManagementLive do
           id="pending-invites-empty"
           class="rounded-lg border border-dashed border-zinc-300 p-8 text-center bg-zinc-50/50"
         >
-          <.icon name="hero-envelope" class="w-8 h-8 text-zinc-400 mx-auto mb-2" />
+          <.icon name="hero-envelope" class="w-8 h-8 text-zinc-500 mx-auto mb-2" />
           <p class="text-sm font-medium text-zinc-700">No pending invitations</p>
           <p class="text-xs text-zinc-500 mt-1">
             Invites you send will appear here until they are accepted.
@@ -841,7 +841,7 @@ defmodule YscWeb.FamilyManagementLive do
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <h2 class="text-zinc-900 text-xl type-subhead">
         Other Family Members
-        <span class="text-zinc-400 font-normal text-sm ml-2">
+        <span class="text-zinc-500 font-normal text-sm ml-2">
           ({length(@other_family_members)})
         </span>
       </h2>

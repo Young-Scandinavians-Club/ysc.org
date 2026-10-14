@@ -2103,7 +2103,7 @@ defmodule YscWeb.TahoeBookingLive do
                             <% else %>
                               <!-- Placeholder when no image -->
                               <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="text-zinc-400 text-sm flex flex-col items-center justify-center">
+                                <div class="text-zinc-500 text-sm flex flex-col items-center justify-center">
                                   <.icon
                                     name="hero-photo"
                                     class="w-20 h-20 mx-auto mb-2"
@@ -2299,7 +2299,7 @@ defmodule YscWeb.TahoeBookingLive do
                             <% else %>
                               <!-- Placeholder when no image -->
                               <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="text-zinc-400 text-sm flex flex-col items-center justify-center">
+                                <div class="text-zinc-500 text-sm flex flex-col items-center justify-center">
                                   <.icon
                                     name="hero-photo"
                                     class="w-20 h-20 mx-auto mb-2"
@@ -2508,7 +2508,7 @@ defmodule YscWeb.TahoeBookingLive do
                     }
                     class="mt-4"
                   >
-                    <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
+                    <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                       Room requirements
                     </p>
                     <div class="space-y-2">
@@ -2585,7 +2585,7 @@ defmodule YscWeb.TahoeBookingLive do
                     }
                     class="space-y-2"
                   >
-                    <p class="text-xs text-zinc-400 type-eyebrow">
+                    <p class="text-xs text-zinc-500 type-eyebrow">
                       Selected Rooms
                     </p>
                     <%= for room_id <- @selected_room_ids do %>
@@ -2613,7 +2613,7 @@ defmodule YscWeb.TahoeBookingLive do
                     }
                     class="space-y-2"
                   >
-                    <p class="text-xs text-zinc-400 type-eyebrow">
+                    <p class="text-xs text-zinc-500 type-eyebrow">
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
@@ -2836,7 +2836,7 @@ defmodule YscWeb.TahoeBookingLive do
                     </.button>
                     <p
                       :if={@calculated_price}
-                      class="text-center text-xs text-zinc-400 mt-2"
+                      class="text-center text-xs text-zinc-500 mt-2"
                     >
                       You won't be charged yet.
                     </p>
@@ -3038,7 +3038,7 @@ defmodule YscWeb.TahoeBookingLive do
                     <button
                       type="button"
                       phx-click="close-terms-modal"
-                      class="text-zinc-400 hover:text-zinc-600 transition-colors"
+                      class="text-zinc-500 hover:text-zinc-600 transition-colors"
                       aria-label="Close modal"
                     >
                       <.icon name="hero-x-mark" class="w-6 h-6" />
@@ -4298,7 +4298,7 @@ defmodule YscWeb.TahoeBookingLive do
                                         RefundPolicyDisplay.refund_percentage_tier_class(
                                           buyout_rule.refund_percentage
                                         ),
-                                      else: "text-zinc-400"
+                                      else: "text-zinc-500"
                                     )
                                   ]}>
                                     <%= if buyout_rule && buyout_rule.refund_percentage do %>
@@ -4316,7 +4316,7 @@ defmodule YscWeb.TahoeBookingLive do
                                         RefundPolicyDisplay.refund_percentage_tier_class(
                                           room_rule.refund_percentage
                                         ),
-                                      else: "text-zinc-400"
+                                      else: "text-zinc-500"
                                     )
                                   ]}>
                                     <%= if room_rule && room_rule.refund_percentage do %>

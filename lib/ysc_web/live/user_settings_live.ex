@@ -264,7 +264,7 @@ defmodule YscWeb.UserSettingsLive do
                             !@default_payment_method ||
                               payment_method.id != @default_payment_method.id
                           }
-                          class="text-xs text-zinc-400"
+                          class="text-xs text-zinc-500"
                         >
                           <%= cond do %>
                             <% @selecting_payment_method -> %>
@@ -303,7 +303,7 @@ defmodule YscWeb.UserSettingsLive do
               id="payment-add-new-divider"
               class="my-6"
               show_label={!@show_new_payment_form}
-              label_class="bg-white px-3 text-xs text-zinc-400 type-eyebrow"
+              label_class="bg-white px-3 text-xs text-zinc-500 type-eyebrow"
             >
               Add new
             </.labeled_divider>
@@ -1193,7 +1193,7 @@ defmodule YscWeb.UserSettingsLive do
                       <div class="flex items-center gap-3">
                         <.icon
                           name="hero-credit-card"
-                          class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
+                          class="w-5 h-5 text-zinc-500 group-hover:text-blue-600"
                         />
                         <span class="text-zinc-600 font-medium group-hover:text-blue-700">
                           Add a payment method
@@ -1201,7 +1201,7 @@ defmodule YscWeb.UserSettingsLive do
                       </div>
                       <.icon
                         name="hero-plus-circle"
-                        class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
+                        class="w-5 h-5 text-zinc-500 group-hover:text-blue-600"
                       />
                     </.link>
 
@@ -1257,7 +1257,7 @@ defmodule YscWeb.UserSettingsLive do
                             )}
                           </p>
                         <% else %>
-                          <p class="text-sm text-zinc-400 italic">
+                          <p class="text-sm text-zinc-500 italic">
                             Select a plan above to see pricing.
                           </p>
                         <% end %>
@@ -1272,7 +1272,7 @@ defmodule YscWeb.UserSettingsLive do
                           <.icon name="hero-shield-check" class="w-5 h-5" />
                           Complete Membership Purchase
                         </.button>
-                        <p class="text-xs text-zinc-400 flex items-center gap-1">
+                        <p class="text-xs text-zinc-500 flex items-center gap-1">
                           <.icon name="hero-lock-closed" class="w-3 h-3" />
                           Secure, encrypted payment
                         </p>
@@ -1645,7 +1645,7 @@ defmodule YscWeb.UserSettingsLive do
                       <div class="flex items-center gap-3">
                         <.icon
                           name="hero-credit-card"
-                          class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
+                          class="w-5 h-5 text-zinc-500 group-hover:text-blue-600"
                         />
                         <span class="text-zinc-600 font-medium group-hover:text-blue-700">
                           Add a payment method
@@ -1653,7 +1653,7 @@ defmodule YscWeb.UserSettingsLive do
                       </div>
                       <.icon
                         name="hero-plus-circle"
-                        class="w-5 h-5 text-zinc-400 group-hover:text-blue-600"
+                        class="w-5 h-5 text-zinc-500 group-hover:text-blue-600"
                       />
                     </.link>
 
@@ -1841,7 +1841,7 @@ defmodule YscWeb.UserSettingsLive do
                             />
                           </td>
                           <td class="px-6 py-4">
-                            <span class="text-sm text-zinc-400">—</span>
+                            <span class="text-sm text-zinc-500">—</span>
                           </td>
                         </tr>
                         <!-- Event Updates Row -->
@@ -1954,7 +1954,7 @@ defmodule YscWeb.UserSettingsLive do
                       Applied automatically when you book a cabin stay that matches each perk below. Discounts and free nights appear in your price before you pay.
                     </p>
                   </div>
-                  <div class="hidden sm:flex items-center text-zinc-400">
+                  <div class="hidden sm:flex items-center text-zinc-500">
                     <.icon name="hero-sparkles" class="w-6 h-6" />
                   </div>
                 </div>
@@ -2022,7 +2022,7 @@ defmodule YscWeb.UserSettingsLive do
                       Finish buying them before the time shown — or as soon as you can if no time is listed.
                     </p>
                   </div>
-                  <div class="hidden sm:flex items-center text-zinc-400">
+                  <div class="hidden sm:flex items-center text-zinc-500">
                     <.icon name="hero-ticket" class="w-6 h-6" />
                   </div>
                 </div>
@@ -5717,7 +5717,7 @@ defmodule YscWeb.UserSettingsLive do
             <.badge type="red">Cancelled</.badge>
           <% end %>
         </div>
-        <p class="text-xs font-mono text-zinc-400 mt-1">
+        <p class="text-xs font-mono text-zinc-500 mt-1">
           {PaymentDisplay.get_payment_reference(@payment_info)}
         </p>
       </div>
@@ -5762,7 +5762,7 @@ defmodule YscWeb.UserSettingsLive do
             "Free"
           end}
         </p>
-        <p class="text-xs text-zinc-400 type-eyebrow">
+        <p class="text-xs text-zinc-500 type-eyebrow">
           Paid on {if @payment_info.payment do
             if @payment_info.payment.payment_date do
               format_payment_date(@payment_info.payment.payment_date, @timezone)
@@ -5854,7 +5854,7 @@ defmodule YscWeb.UserSettingsLive do
                 <.badge type="red" class="text-xs">Cancelled</.badge>
               <% end %>
             </div>
-            <p class="text-xs font-mono text-zinc-400 mt-0.5">
+            <p class="text-xs font-mono text-zinc-500 mt-0.5">
               {PaymentDisplay.get_payment_reference(@payment_info)}
             </p>
           </div>
@@ -5873,7 +5873,7 @@ defmodule YscWeb.UserSettingsLive do
             "Free"
           end}
         </p>
-        <p class="text-xs text-zinc-400 type-eyebrow">
+        <p class="text-xs text-zinc-500 type-eyebrow">
           {if @payment_info.payment do
             if @payment_info.payment.payment_date do
               format_payment_date(@payment_info.payment.payment_date, @timezone)

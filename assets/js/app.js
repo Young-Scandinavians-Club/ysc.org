@@ -66,6 +66,7 @@ import AvatarCropper from "./avatar_cropper";
 import { createLiveToastHook } from "../vendor/live_toast.esm.js";
 import { ToastFlashBridge } from "./toast_flash_bridge";
 import InteractScrollbar from "./interact_scrollbar";
+import AccountNavScroll from "./account_nav_scroll";
 import OtpInput from "./otp_input";
 import StopClick from "./stop_click";
 import DisableOnSubmit from "./disable_on_submit";
@@ -116,6 +117,7 @@ let Hooks = {
     WalletPlatform,
     AvatarCropper,
     InteractScrollbar,
+    AccountNavScroll,
     OtpInput,
     StopClick,
     DisableOnSubmit,

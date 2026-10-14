@@ -139,7 +139,7 @@ defmodule YscWeb.Components.Autocomplete do
             type="button"
             phx-click={@clear_event}
             phx-target={@target}
-            class="ml-2 p-1 text-zinc-400 hover:text-zinc-600 rounded-full hover:bg-blue-100 transition-colors"
+            class="ml-2 p-1 text-zinc-500 hover:text-zinc-600 rounded-full hover:bg-blue-100 transition-colors"
             aria-label="Clear selection"
           >
             <.icon name="hero-x-mark" class="w-4 h-4" />
@@ -150,7 +150,7 @@ defmodule YscWeb.Components.Autocomplete do
       <%!-- Search input --%>
       <div :if={!@selected} class="relative mt-2">
         <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-          <.icon name="hero-magnifying-glass" class="w-4 h-4 text-zinc-400" />
+          <.icon name="hero-magnifying-glass" class="w-4 h-4 text-zinc-500" />
         </div>
         <input
           type="text"
@@ -175,7 +175,7 @@ defmodule YscWeb.Components.Autocomplete do
           type="button"
           phx-click={@clear_event}
           phx-target={@target}
-          class="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-zinc-600 transition-colors"
+          class="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-500 hover:text-zinc-600 transition-colors"
           aria-label="Clear search"
         >
           <.icon name="hero-x-mark" class="w-4 h-4" />
@@ -238,7 +238,7 @@ defmodule YscWeb.Components.Autocomplete do
             else: "opacity-0 scale-y-95 -translate-y-1 pointer-events-none"
           )
         ]}>
-          <div class="px-3 py-3 text-sm text-zinc-400 text-center">
+          <div class="px-3 py-3 text-sm text-zinc-500 text-center">
             Type at least {@min_chars} characters to search
           </div>
         </div>
