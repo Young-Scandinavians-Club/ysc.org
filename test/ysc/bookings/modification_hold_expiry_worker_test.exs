@@ -224,6 +224,68 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorkerTest do
     refute Bookings.modification_ledger_recorded?(booking.id, payment_intent_id)
   end
 
+  test "refunds and releases when succeeded payment cannot apply because check-in is past",
+       %{user: user} do
+    {booking, _extended_checkout, preview} =
+      expired_modification_hold_with_preview!(user)
+
+    payment_intent_id =
+      "pi_mod_hold_expiry_checkin_past_#{System.unique_integer([:positive])}"
+
+    amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+    assert {:ok, _} =
+             Bookings.attach_modification_payment_intent(
+               booking.id,
+               payment_intent_id
+             )
+
+    booking = expire_modification_hold!(Repo.get!(Booking, booking.id))
+    today_pst = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+    past_checkin = Date.add(today_pst, -1)
+    past_checkout = Date.add(today_pst, 1)
+
+    # Simulate a same-day-checkin extension paid before midnight PST: by the
+    # time ModHoldExpiry runs, prepare_modification rejects :checkin_in_past.
+    hold_attrs =
+      booking.modification_hold_attrs
+      |> Map.put("checkin_date", Date.to_iso8601(past_checkin))
+      |> Map.put("checkout_date", Date.to_iso8601(past_checkout))
+
+    booking =
+      booking
+      |> Ecto.Changeset.change(%{
+        checkin_date: past_checkin,
+        checkout_date: today_pst,
+        modification_hold_attrs: hold_attrs
+      })
+      |> Repo.update!()
+
+    expect_cancel_refused(payment_intent_id)
+
+    # CheckoutCancel retrieve + create_stripe_refund retrieve. Before the fix,
+    # :checkin_in_past was not refundable and the second retrieve never ran.
+    expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
+                                                           _opts ->
+      {:ok,
+       succeeded_modification_payment_intent(
+         payment_intent_id,
+         booking,
+         user,
+         amount_cents
+       )}
+    end)
+
+    ModificationHoldExpiryWorker.expire_expired_modification_holds()
+
+    released = Repo.get!(Booking, booking.id)
+    assert released.checkin_date == past_checkin
+    assert released.checkout_date == today_pst
+    assert is_nil(released.modification_hold_expires_at)
+    assert released.modification_hold_attrs
+    refute Bookings.modification_ledger_recorded?(booking.id, payment_intent_id)
+  end
+
   defp expired_modification_hold!(user) do
     {booking, extended_checkout, _preview} =
       expired_modification_hold_with_preview!(user)

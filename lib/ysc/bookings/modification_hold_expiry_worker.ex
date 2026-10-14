@@ -198,10 +198,15 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorker do
           error: inspect(reason)
         )
 
+        # Use :modification_hold_expired so nested apply errors (e.g.
+        # :checkin_in_past after midnight PST) still refund. Passing the raw
+        # reason left some atoms outside @refundable_unfulfilled_modification_errors,
+        # which made release_after_unfulfilled_modification_refund/3 :release
+        # without refunding — captured charge, dates unchanged, hold cleared.
         Bookings.release_after_unfulfilled_modification_refund(
           booking,
           payment_intent,
-          reason
+          :modification_hold_expired
         )
     end
   end

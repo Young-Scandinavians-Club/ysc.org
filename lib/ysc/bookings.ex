@@ -1813,6 +1813,7 @@ defmodule Ysc.Bookings do
 
   @refundable_unfulfilled_modification_errors ~w(
     blackout_conflict
+    checkin_in_past
     entitlement_consume_failed
     entitlement_no_longer_valid
     entitlement_not_eligible_for_booking
