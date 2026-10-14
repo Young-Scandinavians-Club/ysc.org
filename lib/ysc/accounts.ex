@@ -2527,14 +2527,10 @@ defmodule Ysc.Accounts do
   # Force-close LiveViews for every web session token. Same topic shape as
   # `UserAuth.put_token_in_session/2` / `drop_user_session/1`.
   defp disconnect_user_live_views(%User{} = user) do
-    tokens =
-      Repo.all(
-        from t in UserToken,
-          where: t.user_id == ^user.id and t.context == "session",
-          select: t.token
-      )
-
-    Enum.each(tokens, fn token ->
+    user.id
+    |> session_tokens_for_live_disconnect_query()
+    |> Repo.all()
+    |> Enum.each(fn token ->
       YscWeb.Endpoint.broadcast(
         "users_sessions:#{Base.url_encode64(token)}",
         "disconnect",
@@ -2543,6 +2539,12 @@ defmodule Ysc.Accounts do
     end)
 
     :ok
+  end
+
+  defp session_tokens_for_live_disconnect_query(user_id) do
+    from t in UserToken,
+      where: t.user_id == ^user_id and t.context == "session",
+      select: t.token
   end
 
   @doc """
@@ -5707,6 +5709,13 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_user_note_author_query do
     user_note_author_query()
+  end
+
+  @doc false
+  def ci_query_explain_session_tokens_for_live_disconnect_query do
+    session_tokens_for_live_disconnect_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
+    )
   end
 
   defp membership_ytd_windows(%DateTime{} = now) do
