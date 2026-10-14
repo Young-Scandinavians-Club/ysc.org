@@ -47,7 +47,6 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
         (not is_nil(s.current_period_end) and s.current_period_end < ^now) or
           (not is_nil(s.ends_at) and s.ends_at < ^now)
       )
-      |> preload(:user)
       |> Repo.all()
 
     Ysc.Logging.info("Found potentially expired subscriptions",
@@ -155,7 +154,6 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
   # pattern as Accounts / Posts Multi helpers).
   @dialyzer {:nowarn_function, apply_expiration_transition: 2}
   defp apply_expiration_transition(%Subscription{} = subscription, attrs) do
-    user = Ysc.Accounts.get_user(subscription.user_id)
     changeset = Subscription.changeset(subscription, attrs)
 
     preview =
@@ -171,7 +169,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
         MembershipEnded.maybe_schedule_email_multi(
           multi,
           :membership_ended_email,
-          user,
+          Ysc.Accounts.get_user_email_identity(subscription.user_id),
           preview
         )
       else
@@ -287,8 +285,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
       where: s.stripe_status in ["active", "trialing"],
       where:
         (not is_nil(s.current_period_end) and s.current_period_end < ^now) or
-          (not is_nil(s.ends_at) and s.ends_at < ^now),
-      preload: :user
+          (not is_nil(s.ends_at) and s.ends_at < ^now)
     )
   end
 end
