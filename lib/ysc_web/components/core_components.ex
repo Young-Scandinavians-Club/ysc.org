@@ -4062,8 +4062,8 @@ defmodule YscWeb.CoreComponents do
 
   @doc """
   Page title for public pages: centered, bordered, eyebrow + title + optional
-  subtitle. Every public page opens with this (or `hero_title/1` over an image)
-  so the site reads as one place.
+  subtitle. Public text pages open with this so the site reads as one place.
+  (The cabin pages keep their own photo hero.)
 
   - `size={:default}` for section hubs (events, news, newsletters, history):
     `text-4xl md:text-7xl`.
@@ -4160,56 +4160,6 @@ defmodule YscWeb.CoreComponents do
 
   defp page_masthead_title_class(:compact),
     do: "text-3xl md:text-5xl text-zinc-900 type-display"
-
-  @doc """
-  Title block for pages that open with a full-bleed photo (the cabin pages):
-  eyebrow + title + optional subtitle, in white over the image. Same recipe as
-  `page_masthead/1`, so the photo pages and the text pages feel related.
-
-  Position it inside the hero's bottom-anchored container.
-
-  ## Examples
-
-      <.hero_title eyebrow="Member access" title="Tahoe Cabin" />
-
-      <.hero_title
-        size={:large}
-        eyebrow="A Year-Round Retreat"
-        title="Tahoe Cabin"
-        subtitle="Owned and operated by our community since 1993."
-      />
-  """
-  attr :eyebrow, :string, default: nil
-  attr :title, :string, required: true
-  attr :subtitle, :string, default: nil
-  attr :size, :atom, default: :compact, values: [:compact, :large]
-
-  def hero_title(assigns) do
-    ~H"""
-    <p
-      :if={@eyebrow}
-      class="text-sm text-blue-300 mb-3 md:mb-4 drop-shadow-md type-eyebrow"
-    >
-      {@eyebrow}
-    </p>
-    <h1 class={[
-      "text-white drop-shadow-lg type-display",
-      if(@size == :large,
-        do: "text-4xl md:text-7xl",
-        else: "text-3xl sm:text-4xl md:text-5xl"
-      ),
-      @subtitle && "mb-4"
-    ]}>
-      {@title}
-    </h1>
-    <p
-      :if={@subtitle}
-      class="text-base md:text-xl text-zinc-100 max-w-2xl font-normal drop-shadow-md"
-    >
-      {@subtitle}
-    </p>
-    """
-  end
 
   @doc """
   Title block for signed-in app pages (tickets, expense reports, family,

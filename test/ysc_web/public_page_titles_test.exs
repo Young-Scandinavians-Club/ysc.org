@@ -1,7 +1,7 @@
 defmodule YscWeb.PublicPageTitlesTest do
   @moduledoc """
-  Public pages open with one shared title treatment: `page_masthead/1` (text
-  pages) or `hero_title/1` (photo pages), so the site reads as one place.
+  Public text pages open with one shared title treatment, `page_masthead/1`,
+  so the site reads as one place. (The cabin pages keep their own photo hero.)
   """
   use YscWeb.ConnCase, async: true
 
@@ -45,23 +45,6 @@ defmodule YscWeb.PublicPageTitlesTest do
       assert [h1] = doc |> LazyHTML.query("h1") |> Enum.to_list()
       assert LazyHTML.text(h1) =~ unquote(text)
       assert LazyHTML.attribute(h1, "class") |> hd() =~ "md:text-7xl"
-    end
-  end
-
-  for {path, title} <- [
-        {"/bookings/tahoe", "Tahoe Cabin"},
-        {"/bookings/clear-lake", "Clear Lake Cabin"}
-      ] do
-    test "#{path} uses the hero title with an eyebrow", %{conn: conn} do
-      conn = get(conn, unquote(path))
-      doc = conn |> html_response(200) |> LazyHTML.from_document()
-
-      assert [h1] = doc |> LazyHTML.query("#hero-section h1") |> Enum.to_list()
-      assert LazyHTML.text(h1) =~ unquote(title)
-
-      assert doc
-             |> LazyHTML.query("#hero-section .type-eyebrow")
-             |> Enum.to_list() != []
     end
   end
 end

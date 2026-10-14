@@ -121,44 +121,6 @@ defmodule YscWeb.Components.PageMastheadTest do
     end
   end
 
-  describe "hero_title/1" do
-    test "renders eyebrow, h1 and subtitle in white over an image" do
-      assigns = %{}
-
-      heex = ~H"""
-      <.hero_title
-        size={:large}
-        eyebrow="A Year-Round Retreat"
-        title="Tahoe Cabin"
-        subtitle="Owned and operated by our community."
-      />
-      """
-
-      html = rendered_to_string(heex)
-
-      assert html =~ "A Year-Round Retreat"
-      assert html =~ "<h1"
-      assert html =~ "Tahoe Cabin"
-      assert html =~ "text-white"
-      assert html =~ "md:text-7xl"
-      assert html =~ "Owned and operated by our community."
-    end
-
-    test "compact size without subtitle" do
-      assigns = %{}
-
-      heex = ~H"""
-      <.hero_title eyebrow="Member access" title="Clear Lake Cabin" />
-      """
-
-      html = rendered_to_string(heex)
-
-      assert html =~ "Member access"
-      assert html =~ "md:text-5xl"
-      refute html =~ "md:text-7xl"
-    end
-  end
-
   describe "page_header/1" do
     test "renders eyebrow, h1, subtitle and actions" do
       assigns = %{}
