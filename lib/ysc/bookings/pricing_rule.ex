@@ -257,6 +257,29 @@ defmodule Ysc.Bookings.PricingRule do
     result
   end
 
+  @doc """
+  Lowest property-level guest rate (per adult/guest per night) for a property.
+
+  Considers only rules that are not tied to a specific room or room category,
+  across all seasons, for room (Tahoe) and day (Clear Lake) bookings. This is
+  the "from" rate shown on public pages. Returns `nil` when none is configured.
+  """
+  def lowest_property_rate_db(property) do
+    from(pr in __MODULE__,
+      where: pr.property == ^property,
+      where: is_nil(pr.room_id) and is_nil(pr.room_category_id),
+      where: pr.booking_mode in ^[:room, :day],
+      where: pr.price_unit in ^[:per_person_per_night, :per_guest_per_day],
+      select: pr.amount
+    )
+    |> Ysc.Repo.all()
+    |> Enum.reject(&is_nil/1)
+    |> case do
+      [] -> nil
+      amounts -> Enum.min_by(amounts, &Money.to_decimal/1, Decimal)
+    end
+  end
+
   defp build_base_query(property, booking_mode, price_unit) do
     alias Ysc.Bookings.PricingRule
 

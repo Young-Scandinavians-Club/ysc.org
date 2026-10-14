@@ -1058,23 +1058,28 @@ defmodule YscWeb.EventDetailsLive do
 
                     <div
                       :if={@current_user == nil && @has_ticket_tiers}
+                      id="event-tickets-guest-cta"
                       class="w-full space-y-4"
                     >
-                      <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-center">
-                        <.icon
-                          name="hero-exclamation-circle"
-                          class="text-orange-500 w-6 h-6"
-                        />
-                        Sign in with your YSC account to buy tickets. An active, paid membership is required.
-                      </div>
+                      <p class="text-sm text-zinc-700 px-3 py-3 bg-zinc-50 rounded-xl border border-zinc-200 text-center">
+                        Tickets are for YSC members. Sign in to buy yours, or apply to join the club.
+                      </p>
                       <.button
                         class="w-full py-4 type-eyebrow"
                         navigate={
                           ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                         }
                       >
-                        <.icon name="hero-ticket" class="w-6 h-6" />Sign in
+                        <.icon name="hero-ticket" class="w-6 h-6" />Sign in to buy tickets
                       </.button>
+                      <.link
+                        id="event-tickets-apply-link"
+                        navigate={~p"/users/register"}
+                        class="flex items-center justify-center gap-1 min-h-11 text-sm font-semibold text-blue-700 hover:underline"
+                      >
+                        Not a member? Apply for membership
+                        <.icon name="hero-arrow-right" class="w-4 h-4" />
+                      </.link>
                     </div>
 
                     <div
@@ -1099,11 +1104,14 @@ defmodule YscWeb.EventDetailsLive do
                               Member tickets require an active paid membership. Activate or renew your membership to buy tickets.
                           <% end %>
                         </p>
+                        <% {cta_path, cta_label} =
+                          membership_cta(@current_user, @had_membership?) %>
                         <.link
-                          navigate={~p"/users/membership"}
-                          class="inline-flex items-center justify-center gap-1 text-sm font-semibold text-orange-900 underline underline-offset-2"
+                          id="event-tickets-membership-link"
+                          navigate={cta_path}
+                          class="inline-flex items-center justify-center gap-1 min-h-11 text-sm font-semibold text-orange-900 underline underline-offset-2"
                         >
-                          View membership and payment options
+                          {cta_label}
                           <.icon name="hero-arrow-right" class="w-4 h-4" />
                         </.link>
                       </div>
@@ -1194,9 +1202,16 @@ defmodule YscWeb.EventDetailsLive do
                     @current_user == nil && @has_ticket_tiers &&
                       !ticket_sales_closed?(@event)
                   }
-                  class="max-w-(--breakpoint-md) mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
+                  class="max-w-(--breakpoint-md) mx-auto mb-3 text-xs text-zinc-600 text-center leading-snug"
                 >
-                  Sign in with your YSC account to buy tickets. An active, paid membership is required.
+                  Tickets are for YSC members.
+                  <.link
+                    id="event-tickets-apply-link-mobile"
+                    navigate={~p"/users/register"}
+                    class="inline-block py-2 -my-2 font-semibold text-blue-700 underline underline-offset-2"
+                  >
+                    Apply for membership
+                  </.link>
                 </p>
                 <p
                   :if={
@@ -1290,7 +1305,7 @@ defmodule YscWeb.EventDetailsLive do
                             ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                           }
                         >
-                          <.icon name="hero-ticket" class="w-5 h-5" />Sign in
+                          <.icon name="hero-ticket" class="w-5 h-5" />Sign in to buy
                         </.button>
                       <% else %>
                         <%= if @has_ticket_tiers do %>
@@ -1310,14 +1325,17 @@ defmodule YscWeb.EventDetailsLive do
                                 />Get Tickets
                               </.button>
                             <% else %>
+                              <% {cta_path, cta_label} =
+                                membership_cta(@current_user, @had_membership?) %>
                               <.button
+                                id="event-tickets-membership-button-mobile"
                                 class="shrink-0 px-8 py-3.5 type-eyebrow"
-                                navigate={~p"/users/membership"}
+                                navigate={cta_path}
                               >
                                 <.icon
                                   name="hero-identification"
                                   class="w-5 h-5"
-                                />Membership options
+                                />{cta_label}
                               </.button>
                             <% end %>
                           <% end %>
@@ -7248,6 +7266,17 @@ defmodule YscWeb.EventDetailsLive do
   # True once the event's end cutoff has passed (matches Events upcoming/past
   # listing): end date+time, else end of end date, else start date+time, else
   # end of start date.
+  # Where a signed-in non-member should go to be able to buy tickets, and what
+  # the link should say for their situation.
+  defp membership_cta(%{state: :pending_approval}, _had_membership?),
+    do: {~p"/pending-review", "View application status"}
+
+  defp membership_cta(_user, true),
+    do: {~p"/users/membership", "Renew membership"}
+
+  defp membership_cta(_user, _had_membership?),
+    do: {~p"/users/membership", "Choose a membership"}
+
   defp event_in_past?(event) do
     case event_ends_at(event) do
       nil -> false

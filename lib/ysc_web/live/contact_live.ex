@@ -266,6 +266,13 @@ defmodule YscWeb.ContactLive do
   defp department_contact_cards do
     [
       %{
+        id: "contact-card-membership",
+        email: EmailConfig.membership_email(),
+        icon: "hero-identification",
+        title: "Membership",
+        description: "Applications, dues, and your membership status."
+      },
+      %{
         id: "contact-card-tahoe",
         email: EmailConfig.tahoe_email(),
         icon: "hero-home-modern",

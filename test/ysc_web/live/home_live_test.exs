@@ -49,6 +49,66 @@ defmodule YscWeb.HomeLiveTest do
       refute has_element?(view, "#home-quick-actions")
     end
 
+    test "shows the live cabin rates with their unit", %{conn: conn} do
+      for attrs <- [
+            %{
+              amount: Money.new(41, :USD),
+              booking_mode: :room,
+              price_unit: :per_person_per_night,
+              property: :tahoe
+            },
+            %{
+              amount: Money.new(27, :USD),
+              booking_mode: :day,
+              price_unit: :per_guest_per_day,
+              property: :clear_lake
+            }
+          ] do
+        {:ok, _rule} =
+          %Ysc.Bookings.PricingRule{}
+          |> Ysc.Bookings.PricingRule.changeset(attrs)
+          |> Ysc.Repo.insert()
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert has_element?(view, "#home-cabin-tahoe", "$41.00")
+      assert has_element?(view, "#home-cabin-tahoe", "per adult, per night")
+      assert has_element?(view, "#home-cabin-clear-lake", "$27.00")
+
+      assert has_element?(
+               view,
+               "#home-cabin-clear-lake",
+               "per guest, per night"
+             )
+    end
+
+    test "groups the club menu into About and Get involved", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert has_element?(view, "#club-menu-desktop-heading-0", "About")
+      assert has_element?(view, "#club-menu-desktop-heading-1", "Get involved")
+      assert has_element?(view, ~s(#navbar-about-desktop a[href="/volunteer"]))
+      assert has_element?(view, ~s(#navbar-about-desktop a[href="/contact"]))
+      refute render(view) =~ "Club Info"
+    end
+
+    test "uses one consistent apply label and explains eligibility and cost",
+         %{conn: conn} do
+      {:ok, view, html} = live(conn, ~p"/")
+
+      assert has_element?(
+               view,
+               "#membership-apply-link",
+               "Apply for Membership"
+             )
+
+      assert has_element?(view, "#membership-apply-note", "Nothing is charged")
+      assert html =~ "All Ages Are Welcome"
+      refute html =~ "Become a Member"
+      refute html =~ "is for Everyone"
+    end
+
     test "accepts query params on initial load", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/?utm_source=test")
 
@@ -262,8 +322,8 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ user.first_name
       assert has_element?(view, "#home-quick-action-tahoe", "Book a stay")
       assert has_element?(view, "#home-quick-action-clear-lake", "Book a stay")
-      assert has_element?(view, "#home-quick-action-events", "Browse Events")
-      assert has_element?(view, "#home-quick-action-settings", "Preferences")
+      assert has_element?(view, "#home-quick-action-events", "Events")
+      assert has_element?(view, "#home-quick-action-settings", "Account")
       refute has_element?(view, "#home-quick-action-expenses")
       refute has_element?(view, "#home-quick-actions", "Reserve Cabin")
       refute has_element?(view, "#home-cabin-tahoe")
@@ -374,7 +434,7 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       assert html =~ "Membership Required"
-      assert html =~ "Get Membership Now"
+      assert html =~ "Choose a membership"
     end
 
     test "shows pending review state for users awaiting board approval", %{
@@ -399,7 +459,7 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~
                "Cabin bookings and member-only tickets become available after you are approved and your membership dues are paid."
 
-      refute html =~ "Get Membership Now"
+      refute html =~ "Choose a membership"
       refute html =~ "Membership Required"
       refute html =~ "Paying membership dues may still be required"
       refute html =~ "Awaiting board review"
@@ -1133,6 +1193,19 @@ defmodule YscWeb.HomeLiveTest do
   end
 
   describe "logged-in user — events launcher" do
+    test "account menu links straight to My Tickets", %{conn: conn} do
+      user = user_fixture(%{role: "member"})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert has_element?(
+               view,
+               ~s(#account-menu-tickets[href="/users/tickets"]),
+               "My Tickets"
+             )
+    end
+
     test "shows Browse Events launcher for regular members", %{conn: conn} do
       user = user_fixture(%{role: "member"})
       conn = log_in_user(conn, user)

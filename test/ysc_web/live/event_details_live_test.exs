@@ -574,14 +574,19 @@ defmodule YscWeb.EventDetailsLiveTest do
     test "sees login prompt when trying to buy tickets", %{conn: conn} do
       event = event_with_tickets(tier_count: 2, state: :upcoming)
 
-      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
 
       assert html =~ event.title
 
-      assert html =~
-               "Sign in with your YSC account to buy tickets. An active, paid membership is required."
+      assert html =~ "Tickets are for YSC members"
+      assert has_element?(view, "#event-tickets-guest-cta")
 
-      assert html =~ "Sign in"
+      assert has_element?(
+               view,
+               ~s(#event-tickets-apply-link[href="/users/register"])
+             )
+
+      assert html =~ "Sign in to buy"
       refute html =~ "Sign In to Continue"
     end
 
@@ -629,14 +634,14 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert has_element?(
                view,
-               ~s(a[href="/users/membership"]),
-               "View membership and payment options"
+               ~s(#event-tickets-membership-link[href="/users/membership"]),
+               "Choose a membership"
              )
 
       assert has_element?(
                view,
-               ~s(a[href="/users/membership"]),
-               "Membership options"
+               ~s(#event-tickets-membership-button-mobile[href="/users/membership"]),
+               "Choose a membership"
              )
 
       refute has_element?(view, "button", "Get Tickets")
@@ -652,6 +657,13 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert html =~ "Your application is still under board review"
       assert html =~ "After the board approves you and your dues are paid"
+
+      assert has_element?(
+               view,
+               ~s(#event-tickets-membership-link[href="/pending-review"]),
+               "View application status"
+             )
+
       refute html =~ "membership has expired"
       refute has_element?(view, "button", "Get Tickets")
     end
@@ -679,6 +691,13 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert html =~ "Your membership has expired"
       assert html =~ "renew to buy tickets"
       refute html =~ "pay dues or activate your membership"
+
+      assert has_element?(
+               view,
+               ~s(#event-tickets-membership-link[href="/users/membership"]),
+               "Renew membership"
+             )
+
       refute has_element?(view, "button", "Get Tickets")
     end
   end
@@ -2545,7 +2564,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert html =~ "RSVP on"
       assert html =~ "https://partiful.com/e/anon-both"
-      assert html =~ "Sign in with your YSC account to buy tickets"
+      assert html =~ "Tickets are for YSC members"
       refute html =~ "Get Tickets"
     end
   end

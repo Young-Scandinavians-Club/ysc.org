@@ -255,13 +255,66 @@ defmodule YscWeb.Layouts do
       type="orange"
       icon="hero-exclamation-triangle"
       title="Membership Required"
-      action_label="Manage Membership"
+      action_label="Choose a membership"
       action_path={~p"/users/membership"}
     >
       To access events and the cabin booking system, you need an active, paid membership. Use the
-      <strong>Manage Membership</strong>
-      button to choose a plan and complete payment.
+      <strong>Choose a membership</strong>
+      button to pick a plan and complete payment.
     </.alert_banner>
+    """
+  end
+
+  attr :mobile, :boolean, default: false
+
+  @doc """
+  Links inside the "About the Club" nav dropdown, grouped by what the visitor
+  is trying to do: learn about the club, or get involved.
+  """
+  def club_menu_links(assigns) do
+    assigns =
+      assigns
+      |> assign(:id_prefix, if(assigns.mobile, do: "mobile", else: "desktop"))
+      |> assign(:groups, [
+        {"About",
+         [
+           {"Our History", ~p"/history"},
+           {"Board of Directors", ~p"/board"},
+           {"Newsletters", ~p"/newsletters"}
+         ]},
+        {"Get involved",
+         [
+           {"Volunteer", ~p"/volunteer"},
+           {"YSC Choir", ~p"/choir"},
+           {"Contact Us", ~p"/contact"}
+         ]}
+      ])
+
+    ~H"""
+    <div class="py-2 text-sm font-medium text-zinc-800">
+      <%= for {{heading, links}, index} <- Enum.with_index(@groups) do %>
+        <p
+          id={"club-menu-#{@id_prefix}-heading-#{index}"}
+          class={[
+            "px-4 pb-1 text-xs text-zinc-500 type-eyebrow",
+            index > 0 && "pt-3"
+          ]}
+        >
+          {heading}
+        </p>
+        <ul aria-labelledby={"club-menu-#{@id_prefix}-heading-#{index}"}>
+          <li :for={{label, path} <- links}>
+            <.link
+              navigate={path}
+              phx-click={@mobile && hide_mobile_menu("navbar-dropdown")}
+              class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
+            >
+              {label}
+            </.link>
+          </li>
+        </ul>
+      <% end %>
+    </div>
     """
   end
 
