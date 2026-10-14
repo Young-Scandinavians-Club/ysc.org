@@ -183,6 +183,31 @@ defmodule YscWeb.VolunteerLiveTest do
       assert html =~ "hero-megaphone"
       assert html =~ "hero-computer-desktop"
     end
+
+    test "interest checkboxes are not blur-debounced so the first tap registers",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
+
+      # phx-debounce="blur" waited for the card to lose focus, so the first
+      # tap often looked like a no-op (#1551).
+      refute has_element?(view, "#volunteer_interest_events[phx-debounce]")
+      refute has_element?(view, "#volunteer_interest_activities[phx-debounce]")
+      refute has_element?(view, "#volunteer_interest_clear_lake[phx-debounce]")
+      refute has_element?(view, "#volunteer_interest_tahoe[phx-debounce]")
+      refute has_element?(view, "#volunteer_interest_marketing[phx-debounce]")
+      refute has_element?(view, "#volunteer_interest_website[phx-debounce]")
+    end
+
+    test "checking an interest on change marks the card selected immediately",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/volunteer")
+
+      view
+      |> form("#volunteer-form", volunteer: %{"interest_events" => "true"})
+      |> render_change()
+
+      assert has_element?(view, "#volunteer_interest_events[checked]")
+    end
   end
 
   describe "form validation" do
