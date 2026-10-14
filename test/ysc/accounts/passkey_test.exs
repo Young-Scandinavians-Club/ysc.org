@@ -202,11 +202,66 @@ defmodule Ysc.Accounts.PasskeyTest do
         })
 
       # Try to update with lower sign_count (should still work, but indicates replay)
-      # The validation happens in the LiveView, not here
+      # The validation happens in accept_passkey_assertion/2, not here
       assert {:ok, updated_passkey} =
                Accounts.update_passkey_sign_count(passkey, 5)
 
       assert updated_passkey.sign_count == 5
+    end
+  end
+
+  describe "accept_passkey_assertion/2" do
+    setup do
+      user = user_fixture()
+      {:ok, user} = Accounts.mark_email_verified(user)
+      %{user: user}
+    end
+
+    test "advances sign_count when the authenticator counter increased", %{
+      user: user
+    } do
+      passkey = passkey_fixture(user, %{sign_count: 5})
+
+      assert {:ok, updated} =
+               Accounts.accept_passkey_assertion(passkey, %{sign_count: 6})
+
+      assert updated.sign_count == 6
+      assert updated.last_used_at
+    end
+
+    test "allows first use when both counters are zero", %{user: user} do
+      passkey = passkey_fixture(user, %{sign_count: 0})
+
+      assert {:ok, updated} =
+               Accounts.accept_passkey_assertion(passkey, %{sign_count: 0})
+
+      assert updated.sign_count == 0
+    end
+
+    test "rejects equal non-zero counters as a replay", %{user: user} do
+      passkey = passkey_fixture(user, %{sign_count: 5})
+
+      assert {:error, :replay} =
+               Accounts.accept_passkey_assertion(passkey, %{sign_count: 5})
+
+      reloaded = Accounts.get_user_passkey_by_external_id(passkey.external_id)
+      assert reloaded.sign_count == 5
+    end
+
+    test "rejects a cloned authenticator whose counter lagged", %{user: user} do
+      passkey = passkey_fixture(user, %{sign_count: 10})
+
+      assert {:error, :replay} =
+               Accounts.accept_passkey_assertion(passkey, %{sign_count: 7})
+    end
+
+    test "passkey_sign_count_acceptable?/2 matches Finding 7 rules" do
+      assert Accounts.passkey_sign_count_acceptable?(1, 0)
+      assert Accounts.passkey_sign_count_acceptable?(0, 0)
+      refute Accounts.passkey_sign_count_acceptable?(5, 5)
+      refute Accounts.passkey_sign_count_acceptable?(4, 5)
+      refute Accounts.passkey_sign_count_acceptable?(-1, 0)
+      refute Accounts.passkey_sign_count_acceptable?(nil, 0)
     end
   end
 

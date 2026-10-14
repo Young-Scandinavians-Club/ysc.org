@@ -947,126 +947,101 @@ defmodule YscWeb.UserLoginLive do
 
         # Wax.authenticate returns {:ok, authenticator_data} where authenticator_data is a Wax.AuthenticatorData struct
         # The struct has fields like sign_count, not nested under :authenticator_data
-        authenticator_data = auth_result
-
-        # Verify sign_count increased (replay attack prevention).
-        # Strictly require new > stored to detect cloned authenticators.
-        # The only exception is 0 == 0 for authenticators that don't support
-        # sign counts (they always report 0 per the WebAuthn spec).
-        new_sign_count = authenticator_data.sign_count
-
-        Ysc.Logging.debug("[UserLoginLive] Checking sign_count",
-          new_sign_count: new_sign_count,
-          passkey_sign_count: passkey.sign_count,
-          sign_count_valid:
-            new_sign_count > passkey.sign_count or
-              (new_sign_count == 0 and passkey.sign_count == 0)
-        )
-
-        if new_sign_count > passkey.sign_count or
-             (new_sign_count == 0 and passkey.sign_count == 0) do
-          Ysc.Logging.info(
-            "[UserLoginLive] Sign count check passed, proceeding with login",
-            user_id: user_id,
-            user_id_hex: Base.encode16(user_id, case: :lower)
-          )
-
-          # Update passkey sign_count and last_used_at
-          {:ok, _updated_passkey} =
-            Ysc.Accounts.update_passkey_sign_count(passkey, new_sign_count)
-
-          # Do not log login here: we redirect to /users/log-in/passkey and
-          # UserSessionController.passkey_login will log with the real conn
-          # (IP + User-Agent). Logging from the socket would create a duplicate
-          # event with 127.0.0.1 and "Unknown browser on Unknown OS".
-
-          # Clear the challenge and loading state
-          socket =
-            socket
-            |> assign(:passkey_loading, false)
-            |> assign(:passkey_challenge, nil)
-            |> assign(:passkey_auth_mode, nil)
-            |> YscWeb.Flash.success_with_title(
-              "Welcome back!",
-              "Good to see you again."
+        case Ysc.Accounts.accept_passkey_assertion(passkey, auth_result) do
+          {:ok, _updated_passkey} ->
+            Ysc.Logging.info(
+              "[UserLoginLive] Sign count check passed, proceeding with login",
+              user_id: user_id,
+              user_id_hex: Base.encode16(user_id, case: :lower)
             )
 
-          # One-time DB token so the controller can trust this redirect came from
-          # a successful passkey verification. Unlike Phoenix.Token, this token is
-          # deleted on first use, preventing replay attacks within the TTL window.
-          user = Ysc.Accounts.get_user!(passkey.user_id)
-          token = Ysc.Accounts.generate_passkey_login_token(user)
+            # Do not log login here: we redirect to /users/log-in/passkey and
+            # UserSessionController.passkey_login will log with the real conn
+            # (IP + User-Agent). Logging from the socket would create a duplicate
+            # event with 127.0.0.1 and "Unknown browser on Unknown OS".
 
-          query_params = %{"token" => token}
-
-          query_params =
-            if socket.assigns.redirect_to && socket.assigns.redirect_to != "" do
-              Map.put(query_params, "redirect_to", socket.assigns.redirect_to)
-            else
-              query_params
-            end
-
-          query_params =
-            if socket.assigns.mobile_redirect_uri &&
-                 socket.assigns.mobile_redirect_uri != "" do
-              Map.put(
-                query_params,
-                "mobile_redirect_uri",
-                socket.assigns.mobile_redirect_uri
+            # Clear the challenge and loading state
+            socket =
+              socket
+              |> assign(:passkey_loading, false)
+              |> assign(:passkey_challenge, nil)
+              |> assign(:passkey_auth_mode, nil)
+              |> YscWeb.Flash.success_with_title(
+                "Welcome back!",
+                "Good to see you again."
               )
-            else
-              query_params
-            end
 
-          query_params =
-            if socket.assigns[:code_challenge] &&
-                 socket.assigns.code_challenge != "" do
-              Map.put(
-                query_params,
-                "code_challenge",
-                socket.assigns.code_challenge
-              )
-            else
-              query_params
-            end
+            # One-time DB token so the controller can trust this redirect came from
+            # a successful passkey verification. Unlike Phoenix.Token, this token is
+            # deleted on first use, preventing replay attacks within the TTL window.
+            user = Ysc.Accounts.get_user!(passkey.user_id)
+            token = Ysc.Accounts.generate_passkey_login_token(user)
 
-          # Construct URL as plain string to avoid query string parsing issues
-          base_path = ~p"/users/log-in/passkey"
-          query_string = URI.encode_query(query_params)
-          redirect_url = "#{base_path}?#{query_string}"
+            query_params = %{"token" => token}
 
-          require Ysc.Logging
+            query_params =
+              if socket.assigns.redirect_to && socket.assigns.redirect_to != "" do
+                Map.put(query_params, "redirect_to", socket.assigns.redirect_to)
+              else
+                query_params
+              end
 
-          Ysc.Logging.info("[UserLoginLive] Redirecting to passkey login",
-            base_path: base_path,
-            has_redirect_to: Map.has_key?(query_params, "redirect_to"),
-            has_token: Map.has_key?(query_params, "token")
-          )
+            query_params =
+              if socket.assigns.mobile_redirect_uri &&
+                   socket.assigns.mobile_redirect_uri != "" do
+                Map.put(
+                  query_params,
+                  "mobile_redirect_uri",
+                  socket.assigns.mobile_redirect_uri
+                )
+              else
+                query_params
+              end
 
-          {:noreply,
-           socket
-           |> redirect(to: redirect_url)}
-        else
-          require Ysc.Logging
+            query_params =
+              if socket.assigns[:code_challenge] &&
+                   socket.assigns.code_challenge != "" do
+                Map.put(
+                  query_params,
+                  "code_challenge",
+                  socket.assigns.code_challenge
+                )
+              else
+                query_params
+              end
 
-          Ysc.Logging.warning(
-            "[UserLoginLive] Sign count check failed - possible replay attack",
-            %{
-              new_sign_count: new_sign_count,
-              passkey_sign_count: passkey.sign_count,
-              sign_count_decreased: new_sign_count < passkey.sign_count
-            }
-          )
+            # Construct URL as plain string to avoid query string parsing issues
+            base_path = ~p"/users/log-in/passkey"
+            query_string = URI.encode_query(query_params)
+            redirect_url = "#{base_path}?#{query_string}"
 
-          {:noreply,
-           YscWeb.Flash.put_toast(
-             socket,
-             :error,
-             "Security check failed. Please try again."
-           )
-           |> assign(:passkey_loading, false)
-           |> assign(:passkey_challenge, nil)
-           |> assign(:passkey_auth_mode, nil)}
+            require Ysc.Logging
+
+            Ysc.Logging.info("[UserLoginLive] Redirecting to passkey login",
+              base_path: base_path,
+              has_redirect_to: Map.has_key?(query_params, "redirect_to"),
+              has_token: Map.has_key?(query_params, "token")
+            )
+
+            {:noreply,
+             socket
+             |> redirect(to: redirect_url)}
+
+          {:error, :replay} ->
+            Ysc.Logging.warning(
+              "[UserLoginLive] Sign count check failed - possible replay attack",
+              passkey_sign_count: passkey.sign_count
+            )
+
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Security check failed. Please try again."
+             )
+             |> assign(:passkey_loading, false)
+             |> assign(:passkey_challenge, nil)
+             |> assign(:passkey_auth_mode, nil)}
         end
 
       {:error, reason} ->

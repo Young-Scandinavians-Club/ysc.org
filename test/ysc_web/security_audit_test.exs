@@ -82,6 +82,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 86 (HIGH)     After Family→Single (scheduled downgrade or stale invite), linked sub-accounts still inherited membership via has_active_membership?/1 because any valid primary subscription counted. Accept also did not re-check that the primary still hosts Family/Lifetime.
   Finding 87 (HIGH)     Impersonation ignored whether the admin session token still authenticated a full admin. After suspend/revoke/demotion the signed cookie still had `:impersonated_user_id`, so fetch_current_user/LiveView mount kept acting as the victim. Stop impersonation is full-admin-only, so the leftover session could not even be ended.
   Finding 88 (MEDIUM)   Finding 44 bound `user_id` on public forms but volunteer/conduct (and contact via `put_submitter` alone) still trusted client name/email/phone. Signed-in members skip Turnstile, so they could send YSC confirmation mail to arbitrary inboxes and spoof identity on board CoC notifications.
+  Finding 89 (MEDIUM)   Step-up password reauth (`ReauthComponent`) skipped `AuthRateLimit`, so a stolen session could online-guess the account password without login's 5/min identifier cap, then change email/password/passkeys
+  Finding 90 (MEDIUM)   Passkey step-up skipped Finding 7's `sign_count` compare/update, so a cloned authenticator rejected at login could still pass reauth, and legitimate reauth never advanced the stored counter
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -320,6 +322,30 @@ defmodule YscWeb.SecurityAuditTest do
       # Should show an error, not a redirect to home
       assert html =~ "Invalid passkey" or html =~ "another sign-in" or
                html =~ "error"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 90 (MEDIUM): Passkey step-up must use the same sign_count gate
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 90: Passkey reauth advances and enforces sign_count" do
+    test "accept_passkey_assertion/2 rejects a replay of the stored counter" do
+      user = user_fixture()
+      passkey = passkey_fixture(user, %{sign_count: 5})
+
+      assert {:error, :replay} =
+               Accounts.accept_passkey_assertion(passkey, %{sign_count: 5})
+    end
+
+    test "accept_passkey_assertion/2 records an increased counter" do
+      user = user_fixture()
+      passkey = passkey_fixture(user, %{sign_count: 5})
+
+      assert {:ok, updated} =
+               Accounts.accept_passkey_assertion(passkey, %{sign_count: 8})
+
+      assert updated.sign_count == 8
     end
   end
 
