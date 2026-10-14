@@ -458,10 +458,13 @@ defmodule YscWeb.BookingChangeLive do
         </.link>
       </div>
 
-      <h1 class="text-3xl text-zinc-900 mb-2 type-display">Change Booking</h1>
-      <p class="text-zinc-600 mb-6">
-        Booking {@booking.reference_id} · {property_label(@booking.property)}
-      </p>
+      <.page_header
+        id="booking-change-header"
+        eyebrow="Your booking"
+        title="Change Booking"
+        subtitle={"Booking #{@booking.reference_id} · #{property_label(@booking.property)}"}
+        class="mb-6"
+      />
 
       <div
         :if={@step == :edit}

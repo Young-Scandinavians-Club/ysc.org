@@ -4119,21 +4119,34 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Bordered page masthead used on public index pages (events, news, newsletters, booking landing).
+  Page title for public pages: centered, bordered, eyebrow + title + optional
+  subtitle. Public text pages open with this so the site reads as one place.
+  (The cabin pages keep their own photo hero.)
 
-  Use `size={:large}` for hero-style titles (`text-6xl md:text-8xl`). The default size matches
-  section headers on booking landing pages (`text-4xl md:text-7xl`).
+  - `size={:default}` for section hubs (events, news, newsletters, history):
+    `text-4xl md:text-7xl`.
+  - `size={:compact}` for content pages (board, choir, volunteer, contact,
+    legal and governance pages): `text-3xl md:text-5xl`, tighter padding.
+
+  Use the eyebrow to say what kind of page this is ("Events", "Governance",
+  "Legal"); the title says what's on it. Put an intro sentence in `subtitle`.
+  Wrap it in `max-w-(--breakpoint-xl) mx-auto px-4` like other page sections.
 
   ## Examples
 
       <.page_masthead eyebrow="Events" title="What's Next" />
 
-      <.page_masthead size={:large} title="Club News" />
-
       <.page_masthead
-        size={:large}
+        eyebrow="Archive"
         title="Newsletters"
         subtitle="Browse our past newsletters."
+      />
+
+      <.page_masthead
+        size={:compact}
+        eyebrow="Legal"
+        title="Privacy Policy"
+        subtitle="Last updated: July 15, 2026"
       />
 
       <.page_masthead eyebrow="Since 1993" title="Experience Tahoe" heading_tag={:h2} />
@@ -4145,9 +4158,9 @@ defmodule YscWeb.CoreComponents do
 
   attr :size, :atom,
     default: :default,
-    values: [:default, :large],
+    values: [:default, :compact],
     doc:
-      "`:default` uses responsive padding and medium title; `:large` uses fixed py-12 and hero title"
+      "`:default` is the section-hub title; `:compact` is for content and legal pages"
 
   attr :heading_tag, :atom,
     default: :h1,
@@ -4189,7 +4202,7 @@ defmodule YscWeb.CoreComponents do
           {@title}
         </h1>
       <% end %>
-      <p :if={@subtitle} class="mt-4 text-zinc-500 text-lg">
+      <p :if={@subtitle} class="mt-4 mx-auto max-w-2xl text-zinc-600 text-lg">
         {@subtitle}
       </p>
       {render_slot(@inner_block)}
@@ -4198,13 +4211,60 @@ defmodule YscWeb.CoreComponents do
   end
 
   defp page_masthead_padding_class(:default), do: "py-8 md:py-12"
-  defp page_masthead_padding_class(:large), do: "py-12"
+  defp page_masthead_padding_class(:compact), do: "py-8 md:py-10"
 
   defp page_masthead_title_class(:default),
     do: "text-4xl md:text-7xl text-zinc-900 type-display"
 
-  defp page_masthead_title_class(:large),
-    do: "text-6xl md:text-8xl text-zinc-900 type-display"
+  defp page_masthead_title_class(:compact),
+    do: "text-3xl md:text-5xl text-zinc-900 type-display"
+
+  @doc """
+  Title block for signed-in app pages (tickets, expense reports, family,
+  booking steps): left-aligned eyebrow + title + optional subtitle, with an
+  `actions` slot on the right. Unbordered, so it sits comfortably above cards.
+
+  ## Examples
+
+      <.page_header eyebrow="Account" title="Your Tickets" />
+
+      <.page_header eyebrow="Expenses" title="My Expense Reports" subtitle="3 drafts, 2 submitted">
+        <:actions><.button navigate={~p"/expensereport"}>New report</.button></:actions>
+      </.page_header>
+  """
+  attr :id, :string, default: nil
+  attr :eyebrow, :string, default: nil
+  attr :title, :string, required: true
+  attr :subtitle, :string, default: nil
+  attr :class, :any, default: nil
+  slot :actions
+
+  def page_header(assigns) do
+    ~H"""
+    <header
+      id={@id}
+      class={[
+        "flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between",
+        @class
+      ]}
+    >
+      <div class="min-w-0">
+        <p :if={@eyebrow} class="text-xs text-blue-600 mb-2 type-eyebrow">
+          {@eyebrow}
+        </p>
+        <h1 class="text-3xl sm:text-4xl text-zinc-900 wrap-break-word type-display">
+          {@title}
+        </h1>
+        <p :if={@subtitle} class="mt-2 text-base text-zinc-600">
+          {@subtitle}
+        </p>
+      </div>
+      <div :if={@actions != []} class="flex flex-wrap items-center gap-2 shrink-0">
+        {render_slot(@actions)}
+      </div>
+    </header>
+    """
+  end
 
   @doc """
   Rounded feature card with an uppercase eyebrow title and a body slot.

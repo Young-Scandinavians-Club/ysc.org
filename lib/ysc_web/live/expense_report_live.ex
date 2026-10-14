@@ -1728,17 +1728,19 @@ defmodule YscWeb.ExpenseReportLive do
     <div class="py-8 lg:py-10">
       <div class="max-w-3xl mx-auto px-4">
         <!-- Header -->
-        <div class="flex items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 class="text-2xl text-zinc-900 type-display">My Expense Reports</h1>
-            <p class="text-sm text-zinc-500 mt-1">
-              {list_summary_line(@drafts, @submitted)}
-            </p>
-          </div>
-          <.button navigate={~p"/expensereport"}>
-            <.icon name="hero-plus" class="w-5 h-5" /> New Report
-          </.button>
-        </div>
+        <.page_header
+          id="expense-reports-header"
+          eyebrow="Expenses"
+          title="My Expense Reports"
+          subtitle={list_summary_line(@drafts, @submitted)}
+          class="mb-6"
+        >
+          <:actions>
+            <.button navigate={~p"/expensereport"}>
+              <.icon name="hero-plus" class="w-5 h-5" /> New Report
+            </.button>
+          </:actions>
+        </.page_header>
 
         <%= if Enum.empty?(@expense_reports) do %>
           <div class="bg-white rounded-lg border border-zinc-200 p-12 text-center">
@@ -1922,19 +1924,24 @@ defmodule YscWeb.ExpenseReportLive do
         <div :if={!@loading_expense_form_data}>
           <!-- Header -->
           <div class="mb-8">
-            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
-              <div class="flex-1">
-                <h1 class="text-3xl text-zinc-900 type-display">Expense Report</h1>
-              </div>
-              <.button
-                navigate={~p"/expensereports"}
-                variant="outline"
-                color="zinc"
-                class="shrink-0 bg-white hover:bg-zinc-100"
-              >
-                <.icon name="hero-document-text" class="w-5 h-5" /> View My Reports
-              </.button>
-            </div>
+            <.page_header
+              id="expense-report-form-header"
+              eyebrow="Expenses"
+              title="Expense Report"
+              class="mb-6"
+            >
+              <:actions>
+                <.button
+                  navigate={~p"/expensereports"}
+                  variant="outline"
+                  color="zinc"
+                  class="shrink-0 bg-white hover:bg-zinc-100"
+                >
+                  <.icon name="hero-document-text" class="w-5 h-5" />
+                  View My Reports
+                </.button>
+              </:actions>
+            </.page_header>
             <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-5">
               <div class="flex gap-3">
                 <.icon

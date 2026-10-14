@@ -29,7 +29,7 @@ defmodule YscWeb.NewsletterArchiveLive do
     <div class="py-6 md:py-12">
       <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-12">
         <.page_masthead
-          size={:large}
+          eyebrow="Archive"
           title="Newsletters"
           subtitle="Browse our past newsletters. Subscribe to receive future newsletters in your inbox."
         />
