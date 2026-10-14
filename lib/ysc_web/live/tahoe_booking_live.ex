@@ -1135,8 +1135,8 @@ defmodule YscWeb.TahoeBookingLive do
           </div>
         </div>
         <%!-- Title Text Section --%>
-        <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-16 pointer-events-none">
-          <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
+        <div class="absolute bottom-0 left-0 right-0 z-10 py-12 md:py-16 pointer-events-none">
+          <div class="max-w-(--breakpoint-xl) mx-auto px-4 pointer-events-auto">
             <.hero_title eyebrow="Member access" title="Tahoe Cabin" />
           </div>
         </div>
@@ -1176,8 +1176,8 @@ defmodule YscWeb.TahoeBookingLive do
           </div>
         </div>
         <%!-- Title Text Section --%>
-        <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-20 pointer-events-none">
-          <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
+        <div class="absolute bottom-0 left-0 right-0 z-10 py-12 md:py-20 pointer-events-none">
+          <div class="max-w-(--breakpoint-xl) mx-auto px-4 pointer-events-auto">
             <.hero_title
               size={:large}
               eyebrow="A Year-Round Retreat"
