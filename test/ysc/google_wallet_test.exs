@@ -147,6 +147,21 @@ defmodule Ysc.GoogleWalletTest do
       end)
     end
 
+    test "struct-selects pass fields and skips event body HTML" do
+      {user, ticket} = member_with_confirmed_ticket()
+
+      with_fake_credentials(fn ->
+        {_result, fat_cols} =
+          Ysc.QueryCounter.with_query_counter(
+            fn -> GoogleWallet.generate_ticket_save_url(ticket.id, user.id) end,
+            pattern: ~r/raw_details|rendered_details|attendee_questions/i,
+            caller_pids: [self()]
+          )
+
+        assert fat_cols == 0
+      end)
+    end
+
     test "returned JWT contains expected Google Wallet payload structure" do
       {user, ticket} = member_with_confirmed_ticket()
 

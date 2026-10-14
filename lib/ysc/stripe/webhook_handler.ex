@@ -818,8 +818,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       # Schedule the re-engagement email in the same DB transaction as
       # mark_as_cancelled so a transient Oban insert failure rolls back and
       # Stripe retries the webhook (idempotent by membership_ended key).
-      user =
-        subscription.user_id && Ysc.Accounts.get_user(subscription.user_id)
+      user = Ysc.Accounts.get_user_email_identity(subscription.user_id)
 
       result =
         Ecto.Multi.new()

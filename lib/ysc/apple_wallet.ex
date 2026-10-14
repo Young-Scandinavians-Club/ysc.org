@@ -21,10 +21,43 @@ defmodule Ysc.AppleWallet do
   require Ysc.Logging
 
   alias Ysc.Repo
-  alias Ysc.Events.EventDateTime
-  alias Ysc.Events.Ticket
+  alias Ysc.Events.{Event, EventDateTime, Ticket, TicketDetail, TicketTier}
+  alias Ysc.Media.Image
   alias Ysc.Scanning.QrToken
   alias Ysc.AppleWallet.CertManager
+
+  # Pass copy only needs ticket identity, tier name, attendee name, and
+  # event card fields (title / when / where / cover). Omits event body HTML
+  # (`raw_details` / `rendered_details`), attendee answers, and tier sale
+  # windows that `preload([:ticket_tier, :registration, event: :cover_image])`
+  # would SELECT.
+  @wallet_ticket_fields [
+    :id,
+    :reference_id,
+    :status,
+    :user_id,
+    :event_id,
+    :ticket_tier_id
+  ]
+  @wallet_event_fields [
+    :id,
+    :title,
+    :reference_id,
+    :start_date,
+    :start_time,
+    :location_name,
+    :address,
+    :place_id,
+    :image_id
+  ]
+  @wallet_cover_image_fields [
+    :id,
+    :optimized_image_path,
+    :raw_image_path,
+    :thumbnail_path
+  ]
+  @wallet_ticket_tier_fields [:id, :name]
+  @wallet_registration_fields [:id, :ticket_id, :first_name, :last_name]
 
   # Resolve under priv at runtime — Application.app_dir in module attributes is
   # expanded at compile time and would bake in the builder's _build/... path,
@@ -131,13 +164,41 @@ defmodule Ysc.AppleWallet do
   # --- Private ---
 
   defp load_ticket(ticket_id, user_id) do
-    Ticket
-    |> where(
-      [t],
-      t.id == ^ticket_id and t.user_id == ^user_id and t.status == :confirmed
-    )
-    |> preload([:ticket_tier, :registration, event: :cover_image])
+    ticket_id
+    |> ticket_for_wallet_query(user_id)
     |> Repo.one()
+  end
+
+  defp ticket_for_wallet_query(ticket_id, user_id) do
+    from(t in Ticket,
+      where:
+        t.id == ^ticket_id and t.user_id == ^user_id and t.status == :confirmed,
+      select: struct(t, ^@wallet_ticket_fields),
+      preload: [
+        ticket_tier: ^wallet_ticket_tier_query(),
+        registration: ^wallet_registration_query(),
+        event: ^wallet_event_query()
+      ]
+    )
+  end
+
+  defp wallet_event_query do
+    from(e in Event,
+      select: struct(e, ^@wallet_event_fields),
+      preload: [cover_image: ^wallet_cover_image_query()]
+    )
+  end
+
+  defp wallet_cover_image_query do
+    from(i in Image, select: struct(i, ^@wallet_cover_image_fields))
+  end
+
+  defp wallet_ticket_tier_query do
+    from(tt in TicketTier, select: struct(tt, ^@wallet_ticket_tier_fields))
+  end
+
+  defp wallet_registration_query do
+    from(td in TicketDetail, select: struct(td, ^@wallet_registration_fields))
   end
 
   # File.rm cleanup operates on paths generated internally via System.tmp_dir!() in download_image_to_tmp/1
@@ -457,13 +518,6 @@ defmodule Ysc.AppleWallet do
   def ci_query_explain_query do
     alias Ysc.Ci.QueryExplain.Fixtures
 
-    ticket_id = Fixtures.ulid()
-    user_id = Fixtures.user().id
-
-    from(t in Ticket,
-      where:
-        t.id == ^ticket_id and t.user_id == ^user_id and t.status == :confirmed,
-      preload: [:ticket_tier, :registration, event: :cover_image]
-    )
+    ticket_for_wallet_query(Fixtures.ulid(), Fixtures.user().id)
   end
 end

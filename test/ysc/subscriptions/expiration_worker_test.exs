@@ -152,6 +152,81 @@ defmodule Ysc.Subscriptions.ExpirationWorkerTest do
       assert_email_sent(subject: "Your YSC Membership Has Ended")
     end
 
+    test "struct-selects user id/email/first_name when scheduling membership-ended email",
+         %{
+           user: user
+         } do
+      user =
+        user
+        |> Ecto.Changeset.change(%{
+          board_bio: "bio expiration worker must not load"
+        })
+        |> Repo.update!()
+
+      now = DateTime.utc_now()
+      past_date = DateTime.add(now, -1, :day)
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_exp_slim_user",
+          stripe_status: "active",
+          name: "Auto Renew Off Slim",
+          current_period_end: past_date,
+          ends_at: past_date,
+          cancel_at_period_end: true
+        })
+
+      {_result, secret_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpirationWorker.check_and_expire_subscriptions() end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert secret_cols == 0
+      assert_email_sent(subject: "Your YSC Membership Has Ended")
+    end
+
+    test "does not load users when Stripe reports the membership was renewed",
+         %{
+           user: user
+         } do
+      original = Application.get_env(:ysc, :stripe_subscription_retriever)
+
+      Application.put_env(
+        :ysc,
+        :stripe_subscription_retriever,
+        Ysc.StripeSubscriptionRetrieverRenewedMock
+      )
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_subscription_retriever, original)
+      end)
+
+      now = DateTime.utc_now()
+      past_date = DateTime.add(now, -1, :day)
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_renewed_no_user_load",
+          stripe_status: "active",
+          name: "Expired Locally Renewed Slim",
+          current_period_end: past_date,
+          ends_at: nil
+        })
+
+      {_result, user_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> ExpirationWorker.check_and_expire_subscriptions() end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      assert user_cols == 0
+    end
+
     test "does not send membership ended email without cancel_at_period_end", %{
       user: user
     } do

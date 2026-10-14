@@ -864,6 +864,49 @@ defmodule YscWeb.Workers.EmailNotifierTest do
              )
     end
 
+    test "struct-selects user id/email/first_name when rendering deferred new-sign-in email" do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(%{
+          board_bio: "bio new-sign-in email must not load"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(user, %{
+          ip_address: "203.0.113.1",
+          browser: "Chrome",
+          operating_system: "macOS",
+          country: "SE",
+          region: "Stockholm",
+          city: "Stockholm",
+          threat_indicators: ["new_device"]
+        })
+        |> Ysc.Repo.insert()
+
+      {_result, secret_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            perform_job(EmailNotifier, %{
+              "recipient" => user.email,
+              "idempotency_key" =>
+                "new_sign_in_slim_#{user.id}_#{auth_event.id}",
+              "subject" => "New Sign-In to Your YSC Account",
+              "template" => "new_sign_in_detected",
+              "params" => %{"auth_event_id" => auth_event.id},
+              "text_body" => "",
+              "user_id" => user.id,
+              "category" => "account"
+            })
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert secret_cols == 0
+      assert_email_sent(subject: "New Sign-In to Your YSC Account")
+    end
+
     test "records a terminal failure when auth event cannot be resolved for the user" do
       user = user_fixture()
       other = user_fixture()

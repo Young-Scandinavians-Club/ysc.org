@@ -355,22 +355,27 @@ defmodule YscWeb.Workers.EmailNotifier do
       if is_nil(user_id) do
         {:error, :missing_user_id}
       else
-        user = Ysc.Accounts.get_user!(user_id)
-        auth_event_id = Map.get(job_params, "auth_event_id")
+        case Ysc.Accounts.get_user_email_identity(user_id) do
+          nil ->
+            {:error, :missing_user}
 
-        case template_module.prepare_email_data(user, auth_event_id) do
-          {:ok, assigns} ->
-            body =
-              if function_exported?(template_module, :text_body, 1) do
-                template_module.text_body(assigns)
-              else
-                text_body
-              end
+          user ->
+            auth_event_id = Map.get(job_params, "auth_event_id")
 
-            {:ok, {assigns, body}}
+            case template_module.prepare_email_data(user, auth_event_id) do
+              {:ok, assigns} ->
+                body =
+                  if function_exported?(template_module, :text_body, 1) do
+                    template_module.text_body(assigns)
+                  else
+                    text_body
+                  end
 
-          {:error, reason} ->
-            {:error, reason}
+                {:ok, {assigns, body}}
+
+              {:error, reason} ->
+                {:error, reason}
+            end
         end
       end
     else
