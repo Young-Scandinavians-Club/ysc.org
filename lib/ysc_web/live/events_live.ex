@@ -90,7 +90,7 @@ defmodule YscWeb.EventsLive do
                       href={@site_setting_socials_partiful}
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="inline-flex items-center min-h-11 -my-3 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                      class="inline-flex items-center min-h-11 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -120,7 +120,7 @@ defmodule YscWeb.EventsLive do
                       href={@site_setting_socials_whatsapp}
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="inline-flex items-center min-h-11 -my-3 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                      class="inline-flex items-center min-h-11 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                     >
                       <.icon name="hero-device-phone-mobile" class="w-4 h-4 mr-2" />
                       Member WhatsApp group

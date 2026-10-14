@@ -232,16 +232,16 @@ defmodule YscWeb.UserTicketsLive do
                 </h3>
                 <p class="text-sm text-zinc-500">Your past events with YSC</p>
               </div>
-              <span class="px-3 py-1 bg-zinc-100 text-zinc-500 text-xs rounded-full type-eyebrow">
+              <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs rounded-full type-eyebrow">
                 Archived
               </span>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <%= for item <- @past_items do %>
-                <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition duration-500 hover:bg-white hover:ring-2 hover:ring-zinc-300">
+                <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale hover:grayscale-0 transition duration-500 hover:bg-white hover:ring-2 hover:ring-zinc-300">
                   <div class="flex justify-between items-start mb-4">
-                    <span class="text-xs text-zinc-500 border border-zinc-200 px-2 py-0.5 rounded-sm type-eyebrow">
+                    <span class="text-xs text-zinc-600 border border-zinc-200 px-2 py-0.5 rounded-sm type-eyebrow">
                       {format_visited_date(item)}
                     </span>
                     <.icon name="hero-check-badge" class="w-5 h-5 text-zinc-300" />
@@ -250,18 +250,18 @@ defmodule YscWeb.UserTicketsLive do
                   <h4 class="text-xl text-zinc-900 mb-1 type-subhead">
                     {item.title}
                   </h4>
-                  <p class="text-xs font-medium text-zinc-500 flex items-center gap-1 mb-4">
+                  <p class="text-xs font-medium text-zinc-600 flex items-center gap-1 mb-4">
                     <.icon name="hero-map-pin" class="w-3 h-3" />
                     {item.location}
                   </p>
 
                   <div class="pt-4 border-t border-zinc-100 flex justify-between items-center">
-                    <p class="text-xs font-mono text-zinc-500">
+                    <p class="text-xs font-mono text-zinc-600">
                       #{item.reference_id}
                     </p>
                     <.link
                       navigate={item.receipt_path}
-                      class="text-xs text-zinc-500 hover:text-teal-600 underline type-eyebrow"
+                      class="text-xs text-zinc-600 hover:text-teal-600 underline type-eyebrow"
                     >
                       View Receipt
                     </.link>
