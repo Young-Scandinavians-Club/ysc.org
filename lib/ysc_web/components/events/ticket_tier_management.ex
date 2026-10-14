@@ -123,23 +123,21 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                   </p>
 
                   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                    <div>
-                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                        Price
-                      </p>
-                      <p class="text-sm font-bold text-zinc-800">
-                        <%= case ticket_tier.type do %>
-                          <% "free" -> %>
-                            Free
-                          <% "donation" -> %>
-                            User sets amount
-                          <% :donation -> %>
-                            User sets amount
-                          <% _ -> %>
-                            {format_money_safe(ticket_tier.price)}
-                        <% end %>
-                      </p>
-                    </div>
+                    <.labeled_value
+                      label="Price"
+                      value_class="text-sm font-bold text-zinc-800"
+                    >
+                      <%= case ticket_tier.type do %>
+                        <% "free" -> %>
+                          Free
+                        <% "donation" -> %>
+                          User sets amount
+                        <% :donation -> %>
+                          User sets amount
+                        <% _ -> %>
+                          {format_money_safe(ticket_tier.price)}
+                      <% end %>
+                    </.labeled_value>
 
                     <div>
                       <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
@@ -186,29 +184,23 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       <% end %>
                     </div>
 
-                    <div>
-                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                        Sales Period
-                      </p>
-                      <p class="text-sm text-zinc-700 leading-tight">
-                        {format_sales_period(
-                          ticket_tier.start_date,
-                          ticket_tier.end_date
-                        )}
-                      </p>
-                    </div>
+                    <.labeled_value
+                      label="Sales Period"
+                      value_class="text-sm text-zinc-700 leading-tight"
+                    >
+                      {format_sales_period(
+                        ticket_tier.start_date,
+                        ticket_tier.end_date
+                      )}
+                    </.labeled_value>
 
-                    <div>
-                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                        Attendee info
-                      </p>
-                      <p
-                        id={"tier-attendee-info-#{ticket_tier.id}"}
-                        class="text-sm text-zinc-700"
-                      >
-                        {attendee_info_summary(ticket_tier)}
-                      </p>
-                    </div>
+                    <.labeled_value
+                      label="Attendee info"
+                      value_class="text-sm text-zinc-700"
+                      value_id={"tier-attendee-info-#{ticket_tier.id}"}
+                    >
+                      {attendee_info_summary(ticket_tier)}
+                    </.labeled_value>
                   </div>
                 </div>
 

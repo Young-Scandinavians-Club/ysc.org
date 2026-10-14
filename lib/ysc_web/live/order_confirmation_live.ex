@@ -3,6 +3,7 @@ defmodule YscWeb.OrderConfirmationLive do
 
   require Ysc.Logging
 
+  alias Ysc.Events.DateTimeFormatter
   alias YscWeb.DateDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
@@ -263,44 +264,21 @@ defmodule YscWeb.OrderConfirmationLive do
               </div>
             </div>
             <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8 relative z-0">
-              <div>
-                <p class="text-xs text-zinc-500 mb-1 type-eyebrow">Event</p>
-                <p class="text-xl font-bold text-zinc-900">{@event.title}</p>
-              </div>
-              <div>
-                <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                  Date & Time
-                </p>
-                <p class="text-xl font-bold text-zinc-900">
-                  <%= if @event.start_date do %>
-                    {DateDisplay.format_date_long(@event.start_date, "TBD")}
-                  <% else %>
-                    TBD
-                  <% end %>
-                </p>
-                <p class="text-sm text-zinc-500">
-                  <%= if @event.start_time do %>
-                    {Calendar.strftime(@event.start_time, "%I:%M %p")}
-                  <% else %>
-                    Time TBD
-                  <% end %>
-                </p>
-              </div>
-              <div>
-                <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                  Location
-                </p>
-                <p class="text-xl font-bold text-zinc-900">
-                  <%= if @event.location_name do %>
-                    {@event.location_name}
-                  <% else %>
-                    TBD
-                  <% end %>
-                </p>
-                <p :if={@event.address} class="text-sm text-zinc-500">
+              <.labeled_value id="order-confirmation-event" label="Event">
+                {@event.title}
+              </.labeled_value>
+              <.labeled_value id="order-confirmation-when" label="Date & Time">
+                {DateDisplay.format_date_long(@event.start_date, "TBD")}
+                <:detail>
+                  {DateTimeFormatter.format_time(@event.start_time) || "Time TBD"}
+                </:detail>
+              </.labeled_value>
+              <.labeled_value id="order-confirmation-location" label="Location">
+                {@event.location_name || "TBD"}
+                <:detail :if={@event.address}>
                   {@event.address}
-                </p>
-              </div>
+                </:detail>
+              </.labeled_value>
             </div>
           </div>
           <!-- Tickets Card -->

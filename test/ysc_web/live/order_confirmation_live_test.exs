@@ -1054,9 +1054,39 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "Time TBD"
+      assert has_element?(view, "#order-confirmation-when", "Time TBD")
+    end
+
+    test "event start_time uses unpadded wall-clock label", %{conn: conn} do
+      user = create_user_with_membership()
+
+      event =
+        create_event(%{
+          start_time: ~T[19:00:00],
+          location_name: "Grand Hall",
+          address: "100 Nordic Way"
+        })
+
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(view, "#order-confirmation-event", event.title)
+      assert has_element?(view, "#order-confirmation-when", "7:00 PM")
+      refute has_element?(view, "#order-confirmation-when", "07:00 PM")
+      assert has_element?(view, "#order-confirmation-location", "Grand Hall")
+
+      assert has_element?(
+               view,
+               "#order-confirmation-location",
+               "100 Nordic Way"
+             )
     end
 
     test "event without location shows TBD", %{conn: conn} do
@@ -1074,9 +1104,9 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "TBD"
+      assert has_element?(view, "#order-confirmation-location", "TBD")
     end
   end
 

@@ -140,32 +140,26 @@ defmodule YscWeb.ConductViolationReportLive do
                     You are submitting this report as:
                   </p>
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                        Name
-                      </p>
-                      <p class="text-zinc-900 font-medium">
-                        {@current_user.first_name} {@current_user.last_name}
-                      </p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                        Email
-                      </p>
-                      <p class="text-zinc-900 font-medium">
-                        {@current_user.email}
-                      </p>
-                    </div>
-                    <div>
-                      <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                        Phone
-                      </p>
-                      <p class="text-zinc-900 font-medium">
-                        {Ysc.Extensions.PhoneNumber.format_for_display(
-                          @current_user.phone_number
-                        ) || "Not provided"}
-                      </p>
-                    </div>
+                    <.labeled_value
+                      label="Name"
+                      value_class="text-zinc-900 font-medium"
+                    >
+                      {@current_user.first_name} {@current_user.last_name}
+                    </.labeled_value>
+                    <.labeled_value
+                      label="Email"
+                      value_class="text-zinc-900 font-medium"
+                    >
+                      {@current_user.email}
+                    </.labeled_value>
+                    <.labeled_value
+                      label="Phone"
+                      value_class="text-zinc-900 font-medium"
+                    >
+                      {Ysc.Extensions.PhoneNumber.format_for_display(
+                        @current_user.phone_number
+                      ) || "Not provided"}
+                    </.labeled_value>
                   </div>
                   <p class="text-xs text-zinc-500 italic border-t border-zinc-200 pt-3">
                     We may contact you if we need more information.
