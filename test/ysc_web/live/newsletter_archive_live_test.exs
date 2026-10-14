@@ -314,8 +314,13 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
 
       assert html =~ "Full Issue"
       assert html =~ "newsletter-frame"
-      assert html =~ ~s(sandbox="")
-      assert has_element?(view, "#newsletter-frame[sandbox]")
+
+      # The print hook reads the frame's document, which needs allow-same-origin
+      # (and allow-modals for print()). allow-scripts must never be added.
+      assert has_element?(
+               view,
+               ~s(iframe#newsletter-frame[sandbox="allow-same-origin allow-modals"])
+             )
     end
 
     test "renders placeholder when archived HTML is missing", %{conn: conn} do
