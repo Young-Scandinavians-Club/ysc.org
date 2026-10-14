@@ -33,9 +33,14 @@ defmodule Ysc.StripeBehaviour do
               {:ok, Stripe.Invoice.t()} | {:error, any()}
   @callback list_invoice_payments(map(), keyword()) ::
               {:ok, Stripe.List.t(Stripe.InvoicePayment.t())} | {:error, any()}
+  @callback retrieve_payment_link(String.t()) ::
+              {:ok, Stripe.PaymentLink.t()} | {:error, any()}
 
-  # Optional so the many ad-hoc test clients don't all need stubs; callers go
-  # through `Ysc.Stripe.InvoiceHelpers`, which treats a missing callback as an
-  # error.
-  @optional_callbacks retrieve_invoice: 2, list_invoice_payments: 2
+  # Optional so the many ad-hoc test clients don't all need stubs. Invoice
+  # callers go through `Ysc.Stripe.InvoiceHelpers`. Payment-link donations go
+  # through `Ysc.Stripe.DonationPaymentLink`, which treats a missing callback
+  # as a retrieval failure so the webhook is retried.
+  @optional_callbacks retrieve_invoice: 2,
+                      list_invoice_payments: 2,
+                      retrieve_payment_link: 1
 end

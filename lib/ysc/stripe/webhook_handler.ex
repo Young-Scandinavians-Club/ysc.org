@@ -1654,6 +1654,17 @@ defmodule Ysc.Stripe.WebhookHandler do
     :ok
   end
 
+  # Stripe Payment Links (donate.stripe.com) complete as Checkout Sessions.
+  # Book configured donation links into the ledger; payout linking and refunds
+  # then find the payment by its PaymentIntent id.
+  defp handle(event_name, session)
+       when event_name in [
+              "checkout.session.completed",
+              "checkout.session.async_payment_succeeded"
+            ] and is_map(session) do
+    Ysc.Stripe.DonationPaymentLink.book_paid_session(session)
+  end
+
   defp handle(event_name, event_object) when is_binary(event_name) do
     # Log unhandled invoice-related events for debugging
     if String.starts_with?(event_name, "invoice.") do
