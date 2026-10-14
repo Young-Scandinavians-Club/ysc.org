@@ -350,6 +350,50 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Whether a WebAuthn authenticator `sign_count` is acceptable vs the stored
+  counter.
+
+  Strictly requires `new_count > stored_count` so a cloned authenticator
+  whose counter lagged (or a replay of the same assertion) is rejected.
+  The only exception is `0 == 0` for authenticators that do not support
+  counters (Finding 7).
+  """
+  def passkey_sign_count_acceptable?(new_count, stored_count)
+      when is_integer(new_count) and is_integer(stored_count) and
+             new_count >= 0 and stored_count >= 0 do
+    new_count > stored_count or (new_count == 0 and stored_count == 0)
+  end
+
+  def passkey_sign_count_acceptable?(_new_count, _stored_count), do: false
+
+  @doc """
+  Records a successful WebAuthn assertion after cryptographic verification.
+
+  Rejects cloned or replayed authenticators whose `sign_count` did not
+  increase (Finding 7). Login and step-up reauth must both go through this
+  so a clone rejected at login cannot pass reauth, and so legitimate reauth
+  advances the stored counter (Finding 90).
+  """
+  def accept_passkey_assertion(passkey, authenticator_data) do
+    case authenticator_sign_count(authenticator_data) do
+      new_sign_count when is_integer(new_sign_count) ->
+        if passkey_sign_count_acceptable?(new_sign_count, passkey.sign_count) do
+          update_passkey_sign_count(passkey, new_sign_count)
+        else
+          {:error, :replay}
+        end
+
+      _ ->
+        {:error, :replay}
+    end
+  end
+
+  defp authenticator_sign_count(%{sign_count: count}) when is_integer(count),
+    do: count
+
+  defp authenticator_sign_count(_), do: nil
+
+  @doc """
   Deletes a user passkey.
   """
   def delete_user_passkey(passkey) do
