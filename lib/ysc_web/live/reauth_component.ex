@@ -44,14 +44,27 @@ defmodule YscWeb.ReauthComponent do
   def handle_event("reauth_with_password", %{"password" => password}, socket) do
     user = socket.assigns.user
 
-    case Accounts.get_user_by_email_and_password(user.email, password) do
-      nil ->
-        {:noreply,
-         assign(socket, :reauth_error, "Invalid password. Please try again.")}
-
-      _valid_user ->
-        notify_parent(:reauth_verified)
+    # Finding 89: step-up password guesses share login's per-identifier cap.
+    # A stolen session must not get unlimited online guessing that login
+    # (5/min) would have blocked.
+    case enforce_reauth_rate_limit(socket) do
+      {:error, socket} ->
         {:noreply, socket}
+
+      :ok ->
+        case Accounts.get_user_by_email_and_password(user.email, password) do
+          nil ->
+            {:noreply,
+             assign(
+               socket,
+               :reauth_error,
+               "Invalid password. Please try again."
+             )}
+
+          _valid_user ->
+            notify_parent(:reauth_verified)
+            {:noreply, assign(socket, :reauth_error, nil)}
+        end
     end
   end
 
@@ -109,89 +122,12 @@ defmodule YscWeb.ReauthComponent do
          "That sign-in timed out. Please try again, or verify with your password below."
        )}
     else
-      try do
-        raw_id_string = response["rawId"] || response["id"]
-        raw_id = Base.url_decode64!(raw_id_string, padding: false)
+      case enforce_reauth_rate_limit(socket) do
+        {:error, socket} ->
+          {:noreply, socket}
 
-        authenticator_data =
-          Base.url_decode64!(response["response"]["authenticatorData"],
-            padding: false
-          )
-
-        client_data_json =
-          Base.url_decode64!(response["response"]["clientDataJSON"],
-            padding: false
-          )
-
-        signature =
-          Base.url_decode64!(response["response"]["signature"], padding: false)
-
-        case Accounts.get_user_passkey_by_external_id(raw_id) do
-          nil ->
-            Ysc.Logging.warning(
-              "[ReauthComponent] Passkey not found by external_id"
-            )
-
-            {:noreply,
-             assign(
-               socket,
-               :reauth_error,
-               "Passkey not recognized. Please try again."
-             )}
-
-          passkey ->
-            if passkey.user_id != user.id do
-              Ysc.Logging.error(
-                "[ReauthComponent] Passkey user_id mismatch — possible credential stuffing",
-                passkey_user_id: inspect(passkey.user_id),
-                current_user_id: inspect(user.id)
-              )
-
-              {:noreply,
-               assign(
-                 socket,
-                 :reauth_error,
-                 "Passkey verification failed. Please try again."
-               )}
-            else
-              case Wax.authenticate(
-                     raw_id,
-                     authenticator_data,
-                     signature,
-                     client_data_json,
-                     challenge
-                   ) do
-                {:ok, _auth_data} ->
-                  notify_parent(:reauth_verified)
-                  {:noreply, socket}
-
-                {:error, reason} ->
-                  Ysc.Logging.error("[ReauthComponent] Wax.authenticate failed",
-                    error: inspect(reason),
-                    user_id: user.id
-                  )
-
-                  {:noreply,
-                   assign(
-                     socket,
-                     :reauth_error,
-                     "Passkey authentication failed. Please try again."
-                   )}
-              end
-            end
-        end
-      rescue
-        e ->
-          Ysc.Logging.error("[ReauthComponent] Error decoding passkey response",
-            error: inspect(e)
-          )
-
-          {:noreply,
-           assign(
-             socket,
-             :reauth_error,
-             "Invalid passkey response. Please try again."
-           )}
+        :ok ->
+          verify_passkey_authentication(socket, user, challenge, response)
       end
     end
   end
@@ -230,6 +166,149 @@ defmodule YscWeb.ReauthComponent do
     do: {:noreply, socket}
 
   def handle_event("device_detected", _params, socket), do: {:noreply, socket}
+
+  defp verify_passkey_authentication(socket, user, challenge, response) do
+    try do
+      raw_id_string = response["rawId"] || response["id"]
+      raw_id = Base.url_decode64!(raw_id_string, padding: false)
+
+      authenticator_data =
+        Base.url_decode64!(response["response"]["authenticatorData"],
+          padding: false
+        )
+
+      client_data_json =
+        Base.url_decode64!(response["response"]["clientDataJSON"],
+          padding: false
+        )
+
+      signature =
+        Base.url_decode64!(response["response"]["signature"], padding: false)
+
+      case Accounts.get_user_passkey_by_external_id(raw_id) do
+        nil ->
+          Ysc.Logging.warning(
+            "[ReauthComponent] Passkey not found by external_id"
+          )
+
+          {:noreply,
+           assign(
+             socket,
+             :reauth_error,
+             "Passkey not recognized. Please try again."
+           )}
+
+        passkey ->
+          if passkey.user_id != user.id do
+            Ysc.Logging.error(
+              "[ReauthComponent] Passkey user_id mismatch — possible credential stuffing",
+              passkey_user_id: inspect(passkey.user_id),
+              current_user_id: inspect(user.id)
+            )
+
+            {:noreply,
+             assign(
+               socket,
+               :reauth_error,
+               "Passkey verification failed. Please try again."
+             )}
+          else
+            authenticate_passkey_assertion(
+              socket,
+              user,
+              passkey,
+              raw_id,
+              authenticator_data,
+              signature,
+              client_data_json,
+              challenge
+            )
+          end
+      end
+    rescue
+      e ->
+        Ysc.Logging.error("[ReauthComponent] Error decoding passkey response",
+          error: inspect(e)
+        )
+
+        {:noreply,
+         assign(
+           socket,
+           :reauth_error,
+           "Invalid passkey response. Please try again."
+         )}
+    end
+  end
+
+  defp authenticate_passkey_assertion(
+         socket,
+         user,
+         passkey,
+         raw_id,
+         authenticator_data,
+         signature,
+         client_data_json,
+         challenge
+       ) do
+    case Wax.authenticate(
+           raw_id,
+           authenticator_data,
+           signature,
+           client_data_json,
+           challenge
+         ) do
+      {:ok, auth_data} ->
+        # Finding 90: same sign_count compare/update as login (Finding 7).
+        case Accounts.accept_passkey_assertion(passkey, auth_data) do
+          {:ok, _updated} ->
+            notify_parent(:reauth_verified)
+            {:noreply, assign(socket, :reauth_error, nil)}
+
+          {:error, :replay} ->
+            Ysc.Logging.warning(
+              "[ReauthComponent] Passkey sign_count check failed - possible replay",
+              user_id: user.id
+            )
+
+            {:noreply,
+             assign(
+               socket,
+               :reauth_error,
+               "Passkey authentication failed. Please try again."
+             )}
+        end
+
+      {:error, reason} ->
+        Ysc.Logging.error("[ReauthComponent] Wax.authenticate failed",
+          error: inspect(reason),
+          user_id: user.id
+        )
+
+        {:noreply,
+         assign(
+           socket,
+           :reauth_error,
+           "Passkey authentication failed. Please try again."
+         )}
+    end
+  end
+
+  defp enforce_reauth_rate_limit(socket) do
+    user = socket.assigns.user
+
+    case Ysc.AuthRateLimit.check_identifier(user.email) do
+      :ok ->
+        :ok
+
+      {:error, :rate_limited, retry_after_sec} ->
+        {:error,
+         assign(
+           socket,
+           :reauth_error,
+           "Too many attempts. Please try again in #{retry_after_sec} seconds."
+         )}
+    end
+  end
 
   defp oauth_return_to(socket) do
     base = socket.assigns.return_to || "/"

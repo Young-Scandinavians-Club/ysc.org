@@ -29,7 +29,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
         <p class="history-serif text-zinc-500 italic text-sm mt-4 tracking-wide">
           Established 1950
         </p>
-        <p class="text-zinc-400 text-xs mt-2 type-eyebrow">
+        <p class="text-zinc-500 text-xs mt-2 type-eyebrow">
           San Francisco, California
         </p>
       </.page_masthead>
@@ -70,7 +70,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
           <.icon name="hero-clock" class="w-4 h-4" />
           <span>~12 min read</span>
         </div>
-        <div class="text-sm text-zinc-400 hidden sm:block">
+        <div class="text-sm text-zinc-500 hidden sm:block">
           <.icon name="hero-funnel" class="w-4 h-4 inline" /> Filter by category
         </div>
       </div>
@@ -248,7 +248,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
       </div>
 
       <div class="mb-3 md:mb-4">
-        <span class="text-2xl md:text-3xl history-serif text-zinc-400 font-medium">
+        <span class="text-2xl md:text-3xl history-serif text-zinc-500 font-medium">
           {@year}
         </span>
       </div>
@@ -377,7 +377,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
     ~H"""
     <div class="p-4 rounded-xl border border-zinc-200 bg-white flex flex-col items-center text-center relative">
       <div :if={@icon} class="absolute top-2 right-2">
-        <.icon name={@icon} class="w-4 h-4 text-zinc-400" />
+        <.icon name={@icon} class="w-4 h-4 text-zinc-500" />
       </div>
       <span class="text-xs text-zinc-500 mb-2 type-eyebrow">
         {@years}
@@ -398,7 +398,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
   def next_president_invite_card(assigns) do
     ~H"""
     <div class="p-4 rounded-xl border-2 border-dashed border-zinc-300 bg-stone-50 flex flex-col items-center text-center justify-center min-h-32">
-      <.icon name="hero-user-plus" class="w-5 h-5 text-zinc-400 mb-2" />
+      <.icon name="hero-user-plus" class="w-5 h-5 text-zinc-500 mb-2" />
       <span class="text-xs text-zinc-500 mb-2 type-eyebrow">
         The Next Chapter
       </span>
@@ -437,7 +437,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
           navigate={~p"/users/register"}
           class="px-8 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors duration-150 min-h-[44px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
         >
-          Become a Member
+          Apply for Membership
         </.link>
         <.link
           navigate={~p"/contact"}

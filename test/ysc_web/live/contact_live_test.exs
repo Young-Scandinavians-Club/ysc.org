@@ -457,6 +457,20 @@ defmodule YscWeb.ContactLiveTest do
   end
 
   describe "contact info cards" do
+    test "lists the membership mailbox for applicants and members", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/contact")
+
+      assert has_element?(view, "#contact-card-membership")
+
+      assert has_element?(
+               view,
+               "a[href='mailto:memberships@ysc.org']",
+               "memberships@ysc.org"
+             )
+    end
+
     test "displays department contact cards", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/contact")
 

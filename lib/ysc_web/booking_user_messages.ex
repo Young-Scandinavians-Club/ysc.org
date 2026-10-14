@@ -208,14 +208,14 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def membership_required_link_text do
-    "Manage Membership"
+    "Choose a membership"
   end
 
   def membership_required_message_html(membership_path) do
     link =
       ~s(<a href="#{membership_path}" class="font-semibold text-amber-900 hover:text-amber-950 underline">#{membership_required_link_text()}</a>)
 
-    "You need an active YSC membership to book the cabin. Go to your #{link} to pay or renew."
+    "You need an active YSC membership to book the cabin. #{link} and complete payment."
   end
 
   def membership_required_plain_message do

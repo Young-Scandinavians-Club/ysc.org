@@ -13,22 +13,21 @@ defmodule YscWeb.UserTicketsLive do
     ~H"""
     <div class="py-8 lg:py-12 bg-zinc-50/50 min-h-screen">
       <div class="max-w-(--breakpoint-xl) mx-auto px-4">
-        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-          <div>
-            <p class="text-teal-600 text-xs mb-2 type-eyebrow">
-              Your account
-            </p>
-            <h1 class="text-4xl lg:text-5xl text-zinc-900 type-display">
-              Your Tickets
-            </h1>
-          </div>
-          <.link
-            href={~p"/events"}
-            class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition"
-          >
-            <.icon name="hero-plus" class="w-4 h-4" /> Find More Events
-          </.link>
-        </div>
+        <.page_header
+          id="user-tickets-header"
+          eyebrow="Your account"
+          title="Your Tickets"
+          class="mb-12"
+        >
+          <:actions>
+            <.link
+              href={~p"/events"}
+              class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition"
+            >
+              <.icon name="hero-plus" class="w-4 h-4" /> Find More Events
+            </.link>
+          </:actions>
+        </.page_header>
 
         <div
           :if={@loading_user_tickets}
@@ -52,7 +51,7 @@ defmodule YscWeb.UserTicketsLive do
             id="ticket-orders-empty"
             class="only:block hidden lg:col-span-2 text-center py-16"
           >
-            <div class="text-zinc-400 mb-4">
+            <div class="text-zinc-500 mb-4">
               <.icon name="hero-ticket" class="w-16 h-16 mx-auto" />
             </div>
             <h3 class="text-lg text-zinc-900 mb-2 type-subhead">No tickets yet</h3>
@@ -77,7 +76,7 @@ defmodule YscWeb.UserTicketsLive do
                 <div class="flex justify-between items-start mb-6">
                   <.status_badge status={ticket_order.status} />
                   <p
-                    class="text-xs text-zinc-400 text-right type-eyebrow"
+                    class="text-xs text-zinc-500 text-right type-eyebrow"
                     title="Use this order number if you contact us about this purchase"
                   >
                     Order {ticket_order.reference_id}
@@ -131,7 +130,7 @@ defmodule YscWeb.UserTicketsLive do
                         phx-value-order-id={ticket_order.id}
                         color="red"
                         class="flex-1"
-                        data-confirm="Cancel this ticket checkout? Your selected tickets will go back on sale and you may lose your member discount. You can buy tickets again if any are still available."
+                        data-confirm="Cancel this checkout? Your selected tickets will go back on sale so others can buy them. You can buy them again later if any are still available."
                       >
                         Cancel checkout
                       </.button>
@@ -159,7 +158,7 @@ defmodule YscWeb.UserTicketsLive do
                         <p class="text-xs font-bold text-zinc-900">
                           {ticket.ticket_tier.name}
                         </p>
-                        <p class="text-xs font-mono text-zinc-400 mt-1">
+                        <p class="text-xs font-mono text-zinc-500 mt-1">
                           {ticket.reference_id}
                         </p>
                         <div class="mt-3 pt-3 border-t border-zinc-50 flex justify-between items-center">
@@ -185,7 +184,7 @@ defmodule YscWeb.UserTicketsLive do
 
                   <div class="mt-8 flex justify-between items-center">
                     <div class="text-right">
-                      <p class="text-xs text-zinc-400 type-eyebrow">
+                      <p class="text-xs text-zinc-500 type-eyebrow">
                         Total Paid
                       </p>
                       <p class="text-2xl text-zinc-900 type-title">
@@ -227,21 +226,21 @@ defmodule YscWeb.UserTicketsLive do
           <section class="mt-24 border-t border-zinc-200 pt-16">
             <div class="flex items-center justify-between mb-10">
               <div>
-                <h3 class="text-2xl text-zinc-400 italic type-subhead">
+                <h3 class="text-2xl text-zinc-500 italic type-subhead">
                   Memory Gallery
                 </h3>
-                <p class="text-sm text-zinc-400">Your past events with YSC</p>
+                <p class="text-sm text-zinc-500">Your past events with YSC</p>
               </div>
-              <span class="px-3 py-1 bg-zinc-100 text-zinc-400 text-xs rounded-full type-eyebrow">
+              <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs rounded-full type-eyebrow">
                 Archived
               </span>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <%= for item <- @past_items do %>
-                <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition duration-500 hover:bg-white hover:ring-2 hover:ring-zinc-300">
+                <div class="relative group bg-zinc-50/50 border border-zinc-200 rounded-2xl p-6 grayscale hover:grayscale-0 transition duration-500 hover:bg-white hover:ring-2 hover:ring-zinc-300">
                   <div class="flex justify-between items-start mb-4">
-                    <span class="text-xs text-zinc-400 border border-zinc-200 px-2 py-0.5 rounded-sm type-eyebrow">
+                    <span class="text-xs text-zinc-600 border border-zinc-200 px-2 py-0.5 rounded-sm type-eyebrow">
                       {format_visited_date(item)}
                     </span>
                     <.icon name="hero-check-badge" class="w-5 h-5 text-zinc-300" />
@@ -250,18 +249,18 @@ defmodule YscWeb.UserTicketsLive do
                   <h4 class="text-xl text-zinc-900 mb-1 type-subhead">
                     {item.title}
                   </h4>
-                  <p class="text-xs font-medium text-zinc-400 flex items-center gap-1 mb-4">
+                  <p class="text-xs font-medium text-zinc-600 flex items-center gap-1 mb-4">
                     <.icon name="hero-map-pin" class="w-3 h-3" />
                     {item.location}
                   </p>
 
                   <div class="pt-4 border-t border-zinc-100 flex justify-between items-center">
-                    <p class="text-xs font-mono text-zinc-400">
+                    <p class="text-xs font-mono text-zinc-600">
                       #{item.reference_id}
                     </p>
                     <.link
                       navigate={item.receipt_path}
-                      class="text-xs text-zinc-400 hover:text-teal-600 underline type-eyebrow"
+                      class="text-xs text-zinc-600 hover:text-teal-600 underline type-eyebrow"
                     >
                       View Receipt
                     </.link>

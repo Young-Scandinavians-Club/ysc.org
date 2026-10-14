@@ -350,6 +350,50 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Whether a WebAuthn authenticator `sign_count` is acceptable vs the stored
+  counter.
+
+  Strictly requires `new_count > stored_count` so a cloned authenticator
+  whose counter lagged (or a replay of the same assertion) is rejected.
+  The only exception is `0 == 0` for authenticators that do not support
+  counters (Finding 7).
+  """
+  def passkey_sign_count_acceptable?(new_count, stored_count)
+      when is_integer(new_count) and is_integer(stored_count) and
+             new_count >= 0 and stored_count >= 0 do
+    new_count > stored_count or (new_count == 0 and stored_count == 0)
+  end
+
+  def passkey_sign_count_acceptable?(_new_count, _stored_count), do: false
+
+  @doc """
+  Records a successful WebAuthn assertion after cryptographic verification.
+
+  Rejects cloned or replayed authenticators whose `sign_count` did not
+  increase (Finding 7). Login and step-up reauth must both go through this
+  so a clone rejected at login cannot pass reauth, and so legitimate reauth
+  advances the stored counter (Finding 90).
+  """
+  def accept_passkey_assertion(passkey, authenticator_data) do
+    case authenticator_sign_count(authenticator_data) do
+      new_sign_count when is_integer(new_sign_count) ->
+        if passkey_sign_count_acceptable?(new_sign_count, passkey.sign_count) do
+          update_passkey_sign_count(passkey, new_sign_count)
+        else
+          {:error, :replay}
+        end
+
+      _ ->
+        {:error, :replay}
+    end
+  end
+
+  defp authenticator_sign_count(%{sign_count: count}) when is_integer(count),
+    do: count
+
+  defp authenticator_sign_count(_), do: nil
+
+  @doc """
   Deletes a user passkey.
   """
   def delete_user_passkey(passkey) do
@@ -1787,6 +1831,12 @@ defmodule Ysc.Accounts do
             maybe_stop_comms_on_deleted_transition(previous_user, updated_user)
 
           revoke_sessions_if_blocked(updated_user)
+
+          disconnect_live_views_if_admin_privilege_lost(
+            previous_user,
+            updated_user
+          )
+
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
           Task.start(fn ->
@@ -1834,6 +1884,12 @@ defmodule Ysc.Accounts do
             maybe_stop_comms_on_deleted_transition(previous_user, updated_user)
 
           revoke_sessions_if_blocked(updated_user)
+
+          disconnect_live_views_if_admin_privilege_lost(
+            previous_user,
+            updated_user
+          )
+
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
           Task.start(fn ->
@@ -1897,6 +1953,7 @@ defmodule Ysc.Accounts do
             maybe_stop_comms_on_deleted_transition(user, updated_user)
 
           revoke_sessions_if_blocked(updated_user)
+          disconnect_live_views_if_admin_privilege_lost(user, updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
           Task.start(fn ->
@@ -1920,6 +1977,20 @@ defmodule Ysc.Accounts do
   end
 
   defp revoke_sessions_if_blocked(_user), do: :ok
+
+  # Demotion does not delete session tokens (the account can keep browsing as a
+  # member), but Finding 87's remount-only guard is not enough: an already-open
+  # impersonating LiveView keeps `current_user` as the victim until disconnect.
+  defp disconnect_live_views_if_admin_privilege_lost(
+         %User{role: :admin},
+         %User{role: role} = user
+       )
+       when role != :admin do
+    disconnect_user_live_views(user)
+  end
+
+  defp disconnect_live_views_if_admin_privilege_lost(_previous, _updated),
+    do: :ok
 
   # Audit-logs direct account-status edits (e.g. the admin Profile tab's
   # "Account Status" dropdown) the same way record_application_outcome/4
@@ -2474,18 +2545,50 @@ defmodule Ysc.Accounts do
   def receives_outbound_comms?(_), do: true
 
   @doc """
-  Deletes all session tokens for the given user.
+  Deletes all session tokens for the given user and disconnects LiveViews.
 
   Used when an account is suspended, rejected, or deleted so existing cookies
   and mobile bearer tokens stop working immediately instead of remaining valid
   for up to 60 days (web) / 90 days (mobile).
+
+  Finding 87 closed the HTTP/remount impersonation path after revoke, but
+  `UserAuth.mount_current_user/2` only runs on mount. Without a PubSub
+  `"disconnect"` (as `UserAuth.drop_user_session/1` and the Security page's
+  per-session revoke already send), an already-connected LiveView kept
+  `current_user` as the impersonation victim and continued handling events.
   """
   def revoke_all_user_sessions(%User{} = user) do
+    # Broadcast before delete so we can still read session token rows.
+    disconnect_user_live_views(user)
+
     Repo.delete_all(
       UserToken.by_user_and_contexts_query(user, ["session", "mobile_session"])
     )
 
     :ok
+  end
+
+  # Force-close LiveViews for every web session token. Same topic shape as
+  # `UserAuth.put_token_in_session/2` / `drop_user_session/1`.
+  defp disconnect_user_live_views(%User{} = user) do
+    user.id
+    |> session_tokens_for_live_disconnect_query()
+    |> Repo.all()
+    |> Enum.each(fn token ->
+      YscWeb.Endpoint.broadcast(
+        "users_sessions:#{Base.url_encode64(token)}",
+        "disconnect",
+        %{}
+      )
+    end)
+
+    :ok
+  end
+
+  defp session_tokens_for_live_disconnect_query(user_id) do
+    from t in UserToken,
+      where: t.user_id == ^user_id and t.context == "session",
+      select: t.token
   end
 
   @doc """
@@ -5650,6 +5753,13 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_user_note_author_query do
     user_note_author_query()
+  end
+
+  @doc false
+  def ci_query_explain_session_tokens_for_live_disconnect_query do
+    session_tokens_for_live_disconnect_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
+    )
   end
 
   defp membership_ytd_windows(%DateTime{} = now) do

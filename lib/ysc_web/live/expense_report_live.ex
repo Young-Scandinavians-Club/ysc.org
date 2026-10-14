@@ -1728,17 +1728,19 @@ defmodule YscWeb.ExpenseReportLive do
     <div class="py-8 lg:py-10">
       <div class="max-w-3xl mx-auto px-4">
         <!-- Header -->
-        <div class="flex items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 class="text-2xl text-zinc-900 type-display">My Expense Reports</h1>
-            <p class="text-sm text-zinc-500 mt-1">
-              {list_summary_line(@drafts, @submitted)}
-            </p>
-          </div>
-          <.button navigate={~p"/expensereport"}>
-            <.icon name="hero-plus" class="w-5 h-5" /> New Report
-          </.button>
-        </div>
+        <.page_header
+          id="expense-reports-header"
+          eyebrow="Expenses"
+          title="My Expense Reports"
+          subtitle={list_summary_line(@drafts, @submitted)}
+          class="mb-6"
+        >
+          <:actions>
+            <.button navigate={~p"/expensereport"}>
+              <.icon name="hero-plus" class="w-5 h-5" /> New Report
+            </.button>
+          </:actions>
+        </.page_header>
 
         <%= if Enum.empty?(@expense_reports) do %>
           <div class="bg-white rounded-lg border border-zinc-200 p-12 text-center">
@@ -1798,7 +1800,7 @@ defmodule YscWeb.ExpenseReportLive do
                   phx-click="discard-draft"
                   phx-value-id={report.id}
                   data-confirm="Delete this draft? This can't be undone."
-                  class="shrink-0 p-1.5 text-zinc-400 hover:text-red-600 transition-colors"
+                  class="shrink-0 p-1.5 text-zinc-500 hover:text-red-600 transition-colors"
                   title="Delete draft"
                 >
                   <.icon name="hero-trash" class="w-4 h-4" />
@@ -1810,7 +1812,7 @@ defmodule YscWeb.ExpenseReportLive do
           <div :if={@submitted != []}>
             <h2
               :if={@drafts != []}
-              class="text-xs text-zinc-400 mb-2 type-eyebrow"
+              class="text-xs text-zinc-500 mb-2 type-eyebrow"
             >
               Submitted
             </h2>
@@ -1837,7 +1839,7 @@ defmodule YscWeb.ExpenseReportLive do
                     </p>
                   </div>
                   <div class="shrink-0 text-right">
-                    <p class="text-[11px] text-zinc-400 type-eyebrow">
+                    <p class="text-[11px] text-zinc-500 type-eyebrow">
                       Reimburse
                     </p>
                     <p class="font-semibold text-zinc-900 tabular-nums">
@@ -1922,19 +1924,24 @@ defmodule YscWeb.ExpenseReportLive do
         <div :if={!@loading_expense_form_data}>
           <!-- Header -->
           <div class="mb-8">
-            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
-              <div class="flex-1">
-                <h1 class="text-3xl text-zinc-900 type-display">Expense Report</h1>
-              </div>
-              <.button
-                navigate={~p"/expensereports"}
-                variant="outline"
-                color="zinc"
-                class="shrink-0 bg-white hover:bg-zinc-100"
-              >
-                <.icon name="hero-document-text" class="w-5 h-5" /> View My Reports
-              </.button>
-            </div>
+            <.page_header
+              id="expense-report-form-header"
+              eyebrow="Expenses"
+              title="Expense Report"
+              class="mb-6"
+            >
+              <:actions>
+                <.button
+                  navigate={~p"/expensereports"}
+                  variant="outline"
+                  color="zinc"
+                  class="shrink-0 bg-white hover:bg-zinc-100"
+                >
+                  <.icon name="hero-document-text" class="w-5 h-5" />
+                  View My Reports
+                </.button>
+              </:actions>
+            </.page_header>
             <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-5">
               <div class="flex gap-3">
                 <.icon
@@ -2485,13 +2492,13 @@ defmodule YscWeb.ExpenseReportLive do
                                 <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
                                   <.icon
                                     name="hero-photo"
-                                    class="w-12 h-12 text-zinc-400 mb-3"
+                                    class="w-12 h-12 text-zinc-500 mb-3"
                                   />
                                   <p class="mb-2 text-sm text-zinc-500">
                                     <span class="font-semibold">Click to upload</span>
                                     or drag and drop
                                   </p>
-                                  <p class="text-xs text-zinc-400">
+                                  <p class="text-xs text-zinc-500">
                                     PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
                                   </p>
                                 </div>
@@ -2605,7 +2612,7 @@ defmodule YscWeb.ExpenseReportLive do
                               >
                                 <.icon
                                   name="hero-paper-clip"
-                                  class="w-8 h-8 text-zinc-400 mb-2"
+                                  class="w-8 h-8 text-zinc-500 mb-2"
                                 />
                                 <span class="text-sm text-zinc-500">
                                   <span class="font-semibold">Add a receipt</span>
@@ -2638,7 +2645,7 @@ defmodule YscWeb.ExpenseReportLive do
                       <div class="flex flex-col items-center max-w-md mx-auto">
                         <.icon
                           name="hero-currency-dollar"
-                          class="w-12 h-12 text-zinc-400 mb-3"
+                          class="w-12 h-12 text-zinc-500 mb-3"
                         />
                         <p class="text-sm font-medium text-zinc-600 mb-2">
                           None added yet
@@ -2867,13 +2874,13 @@ defmodule YscWeb.ExpenseReportLive do
                               <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
                                 <.icon
                                   name="hero-photo"
-                                  class="w-12 h-12 text-zinc-400 mb-3"
+                                  class="w-12 h-12 text-zinc-500 mb-3"
                                 />
                                 <p class="mb-2 text-sm text-zinc-500">
                                   <span class="font-semibold">Click to upload</span>
                                   or drag and drop
                                 </p>
-                                <p class="text-xs text-zinc-400">
+                                <p class="text-xs text-zinc-500">
                                   PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
                                 </p>
                               </div>
@@ -2987,7 +2994,7 @@ defmodule YscWeb.ExpenseReportLive do
                             >
                               <.icon
                                 name="hero-paper-clip"
-                                class="w-8 h-8 text-zinc-400 mb-2"
+                                class="w-8 h-8 text-zinc-500 mb-2"
                               />
                               <span class="text-sm text-zinc-500">
                                 <span class="font-semibold">Add proof</span>
@@ -3394,7 +3401,7 @@ defmodule YscWeb.ExpenseReportLive do
                     <button
                       type="button"
                       phx-click="close-bank-account-modal"
-                      class="text-zinc-400 hover:text-zinc-500"
+                      class="text-zinc-500 hover:text-zinc-500"
                     >
                       <span class="sr-only">Close</span>
                       <.icon name="hero-x-mark" class="w-6 h-6" />
@@ -3457,19 +3464,19 @@ defmodule YscWeb.ExpenseReportLive do
                           <div class="col-span-2 space-y-2">
                             <div class="flex justify-between items-center">
                               <span class="text-xs text-zinc-500">Date:</span>
-                              <span class="text-xs text-zinc-400">MM/DD/YYYY</span>
+                              <span class="text-xs text-zinc-500">MM/DD/YYYY</span>
                             </div>
                             <div class="border-b border-zinc-300 pb-1">
                               <div class="text-xs text-zinc-500 mb-1">
                                 Pay to the order of
                               </div>
-                              <div class="text-sm text-zinc-400">
+                              <div class="text-sm text-zinc-500">
                                 _________________________
                               </div>
                             </div>
                             <div class="flex justify-between items-center border-b border-zinc-300 pb-1">
                               <div class="text-xs text-zinc-500">$</div>
-                              <div class="text-sm text-zinc-400 flex-1 text-right">
+                              <div class="text-sm text-zinc-500 flex-1 text-right">
                                 _________________________
                               </div>
                             </div>
@@ -3478,7 +3485,7 @@ defmodule YscWeb.ExpenseReportLive do
                           <div class="space-y-2">
                             <div>
                               <div class="text-xs text-zinc-500 mb-1">Memo:</div>
-                              <div class="text-xs text-zinc-400 border-b border-zinc-300 pb-1">
+                              <div class="text-xs text-zinc-500 border-b border-zinc-300 pb-1">
                                 _____________
                               </div>
                             </div>
@@ -3486,7 +3493,7 @@ defmodule YscWeb.ExpenseReportLive do
                               <div class="text-xs text-zinc-500 mb-1">
                                 Signature
                               </div>
-                              <div class="text-xs text-zinc-400">_____________</div>
+                              <div class="text-xs text-zinc-500">_____________</div>
                             </div>
                           </div>
                         </div>
@@ -3518,7 +3525,7 @@ defmodule YscWeb.ExpenseReportLive do
                               </svg>
                             </div>
                             <!-- Separator symbols (typical on MICR line) -->
-                            <span class="text-zinc-400">⦁</span>
+                            <span class="text-zinc-500">⦁</span>
                             <!-- Account Number -->
                             <div class="flex items-center gap-1">
                               <div class="px-2 py-1 bg-blue-100 border-2 border-blue-400 border-dashed rounded-sm">
@@ -3546,7 +3553,7 @@ defmodule YscWeb.ExpenseReportLive do
                               <span class="font-medium text-blue-700">
                                 Routing Number
                               </span>
-                              <span class="text-zinc-400">•</span>
+                              <span class="text-zinc-500">•</span>
                               <span class="font-medium text-blue-700">
                                 Account Number
                               </span>
@@ -4116,7 +4123,7 @@ defmodule YscWeb.ExpenseReportLive do
             </div>
           <% :pending -> %>
             <div class="w-8 h-8 rounded-full bg-zinc-100 border-2 border-zinc-300 flex items-center justify-center">
-              <.icon name={@icon} class="w-5 h-5 text-zinc-400" />
+              <.icon name={@icon} class="w-5 h-5 text-zinc-500" />
             </div>
         <% end %>
       </div>

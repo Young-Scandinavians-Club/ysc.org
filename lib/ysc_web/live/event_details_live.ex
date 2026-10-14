@@ -14,6 +14,7 @@ defmodule YscWeb.EventDetailsLive do
 
   alias Ysc.Events.{
     AttendeeInfo,
+    DateTimeFormatter,
     EventPricingCache,
     MemberOnlyTickets,
     PricingDisplay,
@@ -502,12 +503,12 @@ defmodule YscWeb.EventDetailsLive do
               </div>
               <%= if has_duration do %>
                 <div class="p-8 bg-zinc-50/30">
-                  <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
+                  <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                     Duration
                   </p>
                   <p class="font-bold text-xl text-zinc-900 tracking-tight leading-none">
-                    {case {format_time(@event.start_time),
-                           format_time(@event.end_time)} do
+                    {case {DateTimeFormatter.parse_time(@event.start_time),
+                           DateTimeFormatter.parse_time(@event.end_time)} do
                       {%Time{} = start_time, %Time{} = end_time} ->
                         duration_minutes = Time.diff(end_time, start_time, :minute)
                         hours = div(duration_minutes, 60)
@@ -692,7 +693,7 @@ defmodule YscWeb.EventDetailsLive do
                       <div class="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-8">
                         <div class="w-36 shrink-0">
                           <span class="text-xs text-blue-600 bg-blue-50 px-2.5 py-1 rounded-sm whitespace-nowrap group-hover:bg-blue-600 group-hover:text-white transition-colors type-eyebrow">
-                            {format_start_end(
+                            {DateTimeFormatter.format_time_range(
                               agenda_item.start_time,
                               agenda_item.end_time
                             )}
@@ -731,7 +732,7 @@ defmodule YscWeb.EventDetailsLive do
                       >
                         {update.title}
                       </h4>
-                      <span class="shrink-0 text-sm text-zinc-400">
+                      <span class="shrink-0 text-sm text-zinc-500">
                         {format_relative_time(update.inserted_at)}
                       </span>
                     </div>
@@ -745,7 +746,7 @@ defmodule YscWeb.EventDetailsLive do
                         {raw(update.rendered_body)}
                       </div>
                     </article>
-                    <p :if={update.sent_by} class="mt-4 text-sm text-zinc-400">
+                    <p :if={update.sent_by} class="mt-4 text-sm text-zinc-500">
                       Posted by {update.sent_by.first_name} {update.sent_by.last_name}
                     </p>
                   </div>
@@ -829,7 +830,7 @@ defmodule YscWeb.EventDetailsLive do
                                 else: "tickets"}
                             </p>
                           <% true -> %>
-                            <p class="text-[10px] text-zinc-400 font-medium leading-tight">
+                            <p class="text-[10px] text-zinc-500 font-medium leading-tight">
                               {if is_host, do: "Host · ", else: ""}{ticket_count} {if ticket_count ==
                                                                                         1,
                                                                                       do:
@@ -853,7 +854,7 @@ defmodule YscWeb.EventDetailsLive do
                           +{overflow_count}
                         </span>
                       </div>
-                      <p class="text-xs font-bold text-zinc-400 group-hover:text-zinc-600 transition-colors leading-tight text-center">
+                      <p class="text-xs font-bold text-zinc-500 group-hover:text-zinc-600 transition-colors leading-tight text-center">
                         more
                       </p>
                     </button>
@@ -910,7 +911,7 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                 <% else %>
                   <div class="p-8 text-center bg-zinc-50/50 shadow-[inset_0_-1px_0_0_rgba(0,0,0,0.06)]">
-                    <p class="text-xs text-zinc-400 mb-2 type-eyebrow">
+                    <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
                       Tickets
                     </p>
                     <p class={[
@@ -961,7 +962,7 @@ defmodule YscWeb.EventDetailsLive do
                               <p class="text-xs text-orange-600 type-eyebrow">
                                 Limited Availability
                               </p>
-                              <p class="text-xs font-mono text-zinc-400">
+                              <p class="text-xs font-mono text-zinc-500">
                                 {sold_percentage}% full
                               </p>
                             </div>
@@ -1035,7 +1036,7 @@ defmodule YscWeb.EventDetailsLive do
                           <%!-- Loading skeleton for availability --%>
                           <div
                             :if={!@async_data_loaded}
-                            class="flex items-center gap-3 text-sm text-zinc-400 font-medium animate-pulse"
+                            class="flex items-center gap-3 text-sm text-zinc-500 font-medium animate-pulse"
                           >
                             <div class="w-5 h-5 bg-zinc-200 rounded-sm"></div>
                             <div class="h-4 bg-zinc-200 rounded-sm w-32"></div>
@@ -1057,23 +1058,28 @@ defmodule YscWeb.EventDetailsLive do
 
                     <div
                       :if={@current_user == nil && @has_ticket_tiers}
+                      id="event-tickets-guest-cta"
                       class="w-full space-y-4"
                     >
-                      <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-center">
-                        <.icon
-                          name="hero-exclamation-circle"
-                          class="text-orange-500 w-6 h-6"
-                        />
-                        Sign in with your YSC account to buy tickets. An active, paid membership is required.
-                      </div>
+                      <p class="text-sm text-zinc-700 px-3 py-3 bg-zinc-50 rounded-xl border border-zinc-200 text-center">
+                        Tickets are for YSC members. Sign in to buy yours, or apply to join the club.
+                      </p>
                       <.button
                         class="w-full py-4 type-eyebrow"
                         navigate={
                           ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                         }
                       >
-                        <.icon name="hero-ticket" class="w-6 h-6" />Sign in
+                        <.icon name="hero-ticket" class="w-6 h-6" />Sign in to buy tickets
                       </.button>
+                      <.link
+                        id="event-tickets-apply-link"
+                        navigate={~p"/users/register"}
+                        class="flex items-center justify-center gap-1 min-h-11 text-sm font-semibold text-blue-700 hover:underline"
+                      >
+                        Not a member? Apply for membership
+                        <.icon name="hero-arrow-right" class="w-4 h-4" />
+                      </.link>
                     </div>
 
                     <div
@@ -1098,11 +1104,14 @@ defmodule YscWeb.EventDetailsLive do
                               Member tickets require an active paid membership. Activate or renew your membership to buy tickets.
                           <% end %>
                         </p>
+                        <% {cta_path, cta_label} =
+                          membership_cta(@current_user, @had_membership?) %>
                         <.link
-                          navigate={~p"/users/membership"}
-                          class="inline-flex items-center justify-center gap-1 text-sm font-semibold text-orange-900 underline underline-offset-2"
+                          id="event-tickets-membership-link"
+                          navigate={cta_path}
+                          class="inline-flex items-center justify-center gap-1 min-h-11 text-sm font-semibold text-orange-900 underline underline-offset-2"
                         >
-                          View membership and payment options
+                          {cta_label}
                           <.icon name="hero-arrow-right" class="w-4 h-4" />
                         </.link>
                       </div>
@@ -1193,9 +1202,16 @@ defmodule YscWeb.EventDetailsLive do
                     @current_user == nil && @has_ticket_tiers &&
                       !ticket_sales_closed?(@event)
                   }
-                  class="max-w-(--breakpoint-md) mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
+                  class="max-w-(--breakpoint-md) mx-auto mb-3 text-xs text-zinc-600 text-center leading-snug"
                 >
-                  Sign in with your YSC account to buy tickets. An active, paid membership is required.
+                  Tickets are for YSC members.
+                  <.link
+                    id="event-tickets-apply-link-mobile"
+                    navigate={~p"/users/register"}
+                    class="inline-block py-2 -my-2 font-semibold text-blue-700 underline underline-offset-2"
+                  >
+                    Apply for membership
+                  </.link>
                 </p>
                 <p
                   :if={
@@ -1254,29 +1270,17 @@ defmodule YscWeb.EventDetailsLive do
                       </div>
                       <%= if @event.start_date != nil do %>
                         <%!-- Mobile: Short format (Wed, Dec 25) --%>
-                        <p class="sm:hidden text-xs text-zinc-400 truncate type-eyebrow">
+                        <p class="sm:hidden text-xs text-zinc-500 truncate type-eyebrow">
                           {format_start_date_short(@event.start_date)}
                           <%= if @event.start_time != nil do %>
-                            • {case format_time(@event.start_time) do
-                              %Time{} = time ->
-                                Timex.format!(time, "{h12}:{m} {AM}")
-
-                              _ ->
-                                ""
-                            end}
+                            • {DateTimeFormatter.format_time(@event.start_time)}
                           <% end %>
                         </p>
                         <%!-- Desktop: Full format (Wednesday, December 25) --%>
-                        <p class="hidden sm:block text-xs text-zinc-400 truncate type-eyebrow">
+                        <p class="hidden sm:block text-xs text-zinc-500 truncate type-eyebrow">
                           {format_start_date(@event.start_date)}
                           <%= if @event.start_time != nil do %>
-                            • {case format_time(@event.start_time) do
-                              %Time{} = time ->
-                                Timex.format!(time, "{h12}:{m} {AM}")
-
-                              _ ->
-                                ""
-                            end}
+                            • {DateTimeFormatter.format_time(@event.start_time)}
                           <% end %>
                         </p>
                       <% end %>
@@ -1301,7 +1305,7 @@ defmodule YscWeb.EventDetailsLive do
                             ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                           }
                         >
-                          <.icon name="hero-ticket" class="w-5 h-5" />Sign in
+                          <.icon name="hero-ticket" class="w-5 h-5" />Sign in to buy
                         </.button>
                       <% else %>
                         <%= if @has_ticket_tiers do %>
@@ -1321,14 +1325,17 @@ defmodule YscWeb.EventDetailsLive do
                                 />Get Tickets
                               </.button>
                             <% else %>
+                              <% {cta_path, cta_label} =
+                                membership_cta(@current_user, @had_membership?) %>
                               <.button
+                                id="event-tickets-membership-button-mobile"
                                 class="shrink-0 px-8 py-3.5 type-eyebrow"
-                                navigate={~p"/users/membership"}
+                                navigate={cta_path}
                               >
                                 <.icon
                                   name="hero-identification"
                                   class="w-5 h-5"
-                                />Membership options
+                                />{cta_label}
                               </.button>
                             <% end %>
                           <% end %>
@@ -1748,7 +1755,7 @@ defmodule YscWeb.EventDetailsLive do
                           class={[
                             "w-12 text-center font-medium text-lg",
                             if(is_sold_out or is_sale_ended or is_pre_sale,
-                              do: "text-zinc-400",
+                              do: "text-zinc-500",
                               else: "text-zinc-900"
                             )
                           ]}
@@ -1918,11 +1925,11 @@ defmodule YscWeb.EventDetailsLive do
                   if(@checkout_pricing, do: "hidden", else: "")
                 ]}
               >
-                <div class="text-zinc-400 mb-2">
+                <div class="text-zinc-500 mb-2">
                   <.icon name="hero-shopping-cart" class="w-8 h-8 mx-auto" />
                 </div>
                 <p class="text-zinc-500 text-sm">No tickets selected</p>
-                <p class="hidden lg:block text-zinc-400 text-sm mt-1">
+                <p class="hidden lg:block text-zinc-500 text-sm mt-1">
                   Select tickets from the left to see your order
                 </p>
               </div>
@@ -2324,7 +2331,7 @@ defmodule YscWeb.EventDetailsLive do
                       )}
                     </.button>
                   </div>
-                  <p class="text-center text-xs text-zinc-400 flex items-center justify-center gap-1">
+                  <p class="text-center text-xs text-zinc-500 flex items-center justify-center gap-1">
                     <.icon name="hero-lock-closed" class="w-3 h-3" />
                     Secure, encrypted payment
                   </p>
@@ -2392,7 +2399,7 @@ defmodule YscWeb.EventDetailsLive do
                     <% end %>
                   <% else %>
                     <div class="text-center py-8">
-                      <div class="text-zinc-400 mb-2">
+                      <div class="text-zinc-500 mb-2">
                         <.icon name="hero-shopping-cart" class="w-8 h-8 mx-auto" />
                       </div>
                       <p class="text-zinc-500 text-sm">No tickets selected</p>
@@ -6204,10 +6211,7 @@ defmodule YscWeb.EventDetailsLive do
   defp format_event_when_time_subline(%{start_time: nil}), do: nil
 
   defp format_event_when_time_subline(event) do
-    case format_start_end(event.start_time, event.end_time) do
-      nil -> nil
-      time_label -> time_label
-    end
+    DateTimeFormatter.format_time_range(event.start_time, event.end_time)
   end
 
   defp format_event_when_weekday_range(start, finish) do
@@ -6249,37 +6253,6 @@ defmodule YscWeb.EventDetailsLive do
 
   defp default_active_agenda([]), do: nil
   defp default_active_agenda(agendas), do: hd(agendas).id
-
-  defp format_time(nil), do: nil
-  defp format_time(""), do: nil
-
-  defp format_time(time) when is_binary(time) do
-    case Timex.parse(time, "%H:%M:%S", :strftime) do
-      {:ok, time} -> time
-      {:error, _} -> Timex.parse!(time, "%H:%M", :strftime)
-    end
-  end
-
-  defp format_time(time), do: time
-
-  defp format_start_end(start_time, end_time) do
-    start_time = format_time(start_time)
-    end_time = format_time(end_time)
-
-    case {start_time, end_time} do
-      {nil, nil} ->
-        nil
-
-      {nil, _} ->
-        end_time
-
-      {_, nil} ->
-        Timex.format!(start_time, "{h12}:{m} {AM}")
-
-      {start_time, end_time} ->
-        "#{Timex.format!(start_time, "{h12}:{m} {AM}")} - #{Timex.format!(end_time, "{h12}:{m} {AM}")}"
-    end
-  end
 
   def date_for_add_to_cal(nil), do: nil
 
@@ -7293,6 +7266,17 @@ defmodule YscWeb.EventDetailsLive do
   # True once the event's end cutoff has passed (matches Events upcoming/past
   # listing): end date+time, else end of end date, else start date+time, else
   # end of start date.
+  # Where a signed-in non-member should go to be able to buy tickets, and what
+  # the link should say for their situation.
+  defp membership_cta(%{state: :pending_approval}, _had_membership?),
+    do: {~p"/pending-review", "View application status"}
+
+  defp membership_cta(_user, true),
+    do: {~p"/users/membership", "Renew membership"}
+
+  defp membership_cta(_user, _had_membership?),
+    do: {~p"/users/membership", "Choose a membership"}
+
   defp event_in_past?(event) do
     case event_ends_at(event) do
       nil -> false

@@ -683,7 +683,7 @@ defmodule YscWeb.CoreComponents do
         :if={@label}
         class={[
           "text-sm font-semibold",
-          if(@checked, do: "text-green-700", else: "text-zinc-400")
+          if(@checked, do: "text-green-700", else: "text-zinc-500")
         ]}
         style="transition: color 0.3s ease-in-out;"
       >
@@ -1201,7 +1201,7 @@ defmodule YscWeb.CoreComponents do
     >
       <.icon
         name="hero-eye-solid"
-        class="h-5 w-5 text-zinc-400 hover:text-zinc-600"
+        class="h-5 w-5 text-zinc-500 hover:text-zinc-600"
       />
     </button>
     """
@@ -3066,7 +3066,7 @@ defmodule YscWeb.CoreComponents do
     cond do
       idx == active -> "font-semibold text-blue-800"
       idx < active -> "text-zinc-600 group-hover:text-blue-700"
-      true -> "text-zinc-400 group-hover:text-zinc-600"
+      true -> "text-zinc-500 group-hover:text-zinc-600"
     end
   end
 
@@ -3963,6 +3963,58 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Small inline action used in section headers and status rows ("View all
+  events", "Turn off", "Subscribe").
+
+  The text stays compact, but the tap area is at least 44px tall; negative
+  vertical margin keeps the surrounding layout unchanged. Renders a link when
+  given `navigate`, `patch` or `href`, otherwise a `<button type="button">`.
+
+  ## Examples
+
+      <.section_link navigate={~p"/events"}>View All Events</.section_link>
+
+      <.section_link phx-click="toggle" phx-disable-with="Saving...">Turn off</.section_link>
+  """
+  attr :class, :any, default: nil
+
+  attr :rest, :global,
+    include: ~w(navigate patch href id phx-click phx-disable-with)
+
+  slot :inner_block, required: true
+
+  def section_link(%{rest: rest} = assigns) do
+    assigns =
+      assign(
+        assigns,
+        :link?,
+        Enum.any?([:navigate, :patch, :href], &Map.has_key?(rest, &1))
+      )
+
+    ~H"""
+    <.link
+      :if={@link?}
+      class={[section_link_class(), @class]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </.link>
+    <button
+      :if={!@link?}
+      type="button"
+      class={[section_link_class(), @class]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </button>
+    """
+  end
+
+  defp section_link_class do
+    "inline-flex items-center gap-1 min-h-11 -my-3.5 text-xs font-bold text-blue-600 hover:underline"
+  end
+
   @account_settings_nav_keys [
     {:profile, "Profile", "hero-user"},
     {:membership, "Membership", "hero-heart"},
@@ -4016,25 +4068,30 @@ defmodule YscWeb.CoreComponents do
     assigns = assign(assigns, :nav_items, account_settings_nav_items())
 
     ~H"""
-    <ul class="shrink-0 flex-column space-y-4 md:pr-10 text-sm font-medium text-zinc-600 md:me-4 mb-4 md:mb-0">
-      <li>
-        <h2 class="text-zinc-800 text-2xl mb-10 type-title">
-          Account
-        </h2>
-      </li>
-      <%= for {key, label, icon, path} <- @nav_items do %>
-        <%= if key != :family || @show_family_link? do %>
-          <li>
-            <.account_settings_nav_link
-              navigate={path}
-              icon={icon}
-              label={label}
-              active?={@current == key}
-            />
-          </li>
+    <nav
+      id="account-settings-nav"
+      phx-hook="AccountNavScroll"
+      aria-label="Account settings"
+      class="shrink-0 md:pr-10 md:me-4 mb-4 md:mb-0 text-sm font-medium text-zinc-600"
+    >
+      <h2 class="text-zinc-800 text-2xl mb-4 md:mb-10 type-title">
+        Account
+      </h2>
+      <ul class="account-settings-nav-list relative flex md:flex-col gap-2 md:gap-4 -mx-4 px-4 md:mx-0 md:px-0 overflow-x-auto md:overflow-visible thin-scrollbar">
+        <%= for {key, label, icon, path} <- @nav_items do %>
+          <%= if key != :family || @show_family_link? do %>
+            <li class="shrink-0 md:shrink">
+              <.account_settings_nav_link
+                navigate={path}
+                icon={icon}
+                label={label}
+                active?={@current == key}
+              />
+            </li>
+          <% end %>
         <% end %>
-      <% end %>
-    </ul>
+      </ul>
+    </nav>
     """
   end
 
@@ -4049,11 +4106,12 @@ defmodule YscWeb.CoreComponents do
     <.link
       navigate={@navigate}
       class={[
-        "inline-flex items-center px-4 py-3 rounded-sm w-full whitespace-nowrap",
+        "inline-flex items-center px-4 py-3 rounded-sm md:w-full whitespace-nowrap",
         @active? && "bg-blue-600 active text-zinc-100",
         !@active? && "hover:bg-zinc-100 hover:text-zinc-900"
       ]}
       aria-active={@active?}
+      aria-current={@active? && "page"}
     >
       <.icon name={@icon} class="w-5 h-5 me-2" /> {@label}
     </.link>
@@ -4061,21 +4119,34 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Bordered page masthead used on public index pages (events, news, newsletters, booking landing).
+  Page title for public pages: centered, bordered, eyebrow + title + optional
+  subtitle. Public text pages open with this so the site reads as one place.
+  (The cabin pages keep their own photo hero.)
 
-  Use `size={:large}` for hero-style titles (`text-6xl md:text-8xl`). The default size matches
-  section headers on booking landing pages (`text-4xl md:text-7xl`).
+  - `size={:default}` for section hubs (events, news, newsletters, history):
+    `text-4xl md:text-7xl`.
+  - `size={:compact}` for content pages (board, choir, volunteer, contact,
+    legal and governance pages): `text-3xl md:text-5xl`, tighter padding.
+
+  Use the eyebrow to say what kind of page this is ("Events", "Governance",
+  "Legal"); the title says what's on it. Put an intro sentence in `subtitle`.
+  Wrap it in `max-w-(--breakpoint-xl) mx-auto px-4` like other page sections.
 
   ## Examples
 
       <.page_masthead eyebrow="Events" title="What's Next" />
 
-      <.page_masthead size={:large} title="Club News" />
-
       <.page_masthead
-        size={:large}
+        eyebrow="Archive"
         title="Newsletters"
         subtitle="Browse our past newsletters."
+      />
+
+      <.page_masthead
+        size={:compact}
+        eyebrow="Legal"
+        title="Privacy Policy"
+        subtitle="Last updated: July 15, 2026"
       />
 
       <.page_masthead eyebrow="Since 1993" title="Experience Tahoe" heading_tag={:h2} />
@@ -4087,9 +4158,9 @@ defmodule YscWeb.CoreComponents do
 
   attr :size, :atom,
     default: :default,
-    values: [:default, :large],
+    values: [:default, :compact],
     doc:
-      "`:default` uses responsive padding and medium title; `:large` uses fixed py-12 and hero title"
+      "`:default` is the section-hub title; `:compact` is for content and legal pages"
 
   attr :heading_tag, :atom,
     default: :h1,
@@ -4131,7 +4202,7 @@ defmodule YscWeb.CoreComponents do
           {@title}
         </h1>
       <% end %>
-      <p :if={@subtitle} class="mt-4 text-zinc-500 text-lg">
+      <p :if={@subtitle} class="mt-4 mx-auto max-w-2xl text-zinc-600 text-lg">
         {@subtitle}
       </p>
       {render_slot(@inner_block)}
@@ -4140,13 +4211,60 @@ defmodule YscWeb.CoreComponents do
   end
 
   defp page_masthead_padding_class(:default), do: "py-8 md:py-12"
-  defp page_masthead_padding_class(:large), do: "py-12"
+  defp page_masthead_padding_class(:compact), do: "py-8 md:py-10"
 
   defp page_masthead_title_class(:default),
     do: "text-4xl md:text-7xl text-zinc-900 type-display"
 
-  defp page_masthead_title_class(:large),
-    do: "text-6xl md:text-8xl text-zinc-900 type-display"
+  defp page_masthead_title_class(:compact),
+    do: "text-3xl md:text-5xl text-zinc-900 type-display"
+
+  @doc """
+  Title block for signed-in app pages (tickets, expense reports, family,
+  booking steps): left-aligned eyebrow + title + optional subtitle, with an
+  `actions` slot on the right. Unbordered, so it sits comfortably above cards.
+
+  ## Examples
+
+      <.page_header eyebrow="Account" title="Your Tickets" />
+
+      <.page_header eyebrow="Expenses" title="My Expense Reports" subtitle="3 drafts, 2 submitted">
+        <:actions><.button navigate={~p"/expensereport"}>New report</.button></:actions>
+      </.page_header>
+  """
+  attr :id, :string, default: nil
+  attr :eyebrow, :string, default: nil
+  attr :title, :string, required: true
+  attr :subtitle, :string, default: nil
+  attr :class, :any, default: nil
+  slot :actions
+
+  def page_header(assigns) do
+    ~H"""
+    <header
+      id={@id}
+      class={[
+        "flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between",
+        @class
+      ]}
+    >
+      <div class="min-w-0">
+        <p :if={@eyebrow} class="text-xs text-blue-600 mb-2 type-eyebrow">
+          {@eyebrow}
+        </p>
+        <h1 class="text-3xl sm:text-4xl text-zinc-900 wrap-break-word type-display">
+          {@title}
+        </h1>
+        <p :if={@subtitle} class="mt-2 text-base text-zinc-600">
+          {@subtitle}
+        </p>
+      </div>
+      <div :if={@actions != []} class="flex flex-wrap items-center gap-2 shrink-0">
+        {render_slot(@actions)}
+      </div>
+    </header>
+    """
+  end
 
   @doc """
   Rounded feature card with an uppercase eyebrow title and a body slot.
@@ -4991,7 +5109,7 @@ defmodule YscWeb.CoreComponents do
       />
       <.icon
         name={@icon}
-        class="w-8 h-8 text-zinc-400 group-has-checked:text-blue-600 mb-3 transition duration-200 group-has-checked:animate-bounce"
+        class="w-8 h-8 text-zinc-500 group-has-checked:text-blue-600 mb-3 transition duration-200 group-has-checked:animate-bounce"
       />
       <span class="font-bold text-zinc-900 leading-tight mb-1">
         {@label}
@@ -5130,7 +5248,7 @@ defmodule YscWeb.CoreComponents do
             <p class="text-sm font-bold text-zinc-900 leading-none">
               {@author}
             </p>
-            <p class="text-xs text-zinc-400 mt-1 type-eyebrow">
+            <p class="text-xs text-zinc-500 mt-1 type-eyebrow">
               <time
                 pubdate
                 datetime={Timex.format!(@date, "%Y-%m-%d", :strftime)}
@@ -6108,7 +6226,7 @@ defmodule YscWeb.CoreComponents do
         id="payment-add-new-divider"
         class="my-6"
         show_label={!@show_new_payment_form}
-        label_class="bg-white px-3 text-xs text-zinc-400 type-eyebrow"
+        label_class="bg-white px-3 text-xs text-zinc-500 type-eyebrow"
       >
         Add new
       </.labeled_divider>
@@ -6528,7 +6646,7 @@ defmodule YscWeb.CoreComponents do
         </div>
       </div>
 
-      <p class="flex items-center gap-1.5 pt-1 text-xs text-zinc-400">
+      <p class="flex items-center gap-1.5 pt-1 text-xs text-zinc-500">
         <.icon name="hero-lock-closed" class="w-3 h-3" />
         Loading secure payment form…
       </p>

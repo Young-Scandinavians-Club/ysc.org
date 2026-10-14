@@ -504,14 +504,14 @@ defmodule YscWeb.FamilyManagementLive do
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-zinc-900 text-xl type-subhead">
           Family Members
-          <span class="text-zinc-400 font-normal text-sm ml-2">
+          <span class="text-zinc-500 font-normal text-sm ml-2">
             ({length(@active_rows)})
           </span>
         </h2>
       </div>
 
-      <p class="text-sm text-zinc-500">
-        People on your family membership. Send an invite so they can create their own sign-in and use member benefits.
+      <p id="family-members-help" class="text-sm text-zinc-500">
+        People on your family membership. Send an invite so they can create their own sign-in and use member benefits. Children who are 18 or older need their own membership and cannot be invited.
       </p>
 
       <%= if @active_rows == [] do %>
@@ -586,7 +586,7 @@ defmodule YscWeb.FamilyManagementLive do
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <h2 class="text-zinc-900 text-xl type-subhead">
         Pending Invitations
-        <span class="text-zinc-400 font-normal text-sm ml-2">
+        <span class="text-zinc-500 font-normal text-sm ml-2">
           ({length(@pending_invites)})
         </span>
       </h2>
@@ -596,7 +596,7 @@ defmodule YscWeb.FamilyManagementLive do
           id="pending-invites-empty"
           class="rounded-lg border border-dashed border-zinc-300 p-8 text-center bg-zinc-50/50"
         >
-          <.icon name="hero-envelope" class="w-8 h-8 text-zinc-400 mx-auto mb-2" />
+          <.icon name="hero-envelope" class="w-8 h-8 text-zinc-500 mx-auto mb-2" />
           <p class="text-sm font-medium text-zinc-700">No pending invitations</p>
           <p class="text-xs text-zinc-500 mt-1">
             Invites you send will appear here until they are accepted.
@@ -841,7 +841,7 @@ defmodule YscWeb.FamilyManagementLive do
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <h2 class="text-zinc-900 text-xl type-subhead">
         Other Family Members
-        <span class="text-zinc-400 font-normal text-sm ml-2">
+        <span class="text-zinc-500 font-normal text-sm ml-2">
           ({length(@other_family_members)})
         </span>
       </h2>
@@ -1073,18 +1073,26 @@ defmodule YscWeb.FamilyManagementLive do
 
     roster_rows =
       Enum.map(family_members, fn member ->
+        adult? = adult_child?(member)
+
         subtitle =
           case member.birth_date do
             %Date{} = date ->
-              "Date of birth: #{DateDisplay.format_date_long(date)}"
+              dob = "Date of birth: #{DateDisplay.format_date_long(date)}"
+
+              if adult? do
+                "#{dob}. Family memberships cover children under 18."
+              else
+                dob
+              end
 
             _ ->
               "Details saved"
           end
 
         {status_label, badge_type, can_invite} =
-          if adult_child?(member) do
-            {"18+ needs own membership", "red", false}
+          if adult? do
+            {"Needs their own membership", "red", false}
           else
             {"No account yet", "yellow", true}
           end

@@ -54,7 +54,7 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
 
           <time
             :if={entry.status != :pending and entry.status != :scheduled}
-            class="block mb-2 text-xs font-normal leading-none text-zinc-400"
+            class="block mb-2 text-xs font-normal leading-none text-zinc-500"
           >
             {format_datetime(entry.occurred_at)}
           </time>

@@ -57,7 +57,7 @@ defmodule YscWeb.UserRegistrationLive do
           method="post"
         >
           <div class="space-y-4 min-h-112">
-            <p class="text-right text-xs text-zinc-400">* Required fields</p>
+            <p class="text-right text-xs text-zinc-500">* Required fields</p>
             <.error :if={@check_errors}>
               Some required information is missing or incorrect. Check the highlighted fields on this page, then use
               <strong>Previous step</strong>
@@ -80,17 +80,27 @@ defmodule YscWeb.UserRegistrationLive do
                         single: %{
                           option: "single",
                           subtitle: "Myself",
-                          icon: "user"
+                          icon: "user",
+                          footer:
+                            YscWeb.MembershipPlanDisplay.price_per_year(:single)
                         },
                         family: %{
                           option: "family",
                           subtitle: "You, your partner, and children under 18",
-                          icon: "user-group"
+                          icon: "user-group",
+                          footer:
+                            YscWeb.MembershipPlanDisplay.price_per_year(:family)
                         }
                       ]}
                       checked_value={rf.params["membership_type"]}
                     />
                   </fieldset>
+                  <p
+                    id="registration-no-charge-note"
+                    class="-mt-4 mb-8 text-sm leading-6 text-zinc-600"
+                  >
+                    Applying is free. You're only charged if the board approves your application, and your membership starts once your dues are paid.
+                  </p>
 
                   <.checkgroup
                     field={rf[:membership_eligibility]}
@@ -497,7 +507,7 @@ defmodule YscWeb.UserRegistrationLive do
 
     socket =
       socket
-      |> assign(:page_title, "Become a Member")
+      |> assign(:page_title, "Apply for Membership")
       |> assign(:family_invite, family_invite)
       |> assign(
         :meta_description,

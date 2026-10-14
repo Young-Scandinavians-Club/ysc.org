@@ -26,24 +26,25 @@ defmodule YscWeb.Components.PageMastheadTest do
       refute html =~ "<h2"
     end
 
-    test "renders large size with subtitle" do
+    test "renders compact size with subtitle" do
       assigns = %{}
 
       heex = ~H"""
       <.page_masthead
-        size={:large}
-        title="Newsletters"
-        subtitle="Browse our past newsletters."
+        size={:compact}
+        eyebrow="Legal"
+        title="Privacy Policy"
+        subtitle="Last updated: July 15, 2026"
       />
       """
 
       html = rendered_to_string(heex)
 
-      assert html =~ "py-12"
-      assert html =~ "text-6xl md:text-8xl"
+      assert html =~ "py-8 md:py-10"
+      assert html =~ "text-3xl md:text-5xl"
       assert html =~ "type-display"
-      assert html =~ "Browse our past newsletters."
-      refute html =~ "py-8 md:py-12"
+      assert html =~ "Last updated: July 15, 2026"
+      refute html =~ "md:text-7xl"
     end
 
     test "renders h2 heading and merges title_class" do
@@ -117,6 +118,45 @@ defmodule YscWeb.Components.PageMastheadTest do
       assert html =~ "text-blue-600"
       assert html =~ "text-center"
       assert html =~ "Sign in to view availability."
+    end
+  end
+
+  describe "page_header/1" do
+    test "renders eyebrow, h1, subtitle and actions" do
+      assigns = %{}
+
+      heex = ~H"""
+      <.page_header
+        id="hdr"
+        eyebrow="Expenses"
+        title="My Expense Reports"
+        subtitle="2 drafts"
+      >
+        <:actions><a href="/new">New report</a></:actions>
+      </.page_header>
+      """
+
+      html = rendered_to_string(heex)
+
+      assert html =~ ~s|id="hdr"|
+      assert html =~ "Expenses"
+      assert html =~ "<h1"
+      assert html =~ "My Expense Reports"
+      assert html =~ "2 drafts"
+      assert html =~ "New report"
+    end
+
+    test "omits optional parts" do
+      assigns = %{}
+
+      heex = ~H"""
+      <.page_header title="Your Tickets" />
+      """
+
+      html = rendered_to_string(heex)
+
+      assert html =~ "Your Tickets"
+      refute html =~ "type-eyebrow"
     end
   end
 end

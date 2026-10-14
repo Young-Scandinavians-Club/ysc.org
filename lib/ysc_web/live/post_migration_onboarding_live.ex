@@ -738,7 +738,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           </div>
         </div>
 
-        <p class="mt-3 text-xs text-zinc-400">
+        <p class="mt-3 text-xs text-zinc-500">
           If anything looks incorrect, please contact <.link
             href="mailto:info@ysc.org"
             class="text-blue-600 hover:underline"

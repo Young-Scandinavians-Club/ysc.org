@@ -53,7 +53,7 @@ defmodule YscWeb.NewsListLive do
 
       <div :if={@post_count == 0} class="text-center py-8">
         <div class="text-zinc-500">
-          <.icon name="hero-newspaper" class="w-12 h-12 mx-auto mb-4 text-zinc-400" />
+          <.icon name="hero-newspaper" class="w-12 h-12 mx-auto mb-4 text-zinc-500" />
           <p class="text-lg font-medium text-zinc-600">No news articles yet</p>
           <p class="text-sm text-zinc-500">
             Check back soon for club updates and announcements!

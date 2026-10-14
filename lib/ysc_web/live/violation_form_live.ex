@@ -64,7 +64,10 @@ defmodule YscWeb.ConductViolationReportLive do
                 />
               </.link>
             </div>
-            <h1 class="text-3xl lg:text-4xl text-zinc-900 mb-4 type-display">
+            <p class="text-sm text-blue-600 mb-3 type-eyebrow">
+              Community standards
+            </p>
+            <h1 class="text-3xl md:text-5xl text-zinc-900 mb-4 type-display">
               Report a concern
             </h1>
             <p class="text-lg text-zinc-600 max-w-xl mx-auto mb-4">

@@ -325,9 +325,12 @@ defmodule YscWeb.BookingCheckoutLive do
   def render(assigns) do
     ~H"""
     <div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
-      <div class="prose prose-zinc mb-8">
-        <h1>Complete Your Booking</h1>
-      </div>
+      <.page_header
+        id="booking-checkout-header"
+        eyebrow="Checkout"
+        title="Complete Your Booking"
+        class="mb-8"
+      />
 
       <div
         :if={!@checkout_data_loaded?}

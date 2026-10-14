@@ -100,6 +100,20 @@ defmodule Ysc.Bookings.PricingRuleCache do
   end
 
   @doc """
+  Cached lowest property-level guest rate for public "from $X" displays.
+
+  Returns a `Money` struct, or `nil` when no rate is configured.
+  """
+  def lowest_property_rate(property) do
+    VersionedCache.fetch(
+      @cache_version_key,
+      "#{@cache_prefix}lowest_property_rate:#{property}",
+      fn -> PricingRule.lowest_property_rate_db(property) end,
+      cache_name: @cache_name
+    )
+  end
+
+  @doc """
   Invalidates the pricing rule cache by bumping the version.
 
   This should be called when pricing rules are created, updated, or deleted.

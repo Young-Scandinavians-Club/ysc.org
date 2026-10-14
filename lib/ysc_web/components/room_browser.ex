@@ -93,7 +93,7 @@ defmodule YscWeb.Components.RoomBrowser do
             rounded_class=""
           />
         <% else %>
-          <div class="absolute inset-0 flex items-center justify-center text-zinc-400">
+          <div class="absolute inset-0 flex items-center justify-center text-zinc-500">
             <.icon name="hero-photo" class="w-16 h-16" />
           </div>
         <% end %>

@@ -5,13 +5,18 @@ defmodule YscWeb.VolunteerLive do
   def render(assigns) do
     ~H"""
     <div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
+      <.page_masthead
+        id="volunteer-masthead"
+        size={:compact}
+        eyebrow="Get involved"
+        title="Volunteer with the YSC"
+        subtitle="Want to contribute to a vibrant community and help create memorable experiences for others?"
+        class="mb-8 lg:mb-12"
+      />
+
       <%!-- Split Header Section --%>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-12">
         <div class="prose prose-zinc prose-a:text-blue-600">
-          <h1>Volunteer with the YSC!</h1>
-          <p>
-            Want to contribute to a vibrant community and help create memorable experiences for others?
-          </p>
           <p>
             The YSC thrives on the dedication of our volunteers. Whether you're passionate about event planning, outdoor adventures, or supporting our members, there's a place for you at the YSC. Join our team and make a lasting impact!
           </p>
@@ -96,7 +101,6 @@ defmodule YscWeb.VolunteerLive do
                   label={card.label}
                   description={card.description}
                   hover_class={card.hover_class}
-                  phx-debounce="blur"
                 />
               </div>
             </div>

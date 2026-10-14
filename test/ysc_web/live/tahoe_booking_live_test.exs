@@ -102,7 +102,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert has_element?(
                view,
                "#tahoe-booking-eligibility-banner-public a[href=\"/users/membership\"]",
-               "Manage Membership"
+               "Choose a membership"
              )
     end
   end

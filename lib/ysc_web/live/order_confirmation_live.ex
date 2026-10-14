@@ -208,7 +208,7 @@ defmodule YscWeb.OrderConfirmationLive do
           <% end %>
         </div>
         <div class="text-left md:text-right">
-          <p class="text-xs text-zinc-400 type-eyebrow">
+          <p class="text-xs text-zinc-500 type-eyebrow">
             Order number
           </p>
           <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
@@ -264,11 +264,11 @@ defmodule YscWeb.OrderConfirmationLive do
             </div>
             <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8 relative z-0">
               <div>
-                <p class="text-xs text-zinc-400 mb-1 type-eyebrow">Event</p>
+                <p class="text-xs text-zinc-500 mb-1 type-eyebrow">Event</p>
                 <p class="text-xl font-bold text-zinc-900">{@event.title}</p>
               </div>
               <div>
-                <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
+                <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                   Date & Time
                 </p>
                 <p class="text-xl font-bold text-zinc-900">
@@ -287,7 +287,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 </p>
               </div>
               <div>
-                <p class="text-xs text-zinc-400 mb-1 type-eyebrow">
+                <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
                   Location
                 </p>
                 <p class="text-xl font-bold text-zinc-900">
@@ -384,7 +384,7 @@ defmodule YscWeb.OrderConfirmationLive do
                             class={[
                               "text-sm mt-1",
                               if(is_refunded,
-                                do: "text-zinc-400",
+                                do: "text-zinc-500",
                                 else: "text-amber-900"
                               )
                             ]}
@@ -394,7 +394,7 @@ defmodule YscWeb.OrderConfirmationLive do
                           <p class={[
                             "text-sm font-mono mt-1",
                             if(is_refunded,
-                              do: "text-zinc-400",
+                              do: "text-zinc-500",
                               else: "text-zinc-500"
                             )
                           ]}>
@@ -404,7 +404,7 @@ defmodule YscWeb.OrderConfirmationLive do
                           <p class={[
                             "text-sm font-mono",
                             if(is_refunded,
-                              do: "text-zinc-400",
+                              do: "text-zinc-500",
                               else: "text-zinc-500"
                             )
                           ]}>

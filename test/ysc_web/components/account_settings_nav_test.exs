@@ -56,6 +56,22 @@ defmodule YscWeb.Components.AccountSettingsNavTest do
     end
   end
 
+  describe "account_settings_nav/1 on small screens" do
+    test "is a labelled nav with a scroll hook and marks the current page" do
+      html =
+        render_component(&CoreComponents.account_settings_nav/1, %{
+          current: :security,
+          show_family_link?: false
+        })
+
+      assert html =~ ~s(id="account-settings-nav")
+      assert html =~ ~s(phx-hook="AccountNavScroll")
+      assert html =~ ~s(aria-label="Account settings")
+      assert html =~ ~s(aria-current="page")
+      assert html =~ "overflow-x-auto"
+    end
+  end
+
   describe "account_settings_nav_link/1" do
     test "renders inactive link with hover classes" do
       html =

@@ -148,14 +148,14 @@ defmodule YscWeb.EventPhotoUploadLive do
                 "border-zinc-300 bg-white hover:border-blue-400 hover:bg-blue-50/30"
               ]}
             >
-              <.icon name="hero-arrow-up-tray" class="h-12 w-12 text-zinc-400 mb-4" />
+              <.icon name="hero-arrow-up-tray" class="h-12 w-12 text-zinc-500 mb-4" />
               <span class="text-base font-medium text-zinc-800">
                 Drop photos and videos here or click to browse
               </span>
               <span class="mt-2 text-sm text-zinc-500">
                 Photos up to 200 MB · Videos up to 20 GB
               </span>
-              <span class="mt-1 text-xs text-zinc-400">
+              <span class="mt-1 text-xs text-zinc-500">
                 JPG, PNG, HEIC, WebP, MP4, MOV, and more
               </span>
               <.live_file_input upload={@uploads.photos} class="hidden" />

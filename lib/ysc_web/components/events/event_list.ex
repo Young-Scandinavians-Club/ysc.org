@@ -186,7 +186,7 @@ defmodule YscWeb.EventsListLive do
                   <div class="sm:hidden pt-5 border-t border-zinc-100 space-y-3">
                     <div
                       :if={@hero_event.location_name}
-                      class="flex items-center gap-1.5 text-sm text-zinc-400"
+                      class="flex items-center gap-1.5 text-sm text-zinc-500"
                     >
                       <.icon name="hero-map-pin" class="w-4 h-4 shrink-0" />
                       <span class="truncate">{@hero_event.location_name}</span>
