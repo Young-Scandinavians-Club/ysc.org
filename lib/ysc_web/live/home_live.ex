@@ -169,6 +169,8 @@ defmodule YscWeb.HomeLive do
       newsletter_submitted: false,
       newsletter_error: nil,
       remote_ip: remote_ip,
+      tahoe_rate: cabin_rate_label(:tahoe),
+      clear_lake_rate: cabin_rate_label(:clear_lake),
       # Data is already loaded
       async_data_loaded: true
     )
@@ -397,7 +399,7 @@ defmodule YscWeb.HomeLive do
               <strong class="text-zinc-900">Swedish</strong>
               heritage may qualify for membership, with rates starting at just
               <strong class="text-blue-700">
-                {format_membership_plan_price(:single)}
+                {YscWeb.MembershipPlanDisplay.price(:single)}
               </strong>
               per year.
             </p>
@@ -448,7 +450,7 @@ defmodule YscWeb.HomeLive do
             Nordic Living
           </span>
           <h2 class="mt-3 text-2xl sm:text-3xl lg:text-4xl text-zinc-900 wrap-break-word type-title">
-            Don't Let the Name Fool You – YSC is for Everyone!
+            Don't Let the Name Fool You – All Ages Are Welcome!
           </h2>
           <p class="mt-4 text-base sm:text-lg text-zinc-600">
             We may be called the "Young" Scandinavians Club, but we're a community for all ages! With roughly 500 active members, we're a lively bunch who love to connect and have fun.
@@ -585,8 +587,9 @@ defmodule YscWeb.HomeLive do
             <:feature>
               Minutes from world-class ski resorts & hiking trails
             </:feature>
-            <:feature>
-              Member-only rates: <strong>$45.00 / night</strong>
+            <:feature :if={@tahoe_rate}>
+              Member-only rates: from <strong>{@tahoe_rate}</strong>
+              per adult, per night
             </:feature>
           </.cabin_showcase>
 
@@ -605,8 +608,9 @@ defmodule YscWeb.HomeLive do
           >
             Our social heart since 1963. Swim, boat, and unwind at California's largest natural lake. A sun-drenched escape from the city.
             <:feature>Private dock access for swimming & boating</:feature>
-            <:feature>
-              Member-only rates: <strong>$25.00 / night</strong>
+            <:feature :if={@clear_lake_rate}>
+              Member-only rates: from <strong>{@clear_lake_rate}</strong>
+              per guest, per night
             </:feature>
           </.cabin_showcase>
         </div>
@@ -896,7 +900,7 @@ defmodule YscWeb.HomeLive do
             <dt>
               <span class="block text-lg font-medium text-blue-200">Single</span>
               <span class="block mt-2 text-3xl text-white type-title">
-                {format_membership_plan_price(:single)}<span class="text-lg font-normal text-blue-200">/year</span>
+                {YscWeb.MembershipPlanDisplay.price(:single)}<span class="text-lg font-normal text-blue-200">/year</span>
               </span>
             </dt>
             <dd class="mt-4 text-base text-blue-100 leading-relaxed">
@@ -911,7 +915,7 @@ defmodule YscWeb.HomeLive do
             <dt>
               <span class="block text-lg font-medium text-blue-200">Family</span>
               <span class="block mt-2 text-3xl text-white type-title">
-                {format_membership_plan_price(:family)}<span class="text-lg font-normal text-blue-200">/year</span>
+                {YscWeb.MembershipPlanDisplay.price(:family)}<span class="text-lg font-normal text-blue-200">/year</span>
               </span>
             </dt>
             <dd class="mt-4 text-base text-blue-100 leading-relaxed">
@@ -920,13 +924,20 @@ defmodule YscWeb.HomeLive do
           </div>
         </dl>
 
-        <div class="mt-10 sm:mt-12 flex justify-center">
+        <p
+          id="membership-apply-note"
+          class="mt-8 text-center text-sm text-blue-100"
+        >
+          You'll check your eligibility on the first step. Nothing is charged until the board approves your application.
+        </p>
+
+        <div class="mt-6 flex justify-center">
           <.link
             id="membership-apply-link"
             navigate={~p"/users/register"}
             class="group inline-flex items-center justify-center min-h-[48px] px-8 py-3.5 text-base font-bold text-blue-900 bg-white rounded-sm hover:bg-blue-50 transition-colors duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-900"
           >
-            Check Eligibility & Apply
+            Apply for Membership
             <.icon
               name="hero-arrow-right"
               class="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
@@ -1125,7 +1136,7 @@ defmodule YscWeb.HomeLive do
                 icon="hero-calendar-days"
                 tone={:purple}
                 title="Events"
-                subtitle="Browse Events"
+                subtitle="See what's on"
               />
             <% end %>
             <.quick_action_card
@@ -1133,8 +1144,8 @@ defmodule YscWeb.HomeLive do
               navigate={~p"/users/settings"}
               icon="hero-cog-6-tooth"
               tone={:zinc}
-              title="Settings"
-              subtitle="Preferences"
+              title="Account"
+              subtitle="Membership & billing"
             />
           </div>
 
@@ -1148,7 +1159,7 @@ defmodule YscWeb.HomeLive do
                     <.icon name="hero-map-pin" class="w-5 h-5 text-blue-600" />Your Upcoming Stays
                   </h2>
                   <.section_link navigate={~p"/users/payments"}>
-                    View payment history
+                    All bookings & payments
                   </.section_link>
                 </div>
 
@@ -1621,9 +1632,9 @@ defmodule YscWeb.HomeLive do
                           Manage Membership
                         <% else %>
                           <%= if @current_membership == nil do %>
-                            Get Membership Now
+                            Choose a membership
                           <% else %>
-                            Renew Membership
+                            Renew membership
                           <% end %>
                         <% end %>
                       </.link>
@@ -2108,31 +2119,13 @@ defmodule YscWeb.HomeLive do
 
   defp format_membership_date(_, _timezone), do: ""
 
-  defp format_membership_plan_price(plan_id) when is_atom(plan_id) do
-    plans = Application.get_env(:ysc, :membership_plans, [])
-
-    case Enum.find(plans, &(&1.id == plan_id)) do
-      %{amount: amount, currency: currency}
-      when is_number(amount) and is_binary(currency) ->
-        case membership_plan_currency(currency) do
-          nil ->
-            ""
-
-          currency_atom ->
-            Ysc.MoneyHelper.format_money!(Money.new(currency_atom, amount))
-        end
-
-      _ ->
-        ""
+  # Lowest property-level nightly rate from the live pricing rules, so the
+  # public home page never drifts from what the booking pages charge.
+  defp cabin_rate_label(property) do
+    case Ysc.Bookings.PricingRuleCache.lowest_property_rate(property) do
+      %Money{} = rate -> Ysc.MoneyHelper.format_money!(rate)
+      _ -> nil
     end
-  end
-
-  defp membership_plan_currency(currency) when is_binary(currency) do
-    currency
-    |> String.upcase()
-    |> String.to_existing_atom()
-  rescue
-    ArgumentError -> nil
   end
 
   defp format_booking_date(%Date{} = date) do

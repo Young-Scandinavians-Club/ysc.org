@@ -21,6 +21,15 @@ defmodule YscWeb.UserRegistrationLiveTest do
   end
 
   describe "Registration flow" do
+    test "shows plan prices and that applying costs nothing", %{conn: conn} do
+      {:ok, lv, html} = live(conn, ~p"/users/register")
+
+      assert html =~ "$45.00 per year"
+      assert html =~ "$65.00 per year"
+      assert has_element?(lv, "#registration-no-charge-note")
+      assert render(lv) =~ "only charged if the board approves"
+    end
+
     test "shows clarified eligibility step copy", %{conn: conn} do
       {:ok, lv, html} = live(conn, ~p"/users/register")
 

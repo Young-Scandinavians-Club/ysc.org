@@ -304,12 +304,12 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute BookingUserMessages.single_membership_one_room() =~ "deselect"
 
     assert BookingUserMessages.membership_required_link_text() ==
-             "Manage Membership"
+             "Choose a membership"
 
     assert BookingUserMessages.membership_required_message_html(
              "/users/membership"
            ) =~
-             "Manage Membership"
+             "Choose a membership"
 
     assert BookingUserMessages.membership_required_plain_message() =~
              "active YSC membership"

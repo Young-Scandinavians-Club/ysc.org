@@ -41,7 +41,7 @@ defmodule YscWeb.Components.LayoutSiteComponentsTest do
         })
 
       assert html =~ "Membership Required"
-      assert html =~ "Manage Membership"
+      assert html =~ "Choose a membership"
     end
 
     test "renders nothing on fullscreen layout" do

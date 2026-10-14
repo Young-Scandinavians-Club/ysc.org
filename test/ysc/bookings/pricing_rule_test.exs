@@ -57,6 +57,51 @@ defmodule Ysc.Bookings.PricingRuleTest do
     %{season: season, category: category, room: room}
   end
 
+  describe "lowest_property_rate_db/1" do
+    test "returns the lowest property-level rate and ignores category-specific rules",
+         %{season: season, category: category} do
+      {:ok, _property_rule} =
+        %PricingRule{}
+        |> PricingRule.changeset(%{
+          amount: Money.new(1, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: season.id
+        })
+        |> Repo.insert()
+
+      # A cheaper rule tied to a room category must not become the "from" rate
+      {:ok, _category_rule} =
+        %PricingRule{}
+        |> PricingRule.changeset(%{
+          amount: Money.new(Decimal.new("0.50"), :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_category_id: category.id
+        })
+        |> Repo.insert()
+
+      assert PricingRule.lowest_property_rate_db(:tahoe) == Money.new(1, :USD)
+    end
+
+    test "supports Clear Lake day rates" do
+      {:ok, _rule} =
+        %PricingRule{}
+        |> PricingRule.changeset(%{
+          amount: Money.new(1, :USD),
+          booking_mode: :day,
+          price_unit: :per_guest_per_day,
+          property: :clear_lake
+        })
+        |> Repo.insert()
+
+      assert PricingRule.lowest_property_rate_db(:clear_lake) ==
+               Money.new(1, :USD)
+    end
+  end
+
   describe "changeset/2" do
     test "uses default empty attrs when second argument omitted" do
       changeset = PricingRule.changeset(%PricingRule{})

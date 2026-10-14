@@ -437,7 +437,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
           navigate={~p"/users/register"}
           class="px-8 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors duration-150 min-h-[44px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
         >
-          Become a Member
+          Apply for Membership
         </.link>
         <.link
           navigate={~p"/contact"}

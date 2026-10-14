@@ -91,66 +91,13 @@
                     class="nav-link text-zinc-900 hover:bg-zinc-100 hover:text-black py-3"
                   >
                     <:button_block>
-                      Club Info
+                      About the Club
                       <.icon
                         name="hero-chevron-down"
                         class="w-5 h-5 ms-2 transition-transform duration-200 ease-in-out"
                       />
                     </:button_block>
-                    <ul
-                      class="py-2 text-sm font-medium text-zinc-800"
-                      aria-labelledby="dropdownLargeButton"
-                    >
-                      <li>
-                        <.link
-                          navigate={~p"/newsletters"}
-                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
-                        >
-                          Newsletters
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/choir"}
-                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
-                        >
-                          YSC Choir
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/history"}
-                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
-                        >
-                          Our History
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/board"}
-                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
-                        >
-                          Board of Directors
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/volunteer"}
-                          class="block px-4 py-2 transition ease-in-out duration-150 hover:bg-zinc-100"
-                        >
-                          Volunteer
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/contact"}
-                          class="block px-4 py-2 transition ease-in-out duration-150 hover:bg-zinc-100"
-                        >
-                          Contact Us
-                        </.link>
-                      </li>
-                      <%!-- Moved Governance/Financials/Code of Conduct to Footer to clean up navigation --%>
-                    </ul>
+                    <.club_menu_links />
                   </.dropdown>
                 </li>
               </ul>
@@ -201,72 +148,13 @@
                     mobile={true}
                   >
                     <:button_block>
-                      Club Info
+                      About the Club
                       <.icon
                         name="hero-chevron-down"
                         class="w-5 h-5 ms-2 transition-transform duration-200 ease-in-out"
                       />
                     </:button_block>
-                    <ul
-                      class="py-2 text-sm font-medium text-zinc-800"
-                      aria-labelledby="dropdownLargeButton"
-                    >
-                      <li>
-                        <.link
-                          navigate={~p"/newsletters"}
-                          phx-click={hide_mobile_menu("navbar-dropdown")}
-                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
-                        >
-                          Newsletters
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/choir"}
-                          phx-click={hide_mobile_menu("navbar-dropdown")}
-                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
-                        >
-                          YSC Choir
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/history"}
-                          phx-click={hide_mobile_menu("navbar-dropdown")}
-                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
-                        >
-                          Our History
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/board"}
-                          phx-click={hide_mobile_menu("navbar-dropdown")}
-                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
-                        >
-                          Board of Directors
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/volunteer"}
-                          phx-click={hide_mobile_menu("navbar-dropdown")}
-                          class="block px-4 py-2 transition ease-in-out duration-150 hover:bg-zinc-100"
-                        >
-                          Volunteer
-                        </.link>
-                      </li>
-                      <li>
-                        <.link
-                          navigate={~p"/contact"}
-                          phx-click={hide_mobile_menu("navbar-dropdown")}
-                          class="block px-4 py-2 transition ease-in-out duration-150 hover:bg-zinc-100"
-                        >
-                          Contact Us
-                        </.link>
-                      </li>
-                      <%!-- Moved Governance/Financials/Code of Conduct to Footer to clean up navigation --%>
-                    </ul>
+                    <.club_menu_links mobile />
                   </.dropdown>
                 </li>
               </ul>
@@ -296,6 +184,16 @@
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Membership
+                        </.link>
+                      </li>
+                      <li>
+                        <.link
+                          id="account-menu-tickets"
+                          navigate={~p"/users/tickets"}
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
+                          class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
+                        >
+                          My Tickets
                         </.link>
                       </li>
                       <li>
@@ -343,7 +241,7 @@
                     phx-click={hide_mobile_menu("navbar-dropdown")}
                     class="inline-flex items-center h-10 px-3 lg:px-4 text-sm font-bold text-center text-zinc-100 transition ease-in-out bg-blue-700 rounded-sm duration-150 hover:bg-blue-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                   >
-                    Become a Member
+                    Apply for Membership
                   </.link>
                 </div>
               <% end %>
