@@ -16,8 +16,8 @@ defmodule YscWeb.NewsLive do
     ~H"""
     <div class="py-6 md:py-12">
       <%!-- The "Masthead" Header --%>
-      <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-16">
-        <.page_masthead size={:large} title="Club News" />
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-8 md:mb-16">
+        <.page_masthead eyebrow="From the club" title="Club News" />
       </div>
 
       <%!-- Loading skeleton for featured post --%>

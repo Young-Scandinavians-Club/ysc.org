@@ -7,13 +7,18 @@ defmodule YscWeb.ContactLive do
   def render(assigns) do
     ~H"""
     <div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
+      <.page_masthead
+        id="contact-masthead"
+        size={:compact}
+        eyebrow="Contact"
+        title="Get in touch"
+        subtitle="Have a question about the club or our cabins? Send us a message and we'll get back to you."
+        class="mb-8 lg:mb-12"
+      />
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
         <%!-- Left Column: Contact Form --%>
         <div class="prose prose-zinc prose-a:text-blue-600 max-w-xl mx-auto lg:mx-0">
-          <h1>Get in touch</h1>
-          <p>
-            Have a question about the club or our cabins? Send us a message and we'll get back to you.
-          </p>
           <p class="text-sm text-zinc-500">
             We are a community of volunteers. We usually respond within 24–48 hours.
           </p>

@@ -13,22 +13,21 @@ defmodule YscWeb.UserTicketsLive do
     ~H"""
     <div class="py-8 lg:py-12 bg-zinc-50/50 min-h-screen">
       <div class="max-w-(--breakpoint-xl) mx-auto px-4">
-        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-          <div>
-            <p class="text-teal-600 text-xs mb-2 type-eyebrow">
-              Your account
-            </p>
-            <h1 class="text-4xl lg:text-5xl text-zinc-900 type-display">
-              Your Tickets
-            </h1>
-          </div>
-          <.link
-            href={~p"/events"}
-            class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition"
-          >
-            <.icon name="hero-plus" class="w-4 h-4" /> Find More Events
-          </.link>
-        </div>
+        <.page_header
+          id="user-tickets-header"
+          eyebrow="Your account"
+          title="Your Tickets"
+          class="mb-12"
+        >
+          <:actions>
+            <.link
+              href={~p"/events"}
+              class="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white font-bold rounded-xl hover:bg-zinc-700 transition"
+            >
+              <.icon name="hero-plus" class="w-4 h-4" /> Find More Events
+            </.link>
+          </:actions>
+        </.page_header>
 
         <div
           :if={@loading_user_tickets}

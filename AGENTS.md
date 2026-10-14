@@ -11,6 +11,7 @@ Type tokens are defined in `assets/css/app.css` (search "TYPE TOKENS"). Each car
 
 - Headings use one token: `type-display` (hero / page title), `type-title` (section heading), `type-subhead` (card title / sub-section). Running text may use `type-body`.
 - **Do not** set `font-*` weight, `tracking-*` or `leading-*` by hand on headings; the token owns them.
+- **Page titles** use one of three components, never a hand-rolled `<h1>`: `page_masthead` for public pages (centered, bordered; `size={:default}` for section hubs, `size={:compact}` for content/legal/form pages; eyebrow says what kind of page, title says what is on it, intro goes in `subtitle`), `hero_title` for pages that open on a photo (the cabin pages), and `page_header` for signed-in app pages (left-aligned, with an `actions` slot). One `<h1>` per page.
 - Uppercase is reserved for the eyebrow tier: use `type-eyebrow` at `text-xs`/`text-sm` for labels, badges and table-column captions. **Never** add a bare `uppercase` class, and never uppercase headings, body text or anything at `text-base` or larger (signage in `event_tv_poster.ex` is the only exception).
 - No `font-black` or `font-extrabold` outside signage; use the tokens or `font-bold`.
 - No `transition-all`; use `transition`, `transition-colors`, or an explicit `transition-[...]`.

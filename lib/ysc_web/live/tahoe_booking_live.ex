@@ -1104,7 +1104,7 @@ defmodule YscWeb.TahoeBookingLive do
       <section
         :if={@user}
         id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh] bg-white"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[max(22rem,40vh)] bg-white"
       >
         <div class="hero-media-stage">
           <.hero_flag_grid id="tahoe-hero-flag-grid-member" />
@@ -1137,14 +1137,7 @@ defmodule YscWeb.TahoeBookingLive do
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-16 pointer-events-none">
           <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
-            <div class="flex items-center gap-4 px-4">
-              <h1 class="text-3xl sm:text-4xl md:text-5xl text-white drop-shadow-lg type-display">
-                Tahoe Cabin
-              </h1>
-              <span class="whitespace-nowrap px-2 py-1 bg-blue-600/90 text-white text-xs rounded-sm type-eyebrow">
-                Member Access
-              </span>
-            </div>
+            <.hero_title eyebrow="Member access" title="Tahoe Cabin" />
           </div>
         </div>
       </section>
@@ -1185,15 +1178,12 @@ defmodule YscWeb.TahoeBookingLive do
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-20 pointer-events-none">
           <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
-            <p class="text-sm text-blue-400 mb-3 md:mb-4 drop-shadow-md type-eyebrow">
-              A Year-Round Retreat
-            </p>
-            <h1 class="text-4xl md:text-7xl text-white drop-shadow-lg mb-4 type-display">
-              Tahoe Cabin
-            </h1>
-            <p class="text-base md:text-xl text-zinc-100 max-w-2xl font-normal drop-shadow-md">
-              Owned and operated by our community since 1993. A beautiful cabin on the west shore of Lake Tahoe.
-            </p>
+            <.hero_title
+              size={:large}
+              eyebrow="A Year-Round Retreat"
+              title="Tahoe Cabin"
+              subtitle="Owned and operated by our community since 1993. A beautiful cabin on the west shore of Lake Tahoe."
+            />
           </div>
         </div>
       </section>

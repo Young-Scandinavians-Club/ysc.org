@@ -188,29 +188,31 @@ defmodule YscWeb.UserBookingDetailLive do
       class="py-8 lg:py-10 max-w-(--breakpoint-lg) mx-auto px-4"
     >
       <div class="max-w-xl mx-auto lg:mx-0">
-        <div class="prose prose-zinc mb-6">
-          <div class="flex items-start justify-between">
-            <h1>Booking Details</h1>
-            <div class="flex gap-2">
-              <.button
-                :if={@can_change}
-                navigate={~p"/bookings/#{@booking.id}/change"}
-                variant="outline"
-                color="zinc"
-                id="change-reservation-button"
-              >
-                <.icon name="hero-pencil-square" class="w-5 h-5" /> Change Booking
-              </.button>
-              <.button
-                :if={@can_cancel}
-                phx-click="show-cancel-modal"
-                color="red"
-              >
-                <.icon name="hero-x-circle" class="w-5 h-5" /> Cancel Booking
-              </.button>
-            </div>
-          </div>
-        </div>
+        <.page_header
+          id="booking-detail-header"
+          eyebrow="Your booking"
+          title="Booking Details"
+          class="mb-6"
+        >
+          <:actions>
+            <.button
+              :if={@can_change}
+              navigate={~p"/bookings/#{@booking.id}/change"}
+              variant="outline"
+              color="zinc"
+              id="change-reservation-button"
+            >
+              <.icon name="hero-pencil-square" class="w-5 h-5" /> Change Booking
+            </.button>
+            <.button
+              :if={@can_cancel}
+              phx-click="show-cancel-modal"
+              color="red"
+            >
+              <.icon name="hero-x-circle" class="w-5 h-5" /> Cancel Booking
+            </.button>
+          </:actions>
+        </.page_header>
 
         <div class="space-y-6">
           <!-- Cancellation Policy -->
