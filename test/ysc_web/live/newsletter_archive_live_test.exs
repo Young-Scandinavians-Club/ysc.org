@@ -367,6 +367,13 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
 
       assert has_element?(view, "button", "Save as PDF")
       assert html =~ "newsletter-frame"
+
+      # The print hook reads the frame's document, which needs allow-same-origin
+      # (and allow-modals for print()). allow-scripts must never be added.
+      assert has_element?(
+               view,
+               ~s(iframe#newsletter-frame[sandbox="allow-same-origin allow-modals"])
+             )
     end
   end
 end
