@@ -82,6 +82,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 86 (HIGH)     After Family→Single (scheduled downgrade or stale invite), linked sub-accounts still inherited membership via has_active_membership?/1 because any valid primary subscription counted. Accept also did not re-check that the primary still hosts Family/Lifetime.
   Finding 87 (HIGH)     Impersonation ignored whether the admin session token still authenticated a full admin. After suspend/revoke/demotion the signed cookie still had `:impersonated_user_id`, so fetch_current_user/LiveView mount kept acting as the victim. Stop impersonation is full-admin-only, so the leftover session could not even be ended.
   Finding 88 (MEDIUM)   Finding 44 bound `user_id` on public forms but volunteer/conduct (and contact via `put_submitter` alone) still trusted client name/email/phone. Signed-in members skip Turnstile, so they could send YSC confirmation mail to arbitrary inboxes and spoof identity on board CoC notifications.
+  Finding 89 (MEDIUM)   Step-up password reauth (`ReauthComponent`) skipped `AuthRateLimit`, so a stolen session could online-guess the account password without login's 5/min identifier cap, then change email/password/passkeys
+  Finding 90 (MEDIUM)   Passkey step-up skipped Finding 7's `sign_count` compare/update, so a cloned authenticator rejected at login could still pass reauth, and legitimate reauth never advanced the stored counter
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -320,6 +322,30 @@ defmodule YscWeb.SecurityAuditTest do
       # Should show an error, not a redirect to home
       assert html =~ "Invalid passkey" or html =~ "another sign-in" or
                html =~ "error"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 90 (MEDIUM): Passkey step-up must use the same sign_count gate
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 90: Passkey reauth advances and enforces sign_count" do
+    test "accept_passkey_assertion/2 rejects a replay of the stored counter" do
+      user = user_fixture()
+      passkey = passkey_fixture(user, %{sign_count: 5})
+
+      assert {:error, :replay} =
+               Accounts.accept_passkey_assertion(passkey, %{sign_count: 5})
+    end
+
+    test "accept_passkey_assertion/2 records an increased counter" do
+      user = user_fixture()
+      passkey = passkey_fixture(user, %{sign_count: 5})
+
+      assert {:ok, updated} =
+               Accounts.accept_passkey_assertion(passkey, %{sign_count: 8})
+
+      assert updated.sign_count == 8
     end
   end
 
@@ -5749,6 +5775,89 @@ defmodule YscWeb.SecurityAuditTest do
       assert conn.assigns.current_user.id == admin.id
       refute conn.assigns.impersonating?
       refute get_session(conn, :impersonated_user_id)
+    end
+
+    test "demoting an impersonating admin broadcasts disconnect for their live socket",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      actor = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "DemoteVictim"})
+
+      conn = log_in_user(conn, admin)
+      token = get_session(conn, :user_token)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+
+      {conn, csrf_token} = fetch_conn_csrf(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => csrf_token
+        })
+
+      {:ok, view, html} = live(conn, ~p"/users/settings")
+      assert html =~ "DemoteVictim"
+      assert Process.alive?(view.pid)
+
+      YscWeb.Endpoint.subscribe(live_socket_id)
+      {:ok, _} = Accounts.update_user(admin, %{"role" => "member"}, actor)
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      # Demotion keeps the session token; only impersonation must die.
+      assert Accounts.get_user_by_session_token(token).id == admin.id
+    end
+
+    test "revoke_all_user_sessions broadcasts LiveView disconnect for web sessions" do
+      admin = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(admin)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert :ok = Accounts.revoke_all_user_sessions(admin)
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      assert Accounts.get_user_by_session_token(token) == nil
+    end
+
+    test "suspending an impersonating admin broadcasts disconnect for their live socket",
+         %{conn: conn} do
+      admin = user_fixture(%{role: "admin", state: :active})
+      actor = user_fixture(%{role: "admin"})
+      target = user_fixture(%{first_name: "StickyVictim"})
+
+      conn = log_in_user(conn, admin)
+      token = get_session(conn, :user_token)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+
+      {conn, csrf_token} = fetch_conn_csrf(conn)
+
+      conn =
+        post(conn, ~p"/admin/impersonate/#{target.id}", %{
+          "_csrf_token" => csrf_token
+        })
+
+      {:ok, view, html} = live(conn, ~p"/users/settings")
+      assert html =~ "StickyVictim"
+      assert html =~ "Stop Impersonating"
+      assert Process.alive?(view.pid)
+
+      # LiveViewTest's ClientProxy does not terminate on PubSub "disconnect"
+      # the way Phoenix.Socket does in production; assert the broadcast that
+      # production sockets listen for (see Phoenix.Socket.__info__/2).
+      YscWeb.Endpoint.subscribe(live_socket_id)
+      {:ok, _} = Accounts.update_user(admin, %{"state" => "suspended"}, actor)
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
     end
   end
 

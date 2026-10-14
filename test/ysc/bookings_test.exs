@@ -4414,6 +4414,36 @@ defmodule Ysc.BookingsTest do
       assert String.starts_with?(refund_id, "re_test")
     end
 
+    test "refunds when modification apply fails because check-in is past" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update!()
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_unfulfilled_mod_past_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        metadata: %{
+          "modification" => "true",
+          "booking_id" => to_string(booking.id),
+          "user_id" => to_string(user.id)
+        },
+        latest_charge: "ch_test_unfulfilled_mod_past"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_modification_payment(
+                 booking,
+                 payment_intent,
+                 :checkin_in_past
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
+
     test "skips refund when booking is not complete" do
       user = Ysc.AccountsFixtures.user_fixture()
       booking = booking_fixture(%{status: :hold, user_id: user.id})
