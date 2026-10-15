@@ -633,6 +633,7 @@ defmodule YscWeb.Router do
       live "/users/:id/details", AdminUserDetailsLive, :profile
       live "/users/:id/details/orders", AdminUserDetailsLive, :orders
       live "/users/:id/details/bookings", AdminUserDetailsLive, :bookings
+      live "/users/:id/details/merch", AdminUserDetailsLive, :merch
 
       live "/users/:id/details/booking-benefits",
            AdminUserDetailsLive,
@@ -675,6 +676,9 @@ defmodule YscWeb.Router do
 
       # Merch shop catalog (Printful)
       live "/merch", AdminMerchLive, :index
+      live "/merch/orders", AdminMerchOrdersLive, :index
+      live "/merch/orders/new", AdminMerchOrderNewLive, :new
+      live "/merch/orders/:id", AdminMerchOrdersLive, :show
       live "/merch/products/:id/edit", AdminMerchLive, :edit_product
 
       # Tahoe and Clear Lake settings etc, see bookings

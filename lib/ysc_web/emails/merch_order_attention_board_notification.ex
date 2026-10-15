@@ -61,7 +61,7 @@ defmodule YscWeb.Emails.MerchOrderAttentionBoardNotification do
         ),
       who: who(order),
       amount_paid: format_money(order.total_amount),
-      items: Enum.map(order.items, &%{name: &1.name, quantity: &1.quantity}),
+      items: YscWeb.Emails.MerchItems.for_order(order),
       admin_url: absolute_url("/admin/merch")
     }
   end

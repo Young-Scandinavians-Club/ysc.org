@@ -23,6 +23,19 @@ defmodule Ysc.Merch.OrderItem do
     timestamps()
   end
 
+  # Item names are snapshotted as "Product / Color / Size".
+
+  @doc "The product part of the item's name."
+  def title(%{name: name}), do: name |> String.split(" / ", parts: 2) |> hd()
+
+  @doc "The color/size part of the item's name, or `nil` when it has none."
+  def variant_label(%{name: name}) do
+    case String.split(name, " / ", parts: 2) do
+      [_, rest] -> String.replace(rest, " / ", " · ")
+      _ -> nil
+    end
+  end
+
   def changeset(item, attrs) do
     item
     |> cast(attrs, [:variant_id, :quantity, :name, :unit_price])

@@ -70,6 +70,16 @@ if config_env() != :test do
     webhook_secret: System.get_env("PRINTFUL_WEBHOOK_SECRET")
 end
 
+# The "Shop" link in the main navigation stays hidden until it is switched on
+# with SHOP_NAV_VISIBLE=true, so the shop can be tested in production by going
+# to /shop directly. Always shown in dev; tests set it themselves.
+if config_env() != :test do
+  config :ysc,
+         :shop_nav_visible,
+         config_env() == :dev or
+           System.get_env("SHOP_NAV_VISIBLE") in ["true", "1"]
+end
+
 # Without a Printful token, dev runs the merch shop against a built-in fake
 # Printful (Ysc.Printful.DemoClient) so everything works locally.
 if config_env() == :dev and System.get_env("PRINTFUL_API_TOKEN") in [nil, ""] do

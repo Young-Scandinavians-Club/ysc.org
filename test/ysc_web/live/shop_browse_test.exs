@@ -60,7 +60,33 @@ defmodule YscWeb.ShopBrowseTest do
   end
 
   describe "main navigation" do
-    test "active members see a Shop link", %{conn: conn} do
+    setup do
+      original = Application.get_env(:ysc, :shop_nav_visible)
+      on_exit(fn -> Application.put_env(:ysc, :shop_nav_visible, original) end)
+    end
+
+    test "is hidden by default, even for active members", %{conn: conn} do
+      Application.delete_env(:ysc, :shop_nav_visible)
+
+      {:ok, view, _html} =
+        live(log_in_user(conn, member_fixture()), ~p"/events")
+
+      refute has_element?(view, "#nav-shop-desktop")
+      refute has_element?(view, "#nav-shop-mobile")
+    end
+
+    test "the shop is still reachable at /shop while the link is hidden", %{
+      conn: conn
+    } do
+      Application.put_env(:ysc, :shop_nav_visible, false)
+
+      assert {:ok, _view, _html} =
+               live(log_in_user(conn, member_fixture()), ~p"/shop")
+    end
+
+    test "active members see a Shop link once it is switched on", %{conn: conn} do
+      Application.put_env(:ysc, :shop_nav_visible, true)
+
       {:ok, view, _html} =
         live(log_in_user(conn, member_fixture()), ~p"/events")
 
@@ -68,7 +94,9 @@ defmodule YscWeb.ShopBrowseTest do
       assert has_element?(view, "#nav-shop-mobile")
     end
 
-    test "non-members and visitors do not", %{conn: conn} do
+    test "non-members and visitors never see it", %{conn: conn} do
+      Application.put_env(:ysc, :shop_nav_visible, true)
+
       {:ok, view, _html} = live(log_in_user(conn, user_fixture()), ~p"/events")
       refute has_element?(view, "#nav-shop-desktop")
 
@@ -81,6 +109,12 @@ defmodule YscWeb.ShopBrowseTest do
     setup %{conn: conn} do
       member = member_fixture()
       %{conn: log_in_user(conn, member), member: member}
+    end
+
+    test "marks Products as the current page", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/shop")
+      assert has_element?(view, "#shop-nav-products[aria-current=page]")
+      refute has_element?(view, "#back-to-products")
     end
 
     test "shows an empty state with nothing for sale", %{conn: conn} do
@@ -121,6 +155,22 @@ defmodule YscWeb.ShopBrowseTest do
 
       %{conn: log_in_user(conn, member), member: member}
       |> Map.merge(tee_product())
+    end
+
+    test "has a way back to the catalog, and does not claim to be the Products page",
+         %{conn: conn, product: product} do
+      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+
+      assert has_element?(
+               view,
+               "#back-to-products[href='/shop']",
+               "All products"
+             )
+
+      # The Products link stays highlighted as the section, but the page is a
+      # product, not the Products page.
+      assert has_element?(view, "#shop-nav-products[aria-current=true]")
+      refute has_element?(view, "#shop-nav-products[aria-current=page]")
     end
 
     test "needs a size before it can be added", %{conn: conn, product: product} do

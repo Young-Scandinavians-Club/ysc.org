@@ -26,10 +26,14 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" background-color="#f8f9fa" border-radius="4px" padding="16px">
       <strong>Type:</strong> <%= @order_kind %><br/>
       <strong>For:</strong> <%= @who %><br/>
-      <strong>Amount paid by member:</strong> <%= @amount_paid %><br/>
-      <strong>Items:</strong>
-      <%= for item <- @items do %><br/>&nbsp;&nbsp;<%= item.quantity %> × <%= item.name %><% end %>
+      <strong>Amount paid by member:</strong> <%= @amount_paid %>
     </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Items</strong></mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-table padding="0">
+      <%= YscWeb.Emails.MerchItems.rows(@items) %>
+    </mj-table>
     <mj-spacer height="24px"></mj-spacer>
     <mj-button href="<%= @admin_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Open Merch admin →</mj-button>
     <mj-spacer height="36px"></mj-spacer>

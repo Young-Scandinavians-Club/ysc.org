@@ -19,6 +19,7 @@ defmodule YscWeb.Emails.MerchOrderConfirmation do
     ]
 
   alias Ysc.Merch.Order
+  alias YscWeb.Emails.MerchItems
 
   def get_template_name, do: "merch_order_confirmation"
 
@@ -40,7 +41,7 @@ defmodule YscWeb.Emails.MerchOrderConfirmation do
         reference_id: order.reference_id,
         ordered_at: format_datetime(order.inserted_at)
       },
-      items: Enum.map(order.items, &item_data/1),
+      items: MerchItems.for_order(order),
       subtotal: format_money(order.subtotal),
       shipping: format_money(order.shipping_amount),
       total: format_money(order.total_amount),
@@ -61,15 +62,6 @@ defmodule YscWeb.Emails.MerchOrderConfirmation do
 
   defp first_word(name),
     do: name |> String.split(" ", trim: true) |> List.first()
-
-  defp item_data(item) do
-    %{
-      name: item.name,
-      quantity: item.quantity,
-      unit_price: format_money(item.unit_price),
-      line_total: format_money(Money.mult!(item.unit_price, item.quantity))
-    }
-  end
 
   defp address_lines(order) do
     [

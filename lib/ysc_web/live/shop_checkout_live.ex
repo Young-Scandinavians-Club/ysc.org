@@ -45,7 +45,10 @@ defmodule YscWeb.ShopCheckoutLive do
        |> assign(:step, :address)
        |> assign(
          :form,
-         to_form(ShippingAddress.changeset(prefill(user), %{}), as: :address)
+         to_form(
+           ShippingAddress.changeset(ShippingAddress.from_user(user), %{}),
+           as: :address
+         )
        )
        |> assign(:address, nil)
        |> assign(:shipping_options, [])
@@ -64,47 +67,6 @@ defmodule YscWeb.ShopCheckoutLive do
        )}
     end
   end
-
-  # Start the form with what we already know about the member.
-  defp prefill(user) do
-    billing = user.billing_address
-
-    base = %ShippingAddress{
-      name: String.trim("#{user.first_name} #{user.last_name}"),
-      phone: user.phone_number,
-      email: user.email
-    }
-
-    if billing && us_country?(billing.country) do
-      %{
-        base
-        | address1: billing.address,
-          city: billing.city,
-          zip: billing.postal_code,
-          state_code: state_code(billing.region)
-      }
-    else
-      base
-    end
-  end
-
-  defp us_country?(country) when is_binary(country) do
-    String.upcase(String.trim(country)) in [
-      "US",
-      "USA",
-      "UNITED STATES",
-      "UNITED STATES OF AMERICA"
-    ]
-  end
-
-  defp us_country?(_), do: false
-
-  defp state_code(region) when is_binary(region) do
-    code = region |> String.trim() |> String.upcase()
-    if code in ShippingAddress.states(), do: code
-  end
-
-  defp state_code(_), do: nil
 
   ## Address
 

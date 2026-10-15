@@ -44,6 +44,8 @@ defmodule YscWeb.Emails.Notifier do
     "ticket_reservation_created" => YscWeb.Emails.TicketReservationCreated,
     "ticket_order_refund" => YscWeb.Emails.TicketOrderRefund,
     "merch_order_confirmation" => YscWeb.Emails.MerchOrderConfirmation,
+    "merch_admin_order_board_notification" =>
+      YscWeb.Emails.MerchAdminOrderBoardNotification,
     "merch_order_shipped" => YscWeb.Emails.MerchOrderShipped,
     "merch_order_update" => YscWeb.Emails.MerchOrderUpdate,
     "merch_order_attention_board_notification" =>

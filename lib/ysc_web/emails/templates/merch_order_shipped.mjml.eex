@@ -32,6 +32,12 @@
     <mj-button href="<%= @shipment.tracking_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Track your package →</mj-button>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Your order</mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-table padding="0">
+      <%= YscWeb.Emails.MerchItems.rows(@items) %>
+    </mj-table>
+    <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Shipping to</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">

@@ -30,6 +30,7 @@ defmodule YscWeb.Emails.MerchOrderShipped do
         tracking_url: Shipment.safe_tracking_url(shipment.tracking_url),
         reshipment: shipment.reshipment
       },
+      items: YscWeb.Emails.MerchItems.for_order(order),
       ship_to: %{name: order.recipient_name, lines: address_lines(order)},
       order_url: order_url(order)
     }

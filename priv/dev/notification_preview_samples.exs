@@ -791,6 +791,10 @@
         tracking_url: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223197428490",
         reshipment: false
       },
+      items: [
+        %{name: "Club Tee", variant: "Black · M", quantity: 2, unit_price: "$25.00", line_total: "$50.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
+        %{name: "Logo Sticker", variant: nil, quantity: 3, unit_price: "$3.50", line_total: "$10.50", thumbnail: nil}
+      ],
       ship_to: %{
         name: "Astrid Lindgren",
         lines: ["1 Market St", "San Francisco, CA 94105"]
@@ -805,6 +809,10 @@
         "If anything isn't right, just reply to this email or write to info@ysc.org and we'll sort it out."
       ],
       order: %{reference_id: "MRC-PREVIEW-123"},
+      items: [
+        %{name: "Club Tee", variant: "Black · M", quantity: 2, unit_price: "$25.00", line_total: "$50.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
+        %{name: "Logo Sticker", variant: nil, quantity: 3, unit_price: "$3.50", line_total: "$10.50", thumbnail: nil}
+      ],
       order_url: "http://localhost:4000/shop/orders/preview"
     },
     "merch_order_attention_board_notification" => %{
@@ -816,8 +824,35 @@
       order_kind: "Member purchase",
       who: "Astrid Berg (astrid@example.com)",
       amount_paid: "$66.45",
-      items: [%{name: "Club Tee - Black / M", quantity: 2}, %{name: "Logo Sticker", quantity: 3}],
+      items: [
+        %{name: "Club Tee", variant: "Black · M", quantity: 2, unit_price: "$25.00", line_total: "$50.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
+        %{name: "Logo Sticker", variant: nil, quantity: 3, unit_price: "$3.50", line_total: "$10.50", thumbnail: nil}
+      ],
       admin_url: "http://localhost:4000/admin/merch"
+    },
+    "merch_admin_order_board_notification" => %{
+      order: %{reference_id: "MRC-PREVIEW-456"},
+      placed_by: %{
+        name: "Lars Nilsson",
+        email: "lars@example.com",
+        url: "http://localhost:4000/admin/users/preview/details"
+      },
+      recipient: %{
+        name: "Lars Nilsson",
+        detail: "the admin who placed the order"
+      },
+      address_lines: ["123 Market St", "San Francisco, CA 94105"],
+      items: [
+        %{name: "Club Tee", variant: "Black · M", quantity: 5, unit_price: "$25.00", line_total: "$125.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
+        %{name: "Logo Sticker", variant: nil, quantity: 20, unit_price: "$3.50", line_total: "$70.00", thumbnail: nil}
+      ],
+      estimated_cost: "$118.40",
+      purpose: "Happy hour giveaways, October 24",
+      event: %{
+        title: "October Happy Hour",
+        url: "http://localhost:4000/admin/events/preview/statistics"
+      },
+      order_url: "http://localhost:4000/admin/merch/orders/preview"
     },
     "merch_order_confirmation" => %{
       first_name: "Astrid",
@@ -828,18 +863,8 @@
         ordered_at: "Oct 14, 2026 at 10:00 AM PDT"
       },
       items: [
-        %{
-          name: "Club Tee - Black / M",
-          quantity: 2,
-          unit_price: "$25.00",
-          line_total: "$50.00"
-        },
-        %{
-          name: "Logo Sticker",
-          quantity: 3,
-          unit_price: "$3.50",
-          line_total: "$10.50"
-        }
+        %{name: "Club Tee", variant: "Black · M", quantity: 2, unit_price: "$25.00", line_total: "$50.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
+        %{name: "Logo Sticker", variant: nil, quantity: 3, unit_price: "$3.50", line_total: "$10.50", thumbnail: nil}
       ],
       subtotal: "$60.50",
       shipping: "$5.95",

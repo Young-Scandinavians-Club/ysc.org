@@ -15,7 +15,7 @@ defmodule Ysc.Merch.Orders do
   alias Ysc.Repo
 
   @detail_preloads [
-    items: [variant: :image],
+    items: [variant: [:image, product: :image]],
     shipments: [],
     user: [],
     event: [],

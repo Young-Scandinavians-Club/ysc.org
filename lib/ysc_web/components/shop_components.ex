@@ -14,7 +14,7 @@ defmodule YscWeb.ShopComponents do
   import Ysc.MoneyHelper, only: [format_price: 1]
 
   alias Ysc.Media.Image
-  alias Ysc.Merch.Order
+  alias Ysc.Merch.{Order, OrderItem}
 
   @doc """
   The frame every shop page shares: title section like every other page, then
@@ -32,6 +32,12 @@ defmodule YscWeb.ShopComponents do
   attr :eyebrow, :string, default: "Shop"
   attr :active, :atom, values: [:shop, :cart, :orders], required: true
   attr :cart_count, :integer, default: 0
+
+  attr :section_only?, :boolean,
+    default: false,
+    doc:
+      "true on a page inside the active section (a product, say): its link stays highlighted but is not announced as the current page"
+
   slot :inner_block, required: true
 
   def shop_frame(assigns) do
@@ -48,7 +54,11 @@ defmodule YscWeb.ShopComponents do
       <%!-- The shop links stay at the same left edge on every page; only the
             content below narrows. --%>
       <div class="mx-auto max-w-(--breakpoint-xl) px-4">
-        <.shop_nav active={@active} cart_count={@cart_count} />
+        <.shop_nav
+          active={@active}
+          cart_count={@cart_count}
+          section_only?={@section_only?}
+        />
       </div>
 
       <div class="mx-auto max-w-(--breakpoint-xl) px-4">
@@ -64,6 +74,7 @@ defmodule YscWeb.ShopComponents do
   """
   attr :active, :atom, values: [:shop, :cart, :orders], required: true
   attr :cart_count, :integer, default: 0
+  attr :section_only?, :boolean, default: false
 
   def shop_nav(assigns) do
     ~H"""
@@ -76,6 +87,7 @@ defmodule YscWeb.ShopComponents do
         id="shop-nav-products"
         to={~p"/shop"}
         active={@active == :shop}
+        page?={!@section_only?}
       >
         Products
       </.shop_nav_link>
@@ -107,6 +119,7 @@ defmodule YscWeb.ShopComponents do
   attr :id, :string, required: true
   attr :to, :string, required: true
   attr :active, :boolean, default: false
+  attr :page?, :boolean, default: true
   slot :inner_block, required: true
 
   defp shop_nav_link(assigns) do
@@ -114,7 +127,7 @@ defmodule YscWeb.ShopComponents do
     <.link
       id={@id}
       navigate={@to}
-      aria-current={@active && "page"}
+      aria-current={@active && if(@page?, do: "page", else: "true")}
       class={[
         "inline-flex min-h-11 items-center transition-colors",
         if(@active,
@@ -243,9 +256,12 @@ defmodule YscWeb.ShopComponents do
         >
           <.shop_thumb image={item.variant && item.variant.image} class="size-16" />
           <div class="min-w-0 flex-1">
-            <p class="truncate text-zinc-900">{item_title(item.name)}</p>
-            <p :if={item_variant(item.name)} class="truncate text-sm text-zinc-500">
-              {item_variant(item.name)}
+            <p class="truncate text-zinc-900">{OrderItem.title(item)}</p>
+            <p
+              :if={OrderItem.variant_label(item)}
+              class="truncate text-sm text-zinc-500"
+            >
+              {OrderItem.variant_label(item)}
             </p>
             <p class="text-sm tabular-nums text-zinc-500">
               {item.quantity} × {format_price(item.unit_price)}
@@ -282,23 +298,14 @@ defmodule YscWeb.ShopComponents do
     """
   end
 
-  # Item names are snapshotted as "Product / Color / Size".
-  defp item_title(name), do: name |> String.split(" / ", parts: 2) |> hd()
-
-  defp item_variant(name) do
-    case String.split(name, " / ", parts: 2) do
-      [_, rest] -> String.replace(rest, " / ", " · ")
-      _ -> nil
-    end
-  end
-
   @doc """
-  The floating cart: a translucent pill at the right edge once the cart has
+  The floating cart: a solid white pill centered along the bottom edge once the cart has
   something in it, and an "added" card that opens from the pill.
 
   See `YscWeb.ShopCartPeek` for the card's lifecycle. The pill links to the
   cart; the card offers cart and checkout and can be dismissed. Depth comes
-  from the shadow and the blurred material, not outlines.
+  from the shadow, not outlines. Both are solid white, not translucent, so they
+  read the same over any page content.
   """
   attr :summary, :map, required: true, doc: "`%{count: n, subtotal: Money}`"
 
@@ -323,7 +330,7 @@ defmodule YscWeb.ShopComponents do
       <div
         :if={@peek}
         id="cart-peek"
-        class="cart-peek w-[min(22rem,calc(100vw-2rem))] rounded-3xl bg-white/80 p-5 shadow-2xl shadow-zinc-900/15 backdrop-blur-xl"
+        class="cart-peek w-[min(22rem,calc(100vw-2rem))] rounded-3xl bg-white p-5 shadow-2xl shadow-zinc-900/15"
         data-open={to_string(@open?)}
         aria-hidden={to_string(!@open?)}
         phx-mouseenter="pause_cart_peek"
@@ -376,22 +383,27 @@ defmodule YscWeb.ShopComponents do
         id="cart-pill"
         navigate={~p"/shop/cart"}
         aria-label={"Cart, #{@summary.count} items, #{format_price(@summary.subtotal)}"}
-        class="inline-flex min-h-12 items-center gap-3 rounded-full bg-white/80 py-2 pl-4 pr-5 shadow-xl shadow-zinc-900/15 backdrop-blur-xl transition-transform motion-safe:active:scale-[0.97]"
+        class="inline-flex min-h-16 items-center gap-4 rounded-full bg-white py-3 pl-6 pr-8 shadow-xl shadow-zinc-900/15 transition-transform motion-safe:active:scale-[0.97]"
       >
         <span class="relative">
-          <.icon name="hero-shopping-bag" class="size-6 text-zinc-900" />
+          <.icon name="hero-shopping-bag" class="size-8 text-zinc-900" />
           <span
             id={"cart-dock-count-#{@summary.count}"}
-            class="cart-count-pop absolute -right-2.5 -top-2.5 inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white"
+            class="cart-count-pop absolute -right-3 -top-3 inline-flex min-w-6 items-center justify-center rounded-full bg-blue-600 px-1.5 text-sm font-semibold text-white"
           >
             {@summary.count}
           </span>
         </span>
-        <span
-          id="cart-dock-subtotal"
-          class="text-sm font-semibold tabular-nums text-zinc-900"
-        >
-          {format_price(@summary.subtotal)}
+        <span class="flex flex-col leading-tight">
+          <span id="cart-dock-label" class="text-lg font-semibold text-zinc-900">
+            Your cart
+          </span>
+          <span
+            id="cart-dock-subtotal"
+            class="text-base tabular-nums text-zinc-500"
+          >
+            {format_price(@summary.subtotal)}
+          </span>
         </span>
       </.link>
     </div>

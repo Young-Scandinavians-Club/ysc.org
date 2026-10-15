@@ -280,8 +280,17 @@ defmodule YscWeb.ShopProductLive do
       id="shop-product-page"
       title={@product.name}
       active={:shop}
+      section_only?={true}
       cart_count={@cart_summary.count}
     >
+      <.link
+        id="back-to-products"
+        navigate={~p"/shop"}
+        class="-mt-4 mb-6 inline-flex min-h-11 items-center gap-1.5 text-zinc-500 transition-colors hover:text-zinc-900"
+      >
+        <.icon name="hero-arrow-left" class="size-4" /> All products
+      </.link>
+
       <div class="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-20">
         <div
           id="product-gallery"

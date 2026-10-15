@@ -3797,7 +3797,7 @@ body.overflow-hidden {
 
 /* =============================================
    SHOP CART DOCK
-   A pill that floats at the right edge once the cart has something in it, and
+   A pill that floats at the bottom center once the cart has something in it, and
    an "added" card that materializes from the pill when something is added.
 
    Motion follows one critically damped spring (no overshoot: nothing here is
@@ -3832,12 +3832,18 @@ body.overflow-hidden {
 
 .cart-dock {
   position: fixed;
-  right: max(1rem, env(safe-area-inset-right));
+  /* Centered along the bottom edge, so it stays in view however wide the
+     screen is (a fixed right offset flies off to the side on large monitors). */
+  inset-inline: max(1rem, env(safe-area-inset-left))
+    max(1rem, env(safe-area-inset-right));
+  margin-inline: auto;
+  width: fit-content;
+  max-width: calc(100vw - 2rem);
   bottom: max(1rem, env(safe-area-inset-bottom));
   z-index: 40;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 0.75rem;
   /* Only the pill and the card take clicks, never the empty gap between them. */
   pointer-events: none;
@@ -3851,7 +3857,7 @@ body.overflow-hidden {
 
 @keyframes cart-dock-in {
   from {
-    transform: translateX(calc(100% + 2rem));
+    transform: translateY(calc(100% + 2rem));
     opacity: 0;
   }
   to {
@@ -3862,7 +3868,7 @@ body.overflow-hidden {
 
 /* Anchored to the pill, so it reads as coming out of it. */
 .cart-peek {
-  transform-origin: bottom right;
+  transform-origin: bottom center;
   transition:
     transform 420ms var(--ease-spring-settle),
     opacity 200ms ease,

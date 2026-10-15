@@ -71,6 +71,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "ticket_reservation_created" => :account,
     "ticket_order_refund" => :account,
     "merch_order_confirmation" => :account,
+    "merch_admin_order_board_notification" => :account,
     "merch_order_shipped" => :account,
     "merch_order_update" => :account,
     "merch_order_attention_board_notification" => :account,

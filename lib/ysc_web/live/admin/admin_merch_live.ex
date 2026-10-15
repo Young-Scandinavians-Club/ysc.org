@@ -10,8 +10,11 @@ defmodule YscWeb.AdminMerchLive do
 
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
+  import YscWeb.AdminMerchComponents, only: [merch_tabs: 1]
+
   alias Ysc.Media.Image
   alias Ysc.Merch
+  alias Ysc.Merch.AdminOrders
 
   @impl true
   def mount(_params, _session, socket) do
@@ -24,6 +27,7 @@ defmodule YscWeb.AdminMerchLive do
      |> assign(:demo_mode?, Ysc.Printful.demo_mode?())
      |> assign(:editing_product, nil)
      |> assign(:form, nil)
+     |> assign(:attention_count, AdminOrders.needs_attention_count())
      |> load_products()}
   end
 
@@ -376,7 +380,7 @@ defmodule YscWeb.AdminMerchLive do
       user={@current_user}
       role={@admin_role}
     >
-      <div class="flex justify-between py-6">
+      <div class="flex flex-wrap items-start justify-between gap-4 py-6">
         <div>
           <.admin_page_title subtitle="Products and prices are managed in Printful. Sync to pull in changes.">
             Merch
@@ -416,9 +420,7 @@ defmodule YscWeb.AdminMerchLive do
           Set <code>PRINTFUL_API_TOKEN</code> to use a real Printful store.
         </p>
 
-        <.admin_tabs id="merch-tabs" aria_label="Merch tabs">
-          <.admin_tab active={true} patch={~p"/admin/merch"}>Products</.admin_tab>
-        </.admin_tabs>
+        <.merch_tabs active={:products} attention_count={@attention_count} />
 
         <p id="merch-last-synced" class="py-4 text-sm text-zinc-500">
           <%= if @last_synced_at do %>

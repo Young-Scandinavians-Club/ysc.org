@@ -27,6 +27,7 @@ defmodule YscWeb.Emails.MerchOrderUpdate do
       headline: headline,
       paragraphs: paragraphs,
       order: %{reference_id: order.reference_id},
+      items: YscWeb.Emails.MerchItems.for_order(order),
       order_url: order_url(order)
     }
   end

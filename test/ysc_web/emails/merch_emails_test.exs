@@ -6,6 +6,8 @@ defmodule YscWeb.Emails.MerchEmailsTest do
   alias Ysc.Merch.{Orders, Shipment}
 
   alias YscWeb.Emails.{
+    MerchAdminOrderBoardNotification,
+    MerchItems,
     MerchOrderAttentionBoardNotification,
     MerchOrderConfirmation,
     MerchOrderShipped,
@@ -35,6 +37,264 @@ defmodule YscWeb.Emails.MerchEmailsTest do
         attrs
       )
     )
+  end
+
+  describe "items in every merch email" do
+    setup %{order: order} do
+      image =
+        image_fixture(%{raw_image_path: "https://media.example.test/tee.jpg"})
+
+      for item <- order.items do
+        item.variant
+        |> Ecto.Changeset.change(image_id: image.id)
+        |> Repo.update!()
+      end
+
+      %{order: Orders.get_order!(order.id)}
+    end
+
+    defp assert_lists_items(html, order) do
+      for item <- order.items do
+        assert html =~ "Club Tee"
+        assert html =~ "Black · M"
+        assert html =~ "&times; #{item.quantity}"
+      end
+
+      assert html =~ ~s(src="https://media.example.test/tee.jpg")
+    end
+
+    test "confirmation lists the items with a thumbnail and prices", %{
+      order: order
+    } do
+      html =
+        order
+        |> MerchOrderConfirmation.prepare_email_data()
+        |> MerchOrderConfirmation.render()
+
+      assert html =~ "Club Tee"
+      assert html =~ "Black · M"
+      assert html =~ ~s(src="https://media.example.test/tee.jpg")
+      # Quantity, unit price and line total are still there.
+      assert html =~ "$25.00"
+      assert html =~ "$50.00"
+    end
+
+    test "shipped", %{order: order} do
+      order
+      |> MerchOrderShipped.prepare_email_data(shipment())
+      |> MerchOrderShipped.render()
+      |> assert_lists_items(order)
+    end
+
+    test "every kind of update", %{order: order} do
+      for kind <- [:delivered, :returned, :failed, :canceled] do
+        kind
+        |> MerchOrderUpdate.prepare_email_data(order)
+        |> MerchOrderUpdate.render()
+        |> assert_lists_items(order)
+      end
+    end
+
+    test "board alert", %{order: order} do
+      :submit_failed
+      |> MerchOrderAttentionBoardNotification.prepare_email_data(order, "Boom")
+      |> MerchOrderAttentionBoardNotification.render()
+      |> assert_lists_items(order)
+    end
+
+    test "falls back to the product photo, then to no photo", %{order: order} do
+      [item | _] = order.items
+
+      product_image =
+        image_fixture(%{
+          raw_image_path: "https://media.example.test/product.jpg"
+        })
+
+      item.variant |> Ecto.Changeset.change(image_id: nil) |> Repo.update!()
+
+      Repo.get!(Ysc.Merch.Product, item.variant.product_id)
+      |> Ecto.Changeset.change(image_id: product_image.id)
+      |> Repo.update!()
+
+      assert [%{thumbnail: "https://media.example.test/product.jpg"}] =
+               order.id |> Orders.get_order!() |> MerchItems.for_order()
+
+      Repo.get!(Ysc.Merch.Product, item.variant.product_id)
+      |> Ecto.Changeset.change(image_id: nil)
+      |> Repo.update!()
+
+      [bare] = order.id |> Orders.get_order!() |> MerchItems.for_order()
+      assert bare.thumbnail == nil
+
+      html =
+        MerchOrderUpdate.prepare_email_data(
+          :delivered,
+          Orders.get_order!(order.id)
+        )
+        |> MerchOrderUpdate.render()
+
+      # Still listed, just without a picture.
+      assert html =~ "Club Tee"
+      refute html =~ "<img src=\"https://media"
+    end
+
+    test "a site-relative image path becomes an absolute URL", %{order: order} do
+      relative = image_fixture(%{raw_image_path: "/uploads/tee.jpg"})
+
+      for item <- order.items do
+        item.variant
+        |> Ecto.Changeset.change(image_id: relative.id)
+        |> Repo.update!()
+      end
+
+      [%{thumbnail: url} | _] =
+        order.id |> Orders.get_order!() |> MerchItems.for_order()
+
+      assert url == YscWeb.Endpoint.url() <> "/uploads/tee.jpg"
+    end
+
+    test "a hostile item name cannot inject markup", %{order: order} do
+      [item | _] = order.items
+
+      item
+      |> Ecto.Changeset.change(name: "<script>alert(1)</script> / <b>x</b>")
+      |> Repo.update!()
+
+      html =
+        MerchOrderUpdate.prepare_email_data(
+          :delivered,
+          Orders.get_order!(order.id)
+        )
+        |> MerchOrderUpdate.render()
+
+      refute html =~ "<script>alert(1)</script>"
+      assert html =~ "&lt;script&gt;"
+    end
+
+    test "club-paid order emails list items too", %{} do
+      admin = Ysc.AccountsFixtures.user_fixture(%{role: "admin"})
+
+      image =
+        image_fixture(%{raw_image_path: "https://media.example.test/gift.jpg"})
+
+      variant = variant_fixture(nil, %{name: "Sticker Pack / Blue"})
+      variant |> Ecto.Changeset.change(image_id: image.id) |> Repo.update!()
+
+      order =
+        admin
+        |> admin_order_fixture(%{items: [{variant, 20}]})
+        |> then(&Orders.get_order!(&1.id))
+
+      for html <- [
+            order
+            |> MerchOrderConfirmation.prepare_email_data()
+            |> MerchOrderConfirmation.render(),
+            order
+            |> MerchAdminOrderBoardNotification.prepare_email_data()
+            |> MerchAdminOrderBoardNotification.render()
+          ] do
+        assert html =~ "Sticker Pack"
+        assert html =~ "Blue"
+        assert html =~ ~s(src="https://media.example.test/gift.jpg")
+      end
+    end
+  end
+
+  describe "club-paid order board email" do
+    setup do
+      admin =
+        Ysc.AccountsFixtures.user_fixture(%{
+          role: "admin",
+          first_name: "Lars",
+          last_name: "Nilsson"
+        })
+
+      event = Ysc.EventsFixtures.event_fixture()
+
+      order =
+        admin
+        |> admin_order_fixture(%{
+          event_id: event.id,
+          purpose: "Happy hour <giveaway>",
+          estimated_cost: Money.new(:USD, "118.40"),
+          items: [{variant_fixture(nil, %{name: "Club Tee / Black / M"}), 5}]
+        })
+        |> then(&Orders.get_order!(&1.id))
+
+      %{admin: admin, event: event, club_order: order}
+    end
+
+    test "names who placed it, why, what and what it costs", %{
+      admin: admin,
+      event: event,
+      club_order: order
+    } do
+      html =
+        order
+        |> MerchAdminOrderBoardNotification.prepare_email_data()
+        |> MerchAdminOrderBoardNotification.render()
+
+      assert html =~ "Club-paid merch order"
+      assert html =~ "Lars Nilsson"
+      assert html =~ admin.email
+      assert html =~ order.reference_id
+      assert html =~ "Ada Admin"
+      assert html =~ "1 Market St"
+      assert html =~ "Club Tee"
+      assert html =~ "Black · M"
+      assert html =~ "&times; 5"
+      assert html =~ "$118.40"
+      assert html =~ event.title
+      assert html =~ "/admin/merch/orders/#{order.id}"
+      assert html =~ "/admin/users/#{admin.id}/details"
+    end
+
+    test "escapes the free-text purpose", %{club_order: order} do
+      html =
+        order
+        |> MerchAdminOrderBoardNotification.prepare_email_data()
+        |> MerchAdminOrderBoardNotification.render()
+
+      refute html =~ "<giveaway>"
+      assert html =~ "&lt;giveaway&gt;"
+    end
+
+    test "says so when there is no estimate yet", %{club_order: order} do
+      html =
+        %{order | estimated_cost: nil}
+        |> MerchAdminOrderBoardNotification.prepare_email_data()
+        |> MerchAdminOrderBoardNotification.render()
+
+      assert html =~ "Not available yet"
+    end
+
+    test "the subject names the admin", %{club_order: order} do
+      assert MerchAdminOrderBoardNotification.get_subject(order) ==
+               "Lars Nilsson placed a club-paid merch order (#{order.reference_id})"
+    end
+
+    test "a member recipient is described, and an admin ordering for themselves too",
+         %{admin: admin, club_order: order} do
+      member = member_fixture(%{first_name: "Astrid", last_name: "Berg"})
+
+      for_member =
+        MerchAdminOrderBoardNotification.prepare_email_data(%{
+          order
+          | user: member,
+            granted_by_id: admin.id
+        })
+
+      assert for_member.recipient.detail =~ member.email
+
+      for_self =
+        MerchAdminOrderBoardNotification.prepare_email_data(%{
+          order
+          | user: admin,
+            granted_by_id: admin.id
+        })
+
+      assert for_self.recipient.detail =~ "admin who placed"
+    end
   end
 
   describe "shipped email" do

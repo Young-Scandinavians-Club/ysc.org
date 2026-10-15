@@ -85,7 +85,10 @@
                     Clear Lake Cabin
                   </.link>
                 </li>
-                <li :if={@current_user && @active_membership?}>
+                <li :if={
+                  YscWeb.ShopAccess.nav_visible?() && @current_user &&
+                    @active_membership?
+                }>
                   <.link
                     id="nav-shop-desktop"
                     navigate={~p"/shop"}
@@ -150,7 +153,10 @@
                     Clear Lake Cabin
                   </.link>
                 </li>
-                <li :if={@current_user && @active_membership?}>
+                <li :if={
+                  YscWeb.ShopAccess.nav_visible?() && @current_user &&
+                    @active_membership?
+                }>
                   <.link
                     id="nav-shop-mobile"
                     navigate={~p"/shop"}

@@ -108,6 +108,51 @@ defmodule Ysc.Merch.ShippingAddress do
     }
   end
 
+  @doc """
+  An address pre-filled with what we know about a member: name, phone, email,
+  and their billing address when it is in the US. `user` needs
+  `:billing_address` preloaded.
+  """
+  def from_user(user) do
+    billing = user.billing_address
+
+    base = %__MODULE__{
+      name: String.trim("#{user.first_name} #{user.last_name}"),
+      phone: user.phone_number,
+      email: user.email
+    }
+
+    if billing && us_country?(billing.country) do
+      %{
+        base
+        | address1: billing.address,
+          city: billing.city,
+          zip: billing.postal_code,
+          state_code: state_code(billing.region)
+      }
+    else
+      base
+    end
+  end
+
+  defp us_country?(country) when is_binary(country) do
+    String.upcase(String.trim(country)) in [
+      "US",
+      "USA",
+      "UNITED STATES",
+      "UNITED STATES OF AMERICA"
+    ]
+  end
+
+  defp us_country?(_), do: false
+
+  defp state_code(region) when is_binary(region) do
+    code = region |> String.trim() |> String.upcase()
+    if code in @states, do: code
+  end
+
+  defp state_code(_), do: nil
+
   @doc "Rebuilds an address from an order's snapshot columns."
   def from_order(order) do
     %__MODULE__{

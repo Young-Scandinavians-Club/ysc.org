@@ -39,14 +39,7 @@
         <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Price</td>
         <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Total</td>
       </tr>
-      <%= for item <- @items do %>
-      <tr style="border-bottom:1px solid #f0f0f0;">
-        <td style="padding: 12px 16px; font-size:16px;"><%= item.name %></td>
-        <td style="padding: 12px 16px; font-size:16px; text-align:center;"><%= item.quantity %></td>
-        <td style="padding: 12px 16px; font-size:16px; text-align:right;"><%= item.unit_price %></td>
-        <td style="padding: 12px 16px; font-size:16px; text-align:right;"><%= item.line_total %></td>
-      </tr>
-      <% end %>
+      <%= YscWeb.Emails.MerchItems.priced_rows(@items) %>
       <%= if @comp do %>
       <tr style="border-top:2px solid #000; background-color:#f8f9fa;">
         <td colspan="3" style="padding: 12px 16px; font-weight:bold; font-size:18px;">Paid by the club</td>

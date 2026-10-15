@@ -8,6 +8,7 @@ defmodule Ysc.Merch.Order do
   see `cost/1`.
   """
   use Ecto.Schema
+  use Flop.Schema
   import Ecto.Changeset
 
   alias Ysc.ReferenceGenerator
@@ -25,6 +26,19 @@ defmodule Ysc.Merch.Order do
     :failed,
     :canceled,
     :refunded
+  ]
+
+  # Only paging is used (orders are always newest first); there is nothing to
+  # filter or sort by on the page.
+  @flop_options [
+    filterable: [],
+    sortable: [:inserted_at, :id],
+    default_limit: 25,
+    max_limit: 100,
+    default_order: %{
+      order_by: [:inserted_at, :id],
+      order_directions: [:desc, :desc]
+    }
   ]
 
   @type t :: %__MODULE__{}
