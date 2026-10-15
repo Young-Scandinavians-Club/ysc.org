@@ -26,8 +26,7 @@ defmodule Ysc.Merch.AdminOrders do
     ShippingAddress
   }
 
-  alias Ysc.MoneyHelper
-  alias Ysc.Printful.Error
+  alias Ysc.Printful.{Amount, Error}
   alias Ysc.Repo
 
   alias YscWeb.Emails.{MerchAdminOrderBoardNotification, Notifier}
@@ -301,14 +300,7 @@ defmodule Ysc.Merch.AdminOrders do
     Application.get_env(:ysc, :printful_estimate_wait_ms, @estimate_wait_ms)
   end
 
-  defp parse_money(value) when is_binary(value) do
-    case MoneyHelper.parse_money(value) do
-      %Money{} = money -> money
-      _ -> nil
-    end
-  end
-
-  defp parse_money(_), do: nil
+  defp parse_money(value), do: Amount.to_money(value)
 
   ## Placing an order
 

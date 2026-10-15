@@ -334,6 +334,31 @@ defmodule Ysc.Merch.AdminOrdersTest do
       assert Money.equal?(shipping, Money.new(:USD, "9.40"))
     end
 
+    test "reads the response Printful really sends: numbers, no calculation status" do
+      # Captured from POST /orders/estimate-costs on the live API.
+      expect(ClientMock, :estimate_costs, fn _ ->
+        {:ok,
+         %{
+           "costs" => %{
+             "currency" => "USD",
+             "shipping" => 7.550000000000001,
+             "subtotal" => 27.84,
+             "tax" => 2.64,
+             "total" => 38.03
+           },
+           "retail_costs" => %{"currency" => "USD", "total" => nil}
+         }}
+      end)
+
+      %{address: address, lines: lines} = params()
+
+      assert {:ok, %{total: total, shipping: shipping}} =
+               AdminOrders.estimate_cost(address, lines, "STANDARD")
+
+      assert Money.equal?(total, Money.new(:USD, "38.03"))
+      assert Money.equal?(shipping, Money.new(:USD, "7.55"))
+    end
+
     test "waits for Printful while it is still calculating" do
       calls = :counters.new(1, [])
 

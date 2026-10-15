@@ -15,7 +15,7 @@ defmodule Ysc.Merch.Fulfillment do
   alias Ysc.Ledgers
   alias Ysc.Merch.{Cart, Notifications, Order, Orders, ShippingAddress}
   alias Ysc.MoneyHelper
-  alias Ysc.Printful.Error
+  alias Ysc.Printful.{Amount, Error}
   alias Ysc.Repo
   alias YscWeb.Emails.{MerchOrderConfirmation, Notifier}
   alias YscWeb.Workers.MerchSubmitOrder
@@ -317,11 +317,10 @@ defmodule Ysc.Merch.Fulfillment do
     :ok
   end
 
-  defp printful_total(%{"costs" => %{"total" => total}})
-       when is_binary(total) do
-    case MoneyHelper.parse_money(total) do
+  defp printful_total(%{"costs" => %{"total" => total}}) do
+    case Amount.to_money(total) do
       %Money{} = money -> if Money.positive?(money), do: money
-      _ -> nil
+      nil -> nil
     end
   end
 

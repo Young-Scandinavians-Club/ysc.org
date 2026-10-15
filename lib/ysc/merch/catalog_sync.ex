@@ -20,7 +20,7 @@ defmodule Ysc.Merch.CatalogSync do
 
   alias Ysc.Accounts.User
   alias Ysc.Merch.{ImageImport, Product, ProductImage, Variant}
-  alias Ysc.MoneyHelper
+  alias Ysc.Printful.Amount
   alias Ysc.Repo
 
   defp printful_client do
@@ -211,7 +211,7 @@ defmodule Ysc.Merch.CatalogSync do
         size: sync_variant["size"],
         color: sync_variant["color"],
         sku: sync_variant["sku"],
-        retail_price: MoneyHelper.parse_money(sync_variant["retail_price"]),
+        retail_price: Amount.to_money(sync_variant["retail_price"]),
         available: available?(sync_variant)
       })
 

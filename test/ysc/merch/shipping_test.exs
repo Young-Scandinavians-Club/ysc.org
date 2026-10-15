@@ -128,6 +128,32 @@ defmodule Ysc.Merch.ShippingTest do
       assert Shipping.delivery_window(%{min_days: nil, max_days: nil}) == nil
     end
 
+    test "tidies Printful's names, which embed the delivery dates" do
+      variant = variant_fixture()
+
+      expect(ClientMock, :shipping_rates, fn _, _ ->
+        # Captured from POST /shipping/rates on the live API: a word-joiner
+        # (U+2060) inside the dates and a trailing space.
+        {:ok,
+         [
+           %{
+             "id" => "STANDARD",
+             "name" => "Flat Rate (Estimated delivery: Oct 21\u2060\u201323) ",
+             "rate" => "7.15",
+             "currency" => "USD",
+             "minDeliveryDays" => 4,
+             "maxDeliveryDays" => 6
+           }
+         ]}
+      end)
+
+      assert {:ok, [option]} =
+               Shipping.options(address(), [%{variant: variant, quantity: 1}])
+
+      assert option.name == "Flat Rate"
+      assert Shipping.delivery_window(option) == "4-6 business days"
+    end
+
     test "ignores non-USD and malformed rates" do
       expect(ClientMock, :shipping_rates, fn _, _ ->
         {:ok,

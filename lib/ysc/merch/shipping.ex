@@ -85,7 +85,7 @@ defmodule Ysc.Merch.Shipping do
       [
         %{
           id: id,
-          name: name,
+          name: clean_name(name),
           rate: money,
           min_days: Map.get(raw, "minDeliveryDays"),
           max_days: Map.get(raw, "maxDeliveryDays")
@@ -97,6 +97,16 @@ defmodule Ysc.Merch.Shipping do
   end
 
   defp parse_rate(_), do: []
+
+  # Printful names look like "Flat Rate (Estimated delivery: Oct 21\u2060-23) ":
+  # an invisible word-joiner, a trailing space, and a date window that we show
+  # ourselves (and that would otherwise appear twice).
+  defp clean_name(name) do
+    name
+    |> String.replace("\u2060", "")
+    |> String.replace(~r/\s*\(Estimated delivery:[^)]*\)/i, "")
+    |> String.trim()
+  end
 
   defp unavailable(%Error{} = error) do
     Ysc.Logging.warning("Printful shipping quote unavailable",

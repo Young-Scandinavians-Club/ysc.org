@@ -24,7 +24,7 @@ defmodule Ysc.Merch.PrintfulEvents do
 
   alias Ecto.Multi
   alias Ysc.Merch.{Notifications, Order, Orders, Shipment}
-  alias Ysc.MoneyHelper
+  alias Ysc.Printful.Amount
   alias Ysc.Repo
 
   # Statuses an event may still change. Shipped orders can still be marked
@@ -218,10 +218,10 @@ defmodule Ysc.Merch.PrintfulEvents do
   defp maybe_put(changes, _key, falsy) when falsy in [nil, false], do: changes
   defp maybe_put(changes, key, value), do: Keyword.put(changes, key, value)
 
-  defp cost_from(%{"costs" => %{"total" => total}}) when is_binary(total) do
-    case MoneyHelper.parse_money(total) do
+  defp cost_from(%{"costs" => %{"total" => total}}) do
+    case Amount.to_money(total) do
       %Money{} = money -> if Money.positive?(money), do: money
-      _ -> nil
+      nil -> nil
     end
   end
 
