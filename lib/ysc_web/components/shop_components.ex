@@ -13,6 +13,7 @@ defmodule YscWeb.ShopComponents do
   import YscWeb.CoreComponents, only: [badge: 1, icon: 1, page_masthead: 1]
   import Ysc.MoneyHelper, only: [format_price: 1]
 
+  alias Phoenix.LiveView.JS
   alias Ysc.Media.Image
   alias Ysc.Merch.{Order, OrderItem}
 
@@ -61,7 +62,8 @@ defmodule YscWeb.ShopComponents do
         />
       </div>
 
-      <div class="mx-auto max-w-(--breakpoint-xl) px-4">
+      <%!-- Room below the content so it never sits against the footer. --%>
+      <div class="mx-auto max-w-(--breakpoint-xl) px-4 pb-16 md:pb-24">
         {render_slot(@inner_block)}
       </div>
     </div>
@@ -196,6 +198,170 @@ defmodule YscWeb.ShopComponents do
       </div>
     </div>
     """
+  end
+
+  @doc """
+  A product on the listing page: a photo per color that swaps when a swatch
+  is hovered or tapped, a second photo on hover, then name, price and a line
+  of detail. Everything that swaps happens in the browser (`JS` commands), so
+  it responds instantly and never waits on the server.
+  """
+  attr :tile, :map, required: true, doc: "from `Ysc.Merch.Listing.tile/2`"
+  attr :price, :string, required: true
+
+  def product_tile(assigns) do
+    assigns = assign(assigns, :product, assigns.tile.product)
+
+    ~H"""
+    <li id={"shop-product-#{@product.id}"} class="group/tile">
+      <.link
+        navigate={product_path(@product, @tile.active)}
+        id={"shop-product-link-#{@product.id}"}
+        data-tile-link
+        aria-label={@product.name}
+        class="block transition-transform motion-safe:active:scale-[0.98]"
+      >
+        <div class="relative aspect-square overflow-hidden rounded-2xl bg-zinc-100">
+          <div
+            :for={color <- @tile.colors}
+            id={"shop-layer-#{@product.id}-#{color.slug}"}
+            data-tile-layer
+            class={[
+              "absolute inset-0 motion-safe:transition-opacity motion-safe:duration-300",
+              if(color.slug == @tile.active.slug,
+                do: "opacity-100",
+                else: "opacity-0"
+              )
+            ]}
+          >
+            <.live_component
+              id={"shop-product-image-#{@product.id}-#{color.slug}"}
+              module={YscWeb.Components.Image}
+              image={color.image || @product.image}
+              aspect_class="aspect-square"
+              preferred_type={:optimized}
+              sizes="(max-width: 768px) 50vw, 25vw"
+              loading="lazy"
+              rounded_class=""
+            />
+            <div
+              :if={color.hover_image}
+              class="absolute inset-0 opacity-0 motion-safe:transition-opacity motion-safe:duration-300 group-hover/tile:opacity-100"
+            >
+              <.live_component
+                id={"shop-product-hover-#{@product.id}-#{color.slug}"}
+                module={YscWeb.Components.Image}
+                image={color.hover_image}
+                aspect_class="aspect-square"
+                preferred_type={:optimized}
+                sizes="(max-width: 768px) 50vw, 25vw"
+                loading="lazy"
+                rounded_class=""
+              />
+            </div>
+          </div>
+          <span
+            :if={@tile.new?}
+            id={"shop-product-new-#{@product.id}"}
+            class="type-eyebrow absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-xs text-zinc-900"
+          >
+            New
+          </span>
+        </div>
+      </.link>
+
+      <div
+        :if={@tile.active.name}
+        class="mt-2 flex flex-wrap items-center gap-x-0.5"
+        id={"shop-swatches-#{@product.id}"}
+      >
+        <button
+          :for={color <- @tile.colors}
+          type="button"
+          id={"shop-swatch-#{@product.id}-#{color.slug}"}
+          data-tile-swatch
+          aria-label={color.name}
+          aria-pressed={to_string(color.slug == @tile.active.slug)}
+          title={color.name}
+          phx-click={pick_color(@tile, color)}
+          phx-mouseenter={pick_color(@tile, color)}
+          class="group/swatch flex size-8 items-center justify-center rounded-full outline-none"
+        >
+          <span
+            class="shop-swatch size-5 rounded-full ring-offset-2 transition motion-safe:group-active/swatch:scale-90 group-aria-pressed/swatch:ring-2 group-aria-pressed/swatch:ring-zinc-900 group-focus-visible/swatch:ring-2 group-focus-visible/swatch:ring-blue-600"
+            style={color.hex && "--swatch: #{color.hex}"}
+          ></span>
+        </button>
+        <.link
+          :if={@tile.hidden_colors > 0}
+          navigate={product_path(@product, @tile.active)}
+          id={"shop-more-colors-#{@product.id}"}
+          class="ml-1 rounded-full px-2 py-1 text-sm font-medium text-zinc-600 transition-colors hover:text-blue-700"
+        >
+          +{@tile.hidden_colors}
+        </.link>
+      </div>
+
+      <.link
+        navigate={product_path(@product, @tile.active)}
+        data-tile-link
+        class={["group block", if(@tile.active.name, do: "mt-1", else: "mt-4")]}
+      >
+        <h2 class="type-subhead text-lg text-zinc-900 transition-colors group-hover:text-blue-700 md:text-xl">
+          {@product.name}
+        </h2>
+        <p class="mt-0.5 text-base text-zinc-600">{@price}</p>
+      </.link>
+
+      <p
+        :if={@tile.active.name || @tile.sizes}
+        class="mt-1 text-sm text-zinc-500"
+        id={"shop-details-#{@product.id}"}
+      >
+        <span
+          :for={color <- @tile.colors}
+          :if={color.name}
+          data-tile-color
+          id={"shop-color-name-#{@product.id}-#{color.slug}"}
+          class={[color.slug != @tile.active.slug && "hidden"]}
+        >
+          {color.name}
+        </span>
+        <span :if={@tile.active.name && @tile.sizes} aria-hidden="true"> · </span>
+        <span :if={@tile.sizes}>{@tile.sizes}</span>
+      </p>
+    </li>
+    """
+  end
+
+  defp product_path(product, %{name: name}) when is_binary(name),
+    do: ~p"/shop/products/#{product.id}?#{[color: name]}"
+
+  defp product_path(product, _color), do: ~p"/shop/products/#{product.id}"
+
+  # Show `color`'s photo, mark its swatch, name it, and point the tile's links
+  # at the product in that color.
+  defp pick_color(tile, color) do
+    id = tile.product.id
+    scope = "#shop-product-#{id}"
+    layers = "#{scope} [data-tile-layer]"
+    layer = "#shop-layer-#{id}-#{color.slug}"
+
+    JS.add_class("opacity-0", to: layers)
+    |> JS.remove_class("opacity-100", to: layers)
+    |> JS.remove_class("opacity-0", to: layer)
+    |> JS.add_class("opacity-100", to: layer)
+    |> JS.set_attribute({"aria-pressed", "false"},
+      to: "#{scope} [data-tile-swatch]"
+    )
+    |> JS.set_attribute({"aria-pressed", "true"},
+      to: "#shop-swatch-#{id}-#{color.slug}"
+    )
+    |> JS.add_class("hidden", to: "#{scope} [data-tile-color]")
+    |> JS.remove_class("hidden", to: "#shop-color-name-#{id}-#{color.slug}")
+    |> JS.set_attribute({"href", product_path(tile.product, color)},
+      to: "#{scope} [data-tile-link]"
+    )
   end
 
   @doc "Small square thumbnail for list rows."

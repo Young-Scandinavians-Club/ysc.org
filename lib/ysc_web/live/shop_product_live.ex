@@ -15,7 +15,7 @@ defmodule YscWeb.ShopProductLive do
   alias YscWeb.ShopCartPeek
 
   @impl true
-  def mount(%{"id" => id}, _session, socket) do
+  def mount(%{"id" => id} = params, _session, socket) do
     case fetch_product(id) do
       nil ->
         {:ok,
@@ -32,13 +32,22 @@ defmodule YscWeb.ShopProductLive do
          socket
          |> assign(:page_title, product.name)
          |> assign(:product, product)
-         |> assign(:selection, VariantSelection.default(product.variants))
+         |> assign(:selection, initial_selection(product, params["color"]))
          |> assign(:quantity, 1)
          |> assign(:photo_index, 0)
          |> ShopCartPeek.init(socket.assigns.current_user)
          |> assign_selected_variant()
          |> assign_gallery()}
     end
+  end
+
+  # The listing links here with the color the shopper was looking at.
+  defp initial_selection(product, color) do
+    default = VariantSelection.default(product.variants)
+
+    if is_binary(color),
+      do: VariantSelection.select_color(product.variants, default, color),
+      else: default
   end
 
   defp fetch_product(id) do

@@ -10,18 +10,90 @@ defmodule YscWeb.ShopLive do
   import YscWeb.ShopComponents
 
   alias Ysc.Merch
+  alias Ysc.Merch.Listing
+  alias Phoenix.LiveView.JS
   alias YscWeb.ShopCartPeek
 
   @impl true
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
+    products = Merch.list_shop_products()
 
     {:ok,
      socket
      |> assign(:page_title, "Shop")
-     |> assign(:products, Merch.list_shop_products())
+     |> assign(:products, products)
+     |> assign(:color_options, Listing.available_colors(products))
      |> ShopCartPeek.init(user)}
   end
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    sort = Listing.parse_sort(params["sort"])
+    colors = parse_colors(params["colors"], socket.assigns.color_options)
+
+    tiles =
+      socket.assigns.products
+      |> Listing.filter(colors)
+      |> Listing.sort(sort)
+      |> Enum.map(&Listing.tile(&1, colors))
+
+    {:noreply,
+     socket
+     |> assign(:sort, sort)
+     |> assign(:selected_colors, colors)
+     |> assign(:tiles, tiles)}
+  end
+
+  @impl true
+  def handle_event("sort", %{"sort" => sort}, socket) do
+    {:noreply,
+     push_patch(socket,
+       to:
+         listing_path(Listing.parse_sort(sort), socket.assigns.selected_colors)
+     )}
+  end
+
+  # Only colors some product really offers, in the order the page lists them.
+  defp parse_colors(names, options) when is_list(names) do
+    for %{name: name} <- options, name in names, do: name
+  end
+
+  defp parse_colors(_names, _options), do: []
+
+  defp listing_path(sort, colors) do
+    query =
+      [
+        sort: if(sort != "featured", do: sort),
+        colors: if(colors != [], do: colors)
+      ]
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+
+    if query == [], do: ~p"/shop", else: ~p"/shop?#{query}"
+  end
+
+  defp toggle_color(colors, name) do
+    if name in colors, do: List.delete(colors, name), else: colors ++ [name]
+  end
+
+  # Answers are plain text; `contact` is where members write with problems.
+  defp faq_items do
+    [
+      {"does-the-club-make-money", "Does the club make money on the merch?",
+       "No. The club does not make money on merch. The shop is just for fun, and a way to show your support for the club when you are out and about."},
+      {"delivery-time", "Why might delivery take longer than usual?",
+       "Everything is printed to order. Nothing sits in a warehouse waiting for you: your item is made after you order and then shipped, so it can take a bit longer to arrive than a typical online order. We email you as soon as it ships, with a tracking link."},
+      {"shipping", "Where do you ship, and what does it cost?",
+       "We currently ship within the United States. Shipping is charged at what it really costs, and you see the exact amount at checkout before you pay."},
+      {"tracking", "How do I follow my order?",
+       "You get a confirmation email right away, then an email (and a text message, if you have those turned on) when your order ships and if anything changes. You can also check My orders at any time."},
+      {"problems", "Something is wrong with my order. Who do I ask?",
+       "Write to us at the address below with your order number and we will sort it out."}
+    ]
+  end
+
+  defp count_label(1), do: "1 item"
+  defp count_label(count), do: "#{count} items"
 
   defp price_label(product) do
     prices = Enum.map(product.variants, & &1.retail_price)
@@ -53,27 +125,200 @@ defmodule YscWeb.ShopLive do
         </p>
       </div>
 
-      <ul
-        :if={@products != []}
-        id="shop-products"
-        class="grid grid-cols-1 gap-x-10 gap-y-16 sm:grid-cols-2 lg:grid-cols-3"
-      >
-        <li :for={product <- @products} id={"shop-product-#{product.id}"}>
-          <.link
-            navigate={~p"/shop/products/#{product.id}"}
-            class="group block transition-transform motion-safe:active:scale-[0.98]"
+      <div :if={@products != []} id="shop-toolbar">
+        <div class="flex items-center justify-between gap-4">
+          <p
+            id="shop-count"
+            class="shrink-0 whitespace-nowrap text-base font-medium text-zinc-900"
+            aria-live="polite"
           >
-            <.shop_image
-              id={"shop-product-image-#{product.id}"}
-              image={product.image}
-            />
-            <h2 class="type-subhead mt-5 text-xl text-zinc-900 transition-colors group-hover:text-blue-700">
-              {product.name}
-            </h2>
-            <p class="mt-1 text-lg text-zinc-600">{price_label(product)}</p>
+            {count_label(length(@tiles))}
+          </p>
+
+          <div class="flex min-w-0 items-center gap-2">
+            <div :if={length(@color_options) > 1} class="relative">
+              <button
+                type="button"
+                id="shop-filter-toggle"
+                aria-controls="shop-filter-panel"
+                phx-click={JS.toggle(to: "#shop-filter-panel")}
+                class="inline-flex items-center gap-2 rounded-xl bg-zinc-100 px-3 py-2.5 md:px-4 text-base font-medium text-zinc-900 transition hover:bg-zinc-200 motion-safe:active:scale-[0.97]"
+              >
+                <.icon name="hero-adjustments-horizontal" class="size-5" /> Color
+                <span
+                  :if={@selected_colors != []}
+                  id="shop-filter-count"
+                  class="rounded-full bg-zinc-900 px-2 text-sm text-white"
+                >
+                  {length(@selected_colors)}
+                </span>
+              </button>
+
+              <div
+                id="shop-filter-panel"
+                phx-click-away={JS.hide(to: "#shop-filter-panel")}
+                phx-key="escape"
+                phx-window-keydown={JS.hide(to: "#shop-filter-panel")}
+                class="absolute right-0 z-20 mt-2 hidden w-72 rounded-2xl bg-white p-3 shadow-xl ring-1 ring-zinc-900/5"
+              >
+                <ul class="flex flex-col">
+                  <li :for={option <- @color_options}>
+                    <.link
+                      patch={
+                        listing_path(
+                          @sort,
+                          toggle_color(@selected_colors, option.name)
+                        )
+                      }
+                      id={"shop-filter-color-#{option.slug}"}
+                      aria-current={option.name in @selected_colors && "true"}
+                      class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-base text-zinc-800 transition-colors hover:bg-zinc-50 motion-safe:active:scale-[0.98]"
+                    >
+                      <span
+                        class="shop-swatch size-5 shrink-0 rounded-full"
+                        style={option.hex && "--swatch: #{option.hex}"}
+                      ></span>
+                      <span class={[
+                        "flex-1",
+                        option.name in @selected_colors &&
+                          "font-semibold text-zinc-900"
+                      ]}>
+                        {option.name}
+                      </span>
+                      <.icon
+                        :if={option.name in @selected_colors}
+                        name="hero-check"
+                        class="size-5 text-zinc-900"
+                      />
+                    </.link>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <form id="shop-sort-form" phx-change="sort" class="relative min-w-0">
+              <label for="shop-sort" class="sr-only">Sort by</label>
+              <select
+                id="shop-sort"
+                name="sort"
+                class="w-full appearance-none truncate rounded-xl border-0 bg-zinc-100 py-2.5 pl-3 pr-9 md:pl-4 md:pr-10 text-base font-medium text-zinc-900 transition-colors hover:bg-zinc-200 focus:ring-2 focus:ring-blue-600"
+              >
+                <option
+                  :for={{value, label} <- Listing.sorts()}
+                  value={value}
+                  selected={value == @sort}
+                >
+                  {label}
+                </option>
+              </select>
+              <.icon
+                name="hero-chevron-down"
+                class="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-zinc-600"
+              />
+            </form>
+          </div>
+        </div>
+
+        <div
+          :if={@selected_colors != []}
+          id="shop-active-filters"
+          class="mt-4 flex flex-wrap items-center gap-2"
+        >
+          <.link
+            :for={name <- @selected_colors}
+            patch={listing_path(@sort, toggle_color(@selected_colors, name))}
+            id={"shop-remove-filter-#{Listing.slug(name)}"}
+            aria-label={"Remove #{name} filter"}
+            class="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 py-1.5 pl-4 pr-3 text-base text-zinc-900 transition hover:bg-zinc-200 motion-safe:active:scale-[0.97]"
+          >
+            {name} <.icon name="hero-x-mark" class="size-4" />
           </.link>
-        </li>
+          <.link
+            patch={listing_path(@sort, [])}
+            id="shop-clear-filters"
+            class="rounded-full px-3 py-1.5 text-base font-medium text-blue-700 transition-colors hover:text-blue-800"
+          >
+            Clear all
+          </.link>
+        </div>
+      </div>
+
+      <div
+        :if={@products != [] and @tiles == []}
+        id="shop-no-matches"
+        class="mt-8 rounded-3xl bg-zinc-50 px-6 py-20 text-center"
+      >
+        <h2 class="type-title text-2xl text-zinc-900">Nothing in that color</h2>
+        <p class="mt-3 text-lg text-zinc-600">
+          Try a different color, or see everything.
+        </p>
+        <.link
+          patch={listing_path(@sort, [])}
+          id="shop-no-matches-clear"
+          class="mt-6 inline-block rounded-xl bg-zinc-900 px-6 py-3 text-base font-medium text-white transition hover:bg-zinc-700 motion-safe:active:scale-[0.97]"
+        >
+          Clear all
+        </.link>
+      </div>
+
+      <ul
+        :if={@tiles != []}
+        id="shop-products"
+        class="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 md:gap-x-8 md:gap-y-14 lg:grid-cols-4"
+      >
+        <.product_tile
+          :for={tile <- @tiles}
+          tile={tile}
+          price={price_label(tile.product)}
+        />
       </ul>
+
+      <section
+        :if={@products != []}
+        id="shop-faq"
+        aria-labelledby="shop-faq-title"
+        class="mt-20 md:mt-28"
+      >
+        <h2
+          id="shop-faq-title"
+          class="type-title text-2xl text-zinc-900 md:text-3xl"
+        >
+          Good to know
+        </h2>
+
+        <%!-- Static content: ignoring patches keeps open answers open while
+              the list above is sorted or filtered. --%>
+        <div
+          id="shop-faq-items"
+          phx-update="ignore"
+          class="mt-6 flex max-w-3xl flex-col gap-3"
+        >
+          <details
+            :for={{key, question, answer} <- faq_items()}
+            id={"shop-faq-#{key}"}
+            class="group rounded-2xl bg-zinc-50 transition-colors open:bg-zinc-100"
+          >
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-5 py-4 text-lg font-medium text-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-blue-600 motion-safe:active:scale-[0.99] [&::-webkit-details-marker]:hidden">
+              {question}
+              <.icon
+                name="hero-chevron-down"
+                class="size-5 shrink-0 text-zinc-500 transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <p class="px-5 pb-5 text-base text-zinc-600">
+              {answer}
+              <a
+                :if={key == "problems"}
+                id="shop-faq-contact"
+                href="mailto:info@ysc.org"
+                class="font-medium text-blue-700 hover:text-blue-800"
+              >
+                info@ysc.org
+              </a>
+            </p>
+          </details>
+        </div>
+      </section>
 
       <.cart_dock summary={@cart_summary} />
     </.shop_frame>
