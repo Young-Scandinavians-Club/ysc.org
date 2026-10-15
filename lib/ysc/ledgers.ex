@@ -204,7 +204,8 @@ defmodule Ysc.Ledgers do
     "event_revenue",
     "tahoe_booking_revenue",
     "clear_lake_booking_revenue",
-    "donation_revenue"
+    "donation_revenue",
+    "merch_revenue"
   ]
 
   alias YscWeb.Workers.{
@@ -2472,7 +2473,7 @@ defmodule Ysc.Ledgers do
     case Repo.one(payment_related_booking_id_query(payment.id)) do
       nil ->
         case Repo.one(related_ticket_order_query(payment.id)) do
-          nil -> nil
+          nil -> related_merch_order(payment.id)
           ticket_order -> {:ticket_order, ticket_order}
         end
 
@@ -2481,6 +2482,26 @@ defmodule Ysc.Ledgers do
           nil -> nil
           booking -> {:booking, booking}
         end
+    end
+  end
+
+  defp related_merch_order(payment_id) do
+    entry_order_ids =
+      from(e in LedgerEntry,
+        where: e.payment_id == ^payment_id and e.related_entity_type == :merch,
+        where: not is_nil(e.related_entity_id),
+        select: e.related_entity_id
+      )
+
+    from(o in Ysc.Merch.Order,
+      where: o.payment_id == ^payment_id or o.id in subquery(entry_order_ids),
+      preload: [items: ^from(i in Ysc.Merch.OrderItem, order_by: i.inserted_at)],
+      limit: 1
+    )
+    |> Repo.one()
+    |> case do
+      nil -> nil
+      order -> {:merch_order, order}
     end
   end
 
@@ -3978,6 +3999,12 @@ defmodule Ysc.Ledgers do
               :donation ->
                 %{type: "Donation", details: "General donation"}
 
+              :merch ->
+                %{
+                  type: "Merch",
+                  details: merch_details(entry.related_entity_id)
+                }
+
               :administration ->
                 %{type: "Administration", details: "System transaction"}
 
@@ -3987,6 +4014,36 @@ defmodule Ysc.Ledgers do
         end
 
       Map.put(payment, :payment_type_info, payment_type_info)
+    end
+  end
+
+  # "MRC-261015-AB12C, 3 items" for a merch purchase.
+  defp merch_details(order_id) do
+    order_id
+    |> List.wrap()
+    |> merch_details_by_order_id()
+    |> Map.get(order_id, "Merch order")
+  end
+
+  defp merch_details_by_order_id(order_ids) do
+    order_ids = Enum.reject(order_ids, &is_nil/1)
+
+    if order_ids == [] do
+      %{}
+    else
+      from(o in Ysc.Merch.Order,
+        left_join: i in assoc(o, :items),
+        where: o.id in ^order_ids,
+        group_by: [o.id, o.reference_id],
+        select: {o.id, o.reference_id, coalesce(sum(i.quantity), 0)}
+      )
+      |> Repo.all()
+      |> Map.new(fn {id, reference, quantity} ->
+        quantity = quantity |> to_string() |> String.to_integer()
+
+        {id,
+         "#{reference}, #{quantity} #{if quantity == 1, do: "item", else: "items"}"}
+      end)
     end
   end
 
@@ -4034,6 +4091,14 @@ defmodule Ysc.Ledgers do
         |> Enum.map(fn {_payment_id, entry} -> entry.related_entity_id end)
         |> Enum.uniq()
         |> Enum.filter(& &1)
+
+      merch_details =
+        revenue_entries
+        |> Enum.filter(fn {_payment_id, entry} ->
+          entry.related_entity_type == :merch
+        end)
+        |> Enum.map(fn {_payment_id, entry} -> entry.related_entity_id end)
+        |> merch_details_by_order_id()
 
       # Batch fetch event titles only — skip body HTML TOAST columns
       events =
@@ -4128,6 +4193,17 @@ defmodule Ysc.Ledgers do
 
                   :donation ->
                     %{type: "Donation", details: "General donation"}
+
+                  :merch ->
+                    %{
+                      type: "Merch",
+                      details:
+                        Map.get(
+                          merch_details,
+                          entry.related_entity_id,
+                          "Merch order"
+                        )
+                    }
 
                   :administration ->
                     %{type: "Administration", details: "System transaction"}

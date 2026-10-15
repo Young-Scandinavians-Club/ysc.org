@@ -3241,6 +3241,30 @@ defmodule YscWeb.AdminMoneyLive do
                     )}
                   </p>
                 </div>
+              <% {:merch_order, merch_order} -> %>
+                <div id="payment-related-merch-order" class="text-sm text-zinc-700">
+                  <p><strong>Type:</strong> Merch Order</p>
+                  <p>
+                    <strong>Reference:</strong>
+                    <.link
+                      id="payment-related-merch-order-link"
+                      navigate={~p"/admin/merch/orders/#{merch_order.id}"}
+                      class="text-blue-600 hover:underline"
+                    >
+                      {merch_order.reference_id}
+                    </.link>
+                  </p>
+                  <p>
+                    <strong>Items:</strong> {Enum.sum(
+                      Enum.map(merch_order.items, & &1.quantity)
+                    )}
+                  </p>
+                  <p>
+                    <strong>Status:</strong> {String.capitalize(
+                      to_string(merch_order.status)
+                    )}
+                  </p>
+                </div>
             <% end %>
           </div>
           <!-- Refunds Section -->
@@ -4947,6 +4971,7 @@ defmodule YscWeb.AdminMoneyLive do
       "Event" -> "text-green-600"
       "Booking" -> "text-purple-600"
       "Donation" -> "text-orange-600"
+      "Merch" -> "text-rose-600"
       "Administration" -> "text-zinc-600"
       _ -> "text-zinc-900"
     end
