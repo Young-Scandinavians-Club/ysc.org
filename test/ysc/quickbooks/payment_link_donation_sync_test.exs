@@ -104,9 +104,7 @@ defmodule Ysc.Quickbooks.PaymentLinkDonationSyncTest do
     refute_received :used_special_project_fundraising
   end
 
-  test "moves the payment-link item onto its income account before posting", %{
-    user: user
-  } do
+  test "does not repoint an existing item onto the fund account", %{user: user} do
     stub_common_quickbooks()
 
     stub(ClientMock, :query_account_by_name, fn
@@ -137,15 +135,14 @@ defmodule Ysc.Quickbooks.PaymentLinkDonationSyncTest do
       {:ok, %{"Id" => "sr_plink", "TotalAmt" => "50.00"}}
     end)
 
-    {:ok, _} = book_payment_link_donation(user)
+    {:ok, {payment, _, _}} = book_payment_link_donation(user)
 
-    assert_received {:updated_account, "plink_item_77",
-                     %{
-                       value: "tahoe_kitchen_fund",
-                       name: "Tahoe Kitchen Fund"
-                     }}
+    assert {:error, :payment_link_item_income_account_mismatch} =
+             Sync.sync_payment(payment)
 
-    assert_received {:receipt, _params}
+    payment = Repo.reload!(payment)
+    assert payment.quickbooks_sync_status == "failed"
+    refute_received {:receipt, _}
   end
 
   test "does not fall back to Special Project Fundraising when the payment-link account is missing",
@@ -207,18 +204,104 @@ defmodule Ysc.Quickbooks.PaymentLinkDonationSyncTest do
     refute_received {:receipt, _}
   end
 
-  defp book_payment_link_donation(user) do
+  test "exports a donor who is not a member on the system customer" do
+    Application.put_env(
+      :ysc,
+      :quickbooks,
+      Keyword.put(
+        Application.get_env(:ysc, :quickbooks),
+        :system_customer_id,
+        "system_customer_1"
+      )
+    )
+
+    stub_common_quickbooks()
+
+    stub(ClientMock, :query_account_by_name, fn
+      "Undeposited Funds" -> {:ok, "undeposited_funds"}
+      "Tahoe Kitchen Fund" -> {:ok, "tahoe_kitchen_fund"}
+      _ -> {:error, :not_found}
+    end)
+
+    stub(ClientMock, :get_or_create_item, fn _name, _opts ->
+      {:ok, "plink_item_77"}
+    end)
+
+    stub(ClientMock, :get_item_by_id, fn "plink_item_77" ->
+      {:ok,
+       %{
+         "Id" => "plink_item_77",
+         "IncomeAccountRef" => %{"value" => "tahoe_kitchen_fund"}
+       }}
+    end)
+
+    stub(ClientMock, :create_sales_receipt, fn params, _opts ->
+      send(self(), {:receipt, params})
+      {:ok, %{"Id" => "sr_guest", "TotalAmt" => "50.00"}}
+    end)
+
+    {:ok, _} = book_payment_link_donation(nil)
+
+    assert_received {:receipt, params}
+    assert get_in(params, [:customer_ref, :value]) == "system_customer_1"
+  end
+
+  test "keeps an income account name that contains the description separator",
+       %{
+         user: user
+       } do
+    account = "Tahoe Kitchen Fund | Phase 2"
+
+    stub_common_quickbooks()
+
+    stub(ClientMock, :query_account_by_name, fn
+      "Undeposited Funds" -> {:ok, "undeposited_funds"}
+      ^account -> {:ok, "phase_two"}
+      _ -> {:error, :not_found}
+    end)
+
+    stub(ClientMock, :get_or_create_item, fn name, opts ->
+      send(self(), {:item, name, opts})
+      {:ok, "phase_item"}
+    end)
+
+    stub(ClientMock, :get_item_by_id, fn "phase_item" ->
+      {:ok,
+       %{
+         "Id" => "phase_item",
+         "IncomeAccountRef" => %{"value" => "phase_two"}
+       }}
+    end)
+
+    stub(ClientMock, :create_sales_receipt, fn params, _opts ->
+      send(self(), {:receipt, params})
+      {:ok, %{"Id" => "sr_phase", "TotalAmt" => "50.00"}}
+    end)
+
+    {:ok, {payment, _, _}} = book_payment_link_donation(user, account)
+
+    assert Ysc.Stripe.DonationPaymentLink.payment_link_fund(payment) == %{
+             account: account,
+             class: "Administration"
+           }
+
+    assert_received {:item, ^account, _opts}
+    assert_received {:receipt, _params}
+  end
+
+  defp book_payment_link_donation(user, account \\ "Tahoe Kitchen Fund") do
     Ledgers.process_payment(%{
-      user_id: user.id,
+      user_id: if(is_map(user), do: user.id),
       amount: Money.new(5_000, :USD),
       external_payment_id: "pi_plink_#{System.unique_integer([:positive])}",
       entity_type: :donation,
       entity_id: nil,
       stripe_fee: Money.new(175, :USD),
       description:
-        "Stripe payment link donation | Tahoe Kitchen Fund | from Ada Lovelace <ada@example.com>",
+        "Stripe payment link donation | #{account} | from Ada Lovelace <ada@example.com>",
       property: nil,
-      payment_method_id: nil
+      payment_method_id: nil,
+      metadata: %{"quickbooks_income_account" => account}
     })
   end
 

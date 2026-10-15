@@ -400,6 +400,10 @@ defmodule Ysc.Stripe.WebhookHandler do
   def process_webhook_event(webhook_event, event) do
     require Ysc.Logging
 
+    # Stripe reads happen before the webhook transaction so a slow Payment Link
+    # or fee lookup does not hold a database connection.
+    Ysc.Stripe.DonationPaymentLink.prefetch_paid_session(event)
+
     # CRITICAL: Use a transaction to ensure atomicity
     # Either the handler succeeds AND state is marked processed, or both rollback
     result =

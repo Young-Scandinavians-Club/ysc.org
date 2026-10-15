@@ -35,6 +35,10 @@ defmodule Ysc.Ledgers.Payment do
     field :quickbooks_synced_at, :utc_datetime
     field :quickbooks_last_sync_attempt_at, :utc_datetime
 
+    # Donation Payment Links store the QuickBooks income account here.
+    # Key: "quickbooks_income_account".
+    field :metadata, :map, default: %{}
+
     belongs_to :user, Ysc.Accounts.User, foreign_key: :user_id, references: :id
 
     belongs_to :payment_method, Ysc.Payments.PaymentMethod,
@@ -60,7 +64,8 @@ defmodule Ysc.Ledgers.Payment do
       :quickbooks_sync_error,
       :quickbooks_response,
       :quickbooks_synced_at,
-      :quickbooks_last_sync_attempt_at
+      :quickbooks_last_sync_attempt_at,
+      :metadata
     ])
     |> validate_required([
       :external_provider,

@@ -1033,17 +1033,16 @@ defmodule Ysc.Quickbooks.Sync do
            %{entity_type: entity_type, property: property, entry: event_entry}}
 
         donation_entry ->
-          fund =
-            Ysc.Stripe.DonationPaymentLink.payment_link_fund(donation_entry)
+          fund = Ysc.Stripe.DonationPaymentLink.payment_link_fund(payment)
 
           entity_type =
-            if fund ||
-                 Ysc.Stripe.DonationPaymentLink.payment_link_donation_entry?(
-                   donation_entry
-                 ) do
+            if fund do
               :payment_link_donation
             else
-              :donation
+              case donation_entry.related_entity_type do
+                atom when is_atom(atom) -> atom
+                string when is_binary(string) -> String.to_existing_atom(string)
+              end
             end
 
           Ysc.Logging.debug(
@@ -1454,19 +1453,29 @@ defmodule Ysc.Quickbooks.Sync do
           if current == account_id do
             {:ok, item_id}
           else
-            Ysc.Logging.info(
-              "[QB Sync] Updating payment link donation item income account",
-              item_id: item_id,
-              current_account_id: current,
-              account_id: account_id
-            )
+            if is_binary(current) and current != "" do
+              Ysc.Logging.error(
+                "[QB Sync] Payment link donation item already posts to a different income account",
+                item_id: item_id,
+                current_account_id: current,
+                account_id: account_id
+              )
 
-            case client_module().update_item_income_account(
-                   item_id,
-                   account_ref
-                 ) do
-              {:ok, _} -> {:ok, item_id}
-              error -> error
+              {:error, :payment_link_item_income_account_mismatch}
+            else
+              Ysc.Logging.info(
+                "[QB Sync] Setting payment link donation item income account",
+                item_id: item_id,
+                account_id: account_id
+              )
+
+              case client_module().update_item_income_account(
+                     item_id,
+                     account_ref
+                   ) do
+                {:ok, _} -> {:ok, item_id}
+                error -> error
+              end
             end
           end
 
@@ -4295,6 +4304,8 @@ defmodule Ysc.Quickbooks.Sync do
   defp known_qb_sync_failure?(reason)
        when reason in [
               :no_income_account_for_item,
+              :payment_link_donation_uses_donation_item,
+              :payment_link_item_income_account_mismatch,
               :item_creation_failed,
               :user_not_found,
               :transactions_not_fully_synced,

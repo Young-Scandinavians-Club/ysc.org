@@ -38,8 +38,8 @@ defmodule Ysc.StripeBehaviour do
 
   # Optional so the many ad-hoc test clients don't all need stubs. Invoice
   # callers go through `Ysc.Stripe.InvoiceHelpers`. Payment-link donations go
-  # through `Ysc.Stripe.DonationPaymentLink`, which treats a missing callback
-  # as a retrieval failure so the webhook is retried.
+  # through `Ysc.Stripe.DonationPaymentLink`, which skips booking when this
+  # callback is missing instead of failing the webhook.
   @optional_callbacks retrieve_invoice: 2,
                       list_invoice_payments: 2,
                       retrieve_payment_link: 1

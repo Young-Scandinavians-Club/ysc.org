@@ -4,11 +4,18 @@ defmodule Ysc.Stripe.DonationPaymentLinkTestClient do
   @tahoe_url "https://donate.stripe.com/28E5kEaLcg63aPW6nr2Ji03"
 
   def retrieve_payment_link("plink_tahoe_kitchen") do
+    send(self(), {:retrieve_payment_link, "plink_tahoe_kitchen"})
     {:ok, %{id: "plink_tahoe_kitchen", url: @tahoe_url}}
   end
 
   def retrieve_payment_link("plink_other") do
+    send(self(), {:retrieve_payment_link, "plink_other"})
     {:ok, %{id: "plink_other", url: "https://buy.stripe.com/not-a-donation"}}
+  end
+
+  def retrieve_payment_link("plink_missing") do
+    send(self(), {:retrieve_payment_link, "plink_missing"})
+    {:error, :stripe_down}
   end
 
   def retrieve_payment_link(id), do: {:error, {:not_found, id}}
@@ -16,6 +23,7 @@ defmodule Ysc.Stripe.DonationPaymentLinkTestClient do
   # No expanded charge, so the donation books an estimated fee instead of
   # calling retrieve_charge.
   def retrieve_payment_intent(id, _opts) when is_binary(id) do
+    send(self(), {:retrieve_payment_intent, id})
     {:ok, %{id: id, amount: 5_000}}
   end
 end
