@@ -18,6 +18,7 @@ defmodule Ysc.Payments.PaymentDisplay do
   def get_payment_icon(%{type: :ticket}), do: "hero-ticket"
   def get_payment_icon(%{type: :membership}), do: "hero-heart"
   def get_payment_icon(%{type: :donation}), do: "hero-gift"
+  def get_payment_icon(%{type: :merch}), do: "hero-shopping-bag"
   def get_payment_icon(_), do: "hero-credit-card"
 
   @doc """
@@ -41,6 +42,9 @@ defmodule Ysc.Payments.PaymentDisplay do
   def get_payment_icon_bg(%{type: :donation}),
     do: "bg-yellow-50 group-hover:bg-yellow-600"
 
+  def get_payment_icon_bg(%{type: :merch}),
+    do: "bg-rose-50 group-hover:bg-rose-600"
+
   def get_payment_icon_bg(_), do: "bg-zinc-50 group-hover:bg-zinc-600"
 
   @doc """
@@ -63,6 +67,9 @@ defmodule Ysc.Payments.PaymentDisplay do
 
   def get_payment_icon_color(%{type: :donation}),
     do: "text-yellow-600 group-hover:text-white"
+
+  def get_payment_icon_color(%{type: :merch}),
+    do: "text-rose-600 group-hover:text-white"
 
   def get_payment_icon_color(_), do: "text-zinc-600 group-hover:text-white"
 
@@ -91,6 +98,7 @@ defmodule Ysc.Payments.PaymentDisplay do
   def get_payment_title(%{type: :ticket}), do: "Event Tickets"
   def get_payment_title(%{type: :membership}), do: "Membership Payment"
   def get_payment_title(%{type: :donation}), do: "Donation"
+  def get_payment_title(%{type: :merch}), do: "Club Gear Order"
   def get_payment_title(%{description: description}), do: description
   def get_payment_title(_), do: "Payment"
 
@@ -104,6 +112,11 @@ defmodule Ysc.Payments.PaymentDisplay do
   def get_payment_reference(%{ticket_order: ticket_order})
       when not is_nil(ticket_order) do
     ticket_order.reference_id || "—"
+  end
+
+  def get_payment_reference(%{merch_order: merch_order})
+      when not is_nil(merch_order) do
+    merch_order.reference_id || "—"
   end
 
   def get_payment_reference(%{payment: payment}) when not is_nil(payment) do

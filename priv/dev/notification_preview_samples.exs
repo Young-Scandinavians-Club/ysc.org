@@ -781,6 +781,75 @@
       unsubscribe_url:
         "http://localhost:4000/event-notifications/unsubscribe/preview"
     },
+    "merch_order_shipped" => %{
+      first_name: "Astrid",
+      order: %{reference_id: "MRC-PREVIEW-123"},
+      shipment: %{
+        carrier: "USPS",
+        service: "Priority Mail",
+        tracking_number: "9400111899223197428490",
+        tracking_url: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223197428490",
+        reshipment: false
+      },
+      ship_to: %{
+        name: "Astrid Lindgren",
+        lines: ["1 Market St", "San Francisco, CA 94105"]
+      },
+      order_url: "http://localhost:4000/shop/orders/preview"
+    },
+    "merch_order_update" => %{
+      first_name: "Astrid",
+      headline: "Your merch was delivered",
+      paragraphs: [
+        "The carrier shows your order as delivered. We hope you love it!",
+        "If anything isn't right, just reply to this email or write to info@ysc.org and we'll sort it out."
+      ],
+      order: %{reference_id: "MRC-PREVIEW-123"},
+      order_url: "http://localhost:4000/shop/orders/preview"
+    },
+    "merch_order_attention_board_notification" => %{
+      label: "couldn't be sent to Printful",
+      reason: "Printful rejected the order: Recipient address is invalid",
+      action:
+        "The member has paid and will not receive their order. Refund the payment from Admin > Money, or resolve the problem in Printful and resubmit.",
+      order: %{reference_id: "MRC-PREVIEW-123"},
+      order_kind: "Member purchase",
+      who: "Astrid Berg (astrid@example.com)",
+      amount_paid: "$66.45",
+      items: [%{name: "Club Tee - Black / M", quantity: 2}, %{name: "Logo Sticker", quantity: 3}],
+      admin_url: "http://localhost:4000/admin/merch"
+    },
+    "merch_order_confirmation" => %{
+      first_name: "Astrid",
+      comp: false,
+      purpose: nil,
+      order: %{
+        reference_id: "MRC-PREVIEW-123",
+        ordered_at: "Oct 14, 2026 at 10:00 AM PDT"
+      },
+      items: [
+        %{
+          name: "Club Tee - Black / M",
+          quantity: 2,
+          unit_price: "$25.00",
+          line_total: "$50.00"
+        },
+        %{
+          name: "Logo Sticker",
+          quantity: 3,
+          unit_price: "$3.50",
+          line_total: "$10.50"
+        }
+      ],
+      subtotal: "$60.50",
+      shipping: "$5.95",
+      total: "$66.45",
+      ship_to: %{
+        name: "Astrid Lindgren",
+        lines: ["1 Market St", "San Francisco, CA 94105"]
+      },
+      order_url: "http://localhost:4000/shop/orders/preview"
+    },
     "ticket_order_refund" => %{
       first_name: "Astrid",
       event: %{
@@ -909,6 +978,17 @@
     }
   },
   sms: %{
+    "merch_order_shipped" => %{
+      first_name: "Astrid",
+      reference_id: "MRC-PREVIEW-123",
+      carrier: "USPS",
+      tracking_url: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223197428490"
+    },
+    "merch_order_update" => %{
+      first_name: "Astrid",
+      reference_id: "MRC-PREVIEW-123",
+      kind: "delivered"
+    },
     "booking_checkin_reminder" => %{
       first_name: "Astrid",
       property_name: "Tahoe",

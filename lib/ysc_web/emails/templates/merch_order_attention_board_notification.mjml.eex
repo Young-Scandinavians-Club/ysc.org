@@ -1,0 +1,39 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#b91c1c" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Merch order needs attention</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Dear YSC Board Members,</mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Merch order <strong><%= @order.reference_id %></strong>: <strong><%= @label %></strong>.
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" background-color="#fef2f2" border-radius="4px" padding="16px">
+      <strong>What happened:</strong> <%= @reason %>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>What to do:</strong> <%= @action %></mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px" font-weight="bold">Order details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" background-color="#f8f9fa" border-radius="4px" padding="16px">
+      <strong>Type:</strong> <%= @order_kind %><br/>
+      <strong>For:</strong> <%= @who %><br/>
+      <strong>Amount paid by member:</strong> <%= @amount_paid %><br/>
+      <strong>Items:</strong>
+      <%= for item <- @items do %><br/>&nbsp;&nbsp;<%= item.quantity %> × <%= item.name %><% end %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @admin_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Open Merch admin →</mj-button>
+    <mj-spacer height="36px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

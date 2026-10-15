@@ -946,7 +946,8 @@ defmodule Ysc.Quickbooks.Sync do
             "event",
             "booking",
             "donation",
-            "membership"
+            "membership",
+            "merch"
           ],
         where: a.account_type == "revenue",
         order_by: [desc: e.inserted_at],
@@ -1604,6 +1605,7 @@ defmodule Ysc.Quickbooks.Sync do
     case {entity_type, property} do
       {:event, _} -> "Event Tickets"
       {:donation, _} -> "Donations"
+      {:merch, _} -> "Merch Sales"
       {:booking, :tahoe} -> "Tahoe Bookings"
       {:booking, :clear_lake} -> "Clear Lake Bookings"
       {:membership, :family} -> "Family Membership"
@@ -1617,6 +1619,7 @@ defmodule Ysc.Quickbooks.Sync do
     case {entity_type, property} do
       {:event, _} -> :event_item_id
       {:donation, _} -> :donation_item_id
+      {:merch, _} -> :merch_item_id
       {:booking, :tahoe} -> :tahoe_booking_item_id
       {:booking, :clear_lake} -> :clear_lake_booking_item_id
       {:membership, :family} -> :family_membership_item_id

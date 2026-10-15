@@ -43,6 +43,11 @@ defmodule YscWeb.Emails.Notifier do
     "ticket_purchase_confirmation" => YscWeb.Emails.TicketPurchaseConfirmation,
     "ticket_reservation_created" => YscWeb.Emails.TicketReservationCreated,
     "ticket_order_refund" => YscWeb.Emails.TicketOrderRefund,
+    "merch_order_confirmation" => YscWeb.Emails.MerchOrderConfirmation,
+    "merch_order_shipped" => YscWeb.Emails.MerchOrderShipped,
+    "merch_order_update" => YscWeb.Emails.MerchOrderUpdate,
+    "merch_order_attention_board_notification" =>
+      YscWeb.Emails.MerchOrderAttentionBoardNotification,
     "booking_confirmation" => YscWeb.Emails.BookingConfirmation,
     "booking_modification_confirmation" =>
       YscWeb.Emails.BookingModificationConfirmation,

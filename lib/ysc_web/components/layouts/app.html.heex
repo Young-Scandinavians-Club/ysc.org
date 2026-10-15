@@ -85,6 +85,15 @@
                     Clear Lake Cabin
                   </.link>
                 </li>
+                <li :if={@current_user && @active_membership?}>
+                  <.link
+                    id="nav-shop-desktop"
+                    navigate={~p"/shop"}
+                    class="nav-link inline-block px-4 py-3 font-bold transition ease-in-out rounded-sm duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Shop
+                  </.link>
+                </li>
                 <li>
                   <.dropdown
                     id="navbar-about-desktop"
@@ -139,6 +148,16 @@
                     class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded-sm duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     Clear Lake Cabin
+                  </.link>
+                </li>
+                <li :if={@current_user && @active_membership?}>
+                  <.link
+                    id="nav-shop-mobile"
+                    navigate={~p"/shop"}
+                    phx-click={hide_mobile_menu("navbar-dropdown")}
+                    class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded-sm duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Shop
                   </.link>
                 </li>
                 <li>

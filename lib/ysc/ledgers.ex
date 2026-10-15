@@ -36,7 +36,8 @@ defmodule Ysc.Ledgers do
     :clear_lake,
     :events,
     :donations,
-    :membership
+    :membership,
+    :merch
   ]
 
   # Treasurer payment tables only show name/email. Skip hashed_password,
@@ -232,6 +233,7 @@ defmodule Ysc.Ledgers do
     {"clear_lake_booking_revenue", "revenue", "credit",
      "Revenue from Clear Lake cabin bookings"},
     {"donation_revenue", "revenue", "credit", "Revenue from donations"},
+    {"merch_revenue", "revenue", "credit", "Revenue from merch shop sales"},
 
     # Expense accounts (debit-normal)
     {"stripe_fees", "expense", "debit", "Stripe processing fees"},
@@ -315,7 +317,7 @@ defmodule Ysc.Ledgers do
   ## Parameters:
   - `user_id`: The user making the payment
   - `amount`: Payment amount
-  - `entity_type`: Type of entity being paid for (event, membership, booking, donation)
+  - `entity_type`: Type of entity being paid for (event, membership, booking, donation, merch)
   - `entity_id`: ID of the entity being paid for
   - `external_payment_id`: External payment provider ID (e.g., Stripe payment intent)
   - `stripe_fee`: Stripe processing fee (optional)
@@ -789,6 +791,9 @@ defmodule Ysc.Ledgers do
 
         :donation ->
           "donation_revenue"
+
+        :merch ->
+          "merch_revenue"
 
         _ ->
           "membership_revenue"
@@ -2899,12 +2904,13 @@ defmodule Ysc.Ledgers do
   end
 
   defp payments_for_tab_query(user_id, filter)
-       when filter in [:events, :donations, :membership] do
+       when filter in [:events, :donations, :membership, :merch] do
     entity_type =
       case filter do
         :events -> :event
         :donations -> :donation
         :membership -> :membership
+        :merch -> :merch
       end
 
     revenue_entity_payments_query(user_id, entity_type)
@@ -3069,6 +3075,8 @@ defmodule Ysc.Ledgers do
       end)
       |> Enum.map(fn {id, _entry} -> id end)
 
+    merch_orders_map = batch_load_merch_orders(revenue_entries_map)
+
     # Batch load ticket orders for event payments (event title + ticket
     # status/tier name only — no event body HTML or tier descriptions).
     ticket_orders_map =
@@ -3174,6 +3182,8 @@ defmodule Ysc.Ledgers do
           do: Map.get(subscriptions_map, subscription_id),
           else: nil
 
+      merch_order = Map.get(merch_orders_map, payment.id)
+
       %{
         payment: payment,
         type: determine_payment_type(entity_type),
@@ -3181,6 +3191,7 @@ defmodule Ysc.Ledgers do
         event: if(ticket_order, do: ticket_order.event, else: nil),
         booking: booking,
         subscription: subscription,
+        merch_order: merch_order,
         refund_data: Map.get(refund_data_map, payment.id),
         description:
           build_payment_description(%{
@@ -3188,10 +3199,39 @@ defmodule Ysc.Ledgers do
             ticket_order: ticket_order,
             booking: booking,
             subscription: subscription,
+            merch_order: merch_order,
             revenue_entry: revenue_entry
           })
       }
     end)
+  end
+
+  # Merch purchases, keyed by payment id. Only what the payments list renders.
+  defp batch_load_merch_orders(revenue_entries_map) do
+    order_id_by_payment =
+      for {payment_id, %{related_entity_type: :merch, related_entity_id: id}}
+          when not is_nil(id) <- revenue_entries_map,
+          into: %{},
+          do: {payment_id, id}
+
+    if order_id_by_payment == %{} do
+      %{}
+    else
+      orders =
+        from(o in Ysc.Merch.Order,
+          where: o.id in ^Map.values(order_id_by_payment),
+          preload: [
+            items: ^from(i in Ysc.Merch.OrderItem, order_by: i.inserted_at)
+          ]
+        )
+        |> Repo.all()
+        |> Map.new(&{&1.id, &1})
+
+      for {payment_id, order_id} <- order_id_by_payment,
+          order = Map.get(orders, order_id),
+          into: %{},
+          do: {payment_id, order}
+    end
   end
 
   defp refund_data_map_for_payments([]), do: %{}
@@ -3284,6 +3324,15 @@ defmodule Ysc.Ledgers do
         nil
       end
 
+    merch_order =
+      if entity_type == :merch && entity_id do
+        Repo.get(Ysc.Merch.Order, entity_id)
+        |> case do
+          nil -> nil
+          order -> Repo.preload(order, :items)
+        end
+      end
+
     payment_info = %{
       payment: payment,
       type: determine_payment_type(entity_type),
@@ -3291,12 +3340,14 @@ defmodule Ysc.Ledgers do
       event: if(ticket_order, do: ticket_order.event, else: nil),
       booking: booking,
       subscription: subscription,
+      merch_order: merch_order,
       description:
         build_payment_description(%{
           entity_type: entity_type,
           ticket_order: ticket_order,
           booking: booking,
           subscription: subscription,
+          merch_order: merch_order,
           revenue_entry: revenue_entry
         })
     }
@@ -3308,6 +3359,7 @@ defmodule Ysc.Ledgers do
   defp determine_payment_type(:event), do: :ticket
   defp determine_payment_type(:booking), do: :booking
   defp determine_payment_type(:donation), do: :donation
+  defp determine_payment_type(:merch), do: :merch
   defp determine_payment_type(_), do: :unknown
 
   defp enrich_free_ticket_order(ticket_order) do
@@ -3323,6 +3375,7 @@ defmodule Ysc.Ledgers do
       event: ticket_order.event,
       booking: nil,
       subscription: nil,
+      merch_order: nil,
       description: description
     }
   end
@@ -3393,6 +3446,14 @@ defmodule Ysc.Ledgers do
 
   defp build_payment_description(%{entity_type: :booking}), do: "Cabin Booking"
   defp build_payment_description(%{entity_type: :donation}), do: "Donation"
+
+  defp build_payment_description(%{
+         entity_type: :merch,
+         merch_order: %{reference_id: reference_id}
+       }),
+       do: "Merch order #{reference_id}"
+
+  defp build_payment_description(%{entity_type: :merch}), do: "Merch order"
   defp build_payment_description(_), do: "Payment"
 
   defp get_membership_plan_type(subscription) do

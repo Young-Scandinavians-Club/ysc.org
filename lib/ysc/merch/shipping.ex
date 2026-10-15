@@ -1,0 +1,120 @@
+defmodule Ysc.Merch.Shipping do
+  @moduledoc """
+  Quotes Printful shipping options for an address and a set of cart/order
+  lines. Members pay exactly what Printful quotes.
+  """
+  require Ysc.Logging
+
+  alias Ysc.Merch.ShippingAddress
+  alias Ysc.MoneyHelper
+  alias Ysc.Printful.Error
+
+  defp printful_client do
+    Application.get_env(:ysc, :printful_client, Ysc.Printful.Client)
+  end
+
+  @type option :: %{
+          id: String.t(),
+          name: String.t(),
+          rate: Money.t(),
+          min_days: integer() | nil,
+          max_days: integer() | nil
+        }
+
+  @doc """
+  Shipping options for `lines` (maps with `:variant` and `:quantity`), cheapest
+  first.
+
+    * `{:error, {:rejected, message}}` - Printful rejected the address or items;
+      the message is safe to show the member
+    * `{:error, :unavailable}` - Printful could not be reached or returned
+      nothing usable; try again later
+  """
+  @spec options(ShippingAddress.t(), [map()]) ::
+          {:ok, [option()]} | {:error, {:rejected, String.t()} | :unavailable}
+  def options(%ShippingAddress{} = address, lines) when is_list(lines) do
+    items = Enum.map(lines, &to_item/1)
+
+    case printful_client().shipping_rates(
+           ShippingAddress.to_recipient(address),
+           items
+         ) do
+      {:ok, rates} when is_list(rates) ->
+        parse(rates)
+
+      {:ok, _} ->
+        {:error, :unavailable}
+
+      {:error, %Error{type: :invalid, message: message}} ->
+        {:error, {:rejected, message}}
+
+      {:error, %Error{} = error} ->
+        unavailable(error)
+    end
+  end
+
+  defp to_item(%{variant: variant, quantity: quantity}) do
+    %{variant_id: variant.printful_variant_id, quantity: quantity}
+  end
+
+  defp parse(rates) do
+    options =
+      rates
+      |> Enum.flat_map(&parse_rate/1)
+      |> Enum.sort_by(&{Money.to_decimal(&1.rate), &1.min_days || 999}, fn {a,
+                                                                            a_days},
+                                                                           {b,
+                                                                            b_days} ->
+        case Decimal.compare(a, b) do
+          :lt -> true
+          :gt -> false
+          :eq -> a_days <= b_days
+        end
+      end)
+
+    case options do
+      [] -> {:error, :unavailable}
+      options -> {:ok, options}
+    end
+  end
+
+  defp parse_rate(%{"id" => id, "name" => name, "rate" => rate} = raw)
+       when is_binary(id) and is_binary(name) do
+    with "USD" <- Map.get(raw, "currency", "USD"),
+         %Money{} = money <- MoneyHelper.parse_money(rate) do
+      [
+        %{
+          id: id,
+          name: name,
+          rate: money,
+          min_days: Map.get(raw, "minDeliveryDays"),
+          max_days: Map.get(raw, "maxDeliveryDays")
+        }
+      ]
+    else
+      _ -> []
+    end
+  end
+
+  defp parse_rate(_), do: []
+
+  defp unavailable(%Error{} = error) do
+    Ysc.Logging.warning("Printful shipping quote unavailable",
+      type: error.type,
+      status: error.status,
+      message: error.message
+    )
+
+    {:error, :unavailable}
+  end
+
+  @doc "Human delivery window, e.g. \"3-5 business days\"."
+  def delivery_window(%{min_days: min, max_days: max})
+      when is_integer(min) and is_integer(max) do
+    if min == max,
+      do: "#{min} business days",
+      else: "#{min}-#{max} business days"
+  end
+
+  def delivery_window(_), do: nil
+end

@@ -9,7 +9,7 @@ defmodule Ysc.ReferenceGenerator do
   those IDs on create and unique-constraint retry.
   """
 
-  @prefixes ~w(PMT TKT BKG DON EVT ORD RFD)
+  @prefixes ~w(PMT TKT BKG DON EVT ORD RFD MRC)
 
   @charset Enum.concat(?A..?Z, ?0..?9)
            |> List.delete(?O)

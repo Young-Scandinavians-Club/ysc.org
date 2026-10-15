@@ -10,6 +10,8 @@ defmodule YscWeb.Sms.Notifier do
 
   @template_mappings %{
     "booking_checkin_reminder" => YscWeb.Sms.BookingCheckinReminder,
+    "merch_order_shipped" => YscWeb.Sms.MerchOrderShipped,
+    "merch_order_update" => YscWeb.Sms.MerchOrderUpdate,
     "two_factor_verification" => YscWeb.Sms.TwoFactorVerification,
     "email_changed" => YscWeb.Sms.EmailChanged,
     "password_changed" => YscWeb.Sms.PasswordChanged,

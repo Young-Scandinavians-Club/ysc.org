@@ -1,0 +1,228 @@
+defmodule Ysc.Merch.Cart do
+  @moduledoc """
+  A member's merch cart, stored in the database so it follows them across
+  devices.
+
+  Lines whose variant has since been hidden, sold out or removed are reported
+  as `:unavailable` rather than silently dropped, so the member sees why the
+  cart changed. Checkout only ever uses `available_lines/1`.
+  """
+  import Ecto.Query, warn: false
+
+  alias Ysc.Accounts.User
+  alias Ysc.Merch.{CartItem, Product, Variant}
+  alias Ysc.Repo
+
+  @type line :: %{
+          item: CartItem.t(),
+          variant: Variant.t(),
+          product: Product.t(),
+          quantity: pos_integer(),
+          unit_price: Money.t(),
+          line_total: Money.t(),
+          available?: boolean()
+        }
+
+  @doc """
+  The member's cart lines, oldest first, with variant, product and images loaded.
+  """
+  @spec list(User.t()) :: [line()]
+  def list(%User{id: user_id}) do
+    from(c in CartItem,
+      where: c.user_id == ^user_id,
+      order_by: [asc: c.inserted_at, asc: c.id],
+      preload: [variant: [:image, product: :image]]
+    )
+    |> Repo.all()
+    |> Enum.map(&to_line/1)
+  end
+
+  defp to_line(%CartItem{variant: variant} = item) do
+    product = variant.product
+
+    %{
+      item: item,
+      variant: variant,
+      product: product,
+      quantity: item.quantity,
+      unit_price: variant.retail_price,
+      line_total: Money.mult!(variant.retail_price, item.quantity),
+      available?: variant.available and product.status == :active
+    }
+  end
+
+  @doc "Lines that can actually be bought right now."
+  @spec available_lines([line()]) :: [line()]
+  def available_lines(lines), do: Enum.filter(lines, & &1.available?)
+
+  @doc "Sum of the available lines."
+  @spec subtotal([line()]) :: Money.t()
+  def subtotal(lines) do
+    lines
+    |> available_lines()
+    |> Enum.reduce(Money.new(0, :USD), fn line, acc ->
+      Money.add!(acc, line.line_total)
+    end)
+  end
+
+  @doc "Total number of items across available lines."
+  @spec item_count([line()]) :: non_neg_integer()
+  def item_count(lines) do
+    lines |> available_lines() |> Enum.map(& &1.quantity) |> Enum.sum()
+  end
+
+  @doc """
+  Number of items in the cart, for the nav badge. One cheap query.
+  """
+  @spec count(User.t() | nil) :: non_neg_integer()
+  def count(nil), do: 0
+
+  def count(%User{id: user_id}) do
+    from(c in CartItem,
+      join: v in assoc(c, :variant),
+      join: p in assoc(v, :product),
+      where:
+        c.user_id == ^user_id and v.available == true and p.status == :active,
+      select: coalesce(sum(c.quantity), 0)
+    )
+    |> Repo.one()
+    |> to_integer()
+  end
+
+  @doc """
+  Item count and subtotal of what can be bought, in one query. Powers the
+  floating cart dock, so it avoids loading lines and images.
+  """
+  @spec summary(User.t() | nil) :: %{
+          count: non_neg_integer(),
+          subtotal: Money.t()
+        }
+  def summary(nil), do: %{count: 0, subtotal: Money.new(0, :USD)}
+
+  def summary(%User{id: user_id}) do
+    {count, amount} =
+      from(c in CartItem,
+        join: v in assoc(c, :variant),
+        join: p in assoc(v, :product),
+        where:
+          c.user_id == ^user_id and v.available == true and p.status == :active,
+        select:
+          {coalesce(sum(c.quantity), 0),
+           coalesce(
+             sum(
+               type(c.quantity, :decimal) *
+                 fragment("(?).amount", v.retail_price)
+             ),
+             0
+           )}
+      )
+      |> Repo.one()
+
+    %{count: to_integer(count), subtotal: Money.new(amount || 0, :USD)}
+  end
+
+  defp to_integer(%Decimal{} = decimal), do: Decimal.to_integer(decimal)
+  defp to_integer(int) when is_integer(int), do: int
+
+  @doc """
+  Adds `quantity` of a variant, merging with any existing line. The result is
+  capped at `CartItem.max_quantity/0`.
+
+  Returns `{:error, :unavailable}` for a hidden, sold-out or unknown variant.
+  """
+  @spec add(User.t(), String.t(), integer()) ::
+          {:ok, CartItem.t()} | {:error, :unavailable | Ecto.Changeset.t()}
+  def add(%User{} = user, variant_id, quantity)
+      when is_binary(variant_id) and is_integer(quantity) and quantity > 0 do
+    with {:ok, _variant} <- fetch_available_variant(variant_id) do
+      existing = Repo.get_by(CartItem, user_id: user.id, variant_id: variant_id)
+
+      new_quantity =
+        min(
+          ((existing && existing.quantity) || 0) + quantity,
+          CartItem.max_quantity()
+        )
+
+      upsert(user, variant_id, existing, new_quantity)
+    end
+  end
+
+  @doc """
+  Sets a line's quantity. A quantity of zero or less removes the line.
+  """
+  @spec set_quantity(User.t(), String.t(), integer()) ::
+          {:ok, CartItem.t() | nil} | {:error, Ecto.Changeset.t()}
+  def set_quantity(%User{} = user, variant_id, quantity)
+      when is_binary(variant_id) and is_integer(quantity) do
+    cond do
+      quantity <= 0 ->
+        remove(user, variant_id)
+        {:ok, nil}
+
+      true ->
+        case Repo.get_by(CartItem, user_id: user.id, variant_id: variant_id) do
+          nil ->
+            {:ok, nil}
+
+          existing ->
+            upsert(
+              user,
+              variant_id,
+              existing,
+              min(quantity, CartItem.max_quantity())
+            )
+        end
+    end
+  end
+
+  @doc "Removes a line. Always succeeds."
+  @spec remove(User.t(), String.t()) :: :ok
+  def remove(%User{id: user_id}, variant_id) when is_binary(variant_id) do
+    from(c in CartItem,
+      where: c.user_id == ^user_id and c.variant_id == ^variant_id
+    )
+    |> Repo.delete_all()
+
+    :ok
+  end
+
+  @doc "Empties the cart."
+  @spec clear(User.t()) :: :ok
+  def clear(%User{id: user_id}) do
+    from(c in CartItem, where: c.user_id == ^user_id) |> Repo.delete_all()
+    :ok
+  end
+
+  defp fetch_available_variant(variant_id) do
+    query =
+      from(v in Variant,
+        join: p in assoc(v, :product),
+        where:
+          v.id == ^variant_id and v.available == true and p.status == :active
+      )
+
+    case Repo.one(query) do
+      nil -> {:error, :unavailable}
+      variant -> {:ok, variant}
+    end
+  rescue
+    Ecto.Query.CastError -> {:error, :unavailable}
+  end
+
+  defp upsert(user, variant_id, existing, quantity) do
+    (existing || %CartItem{user_id: user.id, variant_id: variant_id})
+    |> CartItem.changeset(%{quantity: quantity})
+    |> Repo.insert_or_update()
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    from(c in CartItem,
+      where: c.user_id == ^Fixtures.ulid(),
+      order_by: [asc: c.inserted_at, asc: c.id],
+      preload: [variant: [:image, product: :image]]
+    )
+  end
+end
