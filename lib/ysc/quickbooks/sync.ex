@@ -1353,6 +1353,9 @@ defmodule Ysc.Quickbooks.Sync do
        })
        when is_binary(account) and account != "" do
     case income_account_ref_named(account) do
+      {:error, reason} when reason in [:rate_limited, :request_failed] ->
+        {:error, reason}
+
       nil ->
         Ysc.Logging.error(
           "[QB Sync] get_quickbooks_item_id: Payment link donation income account was not found. Create that account in QuickBooks. Event donation accounts are not used for this payment.",
@@ -1418,6 +1421,9 @@ defmodule Ysc.Quickbooks.Sync do
       {:ok, account_id} when is_binary(account_id) and account_id != "" ->
         %{value: account_id, name: name}
 
+      {:error, reason} when reason in [:rate_limited, :request_failed] ->
+        {:error, reason}
+
       {:error, :not_found} ->
         Ysc.Logging.info(
           "[QB Sync] QuickBooks income account not found, creating it",
@@ -1438,7 +1444,14 @@ defmodule Ysc.Quickbooks.Sync do
               error: inspect(error)
             )
 
-            nil
+            case error do
+              {:error, reason}
+              when reason in [:rate_limited, :request_failed] ->
+                error
+
+              _ ->
+                nil
+            end
         end
 
       _ ->
@@ -3436,7 +3449,8 @@ defmodule Ysc.Quickbooks.Sync do
 
   defp format_payout_date(nil), do: nil
 
-  defp check_and_enqueue_payout_syncs_for_payment(%Payment{} = payment) do
+  @doc false
+  def check_and_enqueue_payout_syncs_for_payment(%Payment{} = payment) do
     Ysc.Logging.debug(
       "[QB Sync] check_and_enqueue_payout_syncs_for_payment: Finding payouts for payment",
       payment_id: payment.id

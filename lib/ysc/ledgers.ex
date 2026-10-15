@@ -688,10 +688,13 @@ defmodule Ysc.Ledgers do
     end)
   end
 
-  defp enqueue_quickbooks_sync_payment(%Payment{
-         quickbooks_sales_receipt_id: receipt_id
-       })
+  defp enqueue_quickbooks_sync_payment(
+         %Payment{
+           quickbooks_sales_receipt_id: receipt_id
+         } = payment
+       )
        when is_binary(receipt_id) and receipt_id != "" do
+    Ysc.Quickbooks.Sync.check_and_enqueue_payout_syncs_for_payment(payment)
     :ok
   end
 
