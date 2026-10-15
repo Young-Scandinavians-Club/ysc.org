@@ -208,9 +208,7 @@ defmodule Ysc.Accounts.MembershipCache do
 
   @doc false
   def ci_query_explain_sub_account_ids_query do
-    sub_account_ids_for_primary_query(
-      Ysc.Ci.QueryExplain.Fixtures.user().id
-    )
+    sub_account_ids_for_primary_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
   end
 
   @doc """
