@@ -26,6 +26,7 @@ defmodule YscWeb.PaymentSuccessLive do
   alias Ysc.Tickets
   alias Ysc.Tickets.StripeService
   alias Ysc.Repo
+  alias YscWeb.BookingUserMessages
   import Ecto.Query
   require Ysc.Logging
 
@@ -151,13 +152,16 @@ defmodule YscWeb.PaymentSuccessLive do
         end
 
       redirect_status in ["failed", "canceled"] ->
-        failure_message = get_failure_message(redirect_status)
-
         case redirect_to_failure_page(payment_intent_id, user, redirect_status) do
           {:ok, redirect_path} ->
             {:ok,
              socket
-             |> YscWeb.Flash.put_toast(:error, failure_message,
+             |> YscWeb.Flash.put_toast(
+               :error,
+               get_failure_message(
+                 redirect_status,
+                 failure_context(redirect_path)
+               ),
                title: "Payment"
              )
              |> redirect(to: redirect_path)}
@@ -185,7 +189,9 @@ defmodule YscWeb.PaymentSuccessLive do
 
             {:ok,
              socket
-             |> YscWeb.Flash.put_toast(:error, failure_message,
+             |> YscWeb.Flash.put_toast(
+               :error,
+               get_failure_message(redirect_status),
                title: "Payment"
              )
              |> redirect(to: ~p"/")}
@@ -476,14 +482,26 @@ defmodule YscWeb.PaymentSuccessLive do
     end
   end
 
-  defp get_failure_message(redirect_status) do
+  defp failure_context(path) when is_binary(path) do
+    if String.starts_with?(path, "/bookings/checkout/"),
+      do: :booking,
+      else: :other
+  end
+
+  defp get_failure_message(redirect_status, context \\ :other) do
     contact_email = Ysc.EmailConfig.contact_email()
 
-    case redirect_status do
-      "failed" ->
+    case {redirect_status, context} do
+      {"failed", :booking} ->
+        BookingUserMessages.checkout_redirect_payment_failed()
+
+      {"canceled", :booking} ->
+        BookingUserMessages.checkout_redirect_payment_canceled()
+
+      {"failed", _} ->
         "Payment failed. Please try again, or email #{contact_email} if the problem persists."
 
-      "canceled" ->
+      {"canceled", _} ->
         "Payment was canceled. You can try again when you're ready."
 
       _ ->

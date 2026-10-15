@@ -347,6 +347,16 @@ defmodule YscWeb.BookingUserMessages do
     "These dates are no longer reserved. Start a new booking from the cabin page."
   end
 
+  def checkout_redirect_payment_canceled do
+    "Payment was canceled. Your dates are still held — you can try again from this page."
+  end
+
+  def checkout_redirect_payment_failed do
+    trim("""
+    Payment failed. Your dates are still held — please try again, or email info@ysc.org if the problem persists.
+    """)
+  end
+
   def booking_creation_failed do
     trim("""
     We couldn't complete your booking. You have not been charged. Please try again, or choose different dates. If the problem continues, email info@ysc.org with your dates and guest count.

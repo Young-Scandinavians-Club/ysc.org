@@ -332,6 +332,21 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     refute BookingUserMessages.checkout_hold_expired_toast() =~
              "hold on these dates"
+
+    assert BookingUserMessages.checkout_redirect_payment_canceled() =~
+             "dates are still held"
+
+    assert BookingUserMessages.checkout_redirect_payment_canceled() =~
+             "try again from this page"
+
+    refute BookingUserMessages.checkout_redirect_payment_canceled() =~
+             "when you're ready"
+
+    assert BookingUserMessages.checkout_redirect_payment_failed() =~
+             "dates are still held"
+
+    assert BookingUserMessages.checkout_redirect_payment_failed() =~
+             "info@ysc.org"
   end
 
   test "checkout error messages include contact email" do
