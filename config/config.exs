@@ -220,6 +220,18 @@ config :stripity_stripe, :retries,
   base_backoff: 500,
   max_backoff: 2_000
 
+# Public Stripe Payment Links booked as donations. `account` is the QuickBooks
+# income account for that link. Every donation uses the Administration class.
+# Override with STRIPE_DONATION_PAYMENT_LINK_URLS (comma-separated `url` or
+# `url|Account`). Empty disables.
+config :ysc, :stripe_donation_payment_links,
+  links: [
+    %{
+      url: "https://donate.stripe.com/28E5kEaLcg63aPW6nr2Ji03",
+      account: "Tahoe Kitchen Fund"
+    }
+  ]
+
 # Radar publishable key — set in config/runtime.exs so releases read RADAR_PUBLIC_KEY at VM start
 # (compile-time env in config.exs is empty during Docker build and would bake in the test default).
 

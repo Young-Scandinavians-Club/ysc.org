@@ -525,6 +525,39 @@ if config_env() == :prod do
          :stripe_terminal_location_id,
          System.get_env("STRIPE_TERMINAL_LOCATION_ID")
 
+  # Comma-separated payment links: `url` or `url|Account`. A trailing `|Class`
+  # is ignored; donations always use the Administration class.
+  # Unset keeps the config.exs default (Tahoe Kitchen Fund for the donate link).
+  # An empty value disables booking.
+  if donation_payment_link_urls =
+       System.get_env("STRIPE_DONATION_PAYMENT_LINK_URLS") do
+    config :ysc, :stripe_donation_payment_links,
+      links:
+        donation_payment_link_urls
+        |> String.split(",", trim: true)
+        |> Enum.flat_map(fn entry ->
+          case entry |> String.trim() |> String.split("|", parts: 3) do
+            [""] ->
+              []
+
+            [url] ->
+              [%{url: String.trim(url)}]
+
+            [url, account] ->
+              [%{url: String.trim(url), account: String.trim(account)}]
+
+            [url, account, class] ->
+              [
+                %{
+                  url: String.trim(url),
+                  account: String.trim(account),
+                  class: String.trim(class)
+                }
+              ]
+          end
+        end)
+  end
+
   # ## Membership Plans Configuration
   #
   # Configure membership plans with Stripe Price IDs for production.
