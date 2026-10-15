@@ -4126,8 +4126,8 @@ defmodule YscWeb.CoreComponents do
   - `size={:default}` for section hubs (events, news, newsletters, history):
     `text-3xl sm:text-4xl md:text-7xl`, top and bottom rules.
   - `size={:compact}` for content pages (board, choir, volunteer, contact,
-    legal and governance pages): `text-3xl md:text-4xl`, top rule only,
-    tighter padding.
+    legal and governance pages): `text-3xl md:text-4xl`, no rules or
+    padding of its own.
 
   Use the eyebrow to say what kind of page this is ("Events", "Governance",
   "Legal"); the title says what's on it. Use `subtitle` only when it adds
@@ -4209,13 +4209,13 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  # Section hubs get the full rule-bounded masthead; compact pages keep only
-  # the top rule so the content starts sooner.
+  # Section hubs get the full rule-bounded masthead; compact pages are
+  # unframed (the page wrapper supplies the spacing) so content starts sooner.
   defp page_masthead_frame_class(:default),
     do: "border-y border-zinc-200 py-6 md:py-12"
 
   defp page_masthead_frame_class(:compact),
-    do: "border-t border-zinc-200 pt-5 pb-1 md:pt-6 md:pb-2"
+    do: nil
 
   defp page_masthead_title_class(:default),
     do: "text-3xl sm:text-4xl md:text-7xl text-zinc-900 type-display"
