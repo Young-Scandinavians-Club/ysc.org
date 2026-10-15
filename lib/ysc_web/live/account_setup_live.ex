@@ -154,7 +154,7 @@ defmodule YscWeb.AccountSetupLive do
             <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-900 space-y-2">
               <p>
                 <strong>You're approved.</strong>
-                We'll charge your payment method now for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal in account settings.
+                We'll charge your payment method now for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal from Membership (click your name in the top-right corner).
               </p>
             </div>
 
@@ -191,7 +191,7 @@ defmodule YscWeb.AccountSetupLive do
                 </strong>
               </p>
               <p>
-                If your application is approved, we'll charge this payment method for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal in account settings.
+                If your application is approved, we'll charge this payment method for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal from Membership (click your name in the top-right corner).
               </p>
             </div>
           <% end %>
