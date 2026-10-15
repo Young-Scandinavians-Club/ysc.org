@@ -16,6 +16,7 @@ defenum(LedgerEntryEntityType, [
   "membership",
   "booking",
   "donation",
+  "merch",
   "administration"
 ])
 

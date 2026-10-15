@@ -3,6 +3,7 @@ Mox.defmock(Stripe.SubscriptionMock, for: Stripe.SubscriptionBehaviour)
 Mox.defmock(Stripe.RefundMock, for: Stripe.RefundBehaviour)
 Mox.defmock(Ysc.AccountsMock, for: Ysc.Accounts.Behaviour)
 Mox.defmock(Ysc.Quickbooks.ClientMock, for: Ysc.Quickbooks.ClientBehaviour)
+Mox.defmock(Ysc.Printful.ClientMock, for: Ysc.Printful.ClientBehaviour)
 Mox.defmock(Ysc.StripeMock, for: Ysc.StripeBehaviour)
 
 # Stripe API mocks for controller testing

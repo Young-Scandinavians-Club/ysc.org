@@ -15,6 +15,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias Ysc.Events.Event
   alias Ysc.Events.EventUpdate
   alias Ysc.ExpenseReports
+  alias Ysc.Merch.EventCosts, as: MerchEventCosts
   alias YscWeb.Admin.EditingPresence
   alias YscWeb.AdminBadgeHelpers
   alias YscWeb.AdminCheckInPaths
@@ -1182,10 +1183,17 @@ defmodule YscWeb.AdminEventsNewLive do
                   subtitle="Gross costs (approved + paid)"
                 />
                 <.admin_stat_card
+                  id="stat-merch-costs"
+                  label="Merch"
+                  value={money_display(@merch_totals.cost_total)}
+                  subtitle={merch_card_subtitle(@merch_totals)}
+                />
+                <.admin_stat_card
                   id="stat-total-costs"
                   label="Total Costs"
                   value={money_display(@total_event_costs)}
-                  subtitle="Stripe fees + expense reports"
+                  subtitle="Stripe fees + expense reports + merch"
+                  class="lg:col-span-3"
                 />
               </div>
 
@@ -1384,6 +1392,94 @@ defmodule YscWeb.AdminEventsNewLive do
                   Net total (approved + paid): {money_display(
                     @expense_report_totals.net_total
                   )}
+                </p>
+              </div>
+
+              <div
+                :if={@admin_role == :admin}
+                id="event-merch-section"
+                class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4"
+              >
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 class="text-xl type-subhead">Merch</h2>
+                    <p class="text-zinc-600 text-sm">
+                      Club-paid merch orders linked to this event. Orders Printful has not accepted, or that failed or were canceled, are not counted.
+                    </p>
+                  </div>
+                  <.link
+                    navigate={~p"/admin/merch"}
+                    class="text-sm font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                  >
+                    Open Merch
+                  </.link>
+                </div>
+
+                <p
+                  :if={@event_merch_orders == []}
+                  id="event-merch-empty"
+                  class="text-sm text-zinc-500"
+                >
+                  No merch orders linked to this event.
+                </p>
+
+                <table
+                  :if={@event_merch_orders != []}
+                  class="min-w-full divide-y divide-zinc-200 text-sm"
+                >
+                  <thead>
+                    <tr class="text-left text-zinc-500">
+                      <th class="py-2 pr-4 font-medium">Ordered By</th>
+                      <th class="py-2 pr-4 font-medium">Purpose</th>
+                      <th class="py-2 pr-4 font-medium">Items</th>
+                      <th class="py-2 pr-4 font-medium">Status</th>
+                      <th class="py-2 pr-4 font-medium">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-100">
+                    <tr
+                      :for={order <- @event_merch_orders}
+                      id={"merch-order-#{order.id}"}
+                    >
+                      <td class="py-2 pr-4 text-zinc-800">
+                        {expense_report_submitter_name(order.granted_by)}
+                      </td>
+                      <td class="py-2 pr-4 text-zinc-800">{order.purpose}</td>
+                      <td class="py-2 pr-4 text-zinc-800">
+                        {merch_item_count(order)}
+                      </td>
+                      <td class="py-2 pr-4">
+                        <.badge type="zinc">
+                          {order.status
+                          |> to_string()
+                          |> String.replace("_", " ")
+                          |> String.capitalize()}
+                        </.badge>
+                      </td>
+                      <td class="py-2 pr-4 text-zinc-800">
+                        {money_display(Ysc.Merch.Order.cost(order))}
+                        <span
+                          :if={Ysc.Merch.Order.cost_estimated?(order)}
+                          class="text-xs text-zinc-500"
+                        >
+                          (est.)
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p
+                  :if={@event_merch_orders != []}
+                  class="text-sm font-medium text-zinc-700 pt-2 border-t border-zinc-100"
+                >
+                  Total: {money_display(@merch_totals.cost_total)}
+                  <span
+                    :if={@merch_totals.estimated?}
+                    class="text-zinc-500 font-normal"
+                  >
+                    (includes estimates until Printful reports the final charge)
+                  </span>
                 </p>
               </div>
             </div>
@@ -1619,6 +1715,8 @@ defmodule YscWeb.AdminEventsNewLive do
       income_total: Money.new(0, :USD),
       net_total: Money.new(0, :USD)
     })
+    |> assign(:event_merch_orders, [])
+    |> assign(:merch_totals, MerchEventCosts.totals([]))
     |> assign(:total_event_revenue, Money.new(0, :USD))
     |> assign(:total_event_costs, Money.new(0, :USD))
     |> assign(:net_event_revenue, Money.new(0, :USD))
@@ -1675,8 +1773,13 @@ defmodule YscWeb.AdminEventsNewLive do
     total_revenue =
       money_add(sales_stats.total_revenue, expense_report_totals.income_total)
 
+    merch_orders = data.merch_orders
+    merch_totals = MerchEventCosts.totals(merch_orders)
+
     total_costs =
-      money_add(stripe_fees_total, expense_report_totals.expense_total)
+      stripe_fees_total
+      |> money_add(expense_report_totals.expense_total)
+      |> money_add(merch_totals.cost_total)
 
     net_revenue = money_sub(total_revenue, total_costs)
 
@@ -1693,6 +1796,8 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:stripe_fees_total, stripe_fees_total)
     |> assign(:event_expense_reports, expense_reports)
     |> assign(:expense_report_totals, expense_report_totals)
+    |> assign(:event_merch_orders, merch_orders)
+    |> assign(:merch_totals, merch_totals)
     |> assign(:total_event_revenue, total_revenue)
     |> assign(:total_event_costs, total_costs)
     |> assign(:net_event_revenue, net_revenue)
@@ -1723,6 +1828,7 @@ defmodule YscWeb.AdminEventsNewLive do
        end},
       {:expense_report_totals,
        fn -> ExpenseReports.totals_for_event(event_id) end},
+      {:merch_orders, fn -> MerchEventCosts.list_orders(event_id) end},
       {:event_updates, fn -> Events.list_event_updates(event_id) end},
       {:donations_total, fn -> Events.get_event_donations_total(event_id) end}
     ]
@@ -1857,6 +1963,18 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   defp expense_report_submitter_name(_), do: "—"
+
+  defp merch_card_subtitle(%{order_count: 0}),
+    do: "No club-paid merch linked to this event"
+
+  defp merch_card_subtitle(%{order_count: count, estimated?: estimated?}) do
+    orders = if count == 1, do: "1 order", else: "#{count} orders"
+    if estimated?, do: "#{orders} (includes estimates)", else: orders
+  end
+
+  defp merch_item_count(order) do
+    order.items |> Enum.map(& &1.quantity) |> Enum.sum()
+  end
 
   defp host_ids_from(hosts), do: hosts |> Enum.map(& &1.id) |> MapSet.new()
 

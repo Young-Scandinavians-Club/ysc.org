@@ -40,6 +40,7 @@ import StripeInput from "./stripe_payment";
 import StripeElements from "./stripe_elements";
 import Countdown from "./countdown";
 import GLightboxHook from "./glightbox_hook";
+import ProductLightbox from "./product_lightbox";
 import LocalTime from "./local_time";
 import ResendTimer from "./resend_timer";
 import BackToTop from "./back_to_top";
@@ -93,6 +94,7 @@ let Hooks = {
     StripeElements,
     Countdown,
     GLightboxHook,
+    ProductLightbox,
     LocalTime,
     ResendTimer,
     BackToTop,

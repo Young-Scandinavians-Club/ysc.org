@@ -168,6 +168,21 @@ config :phoenix_test, :endpoint, YscWeb.Endpoint
 config :phoenix_turnstile, :turnstile_module, TurnstileMock
 config :ysc, :stripe_customer, Stripe.CustomerMock
 config :ysc, :stripe_client, Ysc.TestStripeClient
+config :ysc, :printful_client, Ysc.Printful.ClientMock
+
+config :ysc, :printful,
+  api_token: "test-printful-token",
+  store_id: "123",
+  webhook_secret: "test-printful-webhook-secret"
+
+config :ysc, :merch_image_req_options,
+  plug: {Req.Test, Ysc.Merch.ImageImport},
+  retry: false
+
+config :ysc, :printful_req_options,
+  plug: {Req.Test, Ysc.Printful.Client},
+  retry: false
+
 config :ysc, :stripe_subscription_retriever, Ysc.StripeSubscriptionRetrieverMock
 config :ysc, :accounts_module, Ysc.AccountsMock
 

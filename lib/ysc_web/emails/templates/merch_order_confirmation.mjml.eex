@@ -1,0 +1,84 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>We've got your merch order</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <%= if @comp do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The club has placed a merch order for you. There's nothing to pay: the club is covering it.</mj-text>
+    <%= if @purpose do %>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>For:</strong> <%= @purpose %></mj-text>
+    <% end %>
+    <% else %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thanks for your order! Your payment went through and we've sent your items to our printer.</mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Order details</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Order number:
+      <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+        <%= @order.reference_id %>
+      </span>
+    </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Ordered:</strong> <%= @order.ordered_at %>
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-table css-class="table" padding="12px 0">
+      <tr style="border-bottom:1px solid #e0e0e0;">
+        <td style="padding: 12px 16px; font-weight:bold; font-size:16px;">Item</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:center;">Qty</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Price</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Total</td>
+      </tr>
+      <%= YscWeb.Emails.MerchItems.priced_rows(@items) %>
+      <%= if @comp do %>
+      <tr style="border-top:2px solid #000; background-color:#f8f9fa;">
+        <td colspan="3" style="padding: 12px 16px; font-weight:bold; font-size:18px;">Paid by the club</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:18px; text-align:right; color: #059669;">$0.00</td>
+      </tr>
+      <% else %>
+      <tr style="border-top:1px solid #e0e0e0;">
+        <td colspan="3" style="padding: 12px 16px; font-size:16px;">Subtotal</td>
+        <td style="padding: 12px 16px; font-size:16px; text-align:right;"><%= @subtotal %></td>
+      </tr>
+      <tr>
+        <td colspan="3" style="padding: 12px 16px; font-size:16px;">Shipping</td>
+        <td style="padding: 12px 16px; font-size:16px; text-align:right;"><%= @shipping %></td>
+      </tr>
+      <tr style="border-top:2px solid #000; background-color:#f8f9fa;">
+        <td colspan="3" style="padding: 12px 16px; font-weight:bold; font-size:18px;">Total</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:18px; text-align:right;"><%= @total %></td>
+      </tr>
+      <% end %>
+    </mj-table>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Shipping to</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong><%= @ship_to.name %></strong><br />
+      <%= for line <- @ship_to.lines do %><%= line %><br /><% end %>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
+      <strong>What's next?</strong>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• Everything is printed to order, which usually takes 2–5 business days before it ships</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• We'll email you again, with tracking, as soon as it's on its way</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• Questions? Reach out to us at <a href="mailto:info@ysc.org">info@ysc.org</a></mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @order_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">View your order →</mj-button>
+    <mj-spacer height="36px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

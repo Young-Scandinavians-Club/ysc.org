@@ -160,6 +160,8 @@ config :ysc, Oban,
       {"*/5 * * * *", Ysc.Tickets.TimeoutWorker},
       {"*/5 * * * *", Ysc.Tickets.TicketReservationExpiryWorker},
       {"*/5 * * * *", Ysc.Events.EventPublishWorker},
+      {"*/15 * * * *", Ysc.Merch.StaleOrderWorker},
+      {"*/30 * * * *", Ysc.Merch.StatusSyncWorker},
       {"*/5 * * * *", YscWeb.Workers.NewsletterScheduleChecker},
       {"*/15 * * * *", Ysc.Subscriptions.ExpirationWorker},
       # Unused OTP codes expire after ~10 minutes; sweep leftover rows regularly.

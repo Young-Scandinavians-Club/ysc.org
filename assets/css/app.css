@@ -3795,6 +3795,170 @@ body.overflow-hidden {
   }
 }
 
+/* =============================================
+   SHOP CART DOCK
+   A pill that floats at the bottom center once the cart has something in it, and
+   an "added" card that materializes from the pill when something is added.
+
+   Motion follows one critically damped spring (no overshoot: nothing here is
+   thrown by a gesture). It is expressed as a linear() curve so the browser
+   retargets from the live value if the card is toggled mid-flight. Position,
+   scale, opacity and blur only, so it stays on the compositor.
+   ============================================= */
+
+:root {
+  --ease-spring-settle: linear(
+    0,
+    0.0902,
+    0.2642,
+    0.4422,
+    0.594,
+    0.7127,
+    0.8009,
+    0.8641,
+    0.9084,
+    0.9389,
+    0.9596,
+    0.9734,
+    0.9826,
+    0.9887,
+    0.9927,
+    0.9953,
+    0.997,
+    0.9981,
+    1
+  );
+}
+
+.cart-dock {
+  position: fixed;
+  /* Centered along the bottom edge, so it stays in view however wide the
+     screen is (a fixed right offset flies off to the side on large monitors). */
+  inset-inline: max(1rem, env(safe-area-inset-left))
+    max(1rem, env(safe-area-inset-right));
+  margin-inline: auto;
+  width: fit-content;
+  max-width: calc(100vw - 2rem);
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  /* Only the pill and the card take clicks, never the empty gap between them. */
+  pointer-events: none;
+  /* Enters from the edge it lives on. */
+  animation: cart-dock-in 480ms var(--ease-spring-settle) both;
+}
+
+.cart-dock > * {
+  pointer-events: auto;
+}
+
+@keyframes cart-dock-in {
+  from {
+    transform: translateY(calc(100% + 2rem));
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Anchored to the pill, so it reads as coming out of it. */
+.cart-peek {
+  transform-origin: bottom center;
+  transition:
+    transform 420ms var(--ease-spring-settle),
+    opacity 200ms ease,
+    filter 420ms var(--ease-spring-settle),
+    visibility 0s linear 0s;
+}
+
+.cart-peek[data-open="false"] {
+  opacity: 0;
+  transform: translateY(0.5rem) scale(0.94);
+  filter: blur(4px);
+  visibility: hidden;
+  pointer-events: none;
+  /* Stay rendered until the exit has played. */
+  transition:
+    transform 320ms var(--ease-spring-settle),
+    opacity 160ms ease,
+    filter 320ms var(--ease-spring-settle),
+    visibility 0s linear 320ms;
+}
+
+.cart-peek[data-open="true"] {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  visibility: visible;
+}
+
+/* The count lands with a small pulse each time it changes (the element is
+   re-created per count, so the animation replays). */
+.cart-count-pop {
+  display: inline-block;
+  animation: cart-count-pop 420ms var(--ease-spring-settle);
+}
+
+@keyframes cart-count-pop {
+  from {
+    transform: scale(1.4);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Cross-fade instead of sliding, scaling or blurring. */
+  .cart-dock {
+    animation: cart-dock-fade 200ms ease both;
+  }
+
+  .cart-peek,
+  .cart-peek[data-open="false"] {
+    transform: none;
+    filter: none;
+    transition:
+      opacity 200ms ease,
+      visibility 0s linear 200ms;
+  }
+
+  .cart-peek[data-open="true"] {
+    transition:
+      opacity 200ms ease,
+      visibility 0s linear 0s;
+  }
+
+  .cart-count-pop {
+    animation: none;
+  }
+}
+
+@keyframes cart-dock-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Color dot on the shop's product page. The color comes from a CSS variable
+   (set from Ysc.Merch.ColorSwatch), and the faint outline keeps white and
+   cream visible on a white page. */
+
+.shop-swatch {
+  background-color: var(--swatch, #d4d4d8);
+  /* A border, not a shadow, so Tailwind's ring utilities can still add an edge
+     (the selected state on a dark pill). */
+  border: 1px solid rgb(0 0 0 / 0.18);
+}
+
 /* Hero text shadows for better legibility - only on sm+ screens where text overlays image */
 
 @media (min-width: 640px) {

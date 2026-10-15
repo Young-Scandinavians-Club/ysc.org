@@ -405,7 +405,13 @@ const StripeElements = {
             let returnUrl;
             const isModification = this.el.dataset.modification === 'true';
 
-            if (bookingId) {
+            // Pages that own their own post-payment route (e.g. the merch shop)
+            // pass it explicitly; Stripe appends payment_intent params to it.
+            const returnPath = this.el.dataset.returnPath;
+
+            if (returnPath && returnPath.startsWith('/')) {
+                returnUrl = `${window.location.origin}${returnPath}`;
+            } else if (bookingId) {
                 const updatedParam = isModification ? '&updated=true' : '';
                 returnUrl = `${window.location.origin}/bookings/${bookingId}/receipt?confetti=true${updatedParam}`;
             } else if (ticketOrderId) {

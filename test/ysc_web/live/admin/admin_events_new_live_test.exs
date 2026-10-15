@@ -6,6 +6,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
   import Ysc.EventsFixtures
+  import Ysc.MerchFixtures
   import Ysc.ScanningFixtures
 
   alias Ysc.Agendas
@@ -1844,6 +1845,112 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       refute has_element?(view, "#event-expense-reports-section")
       refute has_element?(view, "#expense-report-#{report.id}")
+    end
+  end
+
+  describe "statistics tab merch costs" do
+    setup [:create_admin]
+
+    defp card_text(view, id),
+      do:
+        view
+        |> element(id)
+        |> render()
+        |> Floki.parse_fragment!()
+        |> Floki.text()
+
+    test "shows an empty state with no merch", %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+      render_async(view)
+
+      assert has_element?(view, "#stat-merch-costs", "$0.00")
+      assert has_element?(view, "#event-merch-empty")
+    end
+
+    test "adds club-paid merch to the event's total costs", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      order =
+        admin_order_fixture(admin, %{
+          event_id: event.id,
+          status: :submitted,
+          estimated_cost: Money.new(:USD, "50"),
+          purpose: "Happy hour stickers",
+          items: [{variant_fixture(), 20}, {variant_fixture(), 5}]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+      render_async(view)
+
+      assert has_element?(view, "#stat-merch-costs", "$50.00")
+      assert has_element?(view, "#stat-total-costs", "$50.00")
+      assert has_element?(view, "#stat-net-revenue", "$50.00")
+
+      assert has_element?(
+               view,
+               "#merch-order-#{order.id}",
+               "Happy hour stickers"
+             )
+
+      assert has_element?(view, "#merch-order-#{order.id}", "25")
+      assert has_element?(view, "#merch-order-#{order.id}", "(est.)")
+    end
+
+    test "uses Printful's actual charge once known", %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      order =
+        admin_order_fixture(admin, %{
+          event_id: event.id,
+          status: :shipped,
+          estimated_cost: Money.new(:USD, "50"),
+          printful_cost: Money.new(:USD, "42.50")
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+      render_async(view)
+
+      assert has_element?(view, "#stat-merch-costs", "$42.50")
+      refute has_element?(view, "#merch-order-#{order.id}", "(est.)")
+      refute card_text(view, "#stat-total-costs") =~ "$50.00"
+    end
+
+    test "does not count failed or canceled orders", %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      failed =
+        admin_order_fixture(admin, %{event_id: event.id, status: :failed})
+
+      canceled =
+        admin_order_fixture(admin, %{event_id: event.id, status: :canceled})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+      render_async(view)
+
+      assert has_element?(view, "#stat-merch-costs", "$0.00")
+      refute has_element?(view, "#merch-order-#{failed.id}")
+      refute has_element?(view, "#merch-order-#{canceled.id}")
+    end
+
+    test "volunteers see the aggregate but not the order rows", %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+      conn = log_in_user(conn, volunteer)
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: volunteer.id})
+
+      order =
+        admin_order_fixture(admin, %{event_id: event.id, status: :submitted})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/statistics")
+      render_async(view)
+
+      assert has_element?(view, "#stat-merch-costs", "$50.00")
+      refute has_element?(view, "#event-merch-section")
+      refute has_element?(view, "#merch-order-#{order.id}")
     end
   end
 

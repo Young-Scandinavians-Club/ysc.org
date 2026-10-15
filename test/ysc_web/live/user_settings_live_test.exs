@@ -1044,7 +1044,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(
                view,
                "#payments-intro",
-               "cabin bookings, events, donations, and membership"
+               "cabin bookings, events, donations, merch, and membership"
              )
 
       refute has_element?(
@@ -1056,7 +1056,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(
                view,
                "#payments-empty",
-               "Cabin bookings, events, donations, and membership payments"
+               "Cabin bookings, events, donations, merch, and membership payments"
              )
 
       assert has_element?(
