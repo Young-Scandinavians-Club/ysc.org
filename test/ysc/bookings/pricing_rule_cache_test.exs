@@ -672,4 +672,50 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
       assert Cachex.get(:ysc_cache, cache_key) == {:ok, nil}
     end
   end
+
+  describe "lowest_property_rate/1" do
+    test "returns the lowest property-level rate from the database on cache miss" do
+      create_pricing_rule(%{
+        amount: Money.new(41, :USD),
+        property: :tahoe,
+        booking_mode: :room,
+        price_unit: :per_person_per_night
+      })
+
+      assert PricingRuleCache.lowest_property_rate(:tahoe) ==
+               Money.new(41, :USD)
+    end
+
+    test "serves a stale rate until invalidate after a direct DB update" do
+      rule =
+        create_pricing_rule(%{
+          amount: Money.new(41, :USD),
+          property: :tahoe,
+          booking_mode: :room,
+          price_unit: :per_person_per_night
+        })
+
+      assert PricingRuleCache.lowest_property_rate(:tahoe) ==
+               Money.new(41, :USD)
+
+      {:ok, _} =
+        rule
+        |> PricingRule.changeset(%{amount: Money.new(99, :USD)})
+        |> Repo.update()
+
+      # Public home "from $X" reads this cache. A version miss would mix live
+      # and stale rates after admin pricing edits.
+      assert PricingRuleCache.lowest_property_rate(:tahoe) ==
+               Money.new(41, :USD)
+
+      PricingRuleCache.invalidate()
+
+      assert PricingRuleCache.lowest_property_rate(:tahoe) ==
+               Money.new(99, :USD)
+    end
+
+    test "returns nil when no property-level rate exists" do
+      assert PricingRuleCache.lowest_property_rate(:clear_lake) == nil
+    end
+  end
 end
