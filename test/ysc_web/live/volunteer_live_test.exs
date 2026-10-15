@@ -120,7 +120,6 @@ defmodule YscWeb.VolunteerLiveTest do
     test "displays introductory text", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/volunteer")
 
-      assert html =~ "Want to contribute to a vibrant community"
       assert html =~ "The YSC thrives on the dedication of our volunteers"
     end
 

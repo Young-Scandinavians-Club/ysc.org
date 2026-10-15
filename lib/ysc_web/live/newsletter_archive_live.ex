@@ -31,7 +31,6 @@ defmodule YscWeb.NewsletterArchiveLive do
         <.page_masthead
           eyebrow="Archive"
           title="Newsletters"
-          subtitle="Browse our past newsletters. Subscribe to receive future newsletters in your inbox."
         />
       </div>
 
