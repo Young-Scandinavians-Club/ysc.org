@@ -75,7 +75,8 @@ defmodule Ysc.Merch.Notifications do
 
   @doc """
   Adds an alert to the board to `multi`. `kind` is `:submit_failed`,
-  `:failed`, `:canceled`, `:on_hold` or `:returned`.
+  `:failed`, `:canceled`, `:on_hold`, `:needs_approval`, `:refunded` or
+  `:returned`.
   """
   def put_attention_email(multi, %Order{} = order, kind, reason, suffix \\ nil) do
     key =

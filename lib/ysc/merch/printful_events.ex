@@ -39,10 +39,16 @@ defmodule Ysc.Merch.PrintfulEvents do
     delivered: 4
   }
 
-  @doc "Webhook event types we ask Printful to send."
+  @doc """
+  Webhook event types we ask Printful to send. Only types from Printful's
+  webhook documentation: it sends no "delivered" event, so an order never
+  reaches `:delivered` on its own (see the `package_delivered` clause below,
+  kept for sources that do report delivery).
+  """
   def subscribed_types do
-    ~w(package_shipped package_returned package_delivered order_failed order_canceled
-       order_put_hold order_remove_hold order_updated order_refunded)
+    ~w(package_shipped package_returned order_failed order_canceled
+       order_put_hold order_put_hold_approval order_remove_hold order_updated
+       order_refunded)
   end
 
   @doc """
@@ -113,6 +119,24 @@ defmodule Ysc.Merch.PrintfulEvents do
   defp dispatch("order_put_hold", order, data, po) do
     hold(order, reason_from(data, po, "Printful put this order on hold"))
   end
+
+  # Printful paused the order until the club approves a design change. Nothing
+  # moves until someone does, so the board has to hear about it.
+  defp dispatch("order_put_hold_approval", order, data, po) do
+    needs_approval(
+      order,
+      reason_from(
+        data,
+        po,
+        "Printful needs a design change approved before it can make this order"
+      )
+    )
+  end
+
+  # Printful refunded the club for a confirmed order (usually after a
+  # cancellation). The member is not refunded automatically.
+  defp dispatch("order_refunded", order, data, _po),
+    do: refunded(order, data["amount"])
 
   defp dispatch("order_updated", order, _data, po), do: sync_order(order, po)
   defp dispatch("order_created", order, _data, po), do: sync_order(order, po)
@@ -403,6 +427,38 @@ defmodule Ysc.Merch.PrintfulEvents do
   end
 
   defp hold(_order, _reason), do: :ok
+
+  defp needs_approval(%Order{status: status} = order, reason)
+       when status in @before_shipment do
+    Notifications.alert_board(order, :needs_approval, reason)
+    :ok
+  end
+
+  defp needs_approval(_order, _reason), do: :ok
+
+  # One alert per refunded amount, so a repeated delivery of the same event
+  # does not alert twice but a second, different refund does.
+  defp refunded(order, amount) do
+    text =
+      case Amount.to_money(amount) do
+        %Money{} = money -> Ysc.MoneyHelper.format_price(money)
+        nil -> "an unknown amount"
+      end
+
+    Notifications.alert_board(
+      order,
+      :refunded,
+      "Printful refunded #{text} to the club for this order.",
+      refund_suffix(amount)
+    )
+
+    :ok
+  end
+
+  defp refund_suffix(amount) when is_binary(amount) or is_number(amount),
+    do: to_string(amount)
+
+  defp refund_suffix(_amount), do: nil
 
   # Moves `order` to `to` if it is currently in one of `from`, queueing the
   # member update and board alert in the same transaction. A no-op (status not

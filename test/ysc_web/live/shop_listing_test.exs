@@ -9,6 +9,7 @@ defmodule YscWeb.ShopListingTest do
 
     for {color, size} <- [{"Black", "S"}, {"Black", "XL"}, {"Navy", "M"}] do
       variant_fixture(tee, %{
+        name: "Club Tee / #{color} / #{size}",
         color: color,
         size: size,
         retail_price: Money.new(:USD, "25")

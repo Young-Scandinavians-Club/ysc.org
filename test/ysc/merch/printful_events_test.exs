@@ -383,12 +383,87 @@ defmodule Ysc.Merch.PrintfulEventsTest do
       end)
     end
 
+    test "a hold waiting for design approval alerts the board", %{order: order} do
+      handle("order_put_hold_approval", order, %{
+        "reason" => "Print file needs a larger margin",
+        "approval_files" => [%{"confirm_hash" => "abc"}]
+      })
+
+      assert status(order) == :submitted
+
+      assert_email_sent(fn email ->
+        assert email.subject =~ "needs your approval at Printful"
+        assert email.html_body =~ "Print file needs a larger margin"
+        assert email.html_body =~ "approve it"
+      end)
+    end
+
+    test "a design approval hold on a shipped order is ignored", %{order: order} do
+      handle("package_shipped", order, %{"shipment" => printful_shipment()})
+      assert_email_sent(subject: ~r/on its way/)
+
+      handle("order_put_hold_approval", order, %{"reason" => "x"})
+      refute_email_sent()
+    end
+
+    test "a refund from Printful alerts the board and leaves the order alone",
+         %{
+           order: order
+         } do
+      assert :ok = handle("order_refunded", order, %{"amount" => "13.50"})
+
+      assert status(order) == :submitted
+
+      assert_email_sent(fn email ->
+        assert email.subject =~ "refunded by Printful"
+        assert email.html_body =~ "$13.50"
+        assert email.html_body =~ "not refunded automatically"
+      end)
+    end
+
+    test "the same refund twice alerts once, a different refund alerts again",
+         %{
+           order: order
+         } do
+      handle("order_refunded", order, %{"amount" => "13.50"})
+      assert_email_sent(subject: ~r/refunded by Printful/)
+
+      handle("order_refunded", order, %{"amount" => "13.50"})
+      refute_email_sent()
+
+      handle("order_refunded", order, %{"amount" => "4.00"})
+      assert_email_sent(fn email -> assert email.html_body =~ "$4.00" end)
+    end
+
+    test "a refund on a club-paid order does not mention refunding a member" do
+      admin = user_fixture(%{role: "admin"})
+      comp = admin_order_fixture(admin, %{status: :submitted})
+
+      handle("order_refunded", comp, %{"amount" => "20.00"})
+
+      assert_email_sent(fn email ->
+        refute email.html_body =~ "not refunded automatically"
+        assert email.html_body =~ "place it again"
+      end)
+    end
+
     test "a hold on an order that already shipped is ignored", %{order: order} do
       handle("package_shipped", order, %{"shipment" => printful_shipment()})
       assert_email_sent(subject: ~r/on its way/)
 
       handle("order_put_hold", order, %{"reason" => "x"})
       refute_email_sent()
+    end
+  end
+
+  describe "subscribed webhook types" do
+    test "are the documented events, without the undocumented package_delivered" do
+      types = PrintfulEvents.subscribed_types()
+
+      refute "package_delivered" in types
+      assert "order_put_hold_approval" in types
+      assert "order_refunded" in types
+      assert "order_updated" in types
     end
   end
 

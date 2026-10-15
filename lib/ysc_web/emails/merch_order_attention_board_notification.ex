@@ -23,6 +23,8 @@ defmodule YscWeb.Emails.MerchOrderAttentionBoardNotification do
   def label(:canceled), do: "canceled by Printful"
   def label(:on_hold), do: "on hold at Printful"
   def label(:returned), do: "package returned"
+  def label(:needs_approval), do: "needs your approval at Printful"
+  def label(:refunded), do: "refunded by Printful"
 
   @doc "What a board member should do about it."
   def action(kind, %Order{kind: :admin_comp}), do: club_paid_action(kind)
@@ -33,6 +35,20 @@ defmodule YscWeb.Emails.MerchOrderAttentionBoardNotification do
         "The member has paid and will not receive their order. Refund the payment from Admin > Money, " <>
           "or resolve the problem in Printful and resubmit."
 
+  def action(:needs_approval, _),
+    do:
+      "Printful will not make this order until someone approves a design change. " <>
+        "Open the order in Printful and approve it; until then it will not ship."
+
+  def action(:refunded, %Order{kind: :purchase}),
+    do:
+      "Printful refunded the club for this order. The member was not refunded automatically: " <>
+        "if their order will not arrive, refund the payment from Admin > Money."
+
+  def action(:refunded, _),
+    do:
+      "Printful refunded the club for this order. Check the order in Printful and place it again if it is still needed."
+
   def action(:on_hold, _),
     do:
       "Printful has paused this order, most often because the club's payment method on file was declined. Check billing in Printful."
@@ -42,6 +58,8 @@ defmodule YscWeb.Emails.MerchOrderAttentionBoardNotification do
       "The package came back to Printful. Contact the member to confirm their address."
 
   defp club_paid_action(:on_hold), do: action(:on_hold, nil)
+  defp club_paid_action(:needs_approval), do: action(:needs_approval, nil)
+  defp club_paid_action(:refunded), do: action(:refunded, nil)
   defp club_paid_action(:returned), do: action(:returned, nil)
 
   defp club_paid_action(_),

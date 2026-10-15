@@ -92,8 +92,13 @@ defmodule Ysc.Merch.ListingTest do
       products = loaded()
 
       tile = products |> Enum.find(&(&1.id == tee.id)) |> Listing.tile()
-      assert Enum.map(tile.colors, & &1.name) == ["Black", "Navy"]
-      assert tile.active.name == "Black"
+      # Variants list by price then name, so which color is first is not fixed.
+      assert tile.colors |> Enum.map(& &1.name) |> Enum.sort() == [
+               "Black",
+               "Navy"
+             ]
+
+      assert tile.active.name == hd(tile.colors).name
       assert tile.sizes == "S–XL"
       assert tile.hidden_colors == 0
 
@@ -139,7 +144,8 @@ defmodule Ysc.Merch.ListingTest do
       navy = gallery_photo_fixture(tee, nil, %{color: "Navy", position: 2})
 
       tile = loaded() |> Enum.find(&(&1.id == tee.id)) |> Listing.tile()
-      [black_color, navy_color] = tile.colors
+      black_color = Enum.find(tile.colors, &(&1.name == "Black"))
+      navy_color = Enum.find(tile.colors, &(&1.name == "Navy"))
 
       assert black_color.image.id == black.image_id
       assert black_color.hover_image.id == black_two.image_id
