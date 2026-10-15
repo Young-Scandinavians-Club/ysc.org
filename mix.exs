@@ -345,12 +345,14 @@ defmodule Ysc.MixProject do
       # 1.3.2: walking parent PIDs returns [] when Process.info/2 is nil
       # (an ancestor already exited) instead of raising CaseClauseError.
       {:mox, "~> 1.3", only: :test},
-      # 2.24.1: ack only while the job is still executing (prevents a later
-      # execution from overwriting completed/snoozed); notifier listeners live
-      # in Oban.Notifier.Registry; notify/3 returns {:error, _} instead of
-      # exiting. AdminSettingsLive still uses Oban.Notifier.listen/1 (:ok).
-      # dispatch_cooldown is now a valid start_queue option (unused).
-      {:oban, "~> 2.24.1"},
+      # 2.24.2: snooze uses jsonb_set on current DB meta (keeps updates made
+      # during execution); queues release jobs that exit before pkill. Dolphin
+      # fetch deadlock and Lite nil uniqueness are unused (Basic/Postgres).
+      # We snooze with {:snooze, seconds} in EmailNotifier / NewsletterSender
+      # and do not mutate job.meta during perform. 2.24.1 ack/notifier/
+      # dispatch_cooldown behavior is unchanged. AdminSettingsLive still uses
+      # Oban.Notifier.listen/1 (:ok).
+      {:oban, "~> 2.24.2"},
       {:passbook, "~> 0.1"},
       {:phoenix_bakery, "~> 1.0", runtime: false},
       {:phoenix_ecto, "~> 4.7"},
