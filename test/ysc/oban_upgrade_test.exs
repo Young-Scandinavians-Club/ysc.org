@@ -1,31 +1,86 @@
 defmodule Ysc.ObanUpgradeTest do
   @moduledoc """
-  Guards the Oban 2.24.0 → 2.24.1 upgrade.
+  Guards the Oban 2.24.1 → 2.24.2 upgrade.
 
-  2.24.1 is a patch: ack operations only apply while the job is still
-  `executing` (and `attempted_at` still matches), notifier listeners live
-  in `Oban.Notifier.Registry` so they survive a notifier crash, listen/
-  notify callbacks return `{:error, _}` instead of exiting, and
-  `dispatch_cooldown` is a valid `start_queue` option. We use
-  `Oban.Engines.Basic` and `Oban.Notifiers.PG`. `AdminSettingsLive`
-  still ignores `Oban.Notifier.listen/1`'s return (`:ok`).
+  2.24.2 is a patch with no documented breaking changes. Snooze now
+  `jsonb_set`s `snoozed` on the current DB `meta` instead of overwriting
+  it with the in-memory snapshot from execution start. The producer
+  kills via `Task.Supervisor.terminate_child/2` and lets the existing
+  `{ref, _}` / `:DOWN` handlers release the running slot, so a job that
+  exits just before `pkill` is handled is not stuck in the running list.
+
+  Dolphin fetch deadlocks and Lite `nil` uniqueness are unused — we use
+  `Oban.Engines.Basic` and `Oban.Notifiers.PG`. We snooze with
+  `{:snooze, seconds}` in `EmailNotifier` / `NewsletterSender` and do
+  not mutate `job.meta` during `perform`. 2.24.1 ack/`dispatch_cooldown`
+  behavior is unchanged. The internal listener table moved from
+  `Oban.Notifier.Registry` to `Oban.Notifiers.Listeners` (undocumented,
+  not a public API). `AdminSettingsLive` still calls
+  `Oban.Notifier.listen/1` and ignores the `:ok` return.
   """
-  use ExUnit.Case, async: true
+  use Ysc.DataCase, async: true
 
   alias Ysc.VerificationCodeCleanupWorker
 
   @oban_config Application.compile_env!(:ysc, Oban)
   @prod_opts Keyword.delete(@oban_config, :testing)
+  @mix_exs Path.expand("../../mix.exs", __DIR__)
+  @mix_lock Path.expand("../../mix.lock", __DIR__)
+  @changelog Path.expand("../../deps/oban/CHANGELOG.md", __DIR__)
   @basic_engine Path.expand(
                   "../../deps/oban/lib/oban/engines/basic.ex",
                   __DIR__
                 )
+  @producer Path.expand(
+              "../../deps/oban/lib/oban/queues/producer.ex",
+              __DIR__
+            )
   @notifier Path.expand("../../deps/oban/lib/oban/notifier.ex", __DIR__)
   @oban Path.expand("../../deps/oban/lib/oban.ex", __DIR__)
+  @email_notifier Path.expand(
+                    "../../lib/ysc_web/workers/email_notifier.ex",
+                    __DIR__
+                  )
+  @newsletter_sender Path.expand(
+                       "../../lib/ysc_web/workers/newsletter_sender.ex",
+                       __DIR__
+                     )
 
-  describe "2.24.1 Hex lock" do
-    test "locks oban to 2.24.1" do
-      assert to_string(Application.spec(:oban, :vsn)) == "2.24.1"
+  describe "2.24.2 Hex lock" do
+    test "locks oban to 2.24.2" do
+      {:module, _} = Code.ensure_loaded(Oban)
+      assert to_string(Application.spec(:oban, :vsn)) == "2.24.2"
+    end
+
+    test "mix.exs pins the 2.24.2 floor" do
+      mix_exs = File.read!(@mix_exs)
+      assert mix_exs =~ ~s|{:oban, "~> 2.24.2"}|
+    end
+
+    test "companion lock is 2.24.2" do
+      lock = File.read!(@mix_lock)
+      assert lock =~ ~s|"oban": {:hex, :oban, "2.24.2"|
+      refute lock =~ ~s|"oban": {:hex, :oban, "2.24.1"|
+    end
+  end
+
+  describe "2.24.2 changelog" do
+    test "documents targeted snooze meta updates and pkill release" do
+      changelog = File.read!(@changelog)
+
+      v2242 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.map(&String.replace_prefix(&1, "## ", ""))
+        |> Enum.find(&String.starts_with?(&1, "v2.24.2"))
+
+      assert v2242
+      assert v2242 =~ "Preserve meta updates during execution on snooze"
+      assert v2242 =~ "targeted update"
+      assert v2242 =~ "Release jobs that exit before a pkill is handled"
+      assert v2242 =~ "Dolphin"
+      assert v2242 =~ "Lite"
+      refute v2242 =~ "Breaking"
     end
   end
 
@@ -80,6 +135,7 @@ defmodule Ysc.ObanUpgradeTest do
 
       assert conf.repo == Ysc.Repo
       assert conf.log == false
+      assert conf.engine == Oban.Engines.Basic
 
       assert {Oban.Pruner, pruner_opts} =
                Enum.find(conf.plugins, &match?({Oban.Pruner, _}, &1))
@@ -170,12 +226,82 @@ defmodule Ysc.ObanUpgradeTest do
     end
   end
 
-  describe "2.24.1 notifier registry" do
-    test "Oban.Application supervises Oban.Notifier.Registry" do
-      assert {:module, Oban.Notifier.Registry} =
-               Code.ensure_loaded(Oban.Notifier.Registry)
+  describe "2.24.2 snooze preserves execution-time meta" do
+    test "Basic snooze jsonb_sets snoozed on current DB meta" do
+      source = File.read!(@basic_engine)
 
-      assert Process.whereis(Oban.Notifier.Registry)
+      assert source =~
+               ~s|def snooze_job(%Config{} = conf, %Job{} = job, seconds)|
+
+      assert source =~ "jsonb_set"
+      assert source =~ "{snoozed}"
+      assert source =~ "j.meta"
+      assert source =~ "inc: [attempt: -1]"
+      refute source =~ "Map.update(meta, \"snoozed\""
+    end
+
+    test "jsonb_set keeps other meta keys when the in-memory job is stale" do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, job} =
+          VerificationCodeCleanupWorker.new(%{}, meta: %{"keep" => "yes"})
+          |> Oban.insert()
+
+        {1, _} =
+          from(j in Oban.Job, where: j.id == ^job.id)
+          |> Repo.update_all(
+            set: [
+              state: "executing",
+              attempted_at: DateTime.utc_now(),
+              attempt: 1,
+              meta: %{"keep" => "yes", "during" => "exec"}
+            ]
+          )
+
+        executing = Repo.get!(Oban.Job, job.id)
+        stale = %{executing | meta: %{"keep" => "yes"}}
+
+        assert :ok = Oban.Engine.snooze_job(Oban.config(), stale, 15)
+
+        reloaded = Repo.get!(Oban.Job, job.id)
+        assert reloaded.state == "scheduled"
+        assert reloaded.meta["keep"] == "yes"
+        assert reloaded.meta["during"] == "exec"
+        assert reloaded.meta["snoozed"] == 1
+        assert reloaded.attempt == 0
+      end)
+    end
+
+    test "EmailNotifier and NewsletterSender still return {:snooze, seconds}" do
+      email = File.read!(@email_notifier)
+      newsletter = File.read!(@newsletter_sender)
+
+      assert email =~ "{:error, {:snooze, seconds}} ->"
+      assert email =~ "{:snooze, seconds}"
+      assert newsletter =~ "{:error, {:snooze, seconds}} -> {:snooze, seconds}"
+      assert newsletter =~ "{:snooze, 15}"
+      refute email =~ "job.meta"
+      refute newsletter =~ "job.meta"
+    end
+  end
+
+  describe "2.24.2 producer pkill release" do
+    test "pkill terminates the child and lets DOWN/{ref, _} release the slot" do
+      source = File.read!(@producer)
+
+      assert source =~ ~s|%{"action" => "pkill", "job_id" => jid} ->|
+      assert source =~ "Task.Supervisor.terminate_child(state.foreman, pid)"
+      assert source =~ "def handle_info({ref, _val}, %State{} = state)"
+      assert source =~ "release_ref(ref)"
+      refute source =~ "defp pkill("
+    end
+  end
+
+  describe "2.24.2 notifier listeners" do
+    test "Oban.Application supervises Oban.Notifiers.Listeners" do
+      assert {:module, Oban.Notifiers.Listeners} =
+               Code.ensure_loaded(Oban.Notifiers.Listeners)
+
+      assert Process.whereis(Oban.Notifiers.Listeners)
       assert Process.whereis(Oban.Application)
     end
 
@@ -184,12 +310,12 @@ defmodule Ysc.ObanUpgradeTest do
 
       conf = Oban.config()
 
-      assert self() in Oban.Notifier.Registry.listeners(conf, :insert)
-      assert self() in Oban.Notifier.Registry.listeners(conf, :gossip)
+      assert self() in Oban.Notifiers.Listeners.listeners(conf, :insert)
+      assert self() in Oban.Notifiers.Listeners.listeners(conf, :gossip)
 
       assert :ok = Oban.Notifier.unlisten([:insert, :gossip])
-      refute self() in Oban.Notifier.Registry.listeners(conf, :insert)
-      refute self() in Oban.Notifier.Registry.listeners(conf, :gossip)
+      refute self() in Oban.Notifiers.Listeners.listeners(conf, :insert)
+      refute self() in Oban.Notifiers.Listeners.listeners(conf, :gossip)
     end
 
     test "notify/3 returns :ok or {:error, exception} without exiting" do
@@ -201,7 +327,7 @@ defmodule Ysc.ObanUpgradeTest do
     test "listen still registers even when the notifier callback is wrapped" do
       source = File.read!(@notifier)
 
-      assert source =~ "alias Oban.Notifier.Registry, as: Listeners"
+      assert source =~ "alias Oban.Notifiers.Listeners"
 
       assert source =~
                "for channel <- channels, do: Listeners.register(conf, channel)"
