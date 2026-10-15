@@ -4405,6 +4405,82 @@ defmodule YscWeb.CoreComponents do
   defp at_glance_icon_bg(:teal), do: "bg-teal-50"
 
   @doc """
+  Eyebrow label over a prominent value, with an optional quieter detail line.
+
+  Used on ticket/booking receipts, forms, and admin detail panels so label +
+  value markup stays consistent.
+
+  ## Examples
+
+      <.labeled_value label="Event">{@event.title}</.labeled_value>
+
+      <.labeled_value label="Date & Time">
+        {DateDisplay.format_date_long(@event.start_date, "TBD")}
+        <:detail>7:00 PM</:detail>
+      </.labeled_value>
+
+      <.labeled_value label="Check-in" muted>
+        {DateDisplay.format_date_long(@booking.checkin_date, "—")}
+        <:detail>After 3:00 PM</:detail>
+      </.labeled_value>
+  """
+  attr :id, :string, default: nil
+  attr :label, :string, required: true
+
+  attr :muted, :boolean,
+    default: false,
+    doc: "Struck, muted value for cancelled records"
+
+  attr :class, :any, default: nil, doc: "Extra classes on the wrapper"
+
+  attr :label_class, :any,
+    default: nil,
+    doc: "Extra classes on the eyebrow label"
+
+  attr :value_class, :any,
+    default: nil,
+    doc: """
+    Classes on the value. Defaults to receipt-size `text-xl font-bold
+    text-zinc-900`, or muted zinc with a strike when `muted`.
+    """
+
+  attr :detail_class, :any, default: nil
+  attr :value_id, :string, default: nil
+  attr :detail_id, :string, default: nil
+
+  slot :inner_block, required: true
+  slot :detail
+
+  def labeled_value(assigns) do
+    value_class =
+      cond do
+        assigns.value_class -> assigns.value_class
+        assigns.muted -> "text-xl font-bold text-zinc-500 line-through"
+        true -> "text-xl font-bold text-zinc-900"
+      end
+
+    assigns = assign(assigns, :resolved_value_class, value_class)
+
+    ~H"""
+    <div id={@id} class={@class}>
+      <p class={["text-xs mb-1 type-eyebrow text-zinc-500", @label_class]}>
+        {@label}
+      </p>
+      <div id={@value_id} class={@resolved_value_class}>
+        {render_slot(@inner_block)}
+      </div>
+      <div
+        :if={@detail != []}
+        id={@detail_id}
+        class={["text-sm text-zinc-500", @detail_class]}
+      >
+        {render_slot(@detail)}
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Section heading with a leading emoji or custom icon.
 
   Used on booking landing pages and similar member-facing content. Pass an

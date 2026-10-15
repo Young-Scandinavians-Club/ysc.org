@@ -1438,22 +1438,18 @@ defmodule YscWeb.AdminUserDetailsLive do
                     class="mt-4 pt-4 border-t border-zinc-200"
                   >
                     <div class="grid grid-cols-2 gap-4">
-                      <div>
-                        <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                          Routing Number
-                        </p>
-                        <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm">
-                          {@unsealed_account.routing_number}
-                        </p>
-                      </div>
-                      <div>
-                        <p class="text-xs text-zinc-500 mb-1 type-eyebrow">
-                          Account Number
-                        </p>
-                        <p class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm">
-                          {@unsealed_account.account_number}
-                        </p>
-                      </div>
+                      <.labeled_value
+                        label="Routing Number"
+                        value_class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm"
+                      >
+                        {@unsealed_account.routing_number}
+                      </.labeled_value>
+                      <.labeled_value
+                        label="Account Number"
+                        value_class="text-sm font-mono text-zinc-900 bg-zinc-50 p-2 rounded-sm"
+                      >
+                        {@unsealed_account.account_number}
+                      </.labeled_value>
                     </div>
                     <p class="text-xs text-zinc-500 mt-4 italic">
                       ⚠️ Sensitive information - keep secure

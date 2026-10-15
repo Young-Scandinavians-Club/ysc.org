@@ -426,113 +426,36 @@ defmodule YscWeb.BookingReceiptLive do
               </div>
             </div>
             <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div>
-                <p class={[
-                  "text-xs mb-1 type-eyebrow",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-500",
-                    else: "text-zinc-500"
-                  )
-                ]}>
-                  Check-in
-                </p>
-                <p class={[
-                  "text-xl font-bold",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-500 line-through",
-                    else: "text-zinc-900"
-                  )
-                ]}>
-                  {DateDisplay.format_date_long(@booking.checkin_date, "—")}
-                </p>
-                <p
-                  id="booking-receipt-checkin-time"
-                  class={[
-                    "text-sm",
-                    if(@booking.status == :canceled,
-                      do: "text-zinc-500",
-                      else: "text-zinc-500"
-                    )
-                  ]}
-                >
+              <.labeled_value
+                label="Check-in"
+                muted={@booking.status == :canceled}
+                detail_id="booking-receipt-checkin-time"
+              >
+                {DateDisplay.format_date_long(@booking.checkin_date, "—")}
+                <:detail>
                   After {BookingDisplay.checkin_time_label()}
-                </p>
-              </div>
-              <div>
-                <p class={[
-                  "text-xs mb-1 type-eyebrow",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-500",
-                    else: "text-zinc-500"
-                  )
-                ]}>
-                  Check-out
-                </p>
-                <p class={[
-                  "text-xl font-bold",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-500 line-through",
-                    else: "text-zinc-900"
-                  )
-                ]}>
-                  {DateDisplay.format_date_long(@booking.checkout_date, "—")}
-                </p>
-                <p
-                  id="booking-receipt-checkout-time"
-                  class={[
-                    "text-sm",
-                    if(@booking.status == :canceled,
-                      do: "text-zinc-500",
-                      else: "text-zinc-500"
-                    )
-                  ]}
-                >
+                </:detail>
+              </.labeled_value>
+              <.labeled_value
+                label="Check-out"
+                muted={@booking.status == :canceled}
+                detail_id="booking-receipt-checkout-time"
+              >
+                {DateDisplay.format_date_long(@booking.checkout_date, "—")}
+                <:detail>
                   Before {BookingDisplay.checkout_time_label()}
-                </p>
-              </div>
-              <div>
-                <p class={[
-                  "text-xs mb-1 type-eyebrow",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-500",
-                    else: "text-zinc-500"
-                  )
-                ]}>
-                  <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
-                    {if length(@booking.rooms) == 1, do: "Room", else: "Rooms"}
-                  <% else %>
-                    Booking type
-                  <% end %>
-                </p>
-                <p
-                  id="receipt-booking-type"
-                  class={[
-                    "text-xl font-bold",
-                    if(@booking.status == :canceled,
-                      do: "text-zinc-500 line-through",
-                      else: "text-zinc-900"
-                    )
-                  ]}
-                >
-                  <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
-                    {Enum.map_join(@booking.rooms, ", ", fn room -> room.name end)}
-                  <% else %>
-                    {BookingModeDisplay.stay_type_label(@booking.booking_mode)}
-                  <% end %>
-                </p>
-                <p
-                  :if={@booking.booking_mode != :buyout}
-                  class={[
-                    "text-sm",
-                    if(@booking.status == :canceled,
-                      do: "text-zinc-500",
-                      else: "text-zinc-500"
-                    )
-                  ]}
-                >
+                </:detail>
+              </.labeled_value>
+              <.labeled_value
+                label={receipt_rooms_or_type_label(@booking)}
+                muted={@booking.status == :canceled}
+                value_id="receipt-booking-type"
+              >
+                {receipt_rooms_or_type_value(@booking)}
+                <:detail :if={@booking.booking_mode != :buyout}>
                   {BookingDisplay.guest_headcount_label(@booking)}
-                </p>
-              </div>
+                </:detail>
+              </.labeled_value>
             </div>
           </div>
           <!-- Guest Information (if booking guests exist) -->
@@ -1360,6 +1283,22 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp receipt_timezone(socket), do: YscWeb.TimeZone.from_connect_params(socket)
+
+  defp receipt_rooms_or_type_label(booking) do
+    if Ecto.assoc_loaded?(booking.rooms) && booking.rooms != [] do
+      if length(booking.rooms) == 1, do: "Room", else: "Rooms"
+    else
+      "Booking type"
+    end
+  end
+
+  defp receipt_rooms_or_type_value(booking) do
+    if Ecto.assoc_loaded?(booking.rooms) && booking.rooms != [] do
+      Enum.map_join(booking.rooms, ", ", fn room -> room.name end)
+    else
+      BookingModeDisplay.stay_type_label(booking.booking_mode)
+    end
+  end
 
   defp loaded_booking_matches?(socket, booking_id) do
     match?(%Booking{id: ^booking_id}, socket.assigns[:booking])
