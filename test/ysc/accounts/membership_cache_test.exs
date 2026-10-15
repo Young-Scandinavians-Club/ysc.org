@@ -689,8 +689,7 @@ defmodule Ysc.Accounts.MembershipCacheTest do
         Subscriptions.create_subscription_item(%{
           subscription_id: subscription.id,
           stripe_price_id: family_plan.stripe_price_id,
-          stripe_product_id:
-            "prod_cascade_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_cascade_#{System.unique_integer([:positive])}",
           stripe_id: "si_cascade_#{System.unique_integer([:positive])}",
           quantity: 1
         })
