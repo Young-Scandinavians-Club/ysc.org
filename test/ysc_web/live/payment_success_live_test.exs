@@ -449,6 +449,10 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
         assert conn.request_path == "/bookings/checkout/#{booking.id}"
         assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Payment failed"
+
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+                 "dates are still held"
+
         assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "info@ysc.org"
       after
         Application.put_env(:ysc, :stripe_client, original_client)
@@ -480,6 +484,12 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
         assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
                  "Payment was canceled"
+
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+                 "dates are still held"
+
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+                 "from this page"
       after
         Application.put_env(:ysc, :stripe_client, original_client)
       end
@@ -550,6 +560,86 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         assert conn.query_params["payment_failed"] == "1"
         assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Payment failed"
         assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "info@ysc.org"
+        refute Phoenix.Flash.get(conn.assigns.flash, :error) =~ "still held"
+        assert Repo.get!(Ysc.Tickets.TicketOrder, order.id).status == :cancelled
+      after
+        Application.put_env(:ysc, :stripe_client, original_client)
+      end
+    end
+
+    test "redirects to event page on canceled ticket order payment without saying dates are held",
+         %{conn: conn} do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      {:ok, event} =
+        Ysc.Events.create_event(%{
+          title: "Canceled payment event #{System.unique_integer()}",
+          description: "Test",
+          state: :published,
+          organizer_id: user_fixture().id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          max_attendees: 100,
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(50, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      {:ok, order} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+        end)
+
+      cancel_timeout_jobs_for_order!(order.id)
+
+      payment_intent_id = "pi_ticket_canceled_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      client_module =
+        stripe_client_module(%{"ticket_order_id" => order.id},
+          status: "requires_payment_method",
+          notify: self()
+        )
+
+      original_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, client_module)
+
+      try do
+        redirect =
+          conn
+          |> log_in_user(user)
+          |> live(
+            ~p"/payment/success?redirect_status=canceled&payment_intent=#{payment_intent_id}"
+          )
+
+        {:ok, conn} = follow_redirect(redirect, conn)
+
+        assert_received {:cancel_payment_intent, ^payment_intent_id}
+        assert conn.request_path == "/events/#{event.id}"
+        assert conn.query_params["payment_failed"] == "1"
+
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+                 "Payment was canceled"
+
+        assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+                 "when you're ready"
+
+        refute Phoenix.Flash.get(conn.assigns.flash, :error) =~ "still held"
+        refute Phoenix.Flash.get(conn.assigns.flash, :error) =~ "from this page"
         assert Repo.get!(Ysc.Tickets.TicketOrder, order.id).status == :cancelled
       after
         Application.put_env(:ysc, :stripe_client, original_client)
