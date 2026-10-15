@@ -81,6 +81,9 @@ defmodule Ysc.Quickbooks.Sync do
       account: "Special Project Fundraising",
       class: "Administration"
     },
+    # Merch shop sales. If the account is missing, the item falls back to
+    # General Revenue (see query_income_account/1).
+    merch: %{account: "Merch Sales", class: "Administration"},
     # Clear Lake bookings
     clear_lake_booking: %{account: "Clear Lake Inc", class: "Clear Lake"},
     # Tahoe bookings
@@ -1682,6 +1685,9 @@ defmodule Ysc.Quickbooks.Sync do
 
       {:donation, _} ->
         @account_class_mapping[:donation].account
+
+      {:merch, _} ->
+        @account_class_mapping[:merch].account
 
       {:booking, :tahoe} ->
         @account_class_mapping[:tahoe_booking].account

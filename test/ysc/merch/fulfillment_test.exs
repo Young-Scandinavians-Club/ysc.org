@@ -177,6 +177,44 @@ defmodule Ysc.Merch.FulfillmentTest do
       assert_received {:quickbooks_item, "Merch Sales"}
     end
 
+    test "books merch to the Merch Sales income account", %{order: order} do
+      printful_accepts()
+
+      stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn name ->
+        {:ok, "account:#{name}"}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :get_or_create_item, fn name, opts ->
+        send(self(), {:quickbooks_item, name, opts[:income_account_ref]})
+        {:ok, "qb_item"}
+      end)
+
+      {:ok, _} = Fulfillment.process_successful_payment(payment_intent(order))
+
+      assert_received {:quickbooks_item, "Merch Sales",
+                       %{value: "account:Merch Sales"}}
+    end
+
+    test "falls back to General Revenue while the Merch Sales account is missing",
+         %{order: order} do
+      printful_accepts()
+
+      stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn
+        "General Revenue" -> {:ok, "account:general"}
+        _ -> {:error, :not_found}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :get_or_create_item, fn name, opts ->
+        send(self(), {:quickbooks_item, name, opts[:income_account_ref]})
+        {:ok, "qb_item"}
+      end)
+
+      {:ok, _} = Fulfillment.process_successful_payment(payment_intent(order))
+
+      assert_received {:quickbooks_item, "Merch Sales",
+                       %{value: "account:general"}}
+    end
+
     test "is idempotent across webhook, return page and retries", %{
       order: order
     } do

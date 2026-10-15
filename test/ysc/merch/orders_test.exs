@@ -118,7 +118,6 @@ defmodule Ysc.Merch.OrdersTest do
 
   test "rejects empty carts and unavailable lines", %{
     user: user,
-    lines: lines,
     tee: tee
   } do
     assert {:error, :empty_cart} = create(user, [])
