@@ -5820,21 +5820,25 @@ defmodule Ysc.BookingsTest do
         end)
 
         # CheckoutCancel retrieve + unfulfilled refund retrieve
-        expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
-                                                               _opts ->
-          {:ok,
-           %Stripe.PaymentIntent{
-             id: payment_intent_id,
-             status: "succeeded",
-             amount: amount_cents,
-             latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"},
-             metadata: %{
-               "booking_id" => to_string(booking.id),
-               "user_id" => to_string(user.id),
-               "modification" => "true"
-             }
-           }}
-        end)
+        expect(
+          Ysc.StripeMock,
+          :retrieve_payment_intent,
+          2,
+          fn ^payment_intent_id, _opts ->
+            {:ok,
+             %Stripe.PaymentIntent{
+               id: payment_intent_id,
+               status: "succeeded",
+               amount: amount_cents,
+               latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"},
+               metadata: %{
+                 "booking_id" => to_string(booking.id),
+                 "user_id" => to_string(user.id),
+                 "modification" => "true"
+               }
+             }}
+          end
+        )
 
         assert {:ok, canceled} =
                  Ysc.Bookings.BookingLocker.cancel_complete_booking(booking.id)
@@ -5842,7 +5846,12 @@ defmodule Ysc.BookingsTest do
         assert canceled.status == :canceled
         assert is_nil(canceled.modification_hold_expires_at)
         assert is_nil(canceled.modification_hold_attrs)
-        refute Bookings.modification_ledger_recorded?(booking.id, payment_intent_id)
+
+        refute Bookings.modification_ledger_recorded?(
+                 booking.id,
+                 payment_intent_id
+               )
+
         assert canceled.checkout_date == checkout
       after
         Application.put_env(:ysc, :stripe_client, previous_client)
@@ -5931,6 +5940,7 @@ defmodule Ysc.BookingsTest do
         reloaded = Repo.reload!(booking)
         assert reloaded.status == :complete
         assert reloaded.modification_hold_expires_at
+
         assert Bookings.modification_hold_payment_intent_id(reloaded) ==
                  payment_intent_id
       after
