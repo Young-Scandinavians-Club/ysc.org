@@ -1174,18 +1174,10 @@ defmodule YscWeb.EventDetailsLive do
                 class="p-6 rounded-xl border border-zinc-100 flex items-center justify-between"
               >
                 <span class="text-sm font-bold text-zinc-900">Don't forget</span>
-                <add-to-calendar-button
-                  name={@event.title}
-                  start-date={date_for_add_to_cal(@event.start_date)}
-                  {if get_end_date_for_calendar(@event), do: ["end-date": date_for_add_to_cal(get_end_date_for_calendar(@event))], else: []}
-                  options="'Apple','Google','iCal','Outlook.com','Yahoo'"
-                  start-time={@event.start_time}
-                  {if get_end_time_for_calendar(@event), do: ["end-time": get_end_time_for_calendar(@event)], else: []}
-                  time-zone="America/Los_Angeles"
-                  location={@event.location_name}
-                  size="4"
-                  light-mode="bodyScheme"
-                ></add-to-calendar-button>
+                <.add_to_calendar_button
+                  id="event-add-to-calendar"
+                  event={@event}
+                />
               </div>
             </div>
 
@@ -2585,7 +2577,7 @@ defmodule YscWeb.EventDetailsLive do
             <div class="flex justify-between">
               <span class="text-zinc-600">Time:</span>
               <span class="font-medium">
-                {Calendar.strftime(@event.start_time, "%I:%M %p")}
+                {DateTimeFormatter.format_time(@event.start_time)}
               </span>
             </div>
           </div>
@@ -6253,63 +6245,6 @@ defmodule YscWeb.EventDetailsLive do
 
   defp default_active_agenda([]), do: nil
   defp default_active_agenda(agendas), do: hd(agendas).id
-
-  def date_for_add_to_cal(nil), do: nil
-
-  def date_for_add_to_cal(%DateTime{} = dt) do
-    dt |> DateTime.to_date() |> Timex.format!("%Y-%m-%d", :strftime)
-  end
-
-  def date_for_add_to_cal(%Date{} = d),
-    do: Timex.format!(d, "%Y-%m-%d", :strftime)
-
-  def date_for_add_to_cal(dt), do: Timex.format!(dt, "%Y-%m-%d", :strftime)
-
-  defp get_end_time_for_calendar(event) do
-    case {event.start_time, event.end_time} do
-      {start_time, nil} when not is_nil(start_time) ->
-        # Add 3 hours to start_time when end_time is null
-        Time.add(start_time, 3 * 60 * 60, :second)
-
-      {_start_time, end_time} ->
-        # Use the actual end_time if it exists
-        end_time
-    end
-  end
-
-  defp get_end_date_for_calendar(event) do
-    case {event.start_time, event.end_time, event.end_date} do
-      {start_time, nil, _end_date} when not is_nil(start_time) ->
-        # Calculate end time and check if it goes past midnight
-        calculated_end_time = Time.add(start_time, 3 * 60 * 60, :second)
-
-        # If calculated end time is earlier than start time, it means we went past midnight
-        if Time.compare(calculated_end_time, start_time) == :lt do
-          # Add one day to the start date
-          case event.start_date do
-            %DateTime{} = start_date ->
-              DateTime.add(start_date, 1, :day)
-
-            _ ->
-              # If start_date is not a DateTime, try to add a day using Date
-              case event.start_date do
-                %Date{} = start_date ->
-                  Date.add(start_date, 1)
-
-                _ ->
-                  event.start_date
-              end
-          end
-        else
-          # End time is on the same day, use start_date
-          event.start_date
-        end
-
-      {_start_time, _end_time, end_date} ->
-        # Use the actual end_date if it exists
-        end_date
-    end
-  end
 
   defp new_active_agenda(agenda_id, active_agenda_id, new_agendas)
        when agenda_id == active_agenda_id do

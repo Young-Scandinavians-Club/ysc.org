@@ -94,19 +94,12 @@ defmodule YscWeb.TicketQrLive do
             </div>
             <%!-- Fixed slot so add-to-calendar web component cannot expand the strip --%>
             <div class="shrink-0 min-h-10 min-w-10 flex items-start justify-end">
-              <add-to-calendar-button
+              <.add_to_calendar_button
                 :if={@event.start_date}
-                name={@event.title}
-                startDate={date_for_add_to_cal(@event.start_date)}
-                {if get_end_date_for_calendar(@event), do: [endDate: date_for_add_to_cal(get_end_date_for_calendar(@event))], else: []}
-                options="'Apple','Google','iCal','Outlook.com','Yahoo'"
-                startTime={@event.start_time}
-                {if get_end_time_for_calendar(@event), do: [endTime: get_end_time_for_calendar(@event)], else: []}
-                timeZone="America/Los_Angeles"
-                location={@event.location_name}
-                size="4"
-                lightMode="dark"
-              ></add-to-calendar-button>
+                id="ticket-add-to-calendar"
+                event={@event}
+                light_mode="dark"
+              />
             </div>
           </div>
       <% end %>
@@ -566,42 +559,6 @@ defmodule YscWeb.TicketQrLive do
   end
 
   defp safe_return_to(_), do: ~p"/users/tickets"
-
-  defp date_for_add_to_cal(nil), do: nil
-
-  defp date_for_add_to_cal(%DateTime{} = dt),
-    do: dt |> DateTime.to_date() |> Date.to_iso8601()
-
-  defp date_for_add_to_cal(%NaiveDateTime{} = dt),
-    do: dt |> NaiveDateTime.to_date() |> Date.to_iso8601()
-
-  defp date_for_add_to_cal(%Date{} = d), do: Date.to_iso8601(d)
-
-  defp get_end_time_for_calendar(event) do
-    case {event.start_time, event.end_time} do
-      {start_time, nil} when not is_nil(start_time) ->
-        Time.add(start_time, 3 * 60 * 60, :second)
-
-      {_start_time, end_time} ->
-        end_time
-    end
-  end
-
-  defp get_end_date_for_calendar(event) do
-    case {event.start_time, event.end_time, event.end_date} do
-      {start_time, nil, _end_date} when not is_nil(start_time) ->
-        calculated_end_time = Time.add(start_time, 3 * 60 * 60, :second)
-
-        if Time.compare(calculated_end_time, start_time) == :lt do
-          Date.add(DateTime.to_date(event.start_date), 1)
-        else
-          nil
-        end
-
-      {_start_time, _end_time, end_date} ->
-        if end_date, do: DateTime.to_date(end_date), else: nil
-    end
-  end
 
   defp format_event_date(start_date, start_time) do
     date_str = Calendar.strftime(start_date, "%A, %B %-d, %Y")

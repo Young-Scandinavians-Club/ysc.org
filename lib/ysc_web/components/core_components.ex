@@ -2972,6 +2972,32 @@ defmodule YscWeb.CoreComponents do
     YscWeb.Components.Events.EventCard.event_card(assigns)
   end
 
+  @doc """
+  Add-to-calendar web component for an event.
+
+  Used on event details and ticket QR. Callers still gate visibility
+  (upcoming vs past, presence of `start_date`). Pass `light_mode="dark"` on
+  dark screens.
+
+  ## Examples
+
+      <.add_to_calendar_button event={@event} />
+
+      <.add_to_calendar_button
+        id="ticket-add-to-calendar"
+        event={@event}
+        light_mode="dark"
+      />
+  """
+  attr :event, :map, required: true
+  attr :id, :string, default: nil
+  attr :light_mode, :string, default: "bodyScheme"
+  attr :class, :any, default: nil
+
+  def add_to_calendar_button(assigns) do
+    YscWeb.Components.Events.AddToCalendarButton.add_to_calendar_button(assigns)
+  end
+
   attr :post, :any, required: true
   attr :class, :string, default: nil
   attr :variant, :string, default: "default"
