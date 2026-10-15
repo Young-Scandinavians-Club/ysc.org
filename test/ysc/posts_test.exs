@@ -623,6 +623,43 @@ defmodule Ysc.PostsTest do
       result = Posts.list_posts(10)
       assert result != []
     end
+
+    test "omits author secrets and image upload_data", %{
+      author: author
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Slim list card",
+            "preview_text" => "Card preview",
+            "body" => "<p>Full article for reading time.</p>",
+            "url_name" => "slim-list-card",
+            "state" => "published",
+            "featured_post" => false,
+            "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+          },
+          author
+        )
+
+      {posts, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Posts.list_posts(10) end,
+          pattern: ~r/hashed_password|board_bio|upload_data/i,
+          caller_pids: [self()]
+        )
+
+      listed = Enum.find(posts, &(&1.id == post.id))
+      assert listed
+      assert listed.title == "Slim list card"
+      assert listed.preview_text == "Card preview"
+      assert listed.author.id == author.id
+      assert listed.author.first_name
+      assert is_nil(listed.author.hashed_password)
+      assert Ecto.assoc_loaded?(listed.author)
+      assert Ecto.assoc_loaded?(listed.author.current_avatar)
+      assert Ecto.assoc_loaded?(listed.featured_image)
+      assert fat_cols == 0
+    end
   end
 
   describe "count_published_posts/0" do
@@ -870,6 +907,74 @@ defmodule Ysc.PostsTest do
     end
   end
 
+  describe "get_featured_post_for_listing/0" do
+    test "struct-selects card fields and skips author secrets", %{
+      author: author
+    } do
+      {:ok, featured} =
+        Posts.create_post(
+          %{
+            "title" => "Featured listing",
+            "body" => "<p>Pinned story.</p>",
+            "url_name" => "featured-listing-post",
+            "state" => "published",
+            "featured_post" => true,
+            "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+          },
+          author
+        )
+
+      {result, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Posts.get_featured_post_for_listing() end,
+          pattern: ~r/hashed_password|board_bio|upload_data/i,
+          caller_pids: [self()]
+        )
+
+      assert result.id == featured.id
+      assert result.author.id == author.id
+      assert is_nil(result.author.hashed_password)
+      assert Ecto.assoc_loaded?(result.author.current_avatar)
+      assert Ecto.assoc_loaded?(result.featured_image)
+      assert fat_cols == 0
+    end
+  end
+
+  describe "list_recent_published_posts_for_feed/1" do
+    test "keeps rendered_body and author names without cover or secrets", %{
+      author: author
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Feed post",
+            "preview_text" => "Feed summary",
+            "body" => "<p>Feed HTML body.</p>",
+            "url_name" => "feed-post-slim",
+            "state" => "published",
+            "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+          },
+          author
+        )
+
+      {posts, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Posts.list_recent_published_posts_for_feed(10) end,
+          pattern: ~r/hashed_password|board_bio|upload_data/i,
+          caller_pids: [self()]
+        )
+
+      listed = Enum.find(posts, &(&1.id == post.id))
+      assert listed
+      assert listed.preview_text == "Feed summary"
+      assert listed.updated_at
+      assert listed.author.first_name
+      assert is_nil(listed.author.hashed_password)
+      refute Ecto.assoc_loaded?(listed.featured_image)
+      assert fat_cols == 0
+    end
+  end
+
   describe "list_posts/2" do
     test "returns paginated published posts using keyset cursor", %{
       author: author
@@ -1032,6 +1137,40 @@ defmodule Ysc.PostsTest do
 
     test "returns error when Flop params exceed configured limits" do
       assert {:error, _} = Posts.list_posts_paginated(%{limit: 9999, offset: 0})
+    end
+
+    test "omits post body HTML and author secrets on the admin list", %{
+      author: author
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Admin list slim",
+            "body" => "<p>Should not be selected on the list.</p>",
+            "url_name" => "admin-list-slim",
+            "state" => "published"
+          },
+          author
+        )
+
+      {result, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Posts.list_posts_paginated(%{limit: 50, offset: 0})
+          end,
+          pattern: ~r/hashed_password|board_bio|raw_body|rendered_body/i,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, {entries, _meta}} = result
+      listed = Enum.find(entries, &(&1.id == post.id))
+      assert listed
+      assert listed.title == "Admin list slim"
+      assert is_nil(listed.raw_body)
+      assert is_nil(listed.rendered_body)
+      assert listed.author.first_name
+      assert is_nil(listed.author.hashed_password)
+      assert fat_cols == 0
     end
   end
 

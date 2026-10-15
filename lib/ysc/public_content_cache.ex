@@ -45,13 +45,7 @@ defmodule Ysc.PublicContentCache do
   """
   def get_featured_post do
     fetch_cached(:posts, "public:posts:featured", fn ->
-      case Ysc.Posts.get_featured_post() do
-        nil ->
-          nil
-
-        post ->
-          Ysc.Repo.preload(post, [{:author, :current_avatar}, :featured_image])
-      end
+      Ysc.Posts.get_featured_post_for_listing()
     end)
   end
 
