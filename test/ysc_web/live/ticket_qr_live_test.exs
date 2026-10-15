@@ -105,6 +105,37 @@ defmodule YscWeb.TicketQrLiveTest do
       assert has_element?(view, "[data-slide]")
     end
 
+    test "renders the shared add-to-calendar button in dark mode", %{
+      conn: conn,
+      member: member,
+      event: event,
+      order: order
+    } do
+      {:ok, event} =
+        Ysc.Events.update_event(event, %{
+          location_name: "YSC Hall",
+          start_time: ~T[19:00:00],
+          end_time: ~T[22:00:00]
+        })
+
+      conn = log_in_user(conn, member)
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      render_async(view)
+
+      assert has_element?(view, "#ticket-add-to-calendar")
+      assert has_element?(view, ~s(#ticket-add-to-calendar[light-mode="dark"]))
+
+      assert has_element?(
+               view,
+               ~s(#ticket-add-to-calendar[name="#{event.title}"])
+             )
+
+      assert has_element?(
+               view,
+               ~s(#ticket-add-to-calendar[location="YSC Hall"])
+             )
+    end
+
     test "renders event date and location when present", %{
       conn: conn,
       member: member,

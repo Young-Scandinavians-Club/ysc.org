@@ -49,6 +49,60 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert html =~ "Summer Party"
     end
 
+    test "renders the shared add-to-calendar button for upcoming events", %{
+      conn: conn
+    } do
+      event =
+        event_with_state(:upcoming,
+          attrs: %{
+            title: "Calendar Party",
+            location_name: "YSC Hall",
+            start_time: ~T[19:00:00],
+            end_time: ~T[22:00:00]
+          }
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "#event-add-to-calendar")
+
+      assert has_element?(
+               view,
+               ~s(#event-add-to-calendar[name="Calendar Party"])
+             )
+
+      start_date = event.start_date |> DateTime.to_date() |> Date.to_iso8601()
+      end_date = event.end_date |> DateTime.to_date() |> Date.to_iso8601()
+
+      assert has_element?(
+               view,
+               ~s(#event-add-to-calendar[start-date="#{start_date}"])
+             )
+
+      assert has_element?(
+               view,
+               ~s(#event-add-to-calendar[end-date="#{end_date}"])
+             )
+
+      assert has_element?(
+               view,
+               ~s(#event-add-to-calendar[time-zone="America/Los_Angeles"])
+             )
+
+      assert has_element?(
+               view,
+               ~s(#event-add-to-calendar[location="YSC Hall"])
+             )
+    end
+
+    test "hides add-to-calendar on past events", %{conn: conn} do
+      event = event_with_state(:past, attrs: %{title: "Last Year's Party"})
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      refute has_element?(view, "#event-add-to-calendar")
+    end
+
     test "redirects when event does not exist", %{conn: conn} do
       assert {:error, {:redirect, %{to: path}}} =
                live(conn, ~p"/events/#{Ecto.ULID.generate()}")
