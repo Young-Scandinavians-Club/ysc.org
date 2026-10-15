@@ -669,6 +669,52 @@ defmodule Ysc.Accounts.MembershipCacheTest do
       assert membership_after.type == :lifetime
     end
 
+    test "cascades to linked sub-accounts so unpaid nested cache cannot linger" do
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(membership_plans, &(&1.id == :family))
+      assert family_plan
+
+      primary = user_fixture()
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: primary.id,
+          stripe_id: "sub_cascade_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Family Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: family_plan.stripe_price_id,
+          stripe_product_id: "prod_cascade_#{System.unique_integer([:positive])}",
+          stripe_id: "si_cascade_#{System.unique_integer([:positive])}",
+          quantity: 1
+        })
+
+      sub =
+        user_fixture()
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Repo.update!()
+
+      assert %Subscription{} = MembershipCache.get_active_membership(sub)
+      assert MembershipCache.get_membership_plan_type(sub) == :family
+
+      # Simulate primary cancel/expire/Family→Single side-effect: production
+      # invalidates the primary (webhook / update_subscription / expiration
+      # worker) but dependents keep their own keys unless cascaded.
+      {:ok, _} =
+        Subscriptions.update_subscription(subscription, %{
+          stripe_status: "cancelled"
+        })
+
+      refute Accounts.has_active_membership?(sub)
+      assert MembershipCache.get_active_membership(sub) == nil
+      assert MembershipCache.get_membership_plan_type(sub) == nil
+    end
+
     test "handles invalid input gracefully" do
       assert :ok = MembershipCache.invalidate_user(:invalid)
     end

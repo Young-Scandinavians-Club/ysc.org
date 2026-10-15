@@ -206,17 +206,32 @@ defmodule Ysc.Accounts.MembershipCache do
     from(u in User, where: u.id in ^ids)
   end
 
+  @doc false
+  def ci_query_explain_sub_account_ids_query do
+    sub_account_ids_for_primary_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
+    )
+  end
+
   @doc """
   Invalidates the membership cache for a specific user.
 
   This should be called when a user's membership changes (subscription updated, lifetime awarded, etc.).
+
+  Also clears linked sub-accounts. Dependents inherit via their own cache keys
+  (`membership:<sub_id>:active`), and `membership_valid?/1` only checks the
+  cached subscription struct's status/dates — not whether the primary still
+  hosts Family/Lifetime. Without cascading, a primary cancel, expire, or
+  Family→Single left dependents with up to TTL (5 minutes) of unpaid
+  MembershipCache hits (member-only tickets, `active_membership?` plugs).
   """
   def invalidate_user(user_id) when is_binary(user_id) or is_integer(user_id) do
-    active_key = build_cache_key(user_id, "active")
-    plan_type_key = build_cache_key(user_id, "plan_type")
+    delete_user_cache_keys(user_id)
 
-    Cachex.del(@cache_name, active_key)
-    Cachex.del(@cache_name, plan_type_key)
+    user_id
+    |> sub_account_ids_for_primary_query()
+    |> Repo.all()
+    |> Enum.each(&delete_user_cache_keys/1)
 
     Ysc.Logging.debug("Membership cache invalidated for user", user_id: user_id)
     :ok
@@ -224,6 +239,19 @@ defmodule Ysc.Accounts.MembershipCache do
 
   def invalidate_user(%{id: user_id}), do: invalidate_user(user_id)
   def invalidate_user(_), do: :ok
+
+  defp delete_user_cache_keys(user_id) do
+    Cachex.del(@cache_name, build_cache_key(user_id, "active"))
+    Cachex.del(@cache_name, build_cache_key(user_id, "plan_type"))
+    :ok
+  end
+
+  defp sub_account_ids_for_primary_query(primary_user_id) do
+    from(u in User,
+      where: u.primary_user_id == ^primary_user_id,
+      select: u.id
+    )
+  end
 
   @doc """
   Invalidates all membership caches.
