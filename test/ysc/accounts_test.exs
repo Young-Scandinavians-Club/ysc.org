@@ -1018,6 +1018,39 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "get_user_email_identity/1" do
+    test "returns id/email/first_name without password hashes" do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(%{
+          board_bio: "must not load this bio"
+        })
+        |> Repo.update!()
+
+      {found, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_user_email_identity(user.id) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert found.id == user.id
+      assert found.email == user.email
+      assert found.first_name == user.first_name
+      assert is_nil(found.hashed_password)
+      assert is_nil(found.board_bio)
+      assert password_cols == 0
+    end
+
+    test "returns nil for a missing user" do
+      refute Accounts.get_user_email_identity(Ecto.ULID.generate())
+    end
+
+    test "returns nil for nil" do
+      refute Accounts.get_user_email_identity(nil)
+    end
+  end
+
   describe "get_user_from_stripe_id/1" do
     test "returns user by stripe_id" do
       user = user_fixture(%{phone_number: "+14159098268"})

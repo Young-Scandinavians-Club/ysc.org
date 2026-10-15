@@ -34,6 +34,12 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorker do
   @doc """
   Releases modification holds that have passed their expiry time.
   """
+  # Include canceled/draft/refunded so a complete booking that was released
+  # *before* Stripe-first cancel reconcile (legacy orphans) can still refund a
+  # captured modification PI and free extra nights. New cancels clear these
+  # fields after reconcile; this is the heal path.
+  @modification_hold_expiry_statuses [:complete, :canceled, :draft, :refunded]
+
   def expire_expired_modification_holds do
     now = DateTime.utc_now()
 
@@ -41,7 +47,8 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorker do
       Booking
       |> where(
         [b],
-        b.status == :complete and not is_nil(b.modification_hold_expires_at) and
+        b.status in ^@modification_hold_expiry_statuses and
+          not is_nil(b.modification_hold_expires_at) and
           b.modification_hold_expires_at < ^now
       )
       |> Repo.all()
@@ -121,6 +128,22 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorker do
     params = Bookings.modification_hold_form_params(booking)
 
     cond do
+      booking.status != :complete ->
+        # Heal: stay already canceled/drafted/refunded; cannot apply dates.
+        # Refund the captured modification charge under :booking_canceled.
+        Ysc.Logging.error(
+          "Modification payment succeeded but booking is no longer complete; refunding unfulfilled modification",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent.id,
+          status: booking.status
+        )
+
+        Bookings.release_after_unfulfilled_modification_refund(
+          booking,
+          payment_intent,
+          :booking_canceled
+        )
+
       is_nil(params) ->
         Ysc.Logging.error(
           "Modification payment succeeded during hold expiry but hold attrs could not be applied",
@@ -289,10 +312,12 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorker do
     alias Ysc.Ci.QueryExplain.Fixtures
 
     now = Fixtures.now()
+    statuses = @modification_hold_expiry_statuses
 
     from(b in Booking,
       where:
-        b.status == :complete and not is_nil(b.modification_hold_expires_at) and
+        b.status in ^statuses and
+          not is_nil(b.modification_hold_expires_at) and
           b.modification_hold_expires_at < ^now
     )
   end

@@ -78,6 +78,12 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       assert text =~ "Velkommen! (Welcome!) Your Membership is Active"
       assert text =~ "Your saved payment method has been charged"
+
+      assert text =~
+               "unless you turn off automatic renewal from your Membership page"
+
+      refute text =~ "until you cancel"
+      refute text =~ "account settings"
       refute text =~ "Velkommen! Your Membership is Active"
     end
 

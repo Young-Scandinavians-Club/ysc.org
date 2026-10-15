@@ -534,6 +534,13 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
 
+      # Stripe-first cancel (no status pre-check): cancel refused → retrieve
+      # shows processing → leave pending.
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
                                                           _opts ->
         {:ok, payment_intent("processing", payment_intent_id)}
@@ -544,12 +551,17 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
 
-    test "skips expiration when Stripe cannot retrieve payment intent" do
+    test "skips expiration when Stripe cannot retrieve payment intent after cancel fails" do
       order = ticket_order_fixture()
       payment_intent_id = "pi_missing_expire_#{order.id}"
 
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
 
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
                                                           _opts ->
@@ -574,11 +586,6 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
 
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                          _opts ->
-        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
-      end)
-
       expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                         _opts ->
         {:ok, payment_intent("canceled", payment_intent_id)}
@@ -595,11 +602,6 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
 
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
-
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                          _opts ->
-        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
-      end)
 
       expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                         _opts ->
@@ -631,11 +633,6 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
               "user_id" => order.user_id
             }
           })
-
-        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                            _opts ->
-          {:ok, payment_intent("requires_payment_method", payment_intent_id)}
-        end)
 
         expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                           _opts ->
@@ -679,11 +676,6 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
 
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                          _opts ->
-        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
-      end)
-
       expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                         _opts ->
         {:error, stripe_unexpected_state_error()}
@@ -717,11 +709,6 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
             "user_id" => order.user_id
           }
         })
-
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                          _opts ->
-        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
-      end)
 
       expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                         _opts ->

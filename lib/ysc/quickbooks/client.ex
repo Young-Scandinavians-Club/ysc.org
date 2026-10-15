@@ -3278,6 +3278,151 @@ defmodule Ysc.Quickbooks.Client do
     end
   end
 
+  @doc """
+  Creates a QuickBooks Account (defaults to Income / NonProfitIncome).
+
+  Returns {:ok, account_id} on success and caches the account ID by name.
+  """
+  @spec create_account(String.t(), keyword()) ::
+          {:ok, String.t()} | {:error, atom() | String.t()}
+  def create_account(name, opts \\ []) when is_binary(name) do
+    with {:ok, access_token} <- get_access_token(),
+         {:ok, company_id} <- get_company_id() do
+      account_type = Keyword.get(opts, :account_type, "Income")
+      account_sub_type = Keyword.get(opts, :account_sub_type, "NonProfitIncome")
+
+      idempotency_key =
+        case Keyword.get(opts, :idempotency_key) do
+          nil -> Keyword.get(opts, :requestid)
+          key -> key
+        end
+
+      url_opts = if idempotency_key, do: [requestid: idempotency_key], else: []
+      url = build_url(company_id, "account", url_opts)
+      headers = build_headers(access_token)
+
+      body = %{
+        "Name" => name,
+        "AccountType" => account_type,
+        "AccountSubType" => account_sub_type
+      }
+
+      Ysc.Logging.info("[QB Client] create_account: Creating account",
+        name: name,
+        account_type: account_type,
+        account_sub_type: account_sub_type
+      )
+
+      request = Finch.build(:post, url, headers, Jason.encode!(body))
+
+      result =
+        request_with_429_retry(fn ->
+          Finch.request(request, Ysc.Finch)
+        end)
+
+      cache_key = "quickbooks:account:#{name}"
+
+      case result do
+        {:ok, %Finch.Response{status: status, body: response_body}}
+        when status in 200..299 ->
+          decode_created_account(response_body, name, cache_key)
+
+        {:error, {:rate_limited, _resp}} ->
+          Ysc.Logging.warning(
+            "QuickBooks rate limit exceeded after retries",
+            endpoint: "account",
+            name: name,
+            max_retries: max_429_retries()
+          )
+
+          {:error, :rate_limited}
+
+        {:ok, %Finch.Response{status: 401, body: _response_body}} ->
+          Ysc.Logging.warning(
+            "[QB Client] create_account: Authentication failed, attempting token refresh"
+          )
+
+          case refresh_access_token() do
+            {:ok, new_access_token} ->
+              retry_headers = build_headers(new_access_token)
+
+              retry_request =
+                Finch.build(:post, url, retry_headers, Jason.encode!(body))
+
+              case Finch.request(retry_request, Ysc.Finch) do
+                {:ok, %Finch.Response{status: s, body: retry_body}}
+                when s in 200..299 ->
+                  decode_created_account(retry_body, name, cache_key)
+
+                _ ->
+                  {:error, :create_failed}
+              end
+
+            error ->
+              error
+          end
+
+        {:ok, %Finch.Response{status: status, body: response_body}} ->
+          # Handle race condition if another worker created the same account concurrently
+          case query_account_by_name_from_api(name, cache_key) do
+            {:ok, account_id} ->
+              {:ok, account_id}
+
+            _ ->
+              error = parse_error_response(response_body)
+
+              Ysc.Logging.error(
+                "[QB Client] create_account: Failed to create account",
+                name: name,
+                status: status,
+                error: error
+              )
+
+              {:error, error}
+          end
+
+        {:error, error} ->
+          Ysc.Logging.error("[QB Client] create_account: Request failed",
+            name: name,
+            error: inspect(error)
+          )
+
+          {:error, :request_failed}
+      end
+    end
+  end
+
+  defp decode_created_account(response_body, name, cache_key) do
+    case Jason.decode(response_body) do
+      {:ok, data} ->
+        account = get_response_entity(data, "Account")
+        account_id = Map.get(account, "Id")
+
+        if is_binary(account_id) and account_id != "" do
+          cache_account_id(cache_key, account_id)
+
+          Ysc.Logging.info(
+            "[QB Client] create_account: Successfully created account",
+            name: name,
+            account_id: account_id
+          )
+
+          {:ok, account_id}
+        else
+          {:error, :invalid_response}
+        end
+
+      {:error, error} ->
+        Ysc.Logging.error(
+          "[QB Client] create_account: Failed to parse response",
+          name: name,
+          error: inspect(error)
+        )
+
+        {:error, :invalid_response}
+    end
+  end
+
   defp maybe_put(map, key, value) when is_map(map) do
     if value != nil, do: Map.put(map, key, value), else: map
   end

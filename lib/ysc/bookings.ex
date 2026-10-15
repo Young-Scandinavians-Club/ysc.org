@@ -1813,6 +1813,7 @@ defmodule Ysc.Bookings do
 
   @refundable_unfulfilled_modification_errors ~w(
     blackout_conflict
+    booking_canceled
     checkin_in_past
     entitlement_consume_failed
     entitlement_no_longer_valid
@@ -1951,13 +1952,18 @@ defmodule Ysc.Bookings do
     end
   end
 
+  # `:canceled` / `:draft` / `:refunded` are heal paths: a complete booking was
+  # released while a captured modification PI was still unapplied (before
+  # cancel_complete Stripe-reconcile). ModHoldExpiryWorker and explicit refund
+  # helpers must still return the money — requiring `:complete` only made the
+  # orphan permanent once status left complete.
   defp refund_unfulfilled_modification_payment?(
          %Booking{} = booking,
          %Stripe.PaymentIntent{} = payment_intent,
          reason
        ) do
     payment_intent.status == "succeeded" and
-      booking.status == :complete and
+      booking.status in [:complete, :canceled, :draft, :refunded] and
       modification_payment_intent_metadata?(payment_intent) and
       modification_payment_metadata_matches_booking?(payment_intent, booking) and
       not modification_ledger_recorded?(booking.id, payment_intent.id) and
@@ -4813,6 +4819,11 @@ defmodule Ysc.Bookings do
     # Holds must Stripe-reconcile *before* `release_hold/1`: a succeeded
     # PaymentIntent is treated as `:ok` by `StripeService.cancel_payment_intent/1`,
     # which would orphan the charge, clear the entitlement, and skip HoldExpiryWorker.
+    # Complete bookings must likewise Stripe-reconcile any modification-hold
+    # PaymentIntent before cancel: ModHoldExpiryWorker only selects
+    # `status == :complete`, and unfulfilled mod refunds previously required
+    # that status — cancel without reconcile permanently orphaned a captured
+    # date-change charge (and left extra nights held).
     cancel_result =
       case booking.status do
         :hold ->

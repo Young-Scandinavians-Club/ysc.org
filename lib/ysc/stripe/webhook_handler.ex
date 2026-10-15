@@ -400,6 +400,10 @@ defmodule Ysc.Stripe.WebhookHandler do
   def process_webhook_event(webhook_event, event) do
     require Ysc.Logging
 
+    # Stripe reads happen before the webhook transaction so a slow Payment Link
+    # or fee lookup does not hold a database connection.
+    Ysc.Stripe.DonationPaymentLink.prefetch_paid_session(event)
+
     # CRITICAL: Use a transaction to ensure atomicity
     # Either the handler succeeds AND state is marked processed, or both rollback
     result =
@@ -818,8 +822,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       # Schedule the re-engagement email in the same DB transaction as
       # mark_as_cancelled so a transient Oban insert failure rolls back and
       # Stripe retries the webhook (idempotent by membership_ended key).
-      user =
-        subscription.user_id && Ysc.Accounts.get_user(subscription.user_id)
+      user = Ysc.Accounts.get_user_email_identity(subscription.user_id)
 
       result =
         Ecto.Multi.new()
@@ -1653,6 +1656,17 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     # You could add logic here to update refund status in ledger
     :ok
+  end
+
+  # Stripe Payment Links (donate.stripe.com) complete as Checkout Sessions.
+  # Book configured donation links into the ledger; payout linking and refunds
+  # then find the payment by its PaymentIntent id.
+  defp handle(event_name, session)
+       when event_name in [
+              "checkout.session.completed",
+              "checkout.session.async_payment_succeeded"
+            ] and is_map(session) do
+    Ysc.Stripe.DonationPaymentLink.book_paid_session(session)
   end
 
   defp handle(event_name, event_object) when is_binary(event_name) do

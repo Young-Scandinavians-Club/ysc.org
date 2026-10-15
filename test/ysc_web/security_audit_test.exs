@@ -5860,6 +5860,51 @@ defmodule YscWeb.SecurityAuditTest do
       assert Accounts.get_user_by_session_token(token).id == admin.id
     end
 
+    # Admin profile save (role + account status) uses update_user_with_address/3,
+    # not update_user/3. Finding 87's remount guard is not enough: an already-open
+    # impersonating LiveView keeps current_user as the victim until disconnect.
+    test "demoting via update_user_with_address broadcasts LiveView disconnect" do
+      admin = user_fixture(%{role: "admin"})
+      actor = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(admin)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address(
+                 admin,
+                 profile_save_params(admin, %{"role" => "member"}),
+                 actor
+               )
+
+      assert updated.role == :member
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      assert Accounts.get_user_by_session_token(token).id == admin.id
+    end
+
+    test "saving an admin profile without demotion does not broadcast disconnect" do
+      admin = user_fixture(%{role: "admin", first_name: "StillAdmin"})
+      actor = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(admin)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address(
+                 admin,
+                 profile_save_params(admin, %{"first_name" => "StillAdmin"}),
+                 actor
+               )
+
+      assert updated.role == :admin
+      refute_received %Phoenix.Socket.Broadcast{event: "disconnect"}
+    end
+
     test "revoke_all_user_sessions broadcasts LiveView disconnect for web sessions" do
       admin = user_fixture(%{role: "admin"})
       token = Accounts.generate_user_session_token(admin)
@@ -6006,5 +6051,21 @@ defmodule YscWeb.SecurityAuditTest do
     post(conn, ~p"/admin/impersonate/#{target.id}", %{
       "_csrf_token" => token
     })
+  end
+
+  defp profile_save_params(user, overrides) do
+    %{
+      "first_name" => user.first_name,
+      "last_name" => user.last_name,
+      "role" => to_string(user.role),
+      "billing_address" => %{
+        "address" => "",
+        "city" => "",
+        "region" => "",
+        "postal_code" => "",
+        "country" => ""
+      }
+    }
+    |> Map.merge(overrides)
   end
 end

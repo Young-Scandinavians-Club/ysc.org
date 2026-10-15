@@ -24,11 +24,44 @@ defmodule Ysc.GoogleWallet do
 
   alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.Repo
-  alias Ysc.Events.EventDateTime
-  alias Ysc.Events.Ticket
+  alias Ysc.Events.{Event, EventDateTime, Ticket, TicketDetail, TicketTier}
+  alias Ysc.Media.Image
   alias Ysc.Scanning.QrToken
   alias Ysc.GoogleWallet.Credentials
   alias Ysc.Subscriptions
+
+  # Pass copy only needs ticket identity, tier name, attendee name, and
+  # event card fields (title / when / where / cover). Omits event body HTML
+  # (`raw_details` / `rendered_details`), attendee answers, and tier sale
+  # windows that `preload([:ticket_tier, :registration, event: :cover_image])`
+  # would SELECT.
+  @wallet_ticket_fields [
+    :id,
+    :reference_id,
+    :status,
+    :user_id,
+    :event_id,
+    :ticket_tier_id
+  ]
+  @wallet_event_fields [
+    :id,
+    :title,
+    :reference_id,
+    :start_date,
+    :start_time,
+    :location_name,
+    :address,
+    :place_id,
+    :image_id
+  ]
+  @wallet_cover_image_fields [
+    :id,
+    :optimized_image_path,
+    :raw_image_path,
+    :thumbnail_path
+  ]
+  @wallet_ticket_tier_fields [:id, :name]
+  @wallet_registration_fields [:id, :ticket_id, :first_name, :last_name]
 
   @save_url_base "https://pay.google.com/gp/v/save"
   @wallet_api_base "https://walletobjects.googleapis.com/walletobjects/v1"
@@ -215,15 +248,43 @@ defmodule Ysc.GoogleWallet do
     if ticket_ids == [] do
       %{}
     else
-      Ticket
-      |> where(
-        [t],
-        t.id in ^ticket_ids and t.user_id == ^user_id and t.status == :confirmed
-      )
-      |> preload([:ticket_tier, :registration, event: :cover_image])
+      ticket_ids
+      |> tickets_for_wallet_query(user_id)
       |> Repo.all()
       |> Map.new(&{&1.id, &1})
     end
+  end
+
+  defp tickets_for_wallet_query(ticket_ids, user_id) do
+    from(t in Ticket,
+      where:
+        t.id in ^ticket_ids and t.user_id == ^user_id and t.status == :confirmed,
+      select: struct(t, ^@wallet_ticket_fields),
+      preload: [
+        ticket_tier: ^wallet_ticket_tier_query(),
+        registration: ^wallet_registration_query(),
+        event: ^wallet_event_query()
+      ]
+    )
+  end
+
+  defp wallet_event_query do
+    from(e in Event,
+      select: struct(e, ^@wallet_event_fields),
+      preload: [cover_image: ^wallet_cover_image_query()]
+    )
+  end
+
+  defp wallet_cover_image_query do
+    from(i in Image, select: struct(i, ^@wallet_cover_image_fields))
+  end
+
+  defp wallet_ticket_tier_query do
+    from(tt in TicketTier, select: struct(tt, ^@wallet_ticket_tier_fields))
+  end
+
+  defp wallet_registration_query do
+    from(td in TicketDetail, select: struct(td, ^@wallet_registration_fields))
   end
 
   defp sign_ticket_jwt(ticket, creds) do
@@ -510,25 +571,14 @@ defmodule Ysc.GoogleWallet do
 
   @doc false
   def ci_query_explain_query do
-    ticket_id = Fixtures.ulid()
-    user_id = Fixtures.ulid()
-
-    from(t in Ticket,
-      where:
-        t.id == ^ticket_id and t.user_id == ^user_id and t.status == :confirmed,
-      preload: [:ticket_tier, :registration, event: :cover_image]
-    )
+    tickets_for_wallet_query([Fixtures.ulid()], Fixtures.ulid())
   end
 
   @doc false
   def ci_query_explain_batch_tickets_query do
-    ticket_ids = [Fixtures.ulid(), Fixtures.ulid()]
-    user_id = Fixtures.ulid()
-
-    from(t in Ticket,
-      where:
-        t.id in ^ticket_ids and t.user_id == ^user_id and t.status == :confirmed,
-      preload: [:ticket_tier, :registration, event: :cover_image]
+    tickets_for_wallet_query(
+      [Fixtures.ulid(), Fixtures.ulid()],
+      Fixtures.ulid()
     )
   end
 end

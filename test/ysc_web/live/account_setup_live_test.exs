@@ -522,7 +522,12 @@ defmodule YscWeb.AccountSetupLiveTest do
                "charge this payment method for your first year of membership"
 
       assert html =~ "renews automatically each year"
-      assert html =~ "automatic renewal"
+
+      assert html =~
+               "turn off automatic renewal from Membership (click your name in the top-right corner)"
+
+      refute html =~ "in account settings"
+      refute html =~ "until you cancel"
       refute html =~ "auto-renewal"
       assert html =~ "Save your payment method"
       assert html =~ "Save payment method &amp; continue"
@@ -1291,6 +1296,12 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert has_element?(view, "#pay-on-membership-page")
       assert html =~ "Activate Your Membership"
       assert html =~ "Or pay on the Membership page"
+
+      assert html =~
+               "turn off automatic renewal from Membership (click your name in the top-right corner)"
+
+      refute html =~ "in account settings"
+      refute html =~ "until you cancel"
     end
 
     test "shows payment step when active without membership or payment method",
@@ -1307,6 +1318,11 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       assert html =~ "Activate Your Membership"
       assert html =~ "Add or confirm a payment method"
+
+      assert html =~
+               "turn off automatic renewal from Membership (click your name in the top-right corner)"
+
+      refute html =~ "in account settings"
       assert has_element?(view, "ol li", "Payment")
       refute has_element?(view, "ol li", "Save payment method")
 

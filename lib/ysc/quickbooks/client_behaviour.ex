@@ -95,6 +95,12 @@ defmodule Ysc.Quickbooks.ClientBehaviour do
               {:ok, String.t()} | {:error, atom() | String.t()}
 
   @doc """
+  Creates an account in QuickBooks.
+  """
+  @callback create_account(String.t(), keyword()) ::
+              {:ok, String.t()} | {:error, atom() | String.t()}
+
+  @doc """
   Queries for a class by name in QuickBooks.
   """
   @callback query_class_by_name(String.t()) ::

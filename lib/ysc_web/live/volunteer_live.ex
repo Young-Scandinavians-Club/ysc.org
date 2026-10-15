@@ -4,14 +4,13 @@ defmodule YscWeb.VolunteerLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
+    <div class="py-6 lg:py-8 max-w-(--breakpoint-xl) mx-auto px-4">
       <.page_masthead
         id="volunteer-masthead"
         size={:compact}
         eyebrow="Get involved"
         title="Volunteer with the YSC"
-        subtitle="Want to contribute to a vibrant community and help create memorable experiences for others?"
-        class="mb-8 lg:mb-12"
+        class="mb-5 lg:mb-6"
       />
 
       <%!-- Split Header Section --%>

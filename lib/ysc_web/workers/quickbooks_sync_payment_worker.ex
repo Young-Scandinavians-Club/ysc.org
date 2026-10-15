@@ -26,7 +26,9 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorker do
 
   @non_retriable_errors [
     :payment_not_found,
-    :no_income_account_for_item
+    :no_income_account_for_item,
+    :payment_link_donation_uses_donation_item,
+    :payment_link_item_income_account_mismatch
   ]
 
   @impl Oban.Worker

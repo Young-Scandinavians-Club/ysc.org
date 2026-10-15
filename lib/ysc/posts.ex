@@ -10,7 +10,79 @@ defmodule Ysc.Posts do
   alias Ysc.Posts.Comment
   alias YscWeb.Authorization.Policy
   alias Ysc.Accounts.User
+  alias Ysc.Avatars.Avatar
+  alias Ysc.Media.Image
   alias Ysc.StaffPreview
+
+  # Home / news cards: title, preview/excerpt, reading time, author identity,
+  # cover. Omits `deleted_on`. Author skips hashed_password / bios / Stripe
+  # ids that `preload([{:author, :current_avatar}, :featured_image])` would
+  # SELECT. Keep `raw_body` so cards without `preview_text` still excerpt.
+  @public_post_card_fields [
+    :id,
+    :title,
+    :url_name,
+    :preview_text,
+    :raw_body,
+    :rendered_body,
+    :published_on,
+    :board_position_at_publish,
+    :image_id,
+    :user_id,
+    :featured_post,
+    :comment_count,
+    :inserted_at,
+    :updated_at
+  ]
+  @public_feed_post_fields [
+    :id,
+    :title,
+    :url_name,
+    :preview_text,
+    :raw_body,
+    :rendered_body,
+    :published_on,
+    :inserted_at,
+    :updated_at,
+    :user_id
+  ]
+  @admin_post_list_fields [
+    :id,
+    :title,
+    :url_name,
+    :state,
+    :featured_post,
+    :published_on,
+    :inserted_at,
+    :comment_count,
+    :user_id
+  ]
+  @public_post_author_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :email,
+    :most_connected_country,
+    :current_avatar_id
+  ]
+  @public_post_author_name_fields [:id, :first_name, :last_name]
+  @public_post_avatar_fields [
+    :id,
+    :user_id,
+    :processing_state,
+    :thumb_path,
+    :profile_path,
+    :large_path
+  ]
+  @public_post_image_fields [
+    :id,
+    :title,
+    :alt_text,
+    :optimized_image_path,
+    :raw_image_path,
+    :thumbnail_path,
+    :blur_hash
+  ]
 
   def get_post(id, preloads \\ []) do
     case Ecto.ULID.cast(id) do
@@ -185,6 +257,22 @@ defmodule Ysc.Posts do
     )
   end
 
+  @doc """
+  Featured published post for the public news page.
+
+  Same column set as `list_posts/1` so the cache does not SELECT a full
+  `users` / `images` row. Keep `get_featured_post/0` for admin pin/unpin,
+  which updates the full row.
+  """
+  def get_featured_post_for_listing do
+    from(p in Post,
+      where: p.state == :published,
+      where: p.featured_post == true
+    )
+    |> public_post_card_query()
+    |> Repo.one()
+  end
+
   def count_published_posts() do
     Post
     |> where(state: :published)
@@ -192,52 +280,47 @@ defmodule Ysc.Posts do
   end
 
   def list_posts(nil, limit) do
-    Repo.all(
-      from p in Post,
-        where: p.state == :published,
-        where: p.featured_post == false,
-        order_by: [{:desc, p.published_on}],
-        limit: ^limit
+    from(p in Post,
+      where: p.state == :published,
+      where: p.featured_post == false,
+      order_by: [desc: p.published_on],
+      limit: ^limit
     )
-    |> Repo.preload([{:author, :current_avatar}, :featured_image])
+    |> public_post_card_query()
+    |> Repo.all()
   end
 
   def list_posts(%DateTime{} = cursor, limit) do
-    Repo.all(
-      from p in Post,
-        where: p.state == :published,
-        where: p.featured_post == false,
-        where: p.published_on < ^cursor,
-        order_by: [{:desc, p.published_on}],
-        limit: ^limit
+    from(p in Post,
+      where: p.state == :published,
+      where: p.featured_post == false,
+      where: p.published_on < ^cursor,
+      order_by: [desc: p.published_on],
+      limit: ^limit
     )
-    |> Repo.preload([{:author, :current_avatar}, :featured_image])
+    |> public_post_card_query()
+    |> Repo.all()
   end
 
-  def list_posts(limit) do
-    Repo.all(
-      from p in Post,
-        where: p.state == :published,
-        where: p.featured_post == false,
-        order_by: [{:desc, :published_on}],
-        limit: ^limit
-    )
-    |> Repo.preload([{:author, :current_avatar}, :featured_image])
-  end
+  def list_posts(limit) when is_integer(limit), do: list_posts(nil, limit)
 
   @doc """
   Published posts for Atom feeds: includes featured posts, newest first by publish time.
+
+  Keeps `rendered_body` for entry HTML and `raw_body` for summary fallback.
+  Omits cover images and author columns the feed never renders.
   """
   def list_recent_published_posts_for_feed(limit \\ 50) do
-    Repo.all(
-      from p in Post,
-        where: p.state == :published,
-        order_by: [
-          desc: fragment("COALESCE(?, ?)", p.published_on, p.inserted_at)
-        ],
-        limit: ^limit
+    from(p in Post,
+      where: p.state == :published,
+      order_by: [
+        desc: fragment("COALESCE(?, ?)", p.published_on, p.inserted_at)
+      ],
+      limit: ^limit,
+      select: struct(p, ^@public_feed_post_fields),
+      preload: [author: ^public_post_author_name_query()]
     )
-    |> Repo.preload([{:author, :current_avatar}, :featured_image])
+    |> Repo.all()
   end
 
   def list_posts_paginated(params, opts \\ []) do
@@ -253,7 +336,8 @@ defmodule Ysc.Posts do
         |> maybe_filter_posted_from(date_from)
         |> maybe_filter_posted_to(date_to)
         |> join(:left, [p], u in assoc(p, :author), as: :author)
-        |> preload([author: o], author: o)
+        |> select([p], struct(p, ^@admin_post_list_fields))
+        |> preload(author: ^public_post_author_name_query())
       else
         search_term = String.trim(search_term)
 
@@ -319,8 +403,37 @@ defmodule Ysc.Posts do
                      ),
                      ^search_like
                    )))),
-      preload: [author: u]
+      select: struct(p, ^@admin_post_list_fields),
+      preload: [author: ^public_post_author_name_query()]
     )
+  end
+
+  defp public_post_card_query(query) do
+    query
+    |> select([p], struct(p, ^@public_post_card_fields))
+    |> preload(
+      author: ^public_post_author_query(),
+      featured_image: ^public_post_image_query()
+    )
+  end
+
+  defp public_post_author_query do
+    from(u in User,
+      select: struct(u, ^@public_post_author_fields),
+      preload: [current_avatar: ^public_post_avatar_query()]
+    )
+  end
+
+  defp public_post_author_name_query do
+    from(u in User, select: struct(u, ^@public_post_author_name_fields))
+  end
+
+  defp public_post_avatar_query do
+    from(a in Avatar, select: struct(a, ^@public_post_avatar_fields))
+  end
+
+  defp public_post_image_query do
+    from(i in Image, select: struct(i, ^@public_post_image_fields))
   end
 
   def update_post(post, params, %User{} = current_user, opts \\ []) do
@@ -691,6 +804,39 @@ defmodule Ysc.Posts do
         desc: fragment("COALESCE(?, ?)", p.published_on, p.inserted_at)
       ],
       limit: ^limit
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_posts_query do
+    from(p in Post,
+      where: p.state == :published,
+      where: p.featured_post == false,
+      order_by: [desc: p.published_on],
+      limit: 10
+    )
+    |> public_post_card_query()
+  end
+
+  @doc false
+  def ci_query_explain_featured_post_for_listing_query do
+    from(p in Post,
+      where: p.state == :published,
+      where: p.featured_post == true
+    )
+    |> public_post_card_query()
+  end
+
+  @doc false
+  def ci_query_explain_list_recent_published_posts_for_feed_query do
+    from(p in Post,
+      where: p.state == :published,
+      order_by: [
+        desc: fragment("COALESCE(?, ?)", p.published_on, p.inserted_at)
+      ],
+      limit: 50,
+      select: struct(p, ^@public_feed_post_fields),
+      preload: [author: ^public_post_author_name_query()]
     )
   end
 end

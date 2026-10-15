@@ -4124,23 +4124,22 @@ defmodule YscWeb.CoreComponents do
   (The cabin pages keep their own photo hero.)
 
   - `size={:default}` for section hubs (events, news, newsletters, history):
-    `text-4xl md:text-7xl`.
+    `text-3xl sm:text-4xl md:text-7xl`, top and bottom rules.
   - `size={:compact}` for content pages (board, choir, volunteer, contact,
-    legal and governance pages): `text-3xl md:text-5xl`, tighter padding.
+    legal and governance pages): `text-3xl md:text-4xl`, no rules or
+    padding of its own.
 
   Use the eyebrow to say what kind of page this is ("Events", "Governance",
-  "Legal"); the title says what's on it. Put an intro sentence in `subtitle`.
+  "Legal"); the title says what's on it. Use `subtitle` only when it adds
+  something the title doesn't (a "Last updated" date, a scope note); skip it
+  when it would just restate the title.
   Wrap it in `max-w-(--breakpoint-xl) mx-auto px-4` like other page sections.
 
   ## Examples
 
       <.page_masthead eyebrow="Events" title="What's Next" />
 
-      <.page_masthead
-        eyebrow="Archive"
-        title="Newsletters"
-        subtitle="Browse our past newsletters."
-      />
+      <.page_masthead eyebrow="Archive" title="Newsletters" />
 
       <.page_masthead
         size={:compact}
@@ -4182,14 +4181,14 @@ defmodule YscWeb.CoreComponents do
     <div
       id={@id}
       class={[
-        "text-center border-y border-zinc-200",
-        page_masthead_padding_class(@size),
+        "text-center",
+        page_masthead_frame_class(@size),
         @class
       ]}
     >
       <p
         :if={@eyebrow}
-        class="text-sm text-blue-600 mb-3 md:mb-4 type-eyebrow"
+        class="text-sm text-blue-600 mb-2 md:mb-3 type-eyebrow"
       >
         {@eyebrow}
       </p>
@@ -4202,7 +4201,7 @@ defmodule YscWeb.CoreComponents do
           {@title}
         </h1>
       <% end %>
-      <p :if={@subtitle} class="mt-4 mx-auto max-w-2xl text-zinc-600 text-lg">
+      <p :if={@subtitle} class="mt-3 mx-auto max-w-2xl text-zinc-600 text-lg">
         {@subtitle}
       </p>
       {render_slot(@inner_block)}
@@ -4210,14 +4209,19 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  defp page_masthead_padding_class(:default), do: "py-8 md:py-12"
-  defp page_masthead_padding_class(:compact), do: "py-8 md:py-10"
+  # Section hubs get the full rule-bounded masthead; compact pages are
+  # unframed (the page wrapper supplies the spacing) so content starts sooner.
+  defp page_masthead_frame_class(:default),
+    do: "border-y border-zinc-200 py-6 md:py-12"
+
+  defp page_masthead_frame_class(:compact),
+    do: nil
 
   defp page_masthead_title_class(:default),
-    do: "text-4xl md:text-7xl text-zinc-900 type-display"
+    do: "text-3xl sm:text-4xl md:text-7xl text-zinc-900 type-display"
 
   defp page_masthead_title_class(:compact),
-    do: "text-3xl md:text-5xl text-zinc-900 type-display"
+    do: "text-3xl md:text-4xl text-zinc-900 type-display"
 
   @doc """
   Title block for signed-in app pages (tickets, expense reports, family,
@@ -4403,6 +4407,82 @@ defmodule YscWeb.CoreComponents do
   defp at_glance_hover_border(:teal), do: "hover:border-teal-200"
   defp at_glance_icon_bg(:blue), do: "bg-blue-50"
   defp at_glance_icon_bg(:teal), do: "bg-teal-50"
+
+  @doc """
+  Eyebrow label over a prominent value, with an optional quieter detail line.
+
+  Used on ticket/booking receipts, forms, and admin detail panels so label +
+  value markup stays consistent.
+
+  ## Examples
+
+      <.labeled_value label="Event">{@event.title}</.labeled_value>
+
+      <.labeled_value label="Date & Time">
+        {DateDisplay.format_date_long(@event.start_date, "TBD")}
+        <:detail>7:00 PM</:detail>
+      </.labeled_value>
+
+      <.labeled_value label="Check-in" muted>
+        {DateDisplay.format_date_long(@booking.checkin_date, "—")}
+        <:detail>After 3:00 PM</:detail>
+      </.labeled_value>
+  """
+  attr :id, :string, default: nil
+  attr :label, :string, required: true
+
+  attr :muted, :boolean,
+    default: false,
+    doc: "Struck, muted value for cancelled records"
+
+  attr :class, :any, default: nil, doc: "Extra classes on the wrapper"
+
+  attr :label_class, :any,
+    default: nil,
+    doc: "Extra classes on the eyebrow label"
+
+  attr :value_class, :any,
+    default: nil,
+    doc: """
+    Classes on the value. Defaults to receipt-size `text-xl font-bold
+    text-zinc-900`, or muted zinc with a strike when `muted`.
+    """
+
+  attr :detail_class, :any, default: nil
+  attr :value_id, :string, default: nil
+  attr :detail_id, :string, default: nil
+
+  slot :inner_block, required: true
+  slot :detail
+
+  def labeled_value(assigns) do
+    value_class =
+      cond do
+        assigns.value_class -> assigns.value_class
+        assigns.muted -> "text-xl font-bold text-zinc-500 line-through"
+        true -> "text-xl font-bold text-zinc-900"
+      end
+
+    assigns = assign(assigns, :resolved_value_class, value_class)
+
+    ~H"""
+    <div id={@id} class={@class}>
+      <p class={["text-xs mb-1 type-eyebrow text-zinc-500", @label_class]}>
+        {@label}
+      </p>
+      <div id={@value_id} class={@resolved_value_class}>
+        {render_slot(@inner_block)}
+      </div>
+      <div
+        :if={@detail != []}
+        id={@detail_id}
+        class={["text-sm text-zinc-500", @detail_class]}
+      >
+        {render_slot(@detail)}
+      </div>
+    </div>
+    """
+  end
 
   @doc """
   Section heading with a leading emoji or custom icon.

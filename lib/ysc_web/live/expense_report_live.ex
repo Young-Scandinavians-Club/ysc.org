@@ -1725,15 +1725,14 @@ defmodule YscWeb.ExpenseReportLive do
       )
 
     ~H"""
-    <div class="py-8 lg:py-10">
-      <div class="max-w-3xl mx-auto px-4">
-        <!-- Header -->
+    <div class="py-8 lg:py-12 bg-zinc-50/50 min-h-screen">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4">
         <.page_header
           id="expense-reports-header"
           eyebrow="Expenses"
           title="My Expense Reports"
           subtitle={list_summary_line(@drafts, @submitted)}
-          class="mb-6"
+          class="mb-10"
         >
           <:actions>
             <.button navigate={~p"/expensereport"}>
@@ -1743,7 +1742,10 @@ defmodule YscWeb.ExpenseReportLive do
         </.page_header>
 
         <%= if Enum.empty?(@expense_reports) do %>
-          <div class="bg-white rounded-lg border border-zinc-200 p-12 text-center">
+          <div
+            id="expense-reports-empty"
+            class="rounded-xl bg-white shadow-xs px-6 py-16 text-center"
+          >
             <div class="flex flex-col items-center max-w-md mx-auto">
               <.icon name="hero-document-text" class="w-14 h-14 text-zinc-300 mb-4" />
               <h3 class="text-lg text-zinc-900 mb-2 type-subhead">
@@ -1758,27 +1760,26 @@ defmodule YscWeb.ExpenseReportLive do
             </div>
           </div>
         <% else %>
-          <div :if={@drafts != []} id="expense-report-drafts" class="mb-8">
-            <h2 class="text-xs text-amber-700 mb-2 type-eyebrow">
+          <section :if={@drafts != []} id="expense-report-drafts" class="mb-10">
+            <h2 class="text-xs text-amber-700 mb-3 type-eyebrow">
               Drafts · not yet submitted
             </h2>
-            <ul class="divide-y divide-amber-100 rounded-lg border border-amber-200 bg-amber-50/50 overflow-hidden">
+            <ul class="space-y-3">
               <li
                 :for={report <- @drafts}
                 id={"expense-report-draft-#{report.id}"}
-                class="flex items-center gap-3 p-3 sm:p-4"
+                class="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl bg-amber-50 px-4 py-4 sm:px-6"
               >
-                <.icon
-                  name="hero-pencil-square"
-                  class="w-5 h-5 text-amber-500 shrink-0"
-                />
-                <div class="min-w-0 flex-1">
-                  <p class="font-medium text-zinc-900 truncate">
+                <span class="hidden sm:flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                  <.icon name="hero-pencil-square" class="w-5 h-5" />
+                </span>
+                <div class="min-w-0 flex-1 basis-56">
+                  <p class="font-semibold text-zinc-900 truncate">
                     {if present?(report.purpose),
                       do: report.purpose,
                       else: "Untitled expense report"}
                   </p>
-                  <p class="text-xs text-zinc-500">
+                  <p class="mt-0.5 text-sm text-zinc-600">
                     Edited {DateDisplay.format_date_long(report.updated_at)} · {item_count_label(
                       report
                     )}
@@ -1787,73 +1788,102 @@ defmodule YscWeb.ExpenseReportLive do
                     <% end %>
                   </p>
                 </div>
-                <.link
-                  id={"expense-report-draft-continue-#{report.id}"}
-                  navigate={~p"/expensereport"}
-                  class="shrink-0 inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-500"
-                >
-                  Continue
-                </.link>
-                <button
-                  type="button"
-                  id={"expense-report-draft-discard-#{report.id}"}
-                  phx-click="discard-draft"
-                  phx-value-id={report.id}
-                  data-confirm="Delete this draft? This can't be undone."
-                  class="shrink-0 p-1.5 text-zinc-500 hover:text-red-600 transition-colors"
-                  title="Delete draft"
-                >
-                  <.icon name="hero-trash" class="w-4 h-4" />
-                </button>
+                <div class="flex items-center gap-2">
+                  <.link
+                    id={"expense-report-draft-continue-#{report.id}"}
+                    navigate={~p"/expensereport"}
+                    class="inline-flex items-center gap-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 transition-colors"
+                  >
+                    Continue
+                  </.link>
+                  <button
+                    type="button"
+                    id={"expense-report-draft-discard-#{report.id}"}
+                    phx-click="discard-draft"
+                    phx-value-id={report.id}
+                    data-confirm="Delete this draft? This can't be undone."
+                    class="rounded-md p-2 text-zinc-500 hover:bg-amber-100 hover:text-red-600 transition-colors"
+                    title="Delete draft"
+                    aria-label="Delete draft"
+                  >
+                    <.icon name="hero-trash" class="w-4 h-4" />
+                  </button>
+                </div>
               </li>
             </ul>
-          </div>
+          </section>
 
-          <div :if={@submitted != []}>
-            <h2
-              :if={@drafts != []}
-              class="text-xs text-zinc-500 mb-2 type-eyebrow"
-            >
+          <section :if={@submitted != []} id="expense-reports-submitted">
+            <h2 :if={@drafts != []} class="text-xs text-zinc-500 mb-3 type-eyebrow">
               Submitted
             </h2>
-            <ul class="divide-y divide-zinc-100 rounded-lg border border-zinc-200 bg-white overflow-hidden">
-              <li :for={report <- @submitted} id={"expense-report-row-#{report.id}"}>
-                <.link
-                  navigate={~p"/expensereport/#{report.id}/success"}
-                  class="flex items-center gap-3 p-3 sm:p-4 hover:bg-zinc-50 transition-colors"
+            <div class="rounded-xl bg-white shadow-xs overflow-hidden">
+              <div
+                class="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_7rem_8rem_8rem_5rem_7rem_1rem] lg:gap-x-6 px-6 py-3 bg-zinc-50/80 text-xs text-zinc-500 type-eyebrow"
+                aria-hidden="true"
+              >
+                <span>Report</span>
+                <span>Status</span>
+                <span>Submitted</span>
+                <span>Method</span>
+                <span class="text-right">Items</span>
+                <span class="text-right">Reimburse</span>
+                <span></span>
+              </div>
+              <ul class="divide-y divide-zinc-100/80">
+                <li
+                  :for={report <- @submitted}
+                  id={"expense-report-row-#{report.id}"}
                 >
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2 mb-0.5">
-                      <.expense_status_badge status={report.status} />
-                      <p class="font-medium text-zinc-900 truncate">
-                        {report.purpose}
+                  <.link
+                    navigate={~p"/expensereport/#{report.id}/success"}
+                    class="group block px-4 py-4 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_7rem_8rem_8rem_5rem_7rem_1rem] lg:items-center lg:gap-x-6 hover:bg-zinc-50 transition-colors"
+                  >
+                    <div class="min-w-0">
+                      <div class="flex items-start justify-between gap-4">
+                        <p class="min-w-0 font-semibold text-zinc-900 truncate">
+                          {report.purpose}
+                        </p>
+                        <p class="lg:hidden shrink-0 font-semibold text-zinc-900 tabular-nums">
+                          {display_money(@totals_by_id[report.id].net_total)}
+                        </p>
+                      </div>
+                      <p :if={report.event} class="text-sm text-zinc-500 truncate">
+                        {report.event.title}
                       </p>
+                      <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500 lg:hidden">
+                        <.expense_status_badge status={report.status} />
+                        <span>
+                          {DateDisplay.format_date_long(report.inserted_at)} · {item_count_label(
+                            report
+                          )}
+                        </span>
+                      </div>
                     </div>
-                    <p class="text-xs text-zinc-500 truncate">
-                      {DateDisplay.format_date_long(report.inserted_at)} · {reimbursement_label(
-                        report.reimbursement_method
-                      )} · {item_count_label(report)}
-                      <%= if report.event do %>
-                        · {report.event.title}
-                      <% end %>
+                    <div class="hidden lg:block">
+                      <.expense_status_badge status={report.status} />
+                    </div>
+                    <p class="hidden lg:block text-sm text-zinc-600">
+                      {DateDisplay.format_datetime_display(report.inserted_at)}
                     </p>
-                  </div>
-                  <div class="shrink-0 text-right">
-                    <p class="text-[11px] text-zinc-500 type-eyebrow">
-                      Reimburse
+                    <p class="hidden lg:block text-sm text-zinc-600">
+                      {reimbursement_label(report.reimbursement_method)}
                     </p>
-                    <p class="font-semibold text-zinc-900 tabular-nums">
+                    <p class="hidden lg:block text-right text-sm text-zinc-600 tabular-nums">
+                      {item_count(report)}
+                    </p>
+                    <p class="hidden lg:block text-right font-semibold text-zinc-900 tabular-nums">
                       {display_money(@totals_by_id[report.id].net_total)}
                     </p>
-                  </div>
-                  <.icon
-                    name="hero-chevron-right"
-                    class="w-4 h-4 text-zinc-300 shrink-0"
-                  />
-                </.link>
-              </li>
-            </ul>
-          </div>
+                    <.icon
+                      name="hero-chevron-right"
+                      class="hidden lg:block w-4 h-4 text-zinc-300 group-hover:text-zinc-500 transition-colors"
+                    />
+                  </.link>
+                </li>
+              </ul>
+            </div>
+          </section>
         <% end %>
       </div>
     </div>
@@ -1879,16 +1909,18 @@ defmodule YscWeb.ExpenseReportLive do
   defp reimbursement_label("check"), do: "Check"
   defp reimbursement_label(_), do: "No method set"
 
-  defp item_count_label(%{expense_item_count: count}) when is_integer(count) do
+  defp item_count_label(report) do
+    count = item_count(report)
     "#{count} item#{if count == 1, do: "", else: "s"}"
   end
 
-  defp item_count_label(%{expense_items: items}) when is_list(items) do
-    count = length(items)
-    "#{count} item#{if count == 1, do: "", else: "s"}"
-  end
+  defp item_count(%{expense_item_count: count}) when is_integer(count),
+    do: count
 
-  defp item_count_label(_), do: "0 items"
+  defp item_count(%{expense_items: items}) when is_list(items),
+    do: length(items)
+
+  defp item_count(_), do: 0
 
   defp render_form(assigns) do
     ~H"""

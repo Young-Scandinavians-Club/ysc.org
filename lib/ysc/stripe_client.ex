@@ -52,6 +52,9 @@ defmodule Ysc.StripeClient do
   def retrieve_invoice(id, params),
     do: stripe_retry(fn -> Stripe.Invoice.retrieve(id, params) end)
 
+  def retrieve_payment_link(id, params \\ %{}, opts \\ []),
+    do: stripe_retry(fn -> Stripe.PaymentLink.retrieve(id, params, opts) end)
+
   def list_invoice_payments(params, opts \\ []),
     do: stripe_retry(fn -> Stripe.InvoicePayment.list(params, opts) end)
 end

@@ -76,7 +76,7 @@ defmodule Ysc.Quickbooks.Sync do
   @account_class_mapping %{
     # Event tickets
     event: %{account: "Events Inc", class: "Events"},
-    # Donations
+    # Donations bundled with event tickets
     donation: %{
       account: "Special Project Fundraising",
       class: "Administration"
@@ -1033,20 +1033,33 @@ defmodule Ysc.Quickbooks.Sync do
            %{entity_type: entity_type, property: property, entry: event_entry}}
 
         donation_entry ->
+          fund = Ysc.Stripe.DonationPaymentLink.payment_link_fund(payment)
+
           entity_type =
-            case donation_entry.related_entity_type do
-              atom when is_atom(atom) -> atom
-              string when is_binary(string) -> String.to_existing_atom(string)
+            if fund do
+              :payment_link_donation
+            else
+              case donation_entry.related_entity_type do
+                atom when is_atom(atom) -> atom
+                string when is_binary(string) -> String.to_existing_atom(string)
+              end
             end
 
           Ysc.Logging.debug(
             "[QB Sync] get_payment_entity_info: Detected donation entry",
             payment_id: payment.id,
-            entity_type: entity_type
+            entity_type: entity_type,
+            quickbooks_account: fund && fund.account
           )
 
           {:ok,
-           %{entity_type: entity_type, property: nil, entry: donation_entry}}
+           %{
+             entity_type: entity_type,
+             property: nil,
+             entry: donation_entry,
+             account: fund && fund.account,
+             class: fund && fund.class
+           }}
 
         # Check for membership entry (must be before the generic fallback
         # so we can determine the membership type: single vs family)
@@ -1331,6 +1344,42 @@ defmodule Ysc.Quickbooks.Sync do
     get_quickbooks_item_id(entity_info)
   end
 
+  # Payment-link donations must post to their own income account. Never reuse
+  # the event-donation item, and never fall through to Special Project Fundraising
+  # when that account is missing.
+  defp get_quickbooks_item_id(%{
+         entity_type: :payment_link_donation,
+         account: account
+       })
+       when is_binary(account) and account != "" do
+    case income_account_ref_named(account) do
+      {:error, reason} when reason in [:rate_limited, :request_failed] ->
+        {:error, reason}
+
+      nil ->
+        Ysc.Logging.error(
+          "[QB Sync] get_quickbooks_item_id: Payment link donation income account was not found. Create that account in QuickBooks. Event donation accounts are not used for this payment.",
+          account_name: account
+        )
+
+        {:error, :no_income_account_for_item}
+
+      account_ref ->
+        with {:ok, item_id} <-
+               resolve_payment_link_donation_item_id(account, account_ref) do
+          ensure_payment_link_donation_item_account(item_id, account_ref)
+        end
+    end
+  end
+
+  defp get_quickbooks_item_id(%{entity_type: :payment_link_donation}) do
+    Ysc.Logging.error(
+      "[QB Sync] get_quickbooks_item_id: Payment link donation has no fund account"
+    )
+
+    {:error, :no_income_account_for_item}
+  end
+
   defp get_quickbooks_item_id(%{entity_type: entity_type, property: property}) do
     Ysc.Logging.debug(
       "[QB Sync] get_quickbooks_item_id: Getting or creating item",
@@ -1364,6 +1413,127 @@ defmodule Ysc.Quickbooks.Sync do
           entity_type,
           property
         )
+    end
+  end
+
+  defp income_account_ref_named(name) when is_binary(name) do
+    case client_module().query_account_by_name(name) do
+      {:ok, account_id} when is_binary(account_id) and account_id != "" ->
+        %{value: account_id, name: name}
+
+      {:error, reason} when reason in [:rate_limited, :request_failed] ->
+        {:error, reason}
+
+      {:error, :not_found} ->
+        Ysc.Logging.info(
+          "[QB Sync] QuickBooks income account not found, creating it",
+          account: name
+        )
+
+        case client_module().create_account(name,
+               account_type: "Income",
+               account_sub_type: "NonProfitIncome"
+             ) do
+          {:ok, account_id} when is_binary(account_id) and account_id != "" ->
+            %{value: account_id, name: name}
+
+          error ->
+            Ysc.Logging.error(
+              "[QB Sync] Failed to create QuickBooks income account",
+              account: name,
+              error: inspect(error)
+            )
+
+            case error do
+              {:error, reason}
+              when reason in [:rate_limited, :request_failed] ->
+                error
+
+              _ ->
+                nil
+            end
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp resolve_payment_link_donation_item_id(account_name, account_ref) do
+    client_module().get_or_create_item(account_name,
+      income_account_ref: account_ref
+    )
+  end
+
+  defp ensure_payment_link_donation_item_account(
+         item_id,
+         %{value: account_id} = account_ref
+       ) do
+    donation_item_id =
+      present_config_string(
+        Application.get_env(:ysc, :quickbooks, [])[:donation_item_id]
+      )
+
+    if donation_item_id == item_id do
+      Ysc.Logging.error(
+        "[QB Sync] Payment link donation item is the event donation item, so the receipt would post to Special Project Fundraising.",
+        item_id: item_id
+      )
+
+      {:error, :payment_link_donation_uses_donation_item}
+    else
+      case client_module().get_item_by_id(item_id) do
+        {:ok, item} ->
+          current = income_account_id(item)
+
+          if current == account_id do
+            {:ok, item_id}
+          else
+            if is_binary(current) and current != "" do
+              Ysc.Logging.error(
+                "[QB Sync] Payment link donation item already posts to a different income account",
+                item_id: item_id,
+                current_account_id: current,
+                account_id: account_id
+              )
+
+              {:error, :payment_link_item_income_account_mismatch}
+            else
+              Ysc.Logging.info(
+                "[QB Sync] Setting payment link donation item income account",
+                item_id: item_id,
+                account_id: account_id
+              )
+
+              case client_module().update_item_income_account(
+                     item_id,
+                     account_ref
+                   ) do
+                {:ok, _} -> {:ok, item_id}
+                error -> error
+              end
+            end
+          end
+
+        {:error, reason} = error ->
+          Ysc.Logging.error(
+            "[QB Sync] Could not verify payment link donation item income account",
+            item_id: item_id,
+            error: inspect(reason)
+          )
+
+          error
+      end
+    end
+  end
+
+  defp income_account_id(item) when is_map(item) do
+    ref = item["IncomeAccountRef"] || item[:IncomeAccountRef]
+
+    case ref do
+      %{"value" => value} when is_binary(value) -> value
+      %{value: value} when is_binary(value) -> value
+      _ -> nil
     end
   end
 
@@ -1572,6 +1742,14 @@ defmodule Ysc.Quickbooks.Sync do
     end
   end
 
+  defp get_account_and_class(%{
+         entity_type: :payment_link_donation,
+         account: account
+       })
+       when is_binary(account) do
+    %{account: account, class: "Administration"}
+  end
+
   defp get_account_and_class(%{entity_type: entity_type, property: property}) do
     Ysc.Logging.debug(
       "[QB Sync] get_account_and_class: Getting account and class",
@@ -1691,7 +1869,7 @@ defmodule Ysc.Quickbooks.Sync do
         quantity: 1,
         unit_price: amount,
         txn_date: payment.payment_date || payment.inserted_at,
-        description: "Payment #{payment.reference_id}",
+        description: sales_receipt_description(payment, entity_info),
         memo: "Payment: #{payment.reference_id}",
         private_note: "External Payment ID: #{payment.external_payment_id}",
         deposit_to_account_id: deposit_account_ref && deposit_account_ref.value,
@@ -1764,6 +1942,21 @@ defmodule Ysc.Quickbooks.Sync do
 
       result
     end
+  end
+
+  # Standalone donations, including Stripe Payment Links, keep the donor and
+  # fund on the sales receipt line. Other payments stay on the reference id.
+  defp sales_receipt_description(_payment, %{
+         entity_type: entity_type,
+         entry: %{description: description}
+       })
+       when entity_type in [:donation, :payment_link_donation] and
+              is_binary(description) and description != "" do
+    description
+  end
+
+  defp sales_receipt_description(payment, _entity_info) do
+    "Payment #{payment.reference_id}"
   end
 
   defp create_mixed_payment_sales_receipt(payment, customer_id, entity_info) do
@@ -3256,7 +3449,8 @@ defmodule Ysc.Quickbooks.Sync do
 
   defp format_payout_date(nil), do: nil
 
-  defp check_and_enqueue_payout_syncs_for_payment(%Payment{} = payment) do
+  @doc false
+  def check_and_enqueue_payout_syncs_for_payment(%Payment{} = payment) do
     Ysc.Logging.debug(
       "[QB Sync] check_and_enqueue_payout_syncs_for_payment: Finding payouts for payment",
       payment_id: payment.id
@@ -4147,6 +4341,8 @@ defmodule Ysc.Quickbooks.Sync do
   defp known_qb_sync_failure?(reason)
        when reason in [
               :no_income_account_for_item,
+              :payment_link_donation_uses_donation_item,
+              :payment_link_item_income_account_mismatch,
               :item_creation_failed,
               :user_not_found,
               :transactions_not_fully_synced,

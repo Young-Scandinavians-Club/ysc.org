@@ -161,6 +161,21 @@ defmodule Ysc.AppleWalletTest do
                  AppleWallet.generate_ticket_pass(cancelled.id, user.id)
       end)
     end
+
+    test "struct-selects pass fields and skips event body HTML (certs injected)" do
+      {user, ticket} = member_with_confirmed_ticket()
+
+      with_fake_certs(fn ->
+        {_result, fat_cols} =
+          Ysc.QueryCounter.with_query_counter(
+            fn -> AppleWallet.generate_ticket_pass(ticket.id, user.id) end,
+            pattern: ~r/raw_details|rendered_details|attendee_questions/i,
+            caller_pids: [self()]
+          )
+
+        assert fat_cols == 0
+      end)
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -243,6 +243,31 @@ defmodule Ysc.Accounts do
     )
   end
 
+  @email_identity_fields [:id, :email, :first_name]
+
+  @doc """
+  Loads the columns needed to address and greet a user in email.
+
+  Used by membership-ended scheduling and deferred NewSignInDetected
+  rendering instead of `get_user/1` / `get_user!/1`, so those paths do
+  not SELECT `hashed_password` / `board_bio`.
+  Returns `nil` when no row matches.
+  """
+  def get_user_email_identity(nil), do: nil
+
+  def get_user_email_identity(user_id) do
+    user_id
+    |> user_email_identity_query()
+    |> Repo.one()
+  end
+
+  defp user_email_identity_query(user_id) do
+    from(u in User,
+      where: u.id == ^user_id,
+      select: struct(u, ^@email_identity_fields)
+    )
+  end
+
   @doc """
   Returns whether the user has a password set in the database.
 
@@ -5720,6 +5745,11 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_user_notification_profile_query do
     user_notification_profile_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_user_email_identity_query do
+    user_email_identity_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
   end
 
   @doc false

@@ -338,20 +338,31 @@ defmodule Ysc.Ledgers do
 
     ensure_basic_accounts()
 
+    metadata = Map.get(attrs, :metadata)
+
     # Check if payment already exists (idempotency check)
     case get_payment_by_external_id(external_payment_id) do
       nil ->
+        payment_attrs = %{
+          user_id: user_id,
+          amount: amount,
+          external_provider: :stripe,
+          external_payment_id: external_payment_id,
+          status: :completed,
+          payment_date: DateTime.utc_now(),
+          payment_method_id: payment_method_id
+        }
+
+        payment_attrs =
+          if is_map(metadata) do
+            Map.put(payment_attrs, :metadata, metadata)
+          else
+            payment_attrs
+          end
+
         insert_payment_with_ledger_entries(%{
           external_payment_id: external_payment_id,
-          payment_attrs: %{
-            user_id: user_id,
-            amount: amount,
-            external_provider: :stripe,
-            external_payment_id: external_payment_id,
-            status: :completed,
-            payment_date: DateTime.utc_now(),
-            payment_method_id: payment_method_id
-          },
+          payment_attrs: payment_attrs,
           transaction_amount: amount,
           create_entries: fn payment, transaction ->
             create_payment_entries(%{
@@ -675,6 +686,16 @@ defmodule Ysc.Ledgers do
       _ ->
         false
     end)
+  end
+
+  defp enqueue_quickbooks_sync_payment(
+         %Payment{
+           quickbooks_sales_receipt_id: receipt_id
+         } = payment
+       )
+       when is_binary(receipt_id) and receipt_id != "" do
+    Ysc.Quickbooks.Sync.check_and_enqueue_payout_syncs_for_payment(payment)
+    :ok
   end
 
   defp enqueue_quickbooks_sync_payment(%Payment{} = payment) do
