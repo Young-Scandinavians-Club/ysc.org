@@ -1528,20 +1528,16 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
             }
           })
 
-        # LiveView pre-check + expire_ticket_order/1 pre-check both retrieve
-        # before attempting Stripe cancel.
-        expect(
-          Ysc.StripeMock,
-          :retrieve_payment_intent,
-          2,
-          fn ^payment_intent_id, _opts ->
-            {:ok,
-             build_payment_intent(%{
-               id: payment_intent_id,
-               status: "requires_payment_method"
-             })}
-          end
-        )
+        # LiveView checkout-expired pre-check retrieves once; expire then
+        # Stripe-cancels (no second status pre-check) and fulfills on succeeded.
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           build_payment_intent(%{
+             id: payment_intent_id,
+             status: "requires_payment_method"
+           })}
+        end)
 
         expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                           _opts ->

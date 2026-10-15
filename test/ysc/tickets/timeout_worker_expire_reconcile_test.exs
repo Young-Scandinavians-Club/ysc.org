@@ -72,11 +72,28 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
          payment_intent_id,
          succeeded_payment_intent
        ) do
-    expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                        _opts ->
-      {:ok, payment_intent("requires_payment_method", payment_intent_id)}
+    # Legacy path: pre-check retrieve saw a cancelable status, then cancel
+    # discovered the charge had already succeeded. Kept for coverage of the
+    # cancel→retrieve reconcile; the already-succeeded-at-timeout case below
+    # is the recovery path when the webhook swallowed a fulfill error.
+    expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                      _opts ->
+      {:error, stripe_unexpected_state_error()}
     end)
 
+    expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+      {:ok, succeeded_payment_intent}
+    end)
+  end
+
+  # PI is already succeeded when TimeoutWorker runs (webhook fulfill failed
+  # but acked; member never hit payment-success). expire must fulfill — the
+  # old pending_order_safe_to_cancel? pre-check skipped these forever.
+  defp expect_expire_pi_already_succeeded(
+         payment_intent_id,
+         succeeded_payment_intent
+       ) do
     expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                       _opts ->
       {:error, stripe_unexpected_state_error()}
@@ -111,6 +128,52 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
           })
 
         expect_expire_cancel_reveals_succeeded(
+          payment_intent_id,
+          succeeded_payment_intent
+        )
+
+        assert {:ok, "Expired specific ticket order"} =
+                 TimeoutWorker.perform(%Oban.Job{
+                   args: %{"ticket_order_id" => order.id}
+                 })
+
+        reloaded = Tickets.get_ticket_order(order.id)
+        assert reloaded.status == :completed
+        assert reloaded.payment_id
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket,
+              where: t.ticket_order_id == ^order.id
+          )
+
+        assert tickets != []
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
+      end)
+    end
+
+    test "fulfills when PaymentIntent is already succeeded at timeout (webhook fulfill missed)" do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        order = ticket_order_fixture() |> past_due_order()
+        payment_intent_id = "pi_timeout_pre_succeeded_#{order.id}"
+
+        assert {:ok, order} =
+                 Tickets.update_payment_intent(order, payment_intent_id)
+
+        amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+        succeeded_payment_intent =
+          struct(Stripe.PaymentIntent, %{
+            id: payment_intent_id,
+            status: "succeeded",
+            amount: amount_cents,
+            metadata: %{
+              "ticket_order_id" => order.id,
+              "user_id" => order.user_id
+            }
+          })
+
+        expect_expire_pi_already_succeeded(
           payment_intent_id,
           succeeded_payment_intent
         )
@@ -181,11 +244,6 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
 
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
-
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                          _opts ->
-        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
-      end)
 
       expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                         _opts ->
@@ -297,11 +355,6 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
 
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
-
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                          _opts ->
-        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
-      end)
 
       expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
                                                         _opts ->
