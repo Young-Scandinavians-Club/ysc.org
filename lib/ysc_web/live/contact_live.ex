@@ -12,8 +12,7 @@ defmodule YscWeb.ContactLive do
         size={:compact}
         eyebrow="Contact"
         title="Get in touch"
-        subtitle="Have a question about the club or our cabins? Send us a message and we'll get back to you."
-        class="mb-8 lg:mb-12"
+        class="mb-6 lg:mb-8"
       />
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">

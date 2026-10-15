@@ -10,8 +10,7 @@ defmodule YscWeb.VolunteerLive do
         size={:compact}
         eyebrow="Get involved"
         title="Volunteer with the YSC"
-        subtitle="Want to contribute to a vibrant community and help create memorable experiences for others?"
-        class="mb-8 lg:mb-12"
+        class="mb-6 lg:mb-8"
       />
 
       <%!-- Split Header Section --%>

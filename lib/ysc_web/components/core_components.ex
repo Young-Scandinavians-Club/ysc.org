@@ -4124,23 +4124,22 @@ defmodule YscWeb.CoreComponents do
   (The cabin pages keep their own photo hero.)
 
   - `size={:default}` for section hubs (events, news, newsletters, history):
-    `text-4xl md:text-7xl`.
+    `text-3xl sm:text-4xl md:text-7xl`, top and bottom rules.
   - `size={:compact}` for content pages (board, choir, volunteer, contact,
-    legal and governance pages): `text-3xl md:text-5xl`, tighter padding.
+    legal and governance pages): `text-3xl md:text-4xl`, top rule only,
+    tighter padding.
 
   Use the eyebrow to say what kind of page this is ("Events", "Governance",
-  "Legal"); the title says what's on it. Put an intro sentence in `subtitle`.
+  "Legal"); the title says what's on it. Use `subtitle` only when it adds
+  something the title doesn't (a "Last updated" date, a scope note); skip it
+  when it would just restate the title.
   Wrap it in `max-w-(--breakpoint-xl) mx-auto px-4` like other page sections.
 
   ## Examples
 
       <.page_masthead eyebrow="Events" title="What's Next" />
 
-      <.page_masthead
-        eyebrow="Archive"
-        title="Newsletters"
-        subtitle="Browse our past newsletters."
-      />
+      <.page_masthead eyebrow="Archive" title="Newsletters" />
 
       <.page_masthead
         size={:compact}
@@ -4182,14 +4181,14 @@ defmodule YscWeb.CoreComponents do
     <div
       id={@id}
       class={[
-        "text-center border-y border-zinc-200",
-        page_masthead_padding_class(@size),
+        "text-center",
+        page_masthead_frame_class(@size),
         @class
       ]}
     >
       <p
         :if={@eyebrow}
-        class="text-sm text-blue-600 mb-3 md:mb-4 type-eyebrow"
+        class="text-sm text-blue-600 mb-2 md:mb-3 type-eyebrow"
       >
         {@eyebrow}
       </p>
@@ -4202,7 +4201,7 @@ defmodule YscWeb.CoreComponents do
           {@title}
         </h1>
       <% end %>
-      <p :if={@subtitle} class="mt-4 mx-auto max-w-2xl text-zinc-600 text-lg">
+      <p :if={@subtitle} class="mt-3 mx-auto max-w-2xl text-zinc-600 text-lg">
         {@subtitle}
       </p>
       {render_slot(@inner_block)}
@@ -4210,14 +4209,19 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  defp page_masthead_padding_class(:default), do: "py-8 md:py-12"
-  defp page_masthead_padding_class(:compact), do: "py-8 md:py-10"
+  # Section hubs get the full rule-bounded masthead; compact pages keep only
+  # the top rule so the content starts sooner.
+  defp page_masthead_frame_class(:default),
+    do: "border-y border-zinc-200 py-6 md:py-12"
+
+  defp page_masthead_frame_class(:compact),
+    do: "border-t border-zinc-200 pt-5 pb-1 md:pt-6 md:pb-2"
 
   defp page_masthead_title_class(:default),
-    do: "text-4xl md:text-7xl text-zinc-900 type-display"
+    do: "text-3xl sm:text-4xl md:text-7xl text-zinc-900 type-display"
 
   defp page_masthead_title_class(:compact),
-    do: "text-3xl md:text-5xl text-zinc-900 type-display"
+    do: "text-3xl md:text-4xl text-zinc-900 type-display"
 
   @doc """
   Title block for signed-in app pages (tickets, expense reports, family,
