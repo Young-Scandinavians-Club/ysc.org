@@ -4119,20 +4119,40 @@ defmodule Ysc.Bookings.BookingLocker do
   This is the reverse of confirm_booking - it releases booked inventory
   and updates the booking status to :canceled.
 
+  Stripe-reconciles any modification-hold PaymentIntent *before* releasing
+  inventory. A succeeded unapplied date-change charge would otherwise be
+  orphaned: `ModificationHoldExpiryWorker` only selects `:complete` rows, and
+  cancel clears that status. Same Stripe-first invariant as hold release.
+
   ## Parameters:
   - `booking_id`: The booking to cancel
 
   ## Returns:
   - `{:ok, %Booking{}}` on success
+  - `{:error, :payment_in_progress}` while a modification PaymentIntent is
+    processing / unreachable / refund-failed (retry)
   - `{:error, reason}` on failure
   """
   def cancel_complete_booking(booking_id) do
+    with_modification_payment_reconcile(
+      booking_id,
+      "cancel_complete_booking",
+      &do_cancel_complete_booking/1
+    )
+  end
+
+  defp do_cancel_complete_booking(booking_id) do
     Repo.transaction(fn ->
       booking = Repo.get!(Booking, booking_id) |> Repo.preload(:rooms)
 
       if booking.status != :complete do
         Repo.rollback({:error, :invalid_status})
       end
+
+      # Extra nights from an in-progress paid modification must be released
+      # here — after status leaves `:complete`, ModHoldExpiryWorker will not
+      # pick this row up.
+      release_modification_hold_inventory!(booking)
 
       case booking.booking_mode do
         :buyout ->
@@ -4186,7 +4206,13 @@ defmodule Ysc.Bookings.BookingLocker do
       # Update booking status to canceled
       # Pass existing rooms to avoid Ecto thinking we're removing them
       case booking
-           |> Booking.changeset(%{status: :canceled, hold_expires_at: nil},
+           |> Booking.changeset(
+             %{
+               status: :canceled,
+               hold_expires_at: nil,
+               modification_hold_expires_at: nil,
+               modification_hold_attrs: nil
+             },
              rooms: booking.rooms,
              skip_validation: true
            )
@@ -4205,15 +4231,26 @@ defmodule Ysc.Bookings.BookingLocker do
   Reverts a complete booking to `:draft` and releases booked inventory.
 
   Like `cancel_complete_booking/1`, but leaves the booking in draft instead of
-  canceled.
+  canceled. Stripe-reconciles modification-hold PaymentIntents first (same
+  orphan risk as cancel once status leaves `:complete`).
   """
   def revert_complete_to_draft(booking_id) do
+    with_modification_payment_reconcile(
+      booking_id,
+      "revert_complete_to_draft",
+      &do_revert_complete_to_draft/1
+    )
+  end
+
+  defp do_revert_complete_to_draft(booking_id) do
     Repo.transaction(fn ->
       booking = Repo.get!(Booking, booking_id) |> Repo.preload(:rooms)
 
       if booking.status != :complete do
         Repo.rollback({:error, :invalid_status})
       end
+
+      release_modification_hold_inventory!(booking)
 
       case booking.booking_mode do
         :buyout ->
@@ -4263,7 +4300,13 @@ defmodule Ysc.Bookings.BookingLocker do
       end
 
       case booking
-           |> Booking.changeset(%{status: :draft, hold_expires_at: nil},
+           |> Booking.changeset(
+             %{
+               status: :draft,
+               hold_expires_at: nil,
+               modification_hold_expires_at: nil,
+               modification_hold_attrs: nil
+             },
              rooms: booking.rooms,
              skip_validation: true
            )
@@ -4284,21 +4327,38 @@ defmodule Ysc.Bookings.BookingLocker do
   This is similar to cancel_complete_booking but sets the status to :refunded
   instead of :canceled, making it clear the booking was refunded.
 
+  Stripe-reconciles modification-hold PaymentIntents first (same orphan risk
+  as cancel once status leaves `:complete`). Modification-hold inventory is
+  always released even when `release_inventory` is false — those nights are
+  not part of the booked stay.
+
   ## Parameters:
   - `booking_id`: The booking to mark as refunded
   - `release_inventory`: If true, releases the inventory (dates/rooms become available)
 
   ## Returns:
   - `{:ok, %Booking{}}` on success
+  - `{:error, :payment_in_progress}` while a modification PaymentIntent is
+    processing / unreachable / refund-failed (retry)
   - `{:error, reason}` on failure
   """
   def refund_complete_booking(booking_id, release_inventory \\ true) do
+    with_modification_payment_reconcile(
+      booking_id,
+      "refund_complete_booking",
+      fn id -> do_refund_complete_booking(id, release_inventory) end
+    )
+  end
+
+  defp do_refund_complete_booking(booking_id, release_inventory) do
     Repo.transaction(fn ->
       booking = Repo.get!(Booking, booking_id) |> Repo.preload(:rooms)
 
       if booking.status != :complete do
         Repo.rollback({:error, :invalid_status})
       end
+
+      release_modification_hold_inventory!(booking)
 
       # Release inventory if requested
       if release_inventory do
@@ -4355,7 +4415,13 @@ defmodule Ysc.Bookings.BookingLocker do
       # Update booking status to refunded
       # Pass existing rooms to avoid Ecto thinking we're removing them
       case booking
-           |> Booking.changeset(%{status: :refunded, hold_expires_at: nil},
+           |> Booking.changeset(
+             %{
+               status: :refunded,
+               hold_expires_at: nil,
+               modification_hold_expires_at: nil,
+               modification_hold_attrs: nil
+             },
              rooms: booking.rooms,
              skip_validation: true
            )
@@ -4368,6 +4434,91 @@ defmodule Ysc.Bookings.BookingLocker do
       end
     end)
     |> invalidate_availability_cache()
+  end
+
+  # Stripe-first gate for complete→canceled/draft/refunded. A captured
+  # modification PaymentIntent must be refunded (or already canceled /
+  # fully refunded) before status leaves `:complete` — otherwise
+  # ModHoldExpiryWorker never sees the row and the charge is orphaned.
+  defp with_modification_payment_reconcile(booking_id, context, on_proceed)
+       when is_binary(booking_id) and is_binary(context) and
+              is_function(on_proceed, 1) do
+    booking = Repo.get!(Booking, booking_id)
+
+    case reconcile_modification_payment_before_complete_release(
+           booking,
+           context
+         ) do
+      :proceed ->
+        on_proceed.(booking_id)
+
+      :skip ->
+        {:error, :payment_in_progress}
+    end
+  end
+
+  defp reconcile_modification_payment_before_complete_release(
+         %Booking{} = booking,
+         context
+       )
+       when is_binary(context) do
+    case Bookings.modification_hold_payment_intent_id(booking) do
+      nil ->
+        :proceed
+
+      payment_intent_id ->
+        case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+               payment_intent_id,
+               context
+             ) do
+          {:cancel, _payment_intent} ->
+            :proceed
+
+          {:already_succeeded, payment_intent} ->
+            # Do not apply the date change during cancel/draft/refund — refund
+            # the unfulfilled modification charge, then release. Mirror
+            # ModHoldExpiryWorker apply-fail umbrella.
+            case Bookings.release_after_unfulfilled_modification_refund(
+                   booking,
+                   payment_intent,
+                   :booking_canceled
+                 ) do
+              :release ->
+                :proceed
+
+              :skip ->
+                Ysc.Logging.info(
+                  "Skipped releasing complete booking while unfulfilled modification refund retries",
+                  booking_id: booking.id,
+                  payment_intent_id: payment_intent_id,
+                  context: context
+                )
+
+                :skip
+            end
+
+          {:in_progress, _payment_intent} ->
+            Ysc.Logging.info(
+              "Skipped releasing complete booking while modification payment is in flight",
+              booking_id: booking.id,
+              payment_intent_id: payment_intent_id,
+              context: context
+            )
+
+            :skip
+
+          {:error, stripe_error} ->
+            Ysc.Logging.warning(
+              "Could not reconcile modification hold payment with Stripe, not releasing complete booking",
+              booking_id: booking.id,
+              payment_intent_id: payment_intent_id,
+              context: context,
+              error: inspect(stripe_error)
+            )
+
+            :skip
+        end
+    end
   end
 
   ## Private Functions

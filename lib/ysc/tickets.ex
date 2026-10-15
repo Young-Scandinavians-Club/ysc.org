@@ -1750,9 +1750,6 @@ defmodule Ysc.Tickets do
   @doc """
   Expires a ticket order that has exceeded the payment timeout.
 
-  Skips expiration when checkout payment is in flight (same guard as
-  `CheckoutCancel`), so a late capture is not raced against released tickets.
-
   When a PaymentIntent is present, Stripe cancel runs *before* inventory is
   released — the same atomic reconcile as `cancel_ticket_order/3`.
   `StripeService.cancel_payment_intent/1` treats a succeeded PaymentIntent as
@@ -1760,22 +1757,22 @@ defmodule Ysc.Tickets do
   captured charge. Late fulfillment then re-checked capacity against seats
   that were already given away, and `maybe_refund_unfulfilled_ticket_payment/3`
   only auto-refunds `:amount_mismatch`.
+
+  Do **not** short-circuit on `CheckoutCancel.pending_order_safe_to_cancel?/2`
+  here. That helper treats `succeeded` as "in flight" and would return without
+  fulfilling. `payment_intent.succeeded` webhooks ack even when
+  `process_successful_payment/1` fails (`Tickets.WebhookHandler`), so TimeoutWorker
+  is the recovery path for a captured charge the LiveView never finalized.
+  `expire_after_stripe_reconcile/1` is the atomic arbiter: cancel → expire,
+  already-succeeded → fulfill, processing → leave pending.
   """
   def expire_ticket_order(ticket_order) do
-    if CheckoutCancel.pending_order_safe_to_cancel?(ticket_order,
-         context: "expire_ticket_order"
-       ) do
-      expire_after_stripe_reconcile(ticket_order)
-    else
-      require Ysc.Logging
+    case ticket_order.payment_intent_id do
+      id when is_binary(id) and id != "" ->
+        expire_after_stripe_reconcile(ticket_order)
 
-      Ysc.Logging.info(
-        "Skipped ticket order expiration while checkout payment is in flight",
-        ticket_order_id: ticket_order.id,
-        payment_intent_id: ticket_order.payment_intent_id
-      )
-
-      {:ok, ticket_order}
+      _ ->
+        do_expire_ticket_order(ticket_order)
     end
   end
 
