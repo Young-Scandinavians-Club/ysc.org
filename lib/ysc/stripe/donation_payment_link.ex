@@ -1,20 +1,30 @@
 defmodule Ysc.Stripe.DonationPaymentLink do
   @moduledoc """
-  Books donations paid through a configured Stripe Payment Link.
+  Books donations paid through a Stripe Payment Link.
 
   A Payment Link opens a Checkout Session. `checkout.session.completed` and
   `checkout.session.async_payment_succeeded` include `payment_link`. This module
-  retrieves that link and, when its public URL is configured, records the
-  payment as donation revenue.
+  retrieves that link (expanding `line_items.data.price.product`) and, when it
+  is a donation link, records the payment as donation revenue.
+
+  A link is recognized as a donation link when:
+  - Its URL or slug matches an entry in `:stripe_donation_payment_links`,
+  - `submit_type` is `"donate"` on the PaymentLink or Checkout.Session,
+  - Its public URL is hosted on `donate.stripe.com`, or
+  - Metadata on the session, link, or product defines `"quickbooks_income_account"`.
+
+  The QuickBooks income account is resolved (in priority order) from:
+  1. Explicit `:account` in `:stripe_donation_payment_links` config,
+  2. `"quickbooks_income_account"` metadata on the session, payment link, or product,
+  3. The Stripe Product name on the payment link's line item (e.g. `"Tahoe Kitchen Fund"`),
+  4. Known link fallback for `https://donate.stripe.com/28E5kEaLcg63aPW6nr2Ji03`.
 
   The ledger payment is keyed by the PaymentIntent id. Payout linking and
   refunds already look payments up that way, and `Ledgers.process_payment/1`
-  enqueues the QuickBooks sales receipt. Each link names its own income
-  account, stored on the payment metadata. Donations use the Administration
-  class. `https://donate.stripe.com/28E5kEaLcg63aPW6nr2Ji03` posts to
-  Tahoe Kitchen Fund, not Special Project Fundraising. Donors whose email
-  matches a member are attached to that user; everyone else is exported on
-  the QuickBooks system customer.
+  enqueues the QuickBooks sales receipt. Each donation stores its income
+  account on `payment.metadata["quickbooks_income_account"]` and uses the
+  Administration class. QuickBooks sync creates the income account and item
+  automatically if they do not exist yet.
   """
 
   require Ysc.Logging
@@ -29,6 +39,7 @@ defmodule Ysc.Stripe.DonationPaymentLink do
   @fund_separator " | "
   @income_account_key "quickbooks_income_account"
   @tahoe_kitchen_fund_url "https://donate.stripe.com/28E5kEaLcg63aPW6nr2Ji03"
+  @payment_link_expand %{expand: ["line_items.data.price.product"]}
   @payment_link_cache_ttl :timer.minutes(10)
   @checkout_events [
     "checkout.session.completed",
@@ -138,68 +149,62 @@ defmodule Ysc.Stripe.DonationPaymentLink do
   def prefetch_paid_session(_), do: :ok
 
   @doc """
-  Books a paid Checkout Session when it belongs to a configured donation link.
+  Books a paid Checkout Session when it belongs to a donation Payment Link.
 
-  Returns `:ok`. Raises when the session is a configured donation but Stripe or
+  Returns `:ok`. Raises when the session is a donation link but Stripe or
   the ledger cannot be updated, so the webhook is marked failed and retried.
   """
   def book_paid_session(session) when is_map(session) do
     if session_value(session, :payment_status) == "paid" do
-      maybe_book_configured_link(session)
+      maybe_book_donation_link(session)
     else
       :ok
     end
   end
 
-  defp maybe_book_configured_link(session) do
+  defp maybe_book_donation_link(session) do
     case payment_link_id(session) do
       id when is_binary(id) ->
-        book_if_configured(session, id)
+        book_if_donation_link(session, id)
 
       _ ->
         :ok
     end
   end
 
-  defp book_if_configured(session, payment_link_id) do
-    configured = configured_identifiers()
+  defp book_if_donation_link(session, payment_link_id) do
+    case retrieve_payment_link(payment_link_id) do
+      {:ok, link} ->
+        case resolve_donation_link(session, link) do
+          nil ->
+            :ok
 
-    if configured == [] do
-      :ok
-    else
-      case retrieve_payment_link(payment_link_id) do
-        {:ok, link} ->
-          case matching_configured_link(link, configured) do
-            nil ->
-              :ok
+          resolved_link ->
+            book_donation(session, payment_link_id, resolved_link)
+        end
 
-            configured_link ->
-              book_donation(session, payment_link_id, configured_link)
-          end
+      {:error, :retrieve_payment_link_not_implemented} ->
+        Ysc.Logging.error(
+          "Stripe client cannot retrieve payment links; skipping donation checkout",
+          payment_link_id: payment_link_id,
+          checkout_session_id: session_value(session, :id)
+        )
 
-        {:error, :retrieve_payment_link_not_implemented} ->
-          Ysc.Logging.error(
-            "Stripe client cannot retrieve payment links; skipping donation checkout",
-            payment_link_id: payment_link_id,
-            checkout_session_id: session_value(session, :id)
-          )
+        :ok
 
-          :ok
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Failed to retrieve Stripe payment link for donation checkout",
+          payment_link_id: payment_link_id,
+          checkout_session_id: session_value(session, :id),
+          error: inspect(reason)
+        )
 
-        {:error, reason} ->
-          Ysc.Logging.error(
-            "Failed to retrieve Stripe payment link for donation checkout",
-            payment_link_id: payment_link_id,
-            checkout_session_id: session_value(session, :id),
-            error: inspect(reason)
-          )
-
-          raise "Failed to retrieve Stripe payment link #{payment_link_id}: #{inspect(reason)}"
-      end
+        raise "Failed to retrieve Stripe payment link #{payment_link_id}: #{inspect(reason)}"
     end
   end
 
-  defp book_donation(session, payment_link_id, configured_link) do
+  defp book_donation(session, payment_link_id, resolved_link) do
     session_id = session_value(session, :id)
 
     payment_intent_id =
@@ -244,7 +249,7 @@ defmodule Ysc.Stripe.DonationPaymentLink do
         insert_donation(
           session,
           payment_link_id,
-          configured_link,
+          resolved_link,
           payment_intent_id,
           amount_cents
         )
@@ -254,7 +259,7 @@ defmodule Ysc.Stripe.DonationPaymentLink do
   defp insert_donation(
          session,
          payment_link_id,
-         configured_link,
+         resolved_link,
          payment_intent_id,
          amount_cents
        ) do
@@ -273,7 +278,7 @@ defmodule Ysc.Stripe.DonationPaymentLink do
         book_new_donation(
           session,
           payment_link_id,
-          configured_link,
+          resolved_link,
           payment_intent_id,
           amount_cents
         )
@@ -283,14 +288,14 @@ defmodule Ysc.Stripe.DonationPaymentLink do
   defp book_new_donation(
          session,
          payment_link_id,
-         configured_link,
+         resolved_link,
          payment_intent_id,
          amount_cents
        ) do
     {name, email} = donor_identity(session)
     user = if email, do: Accounts.get_user_by_email(email), else: nil
     amount = MoneyHelper.cents_to_money(amount_cents, :USD)
-    description = donation_description(name, email, configured_link.account)
+    description = donation_description(name, email, resolved_link.account)
 
     case Ledgers.process_payment(%{
            user_id: user && user.id,
@@ -302,7 +307,7 @@ defmodule Ysc.Stripe.DonationPaymentLink do
            description: description,
            property: nil,
            payment_method_id: nil,
-           metadata: %{@income_account_key => configured_link.account}
+           metadata: %{@income_account_key => resolved_link.account}
          }) do
       {:ok, {payment, _transaction, _entries}} ->
         Ysc.Logging.info("Booked Stripe payment link donation",
@@ -312,7 +317,7 @@ defmodule Ysc.Stripe.DonationPaymentLink do
           payment_id: payment.id,
           user_id: payment.user_id,
           amount: Money.to_string!(amount),
-          quickbooks_account: configured_link.account
+          quickbooks_account: resolved_link.account
         )
 
         :ok
@@ -388,6 +393,121 @@ defmodule Ysc.Stripe.DonationPaymentLink do
     end
   end
 
+  defp resolve_donation_link(session, link) do
+    configured = matching_configured_link(link, configured_identifiers())
+
+    if configured != nil or donation_payment_link?(session, link) do
+      account =
+        (configured && configured.account) ||
+          metadata_income_account(session) ||
+          metadata_income_account(link) ||
+          product_income_account(link) ||
+          product_income_account(session) ||
+          known_link_account(link)
+
+      case present_string(account) do
+        account when is_binary(account) ->
+          %{account: account, url: session_value(link, :url)}
+
+        nil ->
+          Ysc.Logging.warning(
+            "Donation payment link has no product name or QuickBooks income account; skipping",
+            payment_link_id: session_value(link, :id),
+            url: session_value(link, :url)
+          )
+
+          nil
+      end
+    else
+      nil
+    end
+  end
+
+  defp donation_payment_link?(session, link) do
+    session_value(link, :submit_type) == "donate" or
+      session_value(session, :submit_type) == "donate" or
+      donate_stripe_url?(session_value(link, :url)) or
+      metadata_income_account(session) != nil or
+      metadata_income_account(link) != nil or
+      product_metadata_income_account(link) != nil
+  end
+
+  defp donate_stripe_url?(url) when is_binary(url) do
+    case URI.parse(String.trim(url)) do
+      %URI{host: host} when is_binary(host) ->
+        String.downcase(host) == "donate.stripe.com"
+
+      _ ->
+        false
+    end
+  end
+
+  defp donate_stripe_url?(_), do: false
+
+  defp metadata_income_account(map) when is_map(map) do
+    case session_value(map, :metadata) do
+      metadata when is_map(metadata) ->
+        one_line(
+          Map.get(metadata, @income_account_key) ||
+            Map.get(metadata, :quickbooks_income_account)
+        )
+
+      _ ->
+        nil
+    end
+  end
+
+  defp metadata_income_account(_), do: nil
+
+  defp product_metadata_income_account(container) do
+    container
+    |> line_items_list()
+    |> Enum.find_value(fn item ->
+      price = session_value(item, :price)
+      product = session_value(price, :product)
+      metadata_income_account(product)
+    end)
+  end
+
+  defp product_income_account(container) do
+    container
+    |> line_items_list()
+    |> Enum.find_value(&line_item_account_name/1)
+  end
+
+  defp line_items_list(container) when is_map(container) do
+    case session_value(container, :line_items) do
+      %{data: items} when is_list(items) -> items
+      %{"data" => items} when is_list(items) -> items
+      items when is_list(items) -> items
+      _ -> []
+    end
+  end
+
+  defp line_items_list(_), do: []
+
+  defp line_item_account_name(item) when is_map(item) do
+    price = session_value(item, :price)
+    product = session_value(price, :product)
+
+    metadata_income_account(product) ||
+      one_line(session_value(product, :name)) ||
+      one_line(session_value(item, :description))
+  end
+
+  defp line_item_account_name(_), do: nil
+
+  defp known_link_account(link) do
+    case session_value(link, :url) do
+      url when is_binary(url) ->
+        known = known_link(url)
+        known && known.account
+
+      _ ->
+        nil
+    end
+  end
+
   defp matching_configured_link(link, configured) do
     case session_value(link, :url) do
       url when is_binary(url) ->
@@ -444,7 +564,7 @@ defmodule Ysc.Stripe.DonationPaymentLink do
   defp normalize_configured_link(_), do: nil
 
   # This donate link raises money for the Tahoe kitchen. A URL-only config
-  # entry still posts to that fund.
+  # entry or an unexpanded PaymentLink in tests still posts to that fund.
   defp known_link(url) when is_binary(url) do
     normalized = normalize_url(url)
     slug = slug_from_url(normalized)
@@ -534,11 +654,17 @@ defmodule Ysc.Stripe.DonationPaymentLink do
     # function_exported?/3 is false until the module is loaded. A missing
     # callback must not fail the webhook: unrelated Checkout Sessions would
     # otherwise retry until the event is dead.
-    if Code.ensure_loaded?(client) and
-         function_exported?(client, :retrieve_payment_link, 1) do
-      client.retrieve_payment_link(id)
-    else
-      {:error, :retrieve_payment_link_not_implemented}
+    cond do
+      Code.ensure_loaded?(client) and
+          function_exported?(client, :retrieve_payment_link, 2) ->
+        client.retrieve_payment_link(id, @payment_link_expand)
+
+      Code.ensure_loaded?(client) and
+          function_exported?(client, :retrieve_payment_link, 1) ->
+        client.retrieve_payment_link(id)
+
+      true ->
+        {:error, :retrieve_payment_link_not_implemented}
     end
   end
 
@@ -546,7 +672,7 @@ defmodule Ysc.Stripe.DonationPaymentLink do
     if session_value(session, :payment_status) == "paid" do
       case payment_link_id(session) do
         id when is_binary(id) ->
-          warm_configured_link(session, id)
+          warm_donation_link(session, id)
 
         _ ->
           :ok
@@ -556,25 +682,19 @@ defmodule Ysc.Stripe.DonationPaymentLink do
     end
   end
 
-  defp warm_configured_link(session, payment_link_id) do
-    configured = configured_identifiers()
+  defp warm_donation_link(session, payment_link_id) do
+    case retrieve_payment_link(payment_link_id) do
+      {:ok, link} ->
+        case resolve_donation_link(session, link) do
+          nil ->
+            :ok
 
-    if configured == [] do
-      :ok
-    else
-      case retrieve_payment_link(payment_link_id) do
-        {:ok, link} ->
-          case matching_configured_link(link, configured) do
-            nil ->
-              :ok
+          _resolved_link ->
+            warm_fee(session)
+        end
 
-            _configured_link ->
-              warm_fee(session)
-          end
-
-        {:error, _reason} ->
-          :ok
-      end
+      {:error, _reason} ->
+        :ok
     end
   end
 

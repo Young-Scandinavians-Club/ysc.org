@@ -45,11 +45,11 @@ defmodule Ysc.Stripe.DonationPaymentLinkTest do
 
   test "books the same payment intent once without another fee lookup" do
     assert :ok = book_session("plink_tahoe_kitchen", "pi_tahoe_once")
-    assert_received {:retrieve_payment_link, "plink_tahoe_kitchen"}
+    assert_received {:retrieve_payment_link, "plink_tahoe_kitchen", _opts}
     assert_received {:retrieve_payment_intent, "pi_tahoe_once"}
 
     assert :ok = book_session("plink_tahoe_kitchen", "pi_tahoe_once")
-    refute_received {:retrieve_payment_link, "plink_tahoe_kitchen"}
+    refute_received {:retrieve_payment_link, "plink_tahoe_kitchen", _opts}
     refute_received {:retrieve_payment_intent, "pi_tahoe_once"}
 
     count =
@@ -59,6 +59,21 @@ defmodule Ysc.Stripe.DonationPaymentLinkTest do
       )
 
     assert count == 1
+  end
+
+  test "automatically books a new unconfigured donate.stripe.com payment link using its Stripe product name" do
+    assert :ok = book_session("plink_sauna_roof", "pi_sauna_roof")
+
+    assert_received {:retrieve_payment_link, "plink_sauna_roof",
+                     %{expand: ["line_items.data.price.product"]}}
+
+    payment = Repo.get_by!(Payment, external_payment_id: "pi_sauna_roof")
+    assert Money.equal?(payment.amount, Money.new(50, :USD))
+
+    assert DonationPaymentLink.payment_link_fund(payment) == %{
+             account: "Sauna Roof Fund",
+             class: "Administration"
+           }
   end
 
   test "books checkout.session.async_payment_succeeded" do

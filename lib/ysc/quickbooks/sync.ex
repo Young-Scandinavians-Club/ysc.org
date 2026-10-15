@@ -1418,6 +1418,29 @@ defmodule Ysc.Quickbooks.Sync do
       {:ok, account_id} when is_binary(account_id) and account_id != "" ->
         %{value: account_id, name: name}
 
+      {:error, :not_found} ->
+        Ysc.Logging.info(
+          "[QB Sync] QuickBooks income account not found, creating it",
+          account: name
+        )
+
+        case client_module().create_account(name,
+               account_type: "Income",
+               account_sub_type: "NonProfitIncome"
+             ) do
+          {:ok, account_id} when is_binary(account_id) and account_id != "" ->
+            %{value: account_id, name: name}
+
+          error ->
+            Ysc.Logging.error(
+              "[QB Sync] Failed to create QuickBooks income account",
+              account: name,
+              error: inspect(error)
+            )
+
+            nil
+        end
+
       _ ->
         nil
     end

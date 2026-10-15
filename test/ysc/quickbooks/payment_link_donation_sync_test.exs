@@ -145,7 +145,64 @@ defmodule Ysc.Quickbooks.PaymentLinkDonationSyncTest do
     refute_received {:receipt, _}
   end
 
-  test "does not fall back to Special Project Fundraising when the payment-link account is missing",
+  test "creates the QuickBooks income account and item when the payment-link account does not exist yet",
+       %{user: user} do
+    stub_common_quickbooks()
+
+    stub(ClientMock, :query_account_by_name, fn
+      "Undeposited Funds" -> {:ok, "undeposited_funds"}
+      "Special Project Fundraising" -> {:ok, "special_project"}
+      "Sauna Roof Fund" -> {:error, :not_found}
+      _ -> {:error, :not_found}
+    end)
+
+    stub(ClientMock, :create_account, fn name, opts ->
+      send(self(), {:created_account, name, opts})
+      {:ok, "sauna_roof_account_id"}
+    end)
+
+    stub(ClientMock, :get_or_create_item, fn name, opts ->
+      send(self(), {:item, name, opts})
+      {:ok, "sauna_roof_item_id"}
+    end)
+
+    stub(ClientMock, :get_item_by_id, fn "sauna_roof_item_id" ->
+      {:ok,
+       %{
+         "Id" => "sauna_roof_item_id",
+         "Name" => "Sauna Roof Fund",
+         "IncomeAccountRef" => %{"value" => "sauna_roof_account_id"}
+       }}
+    end)
+
+    stub(ClientMock, :create_sales_receipt, fn params, _opts ->
+      send(self(), {:receipt, params})
+      {:ok, %{"Id" => "sr_sauna", "TotalAmt" => "50.00"}}
+    end)
+
+    {:ok, {payment, _, _}} = book_payment_link_donation(user, "Sauna Roof Fund")
+
+    payment = Repo.reload!(payment)
+    assert payment.quickbooks_sync_status == "synced"
+    assert payment.quickbooks_sales_receipt_id == "sr_sauna"
+
+    assert_received {:created_account, "Sauna Roof Fund",
+                     [
+                       account_type: "Income",
+                       account_sub_type: "NonProfitIncome"
+                     ]}
+
+    assert_received {:item, "Sauna Roof Fund", item_opts}
+
+    assert item_opts[:income_account_ref] == %{
+             value: "sauna_roof_account_id",
+             name: "Sauna Roof Fund"
+           }
+
+    assert_received {:receipt, _params}
+  end
+
+  test "does not fall back to Special Project Fundraising when creating the payment-link account fails",
        %{user: user} do
     stub_common_quickbooks()
 
@@ -154,6 +211,10 @@ defmodule Ysc.Quickbooks.PaymentLinkDonationSyncTest do
       "Special Project Fundraising" -> {:ok, "special_project"}
       "Tahoe Kitchen Fund" -> {:error, :not_found}
       _ -> {:error, :not_found}
+    end)
+
+    stub(ClientMock, :create_account, fn "Tahoe Kitchen Fund", _opts ->
+      {:error, :api_error}
     end)
 
     stub(ClientMock, :get_or_create_item, fn name, opts ->
