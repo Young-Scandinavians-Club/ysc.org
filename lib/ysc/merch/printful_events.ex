@@ -251,21 +251,58 @@ defmodule Ysc.Merch.PrintfulEvents do
     }
 
     case Repo.get_by(Shipment, printful_shipment_id: id) do
-      nil ->
-        attrs =
-          Map.merge(attrs, %{
-            status: status,
-            delivered_at: if(status == :delivered, do: now())
-          })
-
-        {:ok, Repo.insert!(Shipment.changeset(%Shipment{}, attrs))}
-
-      existing ->
-        {:ok, update_shipment(existing, attrs, status)}
+      nil -> insert_shipment(order, attrs, status)
+      existing -> merge_shipment(order, existing, attrs, status)
     end
   end
 
   defp record_shipment(_order, _bad, _status), do: :ignore
+
+  # A webhook and the status poll can report the same new shipment at once.
+  # The insert is a no-op if the other one got there first; either way we
+  # carry on with whichever row is in the table.
+  defp insert_shipment(order, attrs, status) do
+    attrs =
+      Map.merge(attrs, %{
+        status: status,
+        delivered_at: if(status == :delivered, do: now())
+      })
+
+    {:ok, inserted} =
+      %Shipment{}
+      |> Shipment.changeset(attrs)
+      |> Repo.insert(
+        on_conflict: :nothing,
+        conflict_target: :printful_shipment_id
+      )
+
+    stored =
+      Repo.get_by!(Shipment, printful_shipment_id: attrs.printful_shipment_id)
+
+    if stored.id == inserted.id,
+      do: {:ok, stored},
+      else: merge_shipment(order, stored, attrs, status)
+  end
+
+  # A shipment id belongs to one order. One that turns up on another order's
+  # event is ignored rather than moved.
+  defp merge_shipment(
+         %{id: order_id},
+         %{order_id: order_id} = existing,
+         attrs,
+         status
+       ),
+       do: {:ok, update_shipment(existing, attrs, status)}
+
+  defp merge_shipment(order, existing, _attrs, _status) do
+    Ysc.Logging.warning("Printful shipment reported for a different order",
+      order_id: order.id,
+      shipment_order_id: existing.order_id,
+      printful_shipment_id: existing.printful_shipment_id
+    )
+
+    :ignore
+  end
 
   # A shipment only moves forward: shipped -> delivered, or -> returned. A late
   # "shipped" event never reverts a delivered or returned parcel.

@@ -128,7 +128,7 @@ defmodule Ysc.Merch.OrdersTest do
     assert {:error, :unavailable_items} =
              create(user, Ysc.Merch.Cart.list(user))
 
-    refute Enum.all?(lines, & &1.available?) and false
+    refute Enum.all?(Ysc.Merch.Cart.list(user), & &1.available?)
   end
 
   test "get_user_order only returns the member's own order", %{

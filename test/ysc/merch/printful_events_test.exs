@@ -61,6 +61,25 @@ defmodule Ysc.Merch.PrintfulEventsTest do
       assert body =~ "USPS"
     end
 
+    test "a shipment id that belongs to another order is ignored", %{
+      order: order,
+      member: member
+    } do
+      other = purchase_order_fixture(member, :submitted)
+      shipment = printful_shipment()
+
+      assert :ok = handle("package_shipped", order, %{"shipment" => shipment})
+
+      handle("package_shipped", other, %{
+        "shipment" => Map.put(shipment, "tracking_number", "STOLEN")
+      })
+
+      assert [%Shipment{tracking_number: tracking}] = shipments(order)
+      assert tracking == shipment["tracking_number"]
+      assert shipments(other) == []
+      assert Repo.aggregate(Shipment, :count) == 1
+    end
+
     test "a duplicate event does not notify twice", %{order: order} do
       payload = %{"shipment" => printful_shipment()}
 

@@ -109,6 +109,61 @@ defmodule Ysc.Merch.CartTest do
     assert Cart.count(user) == 2
   end
 
+  describe "add/3 and set_quantity/3" do
+    test "adding the same variant again merges into one line, capped", %{
+      user: user,
+      variant: variant
+    } do
+      assert {:ok, %CartItem{quantity: 3}} = Cart.add(user, variant.id, 3)
+      assert {:ok, %CartItem{quantity: 5}} = Cart.add(user, variant.id, 2)
+
+      assert {:ok, %CartItem{quantity: max}} = Cart.add(user, variant.id, 500)
+      assert max == CartItem.max_quantity()
+
+      assert Repo.aggregate(CartItem, :count) == 1
+    end
+
+    test "a first add over the cap is capped too", %{
+      user: user,
+      variant: variant
+    } do
+      assert {:ok, %CartItem{quantity: max}} = Cart.add(user, variant.id, 500)
+      assert max == CartItem.max_quantity()
+    end
+
+    test "set_quantity changes an existing line and returns it", %{
+      user: user,
+      variant: variant
+    } do
+      {:ok, _} = Cart.add(user, variant.id, 1)
+
+      assert {:ok, %CartItem{quantity: 7}} =
+               Cart.set_quantity(user, variant.id, 7)
+
+      assert [%{quantity: 7}] = Cart.list(user)
+
+      assert {:ok, %CartItem{quantity: max}} =
+               Cart.set_quantity(user, variant.id, 999)
+
+      assert max == CartItem.max_quantity()
+    end
+
+    test "set_quantity never creates a line", %{user: user, variant: variant} do
+      assert {:ok, nil} = Cart.set_quantity(user, variant.id, 3)
+      assert Cart.list(user) == []
+    end
+
+    test "other members' lines are untouched", %{user: user, variant: variant} do
+      other = user_fixture()
+      {:ok, _} = Cart.add(other, variant.id, 2)
+      {:ok, _} = Cart.add(user, variant.id, 1)
+
+      {:ok, _} = Cart.set_quantity(user, variant.id, 9)
+
+      assert [%{quantity: 2}] = Cart.list(other)
+    end
+  end
+
   describe "summary/1" do
     test "is empty for no cart and for no user", %{user: user} do
       assert %{count: 0, subtotal: subtotal} = Cart.summary(user)

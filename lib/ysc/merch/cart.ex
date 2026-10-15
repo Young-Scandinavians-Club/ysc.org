@@ -135,15 +135,26 @@ defmodule Ysc.Merch.Cart do
   def add(%User{} = user, variant_id, quantity)
       when is_binary(variant_id) and is_integer(quantity) and quantity > 0 do
     with {:ok, _variant} <- fetch_available_variant(variant_id) do
-      existing = Repo.get_by(CartItem, user_id: user.id, variant_id: variant_id)
+      max = CartItem.max_quantity()
 
-      new_quantity =
-        min(
-          ((existing && existing.quantity) || 0) + quantity,
-          CartItem.max_quantity()
-        )
-
-      upsert(user, variant_id, existing, new_quantity)
+      # One statement, so two requests adding the same variant at once both
+      # count instead of one hitting the unique index.
+      %CartItem{user_id: user.id, variant_id: variant_id}
+      |> CartItem.changeset(%{quantity: min(quantity, max)})
+      |> Repo.insert(
+        on_conflict:
+          from(c in CartItem,
+            update: [
+              set: [
+                quantity:
+                  fragment("LEAST(? + ?, ?)", c.quantity, ^quantity, ^max),
+                updated_at: ^now()
+              ]
+            ]
+          ),
+        conflict_target: [:user_id, :variant_id],
+        returning: true
+      )
     end
   end
 
@@ -160,18 +171,19 @@ defmodule Ysc.Merch.Cart do
         {:ok, nil}
 
       true ->
-        case Repo.get_by(CartItem, user_id: user.id, variant_id: variant_id) do
-          nil ->
-            {:ok, nil}
+        {_count, items} =
+          from(c in CartItem,
+            where: c.user_id == ^user.id and c.variant_id == ^variant_id,
+            select: c
+          )
+          |> Repo.update_all(
+            set: [
+              quantity: min(quantity, CartItem.max_quantity()),
+              updated_at: now()
+            ]
+          )
 
-          existing ->
-            upsert(
-              user,
-              variant_id,
-              existing,
-              min(quantity, CartItem.max_quantity())
-            )
-        end
+        {:ok, List.first(items)}
     end
   end
 
@@ -209,11 +221,7 @@ defmodule Ysc.Merch.Cart do
     Ecto.Query.CastError -> {:error, :unavailable}
   end
 
-  defp upsert(user, variant_id, existing, quantity) do
-    (existing || %CartItem{user_id: user.id, variant_id: variant_id})
-    |> CartItem.changeset(%{quantity: quantity})
-    |> Repo.insert_or_update()
-  end
+  defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
 
   @doc false
   def ci_query_explain_query do

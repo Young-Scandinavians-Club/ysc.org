@@ -390,6 +390,13 @@ defmodule Ysc.Merch.CatalogSync do
           select: p.image_id,
           limit: 1
         )
+      ) ||
+      Repo.one(
+        from(g in ProductImage,
+          where: g.source_image_url == ^url and not is_nil(g.image_id),
+          select: g.image_id,
+          limit: 1
+        )
       )
   end
 

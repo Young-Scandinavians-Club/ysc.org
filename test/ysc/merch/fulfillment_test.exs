@@ -196,6 +196,39 @@ defmodule Ysc.Merch.FulfillmentTest do
       refute_received {:printful_payload, _}
     end
 
+    test "a settled order does not record the payment again", %{order: order} do
+      printful_accepts()
+      pi = payment_intent(order)
+      test_pid = self()
+
+      :telemetry.attach(
+        "merch-payment-recorded-#{inspect(test_pid)}",
+        [:ysc, :ledgers, :payment_recorded],
+        fn _event, _measurements, _metadata, _config ->
+          send(test_pid, :payment_recorded)
+        end,
+        nil
+      )
+
+      on_exit(fn ->
+        :telemetry.detach("merch-payment-recorded-#{inspect(test_pid)}")
+      end)
+
+      {:ok, _} = Fulfillment.process_successful_payment(pi)
+
+      # A second caller finds the order already paid (here: still waiting for
+      # Printful) and must not touch the ledger or QuickBooks again.
+      Repo.update_all(from(o in Order, where: o.id == ^order.id),
+        set: [status: :paid]
+      )
+
+      assert {:ok, %Order{status: :paid}} =
+               Fulfillment.process_successful_payment(pi)
+
+      assert_received :payment_recorded
+      refute_received :payment_recorded
+    end
+
     test "fetches the PaymentIntent when given an id", %{order: order} do
       printful_accepts()
       pi = payment_intent(order)

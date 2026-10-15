@@ -50,7 +50,10 @@ defmodule Ysc.Merch.Fulfillment do
   def process_successful_payment(%Stripe.PaymentIntent{} = payment_intent) do
     with {:ok, order} <- order_for(payment_intent),
          :ok <- validate(payment_intent, order) do
-      if order.status in [:pending, :paid] do
+      # Anything past :pending was settled already (the claim, confirmation
+      # email and submission job commit together), so there is nothing to
+      # redo, and re-recording the payment would only re-trigger its side effects.
+      if order.status == :pending do
         finalize(order, payment_intent)
       else
         {:ok, order}

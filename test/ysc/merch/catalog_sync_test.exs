@@ -567,6 +567,38 @@ defmodule Ysc.Merch.CatalogSyncTest do
       assert downloads() == []
     end
 
+    test "re-sync reuses every photo of a variant, not only its first", %{
+      admin: admin
+    } do
+      expect(ClientMock, :list_sync_products, 2, fn -> {:ok, [listed(1)]} end)
+
+      expect(ClientMock, :get_sync_product, 2, fn 1 ->
+        detail(listed(1), [
+          sync_variant(10, %{
+            "color" => "Black",
+            "files" =>
+              previews([
+                "https://img/front.png",
+                "https://img/back.png",
+                "https://img/side.png"
+              ])
+          })
+        ])
+      end)
+
+      assert {:ok, _} = Merch.sync_catalog(admin)
+      downloads()
+      images = Repo.aggregate(Ysc.Media.Image, :count)
+      photos = length(gallery(1))
+      assert photos >= 3
+
+      assert {:ok, _} = Merch.sync_catalog(admin)
+
+      assert downloads() == []
+      assert Repo.aggregate(Ysc.Media.Image, :count) == images
+      assert length(gallery(1)) == photos
+    end
+
     test "a photo that fails to download is skipped, the rest are kept", %{
       admin: admin
     } do
