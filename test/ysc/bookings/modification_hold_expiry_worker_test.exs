@@ -224,6 +224,55 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorkerTest do
     refute Bookings.modification_ledger_recorded?(booking.id, payment_intent_id)
   end
 
+  test "refunds and releases when booking was canceled with a captured unapplied modification PI",
+       %{user: user} do
+    {booking, _extended_checkout, preview} =
+      expired_modification_hold_with_preview!(user)
+
+    payment_intent_id =
+      "pi_mod_hold_expiry_canceled_#{System.unique_integer([:positive])}"
+
+    amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+    assert {:ok, _} =
+             Bookings.attach_modification_payment_intent(
+               booking.id,
+               payment_intent_id
+             )
+
+    booking = expire_modification_hold!(Repo.get!(Booking, booking.id))
+    original_checkout = booking.checkout_date
+
+    # Simulate a pre-fix orphan: complete cancel cleared status without
+    # Stripe-reconciling the modification PaymentIntent.
+    booking =
+      booking
+      |> Ecto.Changeset.change(%{status: :canceled})
+      |> Repo.update!()
+
+    expect_cancel_refused(payment_intent_id)
+
+    expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
+                                                           _opts ->
+      {:ok,
+       succeeded_modification_payment_intent(
+         payment_intent_id,
+         booking,
+         user,
+         amount_cents
+       )}
+    end)
+
+    ModificationHoldExpiryWorker.expire_expired_modification_holds()
+
+    released = Repo.get!(Booking, booking.id)
+    assert released.status == :canceled
+    assert released.checkout_date == original_checkout
+    assert is_nil(released.modification_hold_expires_at)
+    assert released.modification_hold_attrs
+    refute Bookings.modification_ledger_recorded?(booking.id, payment_intent_id)
+  end
+
   test "refunds and releases when succeeded payment cannot apply because check-in is past",
        %{user: user} do
     {booking, _extended_checkout, preview} =
