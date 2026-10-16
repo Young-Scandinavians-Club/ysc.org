@@ -2073,39 +2073,74 @@ defmodule YscWeb.EventDetailsLive do
       on_cancel={JS.push("close-payment-modal")}
       max_width="max-w-6xl"
     >
-      <%= if @checkout_expired do %>
-        <!-- Checkout Expired State -->
-        <div class="flex flex-col items-center justify-center py-16 space-y-6">
-          <div class="text-center">
-            <div class="text-red-500 mb-4">
-              <.icon name="hero-clock" class="w-16 h-16 mx-auto" />
+      <%= cond do %>
+        <% @checkout_expired -> %>
+          <!-- Checkout Expired State -->
+          <div class="flex flex-col items-center justify-center py-16 space-y-6">
+            <div class="text-center">
+              <div class="text-red-500 mb-4">
+                <.icon name="hero-clock" class="w-16 h-16 mx-auto" />
+              </div>
+              <h2 class="text-2xl text-red-700 mb-2 type-title">
+                Time ran out
+              </h2>
+              <p class="text-zinc-600 max-w-md">
+                You have 5 minutes to complete your purchase. Time ran out, so those tickets may no longer be available.
+                Please select your tickets again to continue.
+              </p>
             </div>
-            <h2 class="text-2xl text-red-700 mb-2 type-title">
-              Time ran out
-            </h2>
-            <p class="text-zinc-600 max-w-md">
-              You have 5 minutes to complete your purchase. Time ran out, so those tickets may no longer be available.
-              Please select your tickets again to continue.
-            </p>
-          </div>
 
-          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-            <.button
-              class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
-              phx-click="close-payment-modal"
-            >
-              Close
-            </.button>
-            <.button
-              class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
-              phx-click="retry-checkout"
-            >
-              <.icon name="hero-arrow-path" class="w-5 h-5" /> Select tickets again
-            </.button>
+            <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+              <.button
+                class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
+                phx-click="close-payment-modal"
+              >
+                Close
+              </.button>
+              <.button
+                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                phx-click="retry-checkout"
+              >
+                <.icon name="hero-arrow-path" class="w-5 h-5" />
+                Select tickets again
+              </.button>
+            </div>
           </div>
-        </div>
-      <% else %>
-        <%= if @checkout_payment_failed do %>
+        <% @checkout_payment_canceled -> %>
+          <!-- Payment canceled (user closed Stripe / wallet checkout) -->
+          <div
+            id="payment-canceled-state"
+            class="flex flex-col items-center justify-center py-16 space-y-6"
+          >
+            <div class="text-center">
+              <div class="text-zinc-500 mb-4">
+                <.icon name="hero-x-circle" class="w-16 h-16 mx-auto" />
+              </div>
+              <h2 class="text-2xl text-zinc-900 mb-2 type-title">
+                Payment canceled
+              </h2>
+              <p class="text-zinc-600 max-w-md">
+                You didn't finish paying, so those tickets went back on sale. Nobody was charged. Select tickets again when you're ready.
+              </p>
+            </div>
+
+            <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+              <.button
+                class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
+                phx-click="close-payment-modal"
+              >
+                Close
+              </.button>
+              <.button
+                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                phx-click="retry-checkout"
+              >
+                <.icon name="hero-arrow-path" class="w-5 h-5" />
+                Select tickets again
+              </.button>
+            </div>
+          </div>
+        <% @checkout_payment_failed -> %>
           <!-- Payment Failed State (redirect methods like CashApp) -->
           <div
             id="payment-failed-state"
@@ -2139,7 +2174,7 @@ defmodule YscWeb.EventDetailsLive do
               </.button>
             </div>
           </div>
-        <% else %>
+        <% true -> %>
           <!-- Normal Payment Flow -->
         <!-- Sticky Timer Banner at Top -->
           <div class="sticky top-0 z-10 bg-blue-50 border-b border-blue-200 -mx-6 -mt-2 px-6 pt-3 pb-3 mb-6">
@@ -2447,7 +2482,6 @@ defmodule YscWeb.EventDetailsLive do
               </div>
             </div>
           </div>
-        <% end %>
       <% end %>
     </.modal>
     <!-- Free Ticket Confirmation Modal -->
@@ -2976,6 +3010,7 @@ defmodule YscWeb.EventDetailsLive do
     |> clear_selected_tickets()
     |> assign(:checkout_expired, false)
     |> assign(:checkout_payment_failed, false)
+    |> assign(:checkout_payment_canceled, false)
     |> assign(:ticket_details_form, %{})
     |> assign(:ticket_registration_details_by_id, %{})
     |> assign(:tickets_for_me, %{})
@@ -3654,23 +3689,16 @@ defmodule YscWeb.EventDetailsLive do
         query_params[:resume_order]
 
     payment_failed_return? = query_params["payment_failed"] == "1"
+    payment_canceled_return? = query_params["payment_canceled"] == "1"
 
     socket =
       if connected?(socket) do
         cond do
+          payment_canceled_return? && socket.assigns.current_user ->
+            assign_checkout_payment_outcome_from_url(socket, :canceled)
+
           payment_failed_return? && socket.assigns.current_user ->
-            socket
-            |> assign(:show_payment_modal, true)
-            |> assign(:checkout_expired, false)
-            |> assign(:checkout_payment_failed, true)
-            |> assign(:stripe_payment_element_ready, false)
-            |> assign(:checkout_payment_intent_pending, false)
-            |> assign(:show_ticket_modal, false)
-            |> assign(:payment_intent, nil)
-            |> assign(:ticket_order, nil)
-            |> clear_selected_tickets()
-            |> assign(:preserve_failed_checkout_state, true)
-            |> push_patch(to: ~p"/events/#{socket.assigns.event.id}/tickets")
+            assign_checkout_payment_outcome_from_url(socket, :failed)
 
           socket.assigns.preserve_failed_checkout_state ->
             socket
@@ -3714,7 +3742,7 @@ defmodule YscWeb.EventDetailsLive do
             |> assign(:show_ticket_modal, false)
             |> assign(:show_payment_modal, false)
             |> assign(:checkout_expired, false)
-            |> assign(:checkout_payment_failed, false)
+            |> clear_checkout_payment_outcome()
             |> assign(:checkout_payment_intent_pending, false)
             |> assign(:stripe_payment_element_ready, false)
             |> assign(:show_free_ticket_confirmation, false)
@@ -4228,7 +4256,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:show_ticket_modal, false)
     |> assign(:show_payment_modal, true)
     |> assign(:checkout_expired, false)
-    |> assign(:checkout_payment_failed, false)
+    |> clear_checkout_payment_outcome()
     |> assign(:ticket_order, ticket_order)
     |> assign(
       :tickets_requiring_registration,
@@ -4559,7 +4587,7 @@ defmodule YscWeb.EventDetailsLive do
       socket.assigns[:checkout_expired] == true ->
         {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
 
-      socket.assigns[:checkout_payment_failed] == true ->
+      checkout_payment_outcome_shown?(socket) ->
         {:noreply, assign(socket, :checkout_payment_intent_pending, false)}
 
       true ->
@@ -4867,7 +4895,7 @@ defmodule YscWeb.EventDetailsLive do
     expired_order_id = event.ticket_order && event.ticket_order.id
 
     cond do
-      socket.assigns.checkout_payment_failed ->
+      checkout_payment_outcome_shown?(socket) ->
         {:noreply, socket}
 
       socket.assigns.show_payment_modal && current_order_id == expired_order_id ->
@@ -4885,7 +4913,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> assign(:show_payment_modal, false)
          |> assign(:checkout_expired, false)
-         |> assign(:checkout_payment_failed, false)
+         |> clear_checkout_payment_outcome()
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:payment_intent, nil)
          |> assign(:ticket_order, nil)
@@ -4913,28 +4941,21 @@ defmodule YscWeb.EventDetailsLive do
 
     # Only show a modal message if this is the same session that was cancelled
     if checkout_session_cancelled_matches?(socket, event) do
-      if payment_failure_cancellation?(event.reason) do
-        {:noreply,
-         socket
-         |> assign(:show_payment_modal, true)
-         |> assign(:checkout_payment_failed, true)
-         |> assign(:checkout_expired, false)
-         |> assign(:stripe_payment_element_ready, false)
-         |> assign(:payment_intent, nil)
-         |> assign(:ticket_order, nil)
-         |> assign(:payment_redirect_in_progress, false)
-         |> clear_selected_tickets()}
-      else
-        {:noreply,
-         socket
-         |> assign(:show_payment_modal, false)
-         |> assign(:checkout_expired, false)
-         |> assign(:checkout_payment_failed, false)
-         |> assign(:stripe_payment_element_ready, false)
-         |> assign(:payment_intent, nil)
-         |> assign(:ticket_order, nil)
-         |> assign(:payment_redirect_in_progress, false)
-         |> clear_selected_tickets()}
+      case checkout_payment_outcome(event.reason) do
+        outcome when outcome in [:failed, :canceled] ->
+          {:noreply, show_checkout_payment_outcome(socket, outcome)}
+
+        _ ->
+          {:noreply,
+           socket
+           |> assign(:show_payment_modal, false)
+           |> assign(:checkout_expired, false)
+           |> clear_checkout_payment_outcome()
+           |> assign(:stripe_payment_element_ready, false)
+           |> assign(:payment_intent, nil)
+           |> assign(:ticket_order, nil)
+           |> assign(:payment_redirect_in_progress, false)
+           |> clear_selected_tickets()}
       end
     else
       {:noreply, socket}
@@ -5251,7 +5272,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> assign(:show_payment_modal, false)
          |> assign(:checkout_expired, false)
-         |> assign(:checkout_payment_failed, false)
+         |> clear_checkout_payment_outcome()
          |> assign(:checkout_payment_intent_pending, false)
          |> assign(:payment_intent, nil)
          |> assign(:ticket_order, nil)
@@ -5457,7 +5478,7 @@ defmodule YscWeb.EventDetailsLive do
     {:noreply,
      socket
      |> assign(:checkout_expired, false)
-     |> assign(:checkout_payment_failed, false)
+     |> clear_checkout_payment_outcome()
      |> assign(:show_payment_modal, false)
      |> assign(:stripe_payment_element_ready, false)
      |> assign(:payment_intent, nil)
@@ -6545,19 +6566,58 @@ defmodule YscWeb.EventDetailsLive do
     Jason.encode!(selected_tickets)
   end
 
-  @payment_failure_cancellation_reasons ["Payment failed", "Payment canceled"]
+  @checkout_payment_outcome_reasons ["Payment failed", "Payment canceled"]
 
-  defp payment_failure_cancellation?(reason) when is_binary(reason) do
-    reason in @payment_failure_cancellation_reasons
+  defp checkout_payment_outcome("Payment canceled"), do: :canceled
+  defp checkout_payment_outcome("Payment failed"), do: :failed
+  defp checkout_payment_outcome(_), do: nil
+
+  defp checkout_payment_outcome_reason?(reason) when is_binary(reason) do
+    reason in @checkout_payment_outcome_reasons
   end
 
-  defp payment_failure_cancellation?(_), do: false
+  defp checkout_payment_outcome_reason?(_), do: false
+
+  defp checkout_payment_outcome_shown?(socket) do
+    socket.assigns[:checkout_payment_failed] == true or
+      socket.assigns[:checkout_payment_canceled] == true
+  end
+
+  defp clear_checkout_payment_outcome(socket) do
+    socket
+    |> assign(:checkout_payment_failed, false)
+    |> assign(:checkout_payment_canceled, false)
+  end
+
+  defp show_checkout_payment_outcome(socket, outcome)
+       when outcome in [:failed, :canceled] do
+    socket
+    |> assign(:show_payment_modal, true)
+    |> assign(:checkout_expired, false)
+    |> assign(:checkout_payment_failed, outcome == :failed)
+    |> assign(:checkout_payment_canceled, outcome == :canceled)
+    |> assign(:stripe_payment_element_ready, false)
+    |> assign(:payment_intent, nil)
+    |> assign(:ticket_order, nil)
+    |> assign(:payment_redirect_in_progress, false)
+    |> clear_selected_tickets()
+  end
+
+  defp assign_checkout_payment_outcome_from_url(socket, outcome)
+       when outcome in [:failed, :canceled] do
+    socket
+    |> show_checkout_payment_outcome(outcome)
+    |> assign(:checkout_payment_intent_pending, false)
+    |> assign(:show_ticket_modal, false)
+    |> assign(:preserve_failed_checkout_state, true)
+    |> push_patch(to: ~p"/events/#{socket.assigns.event.id}/tickets")
+  end
 
   defp checkout_session_cancelled_matches?(socket, event) do
     same_ticket_order?(socket.assigns.ticket_order, event.ticket_order) ||
       (is_nil(socket.assigns.ticket_order) &&
          socket.assigns.preserve_failed_checkout_state &&
-         payment_failure_cancellation?(event.reason) &&
+         checkout_payment_outcome_reason?(event.reason) &&
          socket.assigns.show_payment_modal &&
          same_user_and_event?(socket, event))
   end
@@ -6578,10 +6638,15 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   defp cancelled_order_error_message(ticket_order) do
-    if payment_failure_cancellation?(ticket_order.cancellation_reason) do
-      "Your payment did not go through. Please select your tickets again to try again."
-    else
-      "This ticket checkout was cancelled. Please choose your tickets again."
+    case checkout_payment_outcome(ticket_order.cancellation_reason) do
+      :canceled ->
+        "You didn't finish paying, so those tickets went back on sale. Select tickets again when you're ready."
+
+      :failed ->
+        "Your payment did not go through. Please select your tickets again to try again."
+
+      _ ->
+        "This ticket checkout was cancelled. Please choose your tickets again."
     end
   end
 
@@ -7775,7 +7840,7 @@ defmodule YscWeb.EventDetailsLive do
        |> assign(:show_ticket_modal, false)
        |> assign(:show_payment_modal, true)
        |> assign(:checkout_expired, false)
-       |> assign(:checkout_payment_failed, false)
+       |> clear_checkout_payment_outcome()
        |> assign(:stripe_payment_element_ready, false)
        |> assign(:ticket_order, ticket_order)
        |> assign(
