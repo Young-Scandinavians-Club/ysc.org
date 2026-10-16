@@ -25,6 +25,9 @@ defmodule Ysc.Quickbooks.Sync do
   # Ysc.Ledgers.ReconciliationWorker uses for retrying local payout linking.
   @payout_deposit_autoupdate_window_days 30
 
+  # Parent of every income account created for a Stripe donation Payment Link.
+  @payment_link_donation_parent_account "Special Project Fundraising"
+
   # Helper to get the configured QuickBooks client module (for testing with mocks)
   defp client_module do
     Application.get_env(:ysc, :quickbooks_client, Ysc.Quickbooks.Client)
@@ -1445,10 +1448,16 @@ defmodule Ysc.Quickbooks.Sync do
           account: name
         )
 
-        case client_module().create_account(name,
-               account_type: "Income",
-               account_sub_type: "NonProfitIncome"
-             ) do
+        create_result =
+          with {:ok, parent_account_id} <- payment_link_parent_account_id() do
+            client_module().create_account(name,
+              account_type: "Income",
+              account_sub_type: "NonProfitIncome",
+              parent_account_id: parent_account_id
+            )
+          end
+
+        case create_result do
           {:ok, account_id} when is_binary(account_id) and account_id != "" ->
             %{value: account_id, name: name}
 
@@ -1471,6 +1480,29 @@ defmodule Ysc.Quickbooks.Sync do
 
       _ ->
         nil
+    end
+  end
+
+  # Payment-link donation funds are sub-accounts of Special Project Fundraising.
+  # If that parent is missing the fund is created at the top level instead of
+  # blocking the donation.
+  defp payment_link_parent_account_id do
+    case client_module().query_account_by_name(
+           @payment_link_donation_parent_account
+         ) do
+      {:ok, id} when is_binary(id) and id != "" ->
+        {:ok, id}
+
+      {:error, reason} when reason in [:rate_limited, :request_failed] ->
+        {:error, reason}
+
+      _ ->
+        Ysc.Logging.warning(
+          "[QB Sync] Parent account for payment link donations not found; creating the fund at the top level",
+          parent_account: @payment_link_donation_parent_account
+        )
+
+        {:ok, nil}
     end
   end
 
