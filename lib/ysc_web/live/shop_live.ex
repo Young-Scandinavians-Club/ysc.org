@@ -92,6 +92,13 @@ defmodule YscWeb.ShopLive do
     ]
   end
 
+  # Splits an answer around a phrase that should render as a link.
+  defp answer_before(answer, phrase),
+    do: answer |> String.split(phrase, parts: 2) |> List.first()
+
+  defp answer_after(answer, phrase),
+    do: answer |> String.split(phrase, parts: 2) |> List.last()
+
   defp count_label(1), do: "1 item"
   defp count_label(count), do: "#{count} items"
 
@@ -110,6 +117,7 @@ defmodule YscWeb.ShopLive do
     <.shop_frame
       id="shop-page"
       title="Club Gear"
+      subtitle="Printed to order, so delivery can take a little longer. The shop is just for fun."
       active={:shop}
       cart_count={@cart_summary.count}
     >
@@ -306,7 +314,19 @@ defmodule YscWeb.ShopLive do
               />
             </summary>
             <p class="px-5 pb-5 text-base text-zinc-600">
-              {answer}
+              <%= if key == "tracking" do %>
+                {answer_before(answer, "My orders")}
+                <.link
+                  id="shop-faq-orders"
+                  navigate={~p"/shop/orders"}
+                  class="font-medium text-blue-700 hover:text-blue-800"
+                >
+                  My orders
+                </.link>
+                {answer_after(answer, "My orders")}
+              <% else %>
+                {answer}
+              <% end %>
               <a
                 :if={key == "problems"}
                 id="shop-faq-contact"
