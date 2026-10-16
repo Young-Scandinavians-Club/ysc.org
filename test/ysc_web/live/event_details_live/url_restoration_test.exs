@@ -209,6 +209,48 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
 
       assert has_element?(view, "#payment-modal")
       assert has_element?(view, "#payment-failed-state")
+      assert has_element?(view, "h2", "Payment failed")
+
+      assert has_element?(
+               view,
+               "#payment-failed-state",
+               "try a different payment method"
+             )
+
+      refute has_element?(view, "#payment-canceled-state")
+      refute has_element?(view, "#ticket-modal")
+    end
+
+    test "opens payment canceled state when returning from canceled redirect payment",
+         %{
+           conn: conn
+         } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/events/#{event.id}?payment_canceled=1")
+
+      view = wait_for_async(view)
+
+      assert has_element?(view, "#payment-modal")
+      assert has_element?(view, "#payment-canceled-state")
+      assert has_element?(view, "h2", "Payment canceled")
+
+      assert has_element?(
+               view,
+               "#payment-canceled-state",
+               "Nobody was charged"
+             )
+
+      refute has_element?(view, "h2", "Payment failed")
+      refute has_element?(view, "#payment-failed-state")
+
+      refute has_element?(
+               view,
+               "#payment-canceled-state",
+               "different payment method"
+             )
+
       refute has_element?(view, "#ticket-modal")
     end
 

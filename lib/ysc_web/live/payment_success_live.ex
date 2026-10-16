@@ -396,7 +396,8 @@ defmodule YscWeb.PaymentSuccessLive do
                        redirect_status
                      ) do
                   :ok ->
-                    {:ok, ~p"/events/#{event_id}?payment_failed=1"}
+                    {:ok,
+                     ticket_checkout_return_path(event_id, redirect_status)}
 
                   {:fulfilled, ticket_order} ->
                     {:fulfilled,
@@ -480,6 +481,14 @@ defmodule YscWeb.PaymentSuccessLive do
 
         {:error, reason}
     end
+  end
+
+  defp ticket_checkout_return_path(event_id, "canceled") do
+    ~p"/events/#{event_id}?payment_canceled=1"
+  end
+
+  defp ticket_checkout_return_path(event_id, _redirect_status) do
+    ~p"/events/#{event_id}?payment_failed=1"
   end
 
   defp failure_context(path) when is_binary(path) do
