@@ -4145,7 +4145,7 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Page title for public pages: centered, bordered, eyebrow + title + optional
+  Page title for public pages: left-aligned eyebrow + title + optional
   subtitle. Public text pages open with this so the site reads as one place.
   (The cabin pages keep their own photo hero.)
 
@@ -4207,7 +4207,6 @@ defmodule YscWeb.CoreComponents do
     <div
       id={@id}
       class={[
-        "text-center",
         page_masthead_frame_class(@size),
         @class
       ]}
@@ -4227,7 +4226,7 @@ defmodule YscWeb.CoreComponents do
           {@title}
         </h1>
       <% end %>
-      <p :if={@subtitle} class="mt-3 mx-auto max-w-2xl text-zinc-600 text-lg">
+      <p :if={@subtitle} class="mt-3 max-w-2xl text-zinc-600 text-lg">
         {@subtitle}
       </p>
       {render_slot(@inner_block)}
@@ -4236,12 +4235,13 @@ defmodule YscWeb.CoreComponents do
   end
 
   # Section hubs get the full rule-bounded masthead; compact pages are
-  # unframed (the page wrapper supplies the spacing) so content starts sooner.
+  # unruled. Both own their bottom margin so the gap to the content is the
+  # same on every page (callers should not add their own).
   defp page_masthead_frame_class(:default),
-    do: "border-y border-zinc-200 py-6 md:py-12"
+    do: "mb-10 border-y border-zinc-200 py-6 md:mb-16 md:py-12"
 
   defp page_masthead_frame_class(:compact),
-    do: nil
+    do: "mb-8 md:mb-10"
 
   defp page_masthead_title_class(:default),
     do: "text-3xl sm:text-4xl md:text-7xl text-zinc-900 type-display"
@@ -4282,7 +4282,7 @@ defmodule YscWeb.CoreComponents do
         <p :if={@eyebrow} class="text-xs text-blue-600 mb-2 type-eyebrow">
           {@eyebrow}
         </p>
-        <h1 class="text-3xl sm:text-4xl text-zinc-900 wrap-break-word type-display">
+        <h1 class="text-3xl md:text-4xl text-zinc-900 wrap-break-word type-display">
           {@title}
         </h1>
         <p :if={@subtitle} class="mt-2 text-base text-zinc-600">

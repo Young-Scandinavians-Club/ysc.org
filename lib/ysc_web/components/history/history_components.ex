@@ -18,7 +18,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
     ~H"""
     <div
       id="history-hero"
-      class="max-w-(--breakpoint-xl) mx-auto px-4 mb-12 md:mb-16"
+      class="max-w-(--breakpoint-xl) mx-auto px-4"
     >
       <.page_masthead
         id="history-masthead"
@@ -34,7 +34,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
         </p>
       </.page_masthead>
 
-      <div class="max-w-2xl mx-auto mt-10 md:mt-12 text-center">
+      <div class="max-w-2xl">
         <h2 class="text-2xl md:text-3xl font-medium text-zinc-900 mb-6 history-serif">
           A Legacy of Friendship: The YSC Story
         </h2>
@@ -52,7 +52,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
           </p>
         </div>
 
-        <blockquote class="border-l-2 border-zinc-300 pl-6 italic text-zinc-600 text-left max-w-xl mx-auto history-serif mt-8">
+        <blockquote class="border-l-2 border-zinc-300 pl-6 italic text-zinc-600 max-w-xl history-serif mt-8">
           <p class="text-base leading-relaxed">
             Today the YSC remains one of the most active Scandinavian organizations in the Bay Area—offering endless opportunities to enjoy all that Northern California has to offer, and to share American culture with fellow Scandinavians along the way.
           </p>

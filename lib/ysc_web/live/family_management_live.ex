@@ -464,31 +464,25 @@ defmodule YscWeb.FamilyManagementLive do
       |> assign(:active_rows, active_rows)
 
     ~H"""
-    <header class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-      <div>
-        <h1
-          id="family-management-heading"
-          class="text-zinc-900 text-2xl sm:text-3xl type-display"
+    <.page_header
+      id="family-management-heading"
+      title="Family Management"
+      subtitle="Manage your family members and invite them to share your membership benefits. Add their details first, then send an invite so they can sign in."
+    >
+      <:actions>
+        <.button
+          type="button"
+          phx-click="show_add_family_member"
+          id="add-family-member-button"
+          class="shrink-0"
         >
-          Family Management
-        </h1>
-        <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
-          Manage your family members and invite them to share your membership benefits.
-          Add their details first, then send an invite so they can sign in.
-        </p>
-        <p id="family-member-limit" class="text-xs text-zinc-500 mt-2">
-          Limit: 1 spouse or partner, up to 9 children
-        </p>
-      </div>
-      <.button
-        type="button"
-        phx-click="show_add_family_member"
-        id="add-family-member-button"
-        class="shrink-0"
-      >
-        <.icon name="hero-plus" class="w-4 h-4 me-1" /> Add Family Member
-      </.button>
-    </header>
+          <.icon name="hero-plus" class="w-4 h-4 me-1" /> Add Family Member
+        </.button>
+      </:actions>
+    </.page_header>
+    <p id="family-member-limit" class="text-xs text-zinc-500">
+      Limit: 1 spouse or partner, up to 9 children
+    </p>
 
     <%= if not @can_send_invite do %>
       <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -809,14 +803,10 @@ defmodule YscWeb.FamilyManagementLive do
 
   defp sub_account_view(assigns) do
     ~H"""
-    <header>
-      <h1 class="text-zinc-900 text-2xl sm:text-3xl type-display">
-        Your Family Group
-      </h1>
-      <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
-        You are part of a family membership. Below you can see who manages your family membership and the other members on your account.
-      </p>
-    </header>
+    <.page_header
+      title="Your Family Group"
+      subtitle="You are part of a family membership. Below you can see who manages your family membership and the other members on your account."
+    />
 
     <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
       <h2 class="text-zinc-900 text-xl type-subhead">Family membership manager</h2>

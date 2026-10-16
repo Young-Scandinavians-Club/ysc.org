@@ -44,7 +44,7 @@ defmodule YscWeb.ShopComponents do
   def shop_frame(assigns) do
     ~H"""
     <div id={@id} class="py-6 md:py-12">
-      <div class="mx-auto mb-8 max-w-(--breakpoint-xl) px-4 md:mb-12">
+      <div class="mx-auto max-w-(--breakpoint-xl) px-4">
         <.page_masthead
           id={"#{@id}-masthead"}
           eyebrow={@eyebrow}

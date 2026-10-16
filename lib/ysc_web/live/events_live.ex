@@ -14,7 +14,7 @@ defmodule YscWeb.EventsLive do
     ~H"""
     <div class="py-6 md:py-12">
       <%!-- The "Masthead" Header --%>
-      <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-8 md:mb-16">
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4">
         <.page_masthead
           eyebrow="Events"
           title={

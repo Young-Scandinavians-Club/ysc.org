@@ -215,7 +215,7 @@ defmodule YscWeb.BookingReceiptLive do
                 Booking Cancelled
               </span>
             </div>
-            <h1 class="text-4xl text-zinc-900 type-display">
+            <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
               Booking Cancelled
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
@@ -249,7 +249,7 @@ defmodule YscWeb.BookingReceiptLive do
                   else: "Booking Confirmed"}
               </span>
             </div>
-            <h1 class="text-4xl text-zinc-900 type-display">
+            <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
               <%= cond do %>
                 <% @show_reservation_updated -> %>
                   Your booking has been updated, {@user_first_name}!
