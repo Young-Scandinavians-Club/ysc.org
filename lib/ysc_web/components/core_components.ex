@@ -4511,6 +4511,59 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Linked card for a downloadable file (PDF, DOCX, PPTX).
+
+  Used on the financials page. `kind` picks the icon tile: `:summary` (red),
+  `:report` (blue), `:minutes` (green), `:slides` (orange).
+
+  ## Examples
+
+      <.document_download_card
+        href={~p"/annual_meetings/2026/report.pdf"}
+        title="Full Annual Report"
+        meta="PDF • 107K"
+        kind={:report}
+      />
+  """
+  attr :id, :string, default: nil
+  attr :href, :string, required: true
+  attr :title, :string, required: true
+  attr :meta, :string, required: true
+
+  attr :kind, :atom,
+    default: :report,
+    values: [:summary, :report, :minutes, :slides]
+
+  attr :icon, :string, default: nil
+  attr :class, :any, default: nil
+
+  def document_download_card(assigns) do
+    YscWeb.Components.DocumentDownload.document_download_card(assigns)
+  end
+
+  @doc """
+  Year block wrapping a grid of `document_download_card/1` links.
+
+  `:featured` is a standalone card with a dark heading. `:archive` is a
+  padded inner block for the collapsible archive on `/financials`.
+
+  ## Examples
+
+      <.annual_meeting_section id="year-2026" title="2026 General Meeting">
+        <.document_download_card title="Full Annual Report" ... />
+      </.annual_meeting_section>
+  """
+  attr :id, :string, required: true
+  attr :title, :string, required: true
+  attr :variant, :atom, default: :featured, values: [:featured, :archive]
+  attr :class, :any, default: nil
+  slot :inner_block, required: true
+
+  def annual_meeting_section(assigns) do
+    YscWeb.Components.DocumentDownload.annual_meeting_section(assigns)
+  end
+
+  @doc """
   Section heading with a leading emoji or custom icon.
 
   Used on booking landing pages and similar member-facing content. Pass an

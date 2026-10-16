@@ -46,358 +46,121 @@
       <span class="text-sm font-semibold text-zinc-700 mr-2">
         Jump to Year:
       </span>
-      <.link
-        href="#year-2026"
-        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-      >
-        2026
-      </.link>
-      <span class="text-zinc-400">|</span>
-      <.link
-        href="#year-2025"
-        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-      >
-        2025
-      </.link>
-      <span class="text-zinc-400">|</span>
-      <.link
-        href="#year-2024"
-        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-      >
-        2024
-      </.link>
-      <span class="text-zinc-400">|</span>
-      <.link
-        href="#year-2023"
-        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-      >
-        2023
-      </.link>
-      <span class="text-zinc-400">|</span>
-      <.link
-        href="#year-2022"
-        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-      >
-        2022
-      </.link>
-      <span class="text-zinc-400">|</span>
-      <.link
-        href="#year-2021"
-        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-      >
-        2021
-      </.link>
-      <span class="text-zinc-400">|</span>
-      <.link
-        href="#year-2020"
-        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-      >
-        2020
-      </.link>
-      <span class="text-zinc-400">|</span>
-      <.link
-        href="#year-2019"
-        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-      >
-        2019
-      </.link>
-      <span class="text-zinc-400">|</span>
-      <.link
-        href="#year-2018"
-        class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-      >
-        2018
-      </.link>
+      <%= for {year, idx} <- Enum.with_index(2026..2018//-1) do %>
+        <span :if={idx > 0} class="text-zinc-400">|</span>
+        <.link
+          href={"#year-#{year}"}
+          class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
+        >
+          {year}
+        </.link>
+      <% end %>
     </div>
   </div>
 
   <%!-- Financial Reports by Year --%>
   <div class="space-y-6">
-    <%!-- 2026 General Meeting (Most Recent - Expanded) --%>
-    <section
-      id="year-2026"
-      class="bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden"
-    >
-      <div class="bg-zinc-900 px-6 py-4">
-        <h2 class="text-white text-xl m-0 type-subhead">
-          2026 General Meeting
-        </h2>
-      </div>
-      <div class="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <.link
-          href={~p"/annual_meetings/2026/YSC_ANNUAL_MEETING_REPORT_FY_2025.pdf"}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Financials Summary 2025
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 70K
-            </div>
-          </div>
-        </.link>
+    <.annual_meeting_section id="year-2026" title="2026 General Meeting">
+      <.document_download_card
+        id="financials-2026-summary"
+        href={~p"/annual_meetings/2026/YSC_ANNUAL_MEETING_REPORT_FY_2025.pdf"}
+        title="Financials Summary 2025"
+        meta="PDF • 70K"
+        kind={:summary}
+      />
+      <.document_download_card
+        id="financials-2026-report"
+        href={~p"/annual_meetings/2026/YSC_ANNUAL_REPORT_FY_2025.pdf"}
+        title="Full Annual Report"
+        meta="PDF • 107K"
+        kind={:report}
+      />
+      <.document_download_card
+        id="financials-2026-minutes"
+        href={~p"/annual_meetings/2026/YSC_AGM_2026_meeting_minutes.pdf"}
+        title="Meeting Minutes"
+        meta="PDF • 104K"
+        kind={:minutes}
+      />
+    </.annual_meeting_section>
 
-        <.link
-          href={~p"/annual_meetings/2026/YSC_ANNUAL_REPORT_FY_2025.pdf"}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Full Annual Report
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 107K
-            </div>
-          </div>
-        </.link>
+    <.annual_meeting_section id="year-2025" title="2025 General Meeting">
+      <.document_download_card
+        id="financials-2025-summary"
+        href={
+          ~p"/annual_meetings/2025/annual_meeting_financials_2024_handout.pdf"
+        }
+        title="Financials Summary 2024"
+        meta="PDF • 70K"
+        kind={:summary}
+      />
+      <.document_download_card
+        id="financials-2025-report"
+        href={~p"/annual_meetings/2025/YSC_Annual_Report_2024.pdf"}
+        title="Full Annual Report"
+        meta="PDF • 106K"
+        kind={:report}
+      />
+      <.document_download_card
+        id="financials-2025-minutes"
+        href="/annual_meetings/2025/YSC_AGM%202025_meeting_minutes.docx"
+        title="Meeting Minutes"
+        meta="DOCX • 51K"
+        kind={:minutes}
+      />
+    </.annual_meeting_section>
 
-        <.link
-          href={~p"/annual_meetings/2026/YSC_AGM_2026_meeting_minutes.pdf"}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-green-100 text-green-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-text" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Meeting Minutes
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 104K
-            </div>
-          </div>
-        </.link>
-      </div>
-    </section>
+    <.annual_meeting_section id="year-2024" title="2024 General Meeting">
+      <.document_download_card
+        id="financials-2024-summary"
+        href={
+          ~p"/annual_meetings/2024/YSC-Financials-2023-General-Meeting-Handout.pdf"
+        }
+        title="Financials Summary 2023"
+        meta="PDF • 57K"
+        kind={:summary}
+      />
+      <.document_download_card
+        id="financials-2024-report"
+        href={~p"/annual_meetings/2024/YSC-AGM-2025_final.pdf"}
+        title="Full Annual Report"
+        meta="PDF • 158K"
+        kind={:report}
+      />
+      <.document_download_card
+        id="financials-2024-minutes"
+        href="/annual_meetings/2024/YSC%20Annual%20General%20Meeting%2001.28.24.docx"
+        title="Meeting Minutes"
+        meta="DOCX • 15K"
+        kind={:minutes}
+      />
+    </.annual_meeting_section>
 
-    <%!-- 2025 General Meeting --%>
-    <section
-      id="year-2025"
-      class="bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden"
-    >
-      <div class="bg-zinc-900 px-6 py-4">
-        <h2 class="text-white text-xl m-0 type-subhead">
-          2025 General Meeting
-        </h2>
-      </div>
-      <div class="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <.link
-          href={
-            ~p"/annual_meetings/2025/annual_meeting_financials_2024_handout.pdf"
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Financials Summary 2024
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 70K
-            </div>
-          </div>
-        </.link>
-
-        <.link
-          href={~p"/annual_meetings/2025/YSC_Annual_Report_2024.pdf"}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Full Annual Report
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 106K
-            </div>
-          </div>
-        </.link>
-
-        <.link
-          href="/annual_meetings/2025/YSC_AGM%202025_meeting_minutes.docx"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-green-100 text-green-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-text" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Meeting Minutes
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              DOCX • 51K
-            </div>
-          </div>
-        </.link>
-      </div>
-    </section>
-
-    <%!-- 2024 General Meeting --%>
-    <section
-      id="year-2024"
-      class="bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden"
-    >
-      <div class="bg-zinc-900 px-6 py-4">
-        <h2 class="text-white text-xl m-0 type-subhead">
-          2024 General Meeting
-        </h2>
-      </div>
-      <div class="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <.link
-          href={
-            ~p"/annual_meetings/2024/YSC-Financials-2023-General-Meeting-Handout.pdf"
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Financials Summary 2023
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 57K
-            </div>
-          </div>
-        </.link>
-
-        <.link
-          href={~p"/annual_meetings/2024/YSC-AGM-2025_final.pdf"}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Full Annual Report
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 158K
-            </div>
-          </div>
-        </.link>
-
-        <.link
-          href="/annual_meetings/2024/YSC%20Annual%20General%20Meeting%2001.28.24.docx"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-green-100 text-green-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-text" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Meeting Minutes
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              DOCX • 15K
-            </div>
-          </div>
-        </.link>
-      </div>
-    </section>
-
-    <%!-- 2023 General Meeting --%>
-    <section
-      id="year-2023"
-      class="bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden"
-    >
-      <div class="bg-zinc-900 px-6 py-4">
-        <h2 class="text-white text-xl m-0 type-subhead">
-          2023 General Meeting
-        </h2>
-      </div>
-      <div class="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <.link
-          href={
-            ~p"/annual_meetings/2023/YSC-General-Meeting-Financials-Summary-2022.pdf"
-          }
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Financials Summary 2022
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 49K
-            </div>
-          </div>
-        </.link>
-
-        <.link
-          href={~p"/annual_meetings/2023/YSC-Financials-2022.v2.pdf"}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Full Annual Report
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 717K
-            </div>
-          </div>
-        </.link>
-
-        <.link
-          href={~p"/annual_meetings/2023/YSC-AGM-Minutes-02.27.22.pdf"}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-        >
-          <div class="bg-green-100 text-green-600 p-3 rounded-lg mr-4 shrink-0">
-            <.icon name="hero-document-text" class="w-6 h-6" />
-          </div>
-          <div class="min-w-0">
-            <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-              Meeting Minutes
-            </div>
-            <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-              PDF • 90K
-            </div>
-          </div>
-        </.link>
-      </div>
-    </section>
+    <.annual_meeting_section id="year-2023" title="2023 General Meeting">
+      <.document_download_card
+        id="financials-2023-summary"
+        href={
+          ~p"/annual_meetings/2023/YSC-General-Meeting-Financials-Summary-2022.pdf"
+        }
+        title="Financials Summary 2022"
+        meta="PDF • 49K"
+        kind={:summary}
+      />
+      <.document_download_card
+        id="financials-2023-report"
+        href={~p"/annual_meetings/2023/YSC-Financials-2022.v2.pdf"}
+        title="Full Annual Report"
+        meta="PDF • 717K"
+        kind={:report}
+      />
+      <.document_download_card
+        id="financials-2023-minutes"
+        href={~p"/annual_meetings/2023/YSC-AGM-Minutes-02.27.22.pdf"}
+        title="Meeting Minutes"
+        meta="PDF • 90K"
+        kind={:minutes}
+      />
+    </.annual_meeting_section>
 
     <%!-- Older Years (Collapsible) --%>
     <details class="bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden">
@@ -411,264 +174,127 @@
         />
       </summary>
       <div class="divide-y divide-zinc-100">
-        <%!-- 2022 General Meeting --%>
-        <div id="year-2022" class="p-6">
-          <h3 class="text-lg text-zinc-900 mb-4 type-subhead">
-            2022 General Meeting
-          </h3>
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <.link
-              href={
-                ~p"/annual_meetings/2022/YSC-Financials-2021-General-Meeting-Overview.pdf"
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2021
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 49K
-                </div>
-              </div>
-            </.link>
+        <.annual_meeting_section
+          id="year-2022"
+          title="2022 General Meeting"
+          variant={:archive}
+        >
+          <.document_download_card
+            id="financials-2022-summary"
+            href={
+              ~p"/annual_meetings/2022/YSC-Financials-2021-General-Meeting-Overview.pdf"
+            }
+            title="Financials Summary 2021"
+            meta="PDF • 49K"
+            kind={:summary}
+          />
+          <.document_download_card
+            id="financials-2022-report"
+            href={~p"/annual_meetings/2022/YSC-Financials-2021-2.18.22.pdf"}
+            title="Full Annual Report"
+            meta="PDF • 763K"
+            kind={:report}
+          />
+        </.annual_meeting_section>
 
-            <.link
-              href={~p"/annual_meetings/2022/YSC-Financials-2021-2.18.22.pdf"}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Full Annual Report
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 763K
-                </div>
-              </div>
-            </.link>
-          </div>
-        </div>
+        <.annual_meeting_section
+          id="year-2021"
+          title="2021 General Meeting"
+          variant={:archive}
+        >
+          <.document_download_card
+            id="financials-2021-summary"
+            href={~p"/annual_meetings/2021/YSC-Annual-Meeting-2021.pdf"}
+            title="Financials Summary 2020"
+            meta="PDF • 7.9M"
+            kind={:summary}
+          />
+          <.document_download_card
+            id="financials-2021-report"
+            href={~p"/annual_meetings/2021/YSC-Financials-2020-1.10.21.pdf"}
+            title="Full Annual Report"
+            meta="PDF • 430K"
+            kind={:report}
+          />
+          <.document_download_card
+            id="financials-2021-minutes"
+            href={
+              ~p"/annual_meetings/2021/YSC-Annual-Meeting-Minutes-022121.pdf"
+            }
+            title="Meeting Minutes"
+            meta="PDF • 88K"
+            kind={:minutes}
+          />
+        </.annual_meeting_section>
 
-        <%!-- 2021 General Meeting --%>
-        <div id="year-2021" class="p-6">
-          <h3 class="text-lg text-zinc-900 mb-4 type-subhead">
-            2021 General Meeting
-          </h3>
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <.link
-              href={~p"/annual_meetings/2021/YSC-Annual-Meeting-2021.pdf"}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2020
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 7.9M
-                </div>
-              </div>
-            </.link>
+        <.annual_meeting_section
+          id="year-2020"
+          title="2020 General Meeting"
+          variant={:archive}
+        >
+          <.document_download_card
+            id="financials-2020-summary"
+            href={
+              ~p"/annual_meetings/2020/YSC-General-Meeting-Financials-2019-Summary-2.4.2020.pdf"
+            }
+            title="Financials Summary 2019"
+            meta="PDF • 79K"
+            kind={:summary}
+          />
+          <.document_download_card
+            id="financials-2020-report"
+            href={~p"/annual_meetings/2020/YSC-Financials-2019-2.4.2020.pdf"}
+            title="Full Annual Report"
+            meta="PDF • 484K"
+            kind={:report}
+          />
+        </.annual_meeting_section>
 
-            <.link
-              href={~p"/annual_meetings/2021/YSC-Financials-2020-1.10.21.pdf"}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Full Annual Report
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 430K
-                </div>
-              </div>
-            </.link>
+        <.annual_meeting_section
+          id="year-2019"
+          title="2019 General Meeting"
+          variant={:archive}
+        >
+          <.document_download_card
+            id="financials-2019-summary"
+            href={
+              ~p"/annual_meetings/2019/YSC-General-Meeting-Financials-Summary-2018-v02.07.19.pdf"
+            }
+            title="Financials Summary 2018"
+            meta="PDF • 74K"
+            kind={:summary}
+          />
+          <.document_download_card
+            id="financials-2019-report"
+            href={~p"/annual_meetings/2019/YSC-Financials-2018-v02.07.19.pdf"}
+            title="Full Annual Report"
+            meta="PDF • 532K"
+            kind={:report}
+          />
+        </.annual_meeting_section>
 
-            <.link
-              href={
-                ~p"/annual_meetings/2021/YSC-Annual-Meeting-Minutes-022121.pdf"
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-green-100 text-green-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-text" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Meeting Minutes
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 88K
-                </div>
-              </div>
-            </.link>
-          </div>
-        </div>
-
-        <%!-- 2020 General Meeting --%>
-        <div id="year-2020" class="p-6">
-          <h3 class="text-lg text-zinc-900 mb-4 type-subhead">
-            2020 General Meeting
-          </h3>
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <.link
-              href={
-                ~p"/annual_meetings/2020/YSC-General-Meeting-Financials-2019-Summary-2.4.2020.pdf"
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2019
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 79K
-                </div>
-              </div>
-            </.link>
-
-            <.link
-              href={~p"/annual_meetings/2020/YSC-Financials-2019-2.4.2020.pdf"}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Full Annual Report
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 484K
-                </div>
-              </div>
-            </.link>
-          </div>
-        </div>
-
-        <%!-- 2019 General Meeting --%>
-        <div id="year-2019" class="p-6">
-          <h3 class="text-lg text-zinc-900 mb-4 type-subhead">
-            2019 General Meeting
-          </h3>
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <.link
-              href={
-                ~p"/annual_meetings/2019/YSC-General-Meeting-Financials-Summary-2018-v02.07.19.pdf"
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2018
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 74K
-                </div>
-              </div>
-            </.link>
-
-            <.link
-              href={~p"/annual_meetings/2019/YSC-Financials-2018-v02.07.19.pdf"}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Full Annual Report
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 532K
-                </div>
-              </div>
-            </.link>
-          </div>
-        </div>
-
-        <%!-- 2018 General Meeting --%>
-        <div id="year-2018" class="p-6">
-          <h3 class="text-lg text-zinc-900 mb-4 type-subhead">
-            2018 General Meeting
-          </h3>
-          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <.link
-              href={
-                ~p"/annual_meetings/2018/YSC-2017-financials-2018-02-14-CPA-approved.pdf"
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-red-100 text-red-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Summary 2017
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PDF • 63K
-                </div>
-              </div>
-            </.link>
-
-            <.link
-              href={~p"/annual_meetings/2018/YSC-2017-financials.pptx"}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-            >
-              <div class="bg-orange-100 text-orange-600 p-3 rounded-lg mr-4 shrink-0">
-                <.icon name="hero-document-chart-bar" class="w-6 h-6" />
-              </div>
-              <div class="min-w-0">
-                <div class="font-bold text-zinc-900 group-hover:text-blue-700">
-                  Financials Presentation
-                </div>
-                <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
-                  PPTX • 284K
-                </div>
-              </div>
-            </.link>
-          </div>
-        </div>
+        <.annual_meeting_section
+          id="year-2018"
+          title="2018 General Meeting"
+          variant={:archive}
+        >
+          <.document_download_card
+            id="financials-2018-summary"
+            href={
+              ~p"/annual_meetings/2018/YSC-2017-financials-2018-02-14-CPA-approved.pdf"
+            }
+            title="Financials Summary 2017"
+            meta="PDF • 63K"
+            kind={:summary}
+          />
+          <.document_download_card
+            id="financials-2018-slides"
+            href={~p"/annual_meetings/2018/YSC-2017-financials.pptx"}
+            title="Financials Presentation"
+            meta="PPTX • 284K"
+            kind={:slides}
+          />
+        </.annual_meeting_section>
       </div>
     </details>
   </div>
