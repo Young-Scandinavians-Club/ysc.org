@@ -246,7 +246,7 @@ defmodule Ysc.Merch.Fulfillment do
     # created the order but we never saw the response, we adopt it.
     case printful_client().get_order_by_external_id(order.reference_id) do
       {:ok, existing} when is_map(existing) ->
-        record_submission(order, existing)
+        adopt_printful_order(order, existing)
 
       {:error, %Error{type: :not_found}} ->
         create_in_printful(order)
@@ -256,14 +256,23 @@ defmodule Ysc.Merch.Fulfillment do
     end
   end
 
+  # A draft is not billed and never ships. Create can return one (costs still
+  # calculating) even with confirm=true; a retry can then find that draft via
+  # external_id. Recording it as :submitted without confirming leaves a paid
+  # order stuck forever — StatusSyncWorker and webhooks no-op on drafts, and
+  # submit_to_printful no-ops once status leaves :paid/:submitting.
+  defp adopt_printful_order(order, %{"status" => "draft"} = draft) do
+    confirm_and_record(order, draft)
+  end
+
+  defp adopt_printful_order(order, existing) when is_map(existing) do
+    record_submission(order, existing)
+  end
+
   defp create_in_printful(order) do
     case printful_client().create_order(printful_payload(order), true) do
-      {:ok, %{"status" => "draft", "id" => id}} ->
-        # Created but not confirmed (e.g. costs were still calculating).
-        case printful_client().confirm_order(id) do
-          {:ok, confirmed} -> record_submission(order, confirmed)
-          {:error, %Error{} = error} -> {:error, error}
-        end
+      {:ok, %{"status" => "draft"} = draft} ->
+        confirm_and_record(order, draft)
 
       {:ok, created} ->
         record_submission(order, created)
@@ -271,6 +280,21 @@ defmodule Ysc.Merch.Fulfillment do
       {:error, %Error{} = error} ->
         {:error, error}
     end
+  end
+
+  defp confirm_and_record(order, %{"id" => id}) do
+    case printful_client().confirm_order(id) do
+      {:ok, confirmed} -> record_submission(order, confirmed)
+      {:error, %Error{} = error} -> {:error, error}
+    end
+  end
+
+  defp confirm_and_record(_order, _draft) do
+    {:error,
+     %Error{
+       type: :invalid,
+       message: "Printful returned a draft order with no id"
+     }}
   end
 
   @doc false

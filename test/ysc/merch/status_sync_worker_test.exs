@@ -13,6 +13,49 @@ defmodule Ysc.Merch.StatusSyncWorkerTest do
   defp run, do: assert(:ok = StatusSyncWorker.perform(%Oban.Job{}))
   defp status(order), do: Orders.get_order!(order.id).status
 
+  test "confirms a Printful draft that was recorded as submitted" do
+    member = member_fixture()
+    order = purchase_order_fixture(member, :submitted)
+
+    expect(ClientMock, :get_order, fn id ->
+      assert id == order.printful_order_id
+      {:ok, %{"id" => id, "status" => "draft"}}
+    end)
+
+    expect(ClientMock, :confirm_order, fn id ->
+      assert id == order.printful_order_id
+
+      {:ok,
+       %{
+         "id" => id,
+         "status" => "inprocess",
+         "costs" => %{"total" => "14.00"}
+       }}
+    end)
+
+    run()
+
+    synced = Orders.get_order!(order.id)
+    assert synced.status == :in_production
+    assert Money.equal?(synced.printful_cost, Money.new(:USD, "14.00"))
+  end
+
+  test "leaves a submitted draft in flight when confirm fails" do
+    member = member_fixture()
+    order = purchase_order_fixture(member, :submitted)
+
+    expect(ClientMock, :get_order, fn id ->
+      {:ok, %{"id" => id, "status" => "draft"}}
+    end)
+
+    expect(ClientMock, :confirm_order, fn _ ->
+      {:error, %Error{type: :server, status: 503, message: "down"}}
+    end)
+
+    run()
+    assert status(order) == :submitted
+  end
+
   test "picks up what Printful says about orders in flight" do
     member = member_fixture()
     order = purchase_order_fixture(member, :submitted)
