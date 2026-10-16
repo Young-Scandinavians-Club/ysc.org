@@ -3,8 +3,9 @@ defmodule YscWeb.ShopCheckoutLive do
   Merch checkout, in three steps on one page: delivery address, shipping
   method (priced live by Printful), and payment through Stripe.
 
-  Totals are always recomputed on the server from the catalog and Printful's
-  quote; nothing monetary is trusted from the browser.
+  Totals are always recomputed on the server from the catalog and a fresh
+  Printful quote taken at payment time; nothing monetary is trusted from the
+  browser or from an earlier shipping step.
   """
   use YscWeb, :live_view
 
@@ -84,16 +85,27 @@ defmodule YscWeb.ShopCheckoutLive do
   def handle_event("submit_address", %{"address" => params}, socket) do
     case ShippingAddress.validate(params) do
       {:ok, address} ->
-        lines = socket.assigns.lines
+        lines =
+          socket.assigns.current_user |> Cart.list() |> Cart.available_lines()
 
-        {:noreply,
-         socket
-         |> assign(:address, address)
-         |> assign(:address_error, nil)
-         |> assign(:quoting?, true)
-         |> start_async(:quote_shipping, fn ->
-           Shipping.options(address, lines)
-         end)}
+        if lines == [] do
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:info, "Your cart is empty.",
+             title: "Shop"
+           )
+           |> push_navigate(to: ~p"/shop/cart")}
+        else
+          {:noreply,
+           socket
+           |> assign_cart(lines)
+           |> assign(:address, address)
+           |> assign(:address_error, nil)
+           |> assign(:quoting?, true)
+           |> start_async(:quote_shipping, fn ->
+             Shipping.options(address, lines)
+           end)}
+        end
 
       {:error, changeset} ->
         {:noreply,
@@ -227,7 +239,7 @@ defmodule YscWeb.ShopCheckoutLive do
 
   def handle_async(
         :prepare_payment,
-        {:ok, {:ok, order, payment_intent}},
+        {:ok, {:ok, order, payment_intent, lines, option}},
         socket
       ) do
     {:noreply,
@@ -236,6 +248,8 @@ defmodule YscWeb.ShopCheckoutLive do
      |> assign(:order, order)
      |> assign(:payment_intent, payment_intent)
      |> assign(:payment_error, nil)
+     |> assign(:selected_option, option)
+     |> assign_cart(lines)
      |> assign(:step, :payment)}
   end
 
@@ -261,18 +275,19 @@ defmodule YscWeb.ShopCheckoutLive do
      )}
   end
 
-  # Runs off the LiveView process: re-reads the cart so the order reflects
-  # exactly what is in it now, then opens the payment.
+  # Runs off the LiveView process: re-reads the cart and re-quotes shipping
+  # so the order is priced for what is in it now, then opens the payment.
   defp prepare_payment(user, address, option) do
     lines = user |> Cart.list() |> Cart.available_lines()
 
-    with {:ok, order} <-
-           Orders.create_pending_purchase(user, lines, address, option),
+    with {:ok, quoted} <- Shipping.requote(address, lines, option),
+         {:ok, order} <-
+           Orders.create_pending_purchase(user, lines, address, quoted),
          {:ok, intent} <- StripeService.ensure_payment_intent(order, user) do
       if intent.status == "succeeded" do
         {:paid, order}
       else
-        {:ok, order, intent}
+        {:ok, order, intent, lines, quoted}
       end
     else
       {:error, :empty_cart} ->
@@ -282,12 +297,30 @@ defmodule YscWeb.ShopCheckoutLive do
         {:error,
          "An item in your cart is no longer available. Review your cart and try again."}
 
+      {:error, :method_unavailable} ->
+        {:error,
+         "Shipping prices changed. Please choose a shipping method again."}
+
+      {:error, :unavailable} ->
+        {:error,
+         "We couldn't get shipping prices right now. Please try again in a moment."}
+
+      {:error, {:rejected, message}} ->
+        {:error, "We couldn't ship to that address: #{message}"}
+
       {:error, message} when is_binary(message) ->
         {:error, message}
 
       {:error, _other} ->
         {:error, "We couldn't set up your order. Please try again."}
     end
+  end
+
+  defp assign_cart(socket, lines) do
+    socket
+    |> assign(:lines, lines)
+    |> assign(:subtotal, Cart.subtotal(lines))
+    |> assign(:cart_count, Cart.item_count(lines))
   end
 
   ## Render
