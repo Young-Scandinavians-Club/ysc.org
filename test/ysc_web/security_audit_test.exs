@@ -84,6 +84,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 88 (MEDIUM)   Finding 44 bound `user_id` on public forms but volunteer/conduct (and contact via `put_submitter` alone) still trusted client name/email/phone. Signed-in members skip Turnstile, so they could send YSC confirmation mail to arbitrary inboxes and spoof identity on board CoC notifications.
   Finding 89 (MEDIUM)   Step-up password reauth (`ReauthComponent`) skipped `AuthRateLimit`, so a stolen session could online-guess the account password without login's 5/min identifier cap, then change email/password/passkeys
   Finding 90 (MEDIUM)   Passkey step-up skipped Finding 7's `sign_count` compare/update, so a cloned authenticator rejected at login could still pass reauth, and legitimate reauth never advanced the stored counter
+  Finding 91 (MEDIUM)   Printful webhook secret lives in the URL path (`/webhooks/printful/:token`) but `Ysc.SentryScrubber` only redacted FlowRoute's path token, so Sentry request URLs leaked `PRINTFUL_WEBHOOK_SECRET`
+  Finding 92 (MEDIUM)   Merch checkout quoted Printful shipping from mount-time cart lines, then created the pending order and Stripe PaymentIntent from a freshly loaded cart plus the stale `option.rate`, so a member could underpay shipping by adding items in another tab
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -346,6 +348,22 @@ defmodule YscWeb.SecurityAuditTest do
                Accounts.accept_passkey_assertion(passkey, %{sign_count: 8})
 
       assert updated.sign_count == 8
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 91 (MEDIUM): Printful path token must be redacted like FlowRoute
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 91: Printful webhook token is redacted from Sentry URLs" do
+    test "scrub_url/1 redacts /webhooks/printful/:token" do
+      conn =
+        Plug.Test.conn(:post, "/webhooks/printful/super-secret-printful-token")
+
+      url = Ysc.SentryScrubber.scrub_url(conn)
+
+      refute url =~ "super-secret-printful-token"
+      assert url =~ "/webhooks/printful/[REDACTED]"
     end
   end
 

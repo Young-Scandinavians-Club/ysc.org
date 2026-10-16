@@ -1,7 +1,8 @@
 defmodule Ysc.Merch.Shipping do
   @moduledoc """
   Quotes Printful shipping options for an address and a set of cart/order
-  lines. Members pay exactly what Printful quotes.
+  lines. Members pay exactly what Printful quotes at payment time, not an
+  earlier cart snapshot.
   """
   require Ysc.Logging
 
@@ -116,6 +117,37 @@ defmodule Ysc.Merch.Shipping do
     )
 
     {:error, :unavailable}
+  end
+
+  @doc """
+  Re-quotes shipping for the current `lines` and returns the option with the
+  same Printful method id as `chosen`, priced for those lines.
+
+  Checkout must call this immediately before creating the pending order so a
+  cart that changed after the first quote cannot keep a stale `rate`
+  (Finding 92).
+  """
+  @spec requote(ShippingAddress.t(), [map()], option()) ::
+          {:ok, option()}
+          | {:error,
+             :empty_cart
+             | :unavailable
+             | :method_unavailable
+             | {:rejected, String.t()}}
+  def requote(_address, [], _chosen), do: {:error, :empty_cart}
+
+  def requote(%ShippingAddress{} = address, lines, %{id: id})
+      when is_list(lines) and is_binary(id) do
+    case options(address, lines) do
+      {:ok, quoted} ->
+        case Enum.find(quoted, &(&1.id == id)) do
+          nil -> {:error, :method_unavailable}
+          option -> {:ok, option}
+        end
+
+      error ->
+        error
+    end
   end
 
   @doc "Human delivery window, e.g. \"3-5 business days\"."

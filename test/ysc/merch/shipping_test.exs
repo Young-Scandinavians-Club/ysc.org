@@ -199,4 +199,76 @@ defmodule Ysc.Merch.ShippingTest do
       end
     end
   end
+
+  describe "requote/3" do
+    test "returns the same method priced for the current lines (Finding 92)" do
+      variant = variant_fixture()
+      lines = [%{variant: variant, quantity: 1}]
+
+      expect(ClientMock, :shipping_rates, fn _, items ->
+        assert hd(items).quantity == 1
+
+        {:ok,
+         [
+           %{
+             "id" => "STANDARD",
+             "name" => "Flat Rate",
+             "rate" => "5.95",
+             "currency" => "USD"
+           }
+         ]}
+      end)
+
+      assert {:ok, [first]} =
+               Shipping.options(address(), lines)
+
+      heavier = [%{variant: variant, quantity: 8}]
+
+      expect(ClientMock, :shipping_rates, fn _, items ->
+        assert hd(items).quantity == 8
+
+        {:ok,
+         [
+           %{
+             "id" => "STANDARD",
+             "name" => "Flat Rate",
+             "rate" => "24.00",
+             "currency" => "USD"
+           }
+         ]}
+      end)
+
+      assert {:ok, quoted} = Shipping.requote(address(), heavier, first)
+      assert quoted.id == "STANDARD"
+      assert Money.equal?(quoted.rate, Money.new(:USD, "24.00"))
+    end
+
+    test "errors when the chosen method is no longer offered" do
+      expect(ClientMock, :shipping_rates, fn _, _ ->
+        {:ok,
+         [
+           %{
+             "id" => "EXPRESS",
+             "name" => "Express",
+             "rate" => "18.00",
+             "currency" => "USD"
+           }
+         ]}
+      end)
+
+      assert {:error, :method_unavailable} =
+               Shipping.requote(
+                 address(),
+                 [%{variant: variant_fixture(), quantity: 1}],
+                 %{
+                   id: "STANDARD"
+                 }
+               )
+    end
+
+    test "empty cart is :empty_cart without calling Printful" do
+      assert {:error, :empty_cart} =
+               Shipping.requote(address(), [], %{id: "STANDARD"})
+    end
+  end
 end

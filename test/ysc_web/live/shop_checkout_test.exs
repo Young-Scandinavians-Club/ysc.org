@@ -289,6 +289,59 @@ defmodule YscWeb.ShopCheckoutTest do
       assert Repo.aggregate(Order, :count) == 1
     end
 
+    test "Finding 92: payment re-quotes shipping for the current cart, not the earlier quote",
+         %{
+           conn: conn,
+           member: member
+         } do
+      extra = variant_fixture(nil, %{retail_price: Money.new(:USD, "25")})
+
+      stub(ClientMock, :shipping_rates, fn _, items ->
+        quantity = Enum.reduce(items, 0, &(&1.quantity + &2))
+        rate = if quantity <= 6, do: "5.95", else: "24.00"
+
+        {:ok,
+         [
+           %{
+             "id" => "STANDARD",
+             "name" => "Flat Rate",
+             "rate" => rate,
+             "currency" => "USD"
+           }
+         ]}
+      end)
+
+      expect(StripeMock, :create_payment_intent, fn params, _ ->
+        # Original cart $64.00 + extra $25.00 + requoted shipping $24.00
+        assert params.amount == 11_300
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_checkout",
+           status: "requires_payment_method",
+           amount: 11_300,
+           client_secret: "pi_checkout_secret_abc"
+         }}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      submit_address(view)
+
+      assert has_element?(view, "#summary-shipping", "$5.95")
+      assert has_element?(view, "#summary-total", "$69.95")
+
+      assert {:ok, _} = Cart.add(member, extra.id, 1)
+
+      view |> element("#continue-to-payment") |> render_click()
+      render_async(view)
+
+      assert [%Order{status: :pending} = order] = Repo.all(Order)
+      assert Money.equal?(order.shipping_amount, Money.new(:USD, "24.00"))
+      assert Money.equal?(order.subtotal, Money.new(:USD, "89.00"))
+      assert Money.equal?(order.total_amount, Money.new(:USD, "113.00"))
+      assert has_element?(view, "#submit-payment", "$113.00")
+    end
+
     test "a Stripe failure keeps the member on the shipping step", %{conn: conn} do
       expect(StripeMock, :create_payment_intent, fn _, _ ->
         {:error,
