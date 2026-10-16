@@ -49,7 +49,10 @@ defmodule Ysc.Stripe.DonationPaymentLinkTest do
     assert_received {:retrieve_payment_intent, "pi_tahoe_once"}
 
     assert :ok = book_session("plink_tahoe_kitchen", "pi_tahoe_once")
-    refute_received {:retrieve_payment_link, "plink_tahoe_kitchen", _opts}
+    # Payment Links are not sticky-cached across bookings (stale product/metadata
+    # after payment_link.updated). A repeat webhook may retrieve the link again,
+    # but must not look up the fee or insert a second ledger payment.
+    assert_received {:retrieve_payment_link, "plink_tahoe_kitchen", _opts}
     refute_received {:retrieve_payment_intent, "pi_tahoe_once"}
 
     count =
