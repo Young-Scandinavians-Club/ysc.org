@@ -47,7 +47,8 @@ defmodule Ysc.Merch.StatusSyncWorker do
   defp check(order_id) do
     with %Order{printful_order_id: printful_id} = order <-
            Orders.get_order(order_id),
-         {:ok, printful_order} <- printful_client().get_order(printful_id) do
+         {:ok, printful_order} <- printful_client().get_order(printful_id),
+         {:ok, printful_order} <- maybe_confirm_draft(printful_order) do
       PrintfulEvents.sync_order(order, printful_order)
     else
       nil ->
@@ -69,6 +70,15 @@ defmodule Ysc.Merch.StatusSyncWorker do
         )
     end
   end
+
+  # Printful drafts are never billed and never ship. If submit recorded a draft
+  # as :submitted (retry adopted it without confirming), polling would otherwise
+  # no-op forever. Confirm, then apply the confirmed record.
+  defp maybe_confirm_draft(%{"status" => "draft", "id" => id}) do
+    printful_client().confirm_order(id)
+  end
+
+  defp maybe_confirm_draft(printful_order), do: {:ok, printful_order}
 
   @doc false
   def ci_query_explain_query, do: orders_to_check_query()

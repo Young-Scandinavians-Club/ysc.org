@@ -385,6 +385,42 @@ defmodule Ysc.Merch.FulfillmentTest do
       assert order.printful_order_id == 99
     end
 
+    test "confirms a draft found by external id instead of recording it as submitted",
+         %{paid: paid} do
+      expect(ClientMock, :get_order_by_external_id, fn ref ->
+        assert ref == paid.reference_id
+        {:ok, %{"id" => 7, "status" => "draft"}}
+      end)
+
+      expect(ClientMock, :confirm_order, fn 7 ->
+        {:ok,
+         %{"id" => 7, "status" => "pending", "costs" => %{"total" => "18.00"}}}
+      end)
+
+      assert :ok = Fulfillment.submit_to_printful(paid.id)
+
+      order = Orders.get_order!(paid.id)
+      assert order.status == :submitted
+      assert order.printful_order_id == 7
+      assert Money.equal?(order.printful_cost, Money.new(:USD, "18.00"))
+    end
+
+    test "keeps a draft-adoption retryable when confirm fails", %{paid: paid} do
+      error = %Error{type: :server, status: 503, message: "down"}
+
+      expect(ClientMock, :get_order_by_external_id, fn _ ->
+        {:ok, %{"id" => 8, "status" => "draft"}}
+      end)
+
+      expect(ClientMock, :confirm_order, fn 8 -> {:error, error} end)
+
+      assert {:error, ^error} = Fulfillment.submit_to_printful(paid.id)
+
+      order = Orders.get_order!(paid.id)
+      assert order.status == :submitting
+      assert is_nil(order.printful_order_id)
+    end
+
     test "confirms an order Printful left as a draft", %{paid: paid} do
       expect(ClientMock, :get_order_by_external_id, fn _ ->
         {:error, %Error{type: :not_found, message: "x"}}
