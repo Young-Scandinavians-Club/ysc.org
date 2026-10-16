@@ -117,7 +117,6 @@ defmodule YscWeb.ShopLive do
     <.shop_frame
       id="shop-page"
       title="Club Gear"
-      subtitle="Printed to order, so delivery can take a little longer. The shop is just for fun."
       active={:shop}
       cart_count={@cart_summary.count}
     >

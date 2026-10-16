@@ -21,9 +21,8 @@ defmodule YscWeb.ShopComponents do
   The frame every shop page shares: title section like every other page, then
   the shop links, then the page content.
 
-  Every page gets the same masthead (same size) so the title and the shop links
-  never move as you go between pages. Only the shop landing page adds a
-  `subtitle`.
+  Every page gets the same masthead (same size, no subtitle) so the title and
+  the shop links never move as you go between pages.
 
   The masthead sits close to the shop links so the two read as one header.
 
@@ -34,7 +33,6 @@ defmodule YscWeb.ShopComponents do
   attr :id, :string, required: true
   attr :title, :string, required: true
   attr :eyebrow, :string, default: "Shop"
-  attr :subtitle, :string, default: nil
   attr :active, :atom, values: [:shop, :cart, :orders], required: true
   attr :cart_count, :integer, default: 0
 
@@ -53,7 +51,6 @@ defmodule YscWeb.ShopComponents do
           id={"#{@id}-masthead"}
           eyebrow={@eyebrow}
           title={@title}
-          subtitle={@subtitle}
           class="mb-6! md:mb-8!"
         />
       </div>
