@@ -79,9 +79,16 @@ defmodule QueryConsole.MixProject do
       {:dns_cluster, "~> 0.3.0"},
       # 1.12.5: EEF-CVE-2026-74836 (HIGH) bounds/cancels HTTP/2 sends blocked on
       # the connection window; EEF-CVE-2026-75484 (MEDIUM) rejects HTTP/2 header
-      # values with CR/LF/NUL. We use Bandit.PhoenixAdapter (bandit_pid/1 for
-      # idle shutdown). Public adapter APIs are unchanged.
-      {:bandit, "~> 1.12.5"},
+      # values with CR/LF/NUL.
+      # 1.13.0/1.13.1: EEF-CVE-2026-105659 (HIGH) bounds HTTP/2 blocked sends by
+      # progress so a WINDOW_UPDATE trickle cannot reset the 15s deadline;
+      # EEF-CVE-2026-105660 (MEDIUM) validates HTTP/1 absolute-form and
+      # authority-form request-target hosts with the same grammar as Host.
+      # 1.13.1 reverts the 1.13.0 stale-conn check that broke Phoenix
+      # Plug.Parsers error rendering. Requires Thousand Island 1.6 (peername
+      # at accept). We use Bandit.PhoenixAdapter (bandit_pid/1 for idle
+      # shutdown). Public adapter APIs are unchanged.
+      {:bandit, "~> 1.13.1"},
       # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
       # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
       # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
