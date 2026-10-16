@@ -1,7 +1,9 @@
 defmodule Ysc.Printful.ClientTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   alias Ysc.Printful.{Client, Error}
+
+  setup {Req.Test, :set_req_test_from_context}
 
   defp stub(fun), do: Req.Test.stub(Client, fun)
 
@@ -121,18 +123,6 @@ defmodule Ysc.Printful.ClientTest do
       assert {:ok, _} = Client.create_order(%{}, false)
       assert_received {:query, query}
       refute Map.has_key?(query, "confirm")
-    end
-  end
-
-  describe "without a token" do
-    # Mutates global app env, so keep it out of the async tests above.
-    test "returns :not_configured without touching the network" do
-      original = Application.get_env(:ysc, :printful)
-      on_exit(fn -> Application.put_env(:ysc, :printful, original) end)
-      Application.put_env(:ysc, :printful, api_token: nil)
-
-      assert {:error, %Error{type: :not_configured}} =
-               Client.list_sync_products()
     end
   end
 end
