@@ -4,7 +4,7 @@ defmodule Ysc.Merch.Listing do
   by color, and the per-color photos behind each tile's swatches.
 
   Pure functions over products as `Ysc.Merch.list_shop_products/0` loads them
-  (variants, image and gallery images preloaded).
+  (slim variants, display-image paths, and gallery images).
   """
   alias Ysc.Merch
   alias Ysc.Merch.{ColorSwatch, Product, VariantSelection}

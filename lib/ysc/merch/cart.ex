@@ -10,8 +10,35 @@ defmodule Ysc.Merch.Cart do
   import Ecto.Query, warn: false
 
   alias Ysc.Accounts.User
+  alias Ysc.Media.Image
   alias Ysc.Merch.{CartItem, Product, Variant}
   alias Ysc.Repo
+
+  # Cart / checkout need Printful's variant id for shipping quotes. Skip
+  # sku / source URLs and image `upload_data`.
+  @cart_image_fields [
+    :id,
+    :title,
+    :alt_text,
+    :optimized_image_path,
+    :raw_image_path,
+    :thumbnail_path,
+    :blur_hash,
+    :width,
+    :height
+  ]
+  @cart_product_fields [:id, :name, :status, :image_id]
+  @cart_variant_fields [
+    :id,
+    :product_id,
+    :name,
+    :size,
+    :color,
+    :retail_price,
+    :available,
+    :image_id,
+    :printful_variant_id
+  ]
 
   @type line :: %{
           item: CartItem.t(),
@@ -24,17 +51,39 @@ defmodule Ysc.Merch.Cart do
         }
 
   @doc """
-  The member's cart lines, oldest first, with variant, product and images loaded.
+  The member's cart lines, oldest first, with variant, product and display
+  images loaded. Keeps `printful_variant_id` for shipping quotes.
   """
   @spec list(User.t()) :: [line()]
   def list(%User{id: user_id}) do
     from(c in CartItem,
       where: c.user_id == ^user_id,
       order_by: [asc: c.inserted_at, asc: c.id],
-      preload: [variant: [:image, product: :image]]
+      preload: [variant: ^cart_variant_query()]
     )
     |> Repo.all()
     |> Enum.map(&to_line/1)
+  end
+
+  defp cart_variant_query do
+    from(v in Variant,
+      select: struct(v, ^@cart_variant_fields),
+      preload: [
+        image: ^cart_image_query(),
+        product: ^cart_product_query()
+      ]
+    )
+  end
+
+  defp cart_product_query do
+    from(p in Product,
+      select: struct(p, ^@cart_product_fields),
+      preload: [image: ^cart_image_query()]
+    )
+  end
+
+  defp cart_image_query do
+    from(i in Image, select: struct(i, ^@cart_image_fields))
   end
 
   defp to_line(%CartItem{variant: variant} = item) do
@@ -230,7 +279,7 @@ defmodule Ysc.Merch.Cart do
     from(c in CartItem,
       where: c.user_id == ^Fixtures.ulid(),
       order_by: [asc: c.inserted_at, asc: c.id],
-      preload: [variant: [:image, product: :image]]
+      preload: [variant: ^cart_variant_query()]
     )
   end
 end

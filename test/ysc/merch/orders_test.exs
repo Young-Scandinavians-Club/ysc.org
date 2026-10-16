@@ -152,6 +152,38 @@ defmodule Ysc.Merch.OrdersTest do
     assert id == order.id
   end
 
+  test "list_user_orders omits addresses, Printful ids, and image upload_data",
+       %{user: user, lines: lines, tee: tee} do
+    image =
+      image_fixture(%{
+        upload_data: %{"original" => "fat-json"},
+        content_hash: "abc123"
+      })
+
+    tee |> Ecto.Changeset.change(image_id: image.id) |> Repo.update!()
+
+    {:ok, order} = create(user, lines)
+    order |> Ecto.Changeset.change(status: :paid) |> Repo.update!()
+
+    {listed, fat_cols} =
+      Ysc.QueryCounter.with_query_counter(
+        fn -> Orders.list_user_orders(user) end,
+        pattern:
+          ~r/address1|payment_intent_id|printful_order_id|upload_data|content_hash|hashed_password/i,
+        caller_pids: [self()]
+      )
+
+    [shown] = listed
+    assert shown.id == order.id
+    assert shown.reference_id
+    assert is_nil(shown.address1)
+    assert is_nil(shown.payment_intent_id)
+    item = Enum.find(shown.items, &(&1.variant_id == tee.id))
+    assert item.variant.image.id == image.id
+    assert is_nil(item.variant.image.upload_data)
+    assert fat_cols == 0
+  end
+
   test "cancel_pending only cancels pending orders", %{user: user, lines: lines} do
     {:ok, order} = create(user, lines)
     assert :ok = Orders.cancel_pending(order, "abandoned")
