@@ -1725,7 +1725,7 @@ defmodule YscWeb.ExpenseReportLive do
       )
 
     ~H"""
-    <div class="py-8 lg:py-12 bg-zinc-50/50 min-h-screen">
+    <div class="py-8 lg:py-12 min-h-screen">
       <div class="max-w-(--breakpoint-xl) mx-auto px-4">
         <.page_header
           id="expense-reports-header"
@@ -1744,7 +1744,7 @@ defmodule YscWeb.ExpenseReportLive do
         <%= if Enum.empty?(@expense_reports) do %>
           <div
             id="expense-reports-empty"
-            class="rounded-xl bg-white shadow-xs px-6 py-16 text-center"
+            class="rounded-xl bg-white border border-zinc-200 shadow-xs px-6 py-16 text-center"
           >
             <div class="flex flex-col items-center max-w-md mx-auto">
               <.icon name="hero-document-text" class="w-14 h-14 text-zinc-300 mb-4" />
@@ -1817,7 +1817,7 @@ defmodule YscWeb.ExpenseReportLive do
             <h2 :if={@drafts != []} class="text-xs text-zinc-500 mb-3 type-eyebrow">
               Submitted
             </h2>
-            <div class="rounded-xl bg-white shadow-xs overflow-hidden">
+            <div class="rounded-xl bg-white border border-zinc-200 shadow-xs overflow-hidden">
               <div
                 class="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_7rem_8rem_8rem_5rem_7rem_1rem] lg:gap-x-6 px-6 py-3 bg-zinc-50/80 text-xs text-zinc-500 type-eyebrow"
                 aria-hidden="true"
@@ -1924,7 +1924,7 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp render_form(assigns) do
     ~H"""
-    <div id="expense-report-form-page" class="bg-zinc-50">
+    <div id="expense-report-form-page">
       <div class="max-w-(--breakpoint-xl) mx-auto px-4 py-8 lg:py-10">
         <div
           :if={@loading_expense_form_data}
