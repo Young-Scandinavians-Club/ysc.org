@@ -1420,6 +1420,17 @@ defmodule Ysc.Quickbooks.Sync do
     end
   end
 
+  @doc """
+  Finds the QuickBooks income account with this name, creating it if missing.
+  """
+  def ensure_income_account(name) when is_binary(name) do
+    case income_account_ref_named(name) do
+      %{} = ref -> {:ok, ref}
+      {:error, _reason} = error -> error
+      nil -> {:error, :income_account_unavailable}
+    end
+  end
+
   defp income_account_ref_named(name) when is_binary(name) do
     case client_module().query_account_by_name(name) do
       {:ok, account_id} when is_binary(account_id) and account_id != "" ->

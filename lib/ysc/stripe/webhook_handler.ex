@@ -1678,6 +1678,13 @@ defmodule Ysc.Stripe.WebhookHandler do
     Ysc.Stripe.DonationPaymentLink.book_paid_session(session)
   end
 
+  # A new or edited Payment Link: create its QuickBooks income account up front.
+  defp handle(event_name, payment_link)
+       when event_name in ["payment_link.created", "payment_link.updated"] and
+              is_map(payment_link) do
+    Ysc.Stripe.DonationPaymentLink.enqueue_account_setup(payment_link)
+  end
+
   defp handle(event_name, event_object) when is_binary(event_name) do
     # Log unhandled invoice-related events for debugging
     if String.starts_with?(event_name, "invoice.") do
