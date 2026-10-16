@@ -472,11 +472,11 @@ defmodule YscWeb.ShopProductLive do
             id="add-to-cart-form"
             phx-change="set_quantity"
             phx-submit="add_to_cart"
-            class="flex flex-col gap-3 sm:flex-row"
+            class="flex flex-col gap-3"
           >
             <label for="quantity" class="sr-only">Quantity</label>
             <div
-              class="inline-flex h-14 shrink-0 items-center self-start rounded-sm bg-zinc-100"
+              class="inline-flex h-12 shrink-0 items-center self-start rounded-sm bg-zinc-100"
               role="group"
               aria-label="Quantity"
             >
@@ -486,7 +486,7 @@ defmodule YscWeb.ShopProductLive do
                 phx-click="decrement"
                 disabled={@quantity <= 1}
                 aria-label="Decrease quantity"
-                class="inline-flex size-14 items-center justify-center rounded-sm text-zinc-900 transition-colors hover:bg-zinc-200 motion-safe:active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                class="inline-flex size-12 items-center justify-center rounded-sm text-zinc-900 transition-colors hover:bg-zinc-200 motion-safe:active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <.icon name="hero-minus" class="size-5" />
               </button>
@@ -498,7 +498,7 @@ defmodule YscWeb.ShopProductLive do
                 value={@quantity}
                 min="1"
                 max={CartItem.max_quantity()}
-                class="h-14 w-12 border-0 bg-transparent p-0 text-center text-base font-medium tabular-nums text-zinc-900 [appearance:textfield] focus:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                class="h-12 w-12 border-0 bg-transparent p-0 text-center text-base font-medium tabular-nums text-zinc-900 [appearance:textfield] focus:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
               <button
                 type="button"
@@ -506,7 +506,7 @@ defmodule YscWeb.ShopProductLive do
                 phx-click="increment"
                 disabled={@quantity >= CartItem.max_quantity()}
                 aria-label="Increase quantity"
-                class="inline-flex size-14 items-center justify-center rounded-sm text-zinc-900 transition-colors hover:bg-zinc-200 motion-safe:active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                class="inline-flex size-12 items-center justify-center rounded-sm text-zinc-900 transition-colors hover:bg-zinc-200 motion-safe:active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <.icon name="hero-plus" class="size-5" />
               </button>
@@ -516,7 +516,7 @@ defmodule YscWeb.ShopProductLive do
               id="add-to-cart"
               type="submit"
               disabled={is_nil(@variant)}
-              class="h-14 w-full flex-1 text-base motion-safe:active:scale-[0.98]"
+              class="h-12 w-full text-base motion-safe:active:scale-[0.98]"
             >
               <%= if @variant do %>
                 <.icon name="hero-shopping-bag" class="size-5" /> Add to cart ·
