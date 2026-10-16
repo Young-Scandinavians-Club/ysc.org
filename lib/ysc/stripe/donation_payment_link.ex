@@ -149,6 +149,58 @@ defmodule Ysc.Stripe.DonationPaymentLink do
   def prefetch_paid_session(_), do: :ok
 
   @doc """
+  Queues creation of the QuickBooks income account for a new or edited
+  Payment Link. The webhook object has no expanded line items, so the job
+  retrieves the link itself.
+  """
+  def enqueue_account_setup(payment_link) when is_map(payment_link) do
+    case session_value(payment_link, :id) do
+      id when is_binary(id) ->
+        case %{"payment_link_id" => id}
+             |> YscWeb.Workers.QuickbooksEnsureDonationAccountWorker.new()
+             |> Oban.insert() do
+          {:ok, _job} ->
+            :ok
+
+          {:error, reason} ->
+            raise "Failed to enqueue account setup: #{inspect(reason)}"
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  @doc """
+  Creates the QuickBooks income account for a donation Payment Link when it
+  does not exist yet.
+
+  The account is the link's resolved fund (config, metadata, or Stripe product
+  name). Returns `{:ok, account}`, `:skip` when the link is not a donation
+  link, or `{:error, reason}` so the job retries. Always reads the link from
+  Stripe, since a cached copy may predate the edit that triggered this call.
+  """
+  def ensure_quickbooks_account(payment_link_id)
+      when is_binary(payment_link_id) do
+    case fetch_payment_link(payment_link_id) do
+      {:ok, link} ->
+        case resolve_donation_link(%{}, link) do
+          %{account: account} ->
+            case Ysc.Quickbooks.Sync.ensure_income_account(account) do
+              {:ok, _ref} -> {:ok, account}
+              {:error, _reason} = error -> error
+            end
+
+          nil ->
+            :skip
+        end
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  @doc """
   Books a paid Checkout Session when it belongs to a donation Payment Link.
 
   Returns `:ok`. Raises when the session is a donation link but Stripe or
@@ -419,6 +471,14 @@ defmodule Ysc.Stripe.DonationPaymentLink do
           nil
       end
     else
+      Ysc.Logging.info(
+        "Stripe payment link checkout is not a configured donation link; not booking",
+        payment_link_id: session_value(link, :id),
+        url: session_value(link, :url),
+        submit_type: session_value(link, :submit_type),
+        checkout_session_id: session_value(session, :id)
+      )
+
       nil
     end
   end

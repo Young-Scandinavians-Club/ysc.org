@@ -3281,6 +3281,8 @@ defmodule Ysc.Quickbooks.Client do
   @doc """
   Creates a QuickBooks Account (defaults to Income / NonProfitIncome).
 
+  Pass `:parent_account_id` to create it as a sub-account of that account.
+
   Returns {:ok, account_id} on success and caches the account ID by name.
   """
   @spec create_account(String.t(), keyword()) ::
@@ -3307,7 +3309,20 @@ defmodule Ysc.Quickbooks.Client do
         "AccountSubType" => account_sub_type
       }
 
+      parent_account_id = Keyword.get(opts, :parent_account_id)
+
+      body =
+        if is_binary(parent_account_id) and parent_account_id != "" do
+          Map.merge(body, %{
+            "SubAccount" => true,
+            "ParentRef" => %{"value" => parent_account_id}
+          })
+        else
+          body
+        end
+
       Ysc.Logging.info("[QB Client] create_account: Creating account",
+        parent_account_id: parent_account_id,
         name: name,
         account_type: account_type,
         account_sub_type: account_sub_type
