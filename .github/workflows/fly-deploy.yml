@@ -386,12 +386,14 @@ jobs:
             --cache-scope main-app \
             --build-arg "BUILD_VERSION=${{ steps.version.outputs.version }}"
 
+      # flyctl deploy --image looks the digest up on registry.fly.io; the same
+      # 502/500 the push retry already covers (run 38945847545).
       - name: Deploy to Fly.io sandbox
         if: steps.version.outputs.skip != 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
         run: |
-          flyctl deploy \
+          bash etc/scripts/flyctl_deploy_retry.sh \
             --image registry.fly.io/ysc-sandbox:${{ steps.version.outputs.version }} \
             -a ysc-sandbox \
             -c etc/fly/fly-sandbox.toml \
@@ -475,13 +477,16 @@ jobs:
             --cache-scope query-console \
             --build-arg "BUILD_VERSION=${{ steps.version.outputs.version }}"
 
+      # Same Fly registry 502 retry as the app sandbox deploy. This job's default
+      # working-directory is query_console/, so run from the repo root.
       - name: Deploy query console to Fly.io sandbox
         if: steps.version.outputs.skip != 'true'
+        working-directory: .
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
         run: |
-          flyctl deploy \
+          bash etc/scripts/flyctl_deploy_retry.sh \
             --image registry.fly.io/ysc-query-console-sandbox:${{ steps.version.outputs.version }} \
             -a ysc-query-console-sandbox \
-            -c fly.sandbox.toml \
+            -c query_console/fly.sandbox.toml \
             --image-label "${{ steps.version.outputs.version }}"
