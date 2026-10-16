@@ -419,6 +419,14 @@ defmodule Ysc.Stripe.DonationPaymentLink do
           nil
       end
     else
+      Ysc.Logging.info(
+        "Stripe payment link checkout is not a configured donation link; not booking",
+        payment_link_id: session_value(link, :id),
+        url: session_value(link, :url),
+        submit_type: session_value(link, :submit_type),
+        checkout_session_id: session_value(session, :id)
+      )
+
       nil
     end
   end
