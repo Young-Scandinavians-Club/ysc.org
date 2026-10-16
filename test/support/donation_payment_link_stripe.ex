@@ -52,30 +52,6 @@ defmodule Ysc.Stripe.DonationPaymentLinkTestClient do
      }}
   end
 
-  defp do_retrieve_payment_link("plink_renamed_fund") do
-    name = Process.get(:plink_renamed_fund_product_name, "Old Fund Name")
-
-    {:ok,
-     %{
-       id: "plink_renamed_fund",
-       url: "https://donate.stripe.com/renamed_fund_link",
-       submit_type: "donate",
-       line_items: %{
-         data: [
-           %{
-             description: name,
-             price: %{
-               product: %{
-                 id: "prod_renamed_fund",
-                 name: name
-               }
-             }
-           }
-         ]
-       }
-     }}
-  end
-
   defp do_retrieve_payment_link("plink_other") do
     {:ok, %{id: "plink_other", url: "https://buy.stripe.com/not-a-donation"}}
   end

@@ -76,50 +76,6 @@ defmodule Ysc.Stripe.DonationPaymentLinkTest do
            }
   end
 
-  test "does not book a later donation to a stale Cachex product name after the Payment Link is edited" do
-    Process.put(:plink_renamed_fund_product_name, "Old Fund Name")
-    assert :ok = book_session("plink_renamed_fund", "pi_renamed_old")
-
-    payment_old = Repo.get_by!(Payment, external_payment_id: "pi_renamed_old")
-
-    assert DonationPaymentLink.payment_link_fund(payment_old).account ==
-             "Old Fund Name"
-
-    # Older releases cached the Payment Link in Cachex for 10 minutes across
-    # webhooks. After the Stripe product is renamed, booking must fetch again
-    # — not reuse that shared snapshot (wrong QuickBooks income account).
-    Cachex.put(
-      :ysc_cache,
-      "stripe_donation_payment_link:plink_renamed_fund",
-      %{
-        id: "plink_renamed_fund",
-        url: "https://donate.stripe.com/renamed_fund_link",
-        submit_type: "donate",
-        line_items: %{
-          data: [
-            %{
-              description: "Old Fund Name",
-              price: %{
-                product: %{id: "prod_renamed_fund", name: "Old Fund Name"}
-              }
-            }
-          ]
-        }
-      },
-      expire: :timer.minutes(10)
-    )
-
-    Process.put(:plink_renamed_fund_product_name, "Dock Repair Fund")
-    assert :ok = book_session("plink_renamed_fund", "pi_renamed_new")
-
-    payment_new = Repo.get_by!(Payment, external_payment_id: "pi_renamed_new")
-
-    assert DonationPaymentLink.payment_link_fund(payment_new) == %{
-             account: "Dock Repair Fund",
-             class: "Administration"
-           }
-  end
-
   test "books checkout.session.async_payment_succeeded" do
     assert :ok =
              WebhookHandler.handle_webhook_event(

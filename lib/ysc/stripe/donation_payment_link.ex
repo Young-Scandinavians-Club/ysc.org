@@ -156,10 +156,6 @@ defmodule Ysc.Stripe.DonationPaymentLink do
   def enqueue_account_setup(payment_link) when is_map(payment_link) do
     case session_value(payment_link, :id) do
       id when is_binary(id) ->
-        # Drop any process-local or leftover shared cache so the next booking
-        # cannot resolve the previous product/metadata income account.
-        invalidate_payment_link_cache(id)
-
         case %{"payment_link_id" => id}
              |> YscWeb.Workers.QuickbooksEnsureDonationAccountWorker.new()
              |> Oban.insert() do
@@ -693,20 +689,22 @@ defmodule Ysc.Stripe.DonationPaymentLink do
     )
   end
 
-  # Prefetch stores a one-shot copy for book_paid_session in the same webhook
-  # process. Do not use Cachex or a sticky Process dict: both survived
-  # payment_link.updated (and reused Cowboy processes) and booked later
-  # donations to the previous product/metadata income account.
   defp retrieve_payment_link(id) do
-    key = payment_link_process_key(id)
+    key = payment_link_cache_key(id)
 
-    case Process.get(key) do
-      {:prefetch, link} when is_map(link) ->
-        Process.delete(key)
+    case Cachex.get(:ysc_cache, key) do
+      {:ok, link} when is_map(link) ->
         {:ok, link}
 
       _ ->
-        fetch_payment_link(id)
+        case fetch_payment_link(id) do
+          {:ok, link} = ok ->
+            Cachex.put(:ysc_cache, key, link, expire: @payment_link_cache_ttl)
+            ok
+
+          other ->
+            other
+        end
     end
   end
 
@@ -730,14 +728,6 @@ defmodule Ysc.Stripe.DonationPaymentLink do
     end
   end
 
-  defp invalidate_payment_link_cache(id) when is_binary(id) do
-    Process.delete(payment_link_process_key(id))
-    # Older releases cached Payment Links in Cachex for 10 minutes; clear that
-    # key so a mixed deploy cannot keep serving the pre-edit snapshot.
-    Cachex.del(:ysc_cache, payment_link_shared_cache_key(id))
-    :ok
-  end
-
   defp warm_paid_session(session) do
     if session_value(session, :payment_status) == "paid" do
       case payment_link_id(session) do
@@ -753,13 +743,8 @@ defmodule Ysc.Stripe.DonationPaymentLink do
   end
 
   defp warm_donation_link(session, payment_link_id) do
-    case fetch_payment_link(payment_link_id) do
+    case retrieve_payment_link(payment_link_id) do
       {:ok, link} ->
-        Process.put(
-          payment_link_process_key(payment_link_id),
-          {:prefetch, link}
-        )
-
         case resolve_donation_link(session, link) do
           nil ->
             :ok
@@ -792,8 +777,7 @@ defmodule Ysc.Stripe.DonationPaymentLink do
     end
   end
 
-  defp payment_link_process_key(id), do: {:stripe_donation_payment_link, id}
-  defp payment_link_shared_cache_key(id), do: "stripe_donation_payment_link:#{id}"
+  defp payment_link_cache_key(id), do: "stripe_donation_payment_link:#{id}"
   defp fee_cache_key(id), do: "stripe_donation_fee:#{id}"
 
   defp data_object(%{object: object}), do: object
