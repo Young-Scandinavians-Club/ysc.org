@@ -8,17 +8,62 @@ defmodule Ysc.Merch do
   """
   import Ecto.Query, warn: false
 
+  alias Ysc.Media.Image
   alias Ysc.Merch.{CatalogSync, Product, ProductImage, Variant}
   alias Ysc.Repo
+
+  # Shop tiles and product pages only need display paths. Skipping
+  # `upload_data` / `content_hash` keeps Printful mockup JSON off the listing.
+  @shop_image_fields [
+    :id,
+    :title,
+    :alt_text,
+    :optimized_image_path,
+    :raw_image_path,
+    :thumbnail_path,
+    :blur_hash,
+    :width,
+    :height
+  ]
+
+  # Listing tiles: name, sort, "new" badge, starting price, colors/sizes.
+  # Omits `description` (up to 5k) and Printful sync columns.
+  @shop_listing_product_fields [
+    :id,
+    :name,
+    :status,
+    :sort_order,
+    :image_id,
+    :inserted_at
+  ]
+
+  # Product page also renders the club-written description.
+  @shop_product_fields @shop_listing_product_fields ++ [:description]
+
+  @shop_variant_fields [
+    :id,
+    :product_id,
+    :name,
+    :size,
+    :color,
+    :retail_price,
+    :available,
+    :image_id
+  ]
+
+  @shop_gallery_fields [:id, :product_id, :image_id, :color, :position]
 
   ## Catalog (member-facing)
 
   @doc """
   Products shown in the shop: active, with at least one available variant.
-  Available variants are preloaded, cheapest first.
+
+  Listing columns only: name, sort, timestamps, available variants (color /
+  size / price), and display-image paths. Skips descriptions, Printful ids,
+  and `images.upload_data`.
   """
   def list_shop_products do
-    shop_products_query()
+    shop_products_query(@shop_listing_product_fields)
     |> Repo.all()
   end
 
@@ -27,19 +72,12 @@ defmodule Ysc.Merch do
   hidden, removed or has nothing left to sell.
   """
   def get_shop_product(id) do
-    shop_products_query()
+    shop_products_query(@shop_product_fields)
     |> where([p], p.id == ^id)
     |> Repo.one()
   end
 
-  defp shop_products_query do
-    variants =
-      from(v in Variant,
-        where: v.available == true,
-        order_by: [asc: fragment("(?).amount", v.retail_price), asc: v.name],
-        preload: :image
-      )
-
+  defp shop_products_query(product_fields) do
     from(p in Product,
       as: :product,
       where: p.status == :active,
@@ -47,23 +85,39 @@ defmodule Ysc.Merch do
         exists(
           from(v in Variant,
             where:
-              v.product_id == parent_as(:product).id and v.available == true
+              v.product_id == parent_as(:product).id and v.available == true,
+            select: 1
           )
         ),
       order_by: [asc: p.sort_order, asc: p.name],
+      select: struct(p, ^product_fields),
       preload: [
-        :image,
-        variants: ^variants,
+        image: ^shop_image_query(),
+        variants: ^shop_variants_query(),
         gallery_images: ^gallery_images_query()
       ]
+    )
+  end
+
+  defp shop_variants_query do
+    from(v in Variant,
+      where: v.available == true,
+      order_by: [asc: fragment("(?).amount", v.retail_price), asc: v.name],
+      select: struct(v, ^@shop_variant_fields),
+      preload: [image: ^shop_image_query()]
     )
   end
 
   defp gallery_images_query do
     from(g in ProductImage,
       order_by: [asc: g.position, asc: g.inserted_at],
-      preload: :image
+      select: struct(g, ^@shop_gallery_fields),
+      preload: [image: ^shop_image_query()]
     )
+  end
+
+  defp shop_image_query do
+    from(i in Image, select: struct(i, ^@shop_image_fields))
   end
 
   ## Gallery
@@ -203,8 +257,12 @@ defmodule Ysc.Merch do
     from(p in Product,
       order_by: [asc: p.sort_order, asc: p.name],
       preload: [
-        :image,
-        variants: ^from(v in Variant, order_by: [asc: v.name], preload: :image),
+        image: ^shop_image_query(),
+        variants:
+          ^from(v in Variant,
+            order_by: [asc: v.name],
+            preload: [image: ^shop_image_query()]
+          ),
         gallery_images: ^gallery_images_query()
       ]
     )
@@ -234,5 +292,6 @@ defmodule Ysc.Merch do
   defdelegate sync_catalog(uploader), to: CatalogSync, as: :run
 
   @doc false
-  def ci_query_explain_query, do: shop_products_query()
+  def ci_query_explain_query,
+    do: shop_products_query(@shop_listing_product_fields)
 end

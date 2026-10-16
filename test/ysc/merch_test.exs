@@ -1,6 +1,8 @@
 defmodule Ysc.MerchTest do
   use Ysc.DataCase, async: true
 
+  import Ysc.MerchFixtures, only: [image_fixture: 1, gallery_photo_fixture: 3]
+
   alias Ysc.Merch
   alias Ysc.Merch.{Product, Variant}
 
@@ -73,6 +75,48 @@ defmodule Ysc.MerchTest do
 
       assert Enum.map(Merch.list_shop_products(), & &1.id) == [a.id, b.id]
     end
+
+    test "omits descriptions, Printful ids, and image upload_data" do
+      image =
+        image_fixture(%{
+          upload_data: %{"original" => "fat-json"},
+          content_hash: "abc123"
+        })
+
+      product =
+        product!()
+        |> Ecto.Changeset.change(%{
+          description: "Club-written copy the listing never shows.",
+          image_id: image.id
+        })
+        |> Repo.update!()
+
+      variant!(product, "20", %{
+        sku: "TEE-BLK-M",
+        source_image_url: "https://printful.example/tee.png",
+        image_id: image.id
+      })
+
+      gallery_photo_fixture(product, image, %{position: 0})
+
+      {listed, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Merch.list_shop_products() end,
+          pattern:
+            ~r/description|printful_product_id|printful_sync_variant_id|printful_variant_id|source_image_url|upload_data|content_hash|sku/i,
+          caller_pids: [self()]
+        )
+
+      shown = Enum.find(listed, &(&1.id == product.id))
+      assert shown
+      assert shown.name
+      assert is_nil(shown.description)
+      assert is_nil(shown.printful_product_id)
+      assert hd(shown.variants).printful_variant_id == nil
+      assert shown.image.id == image.id
+      assert is_nil(shown.image.upload_data)
+      assert fat_cols == 0
+    end
   end
 
   describe "get_shop_product/1" do
@@ -90,6 +134,32 @@ defmodule Ysc.MerchTest do
                Merch.get_shop_product(product.id)
 
       assert id == variant.id
+    end
+
+    test "keeps the description and omits image upload_data" do
+      image = image_fixture(%{upload_data: %{"original" => "fat-json"}})
+
+      product =
+        product!()
+        |> Ecto.Changeset.change(%{
+          description: "Soft cotton club tee.",
+          image_id: image.id
+        })
+        |> Repo.update!()
+
+      variant!(product, "10", %{image_id: image.id})
+
+      {shown, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Merch.get_shop_product(product.id) end,
+          pattern: ~r/upload_data|content_hash|printful_product_id|sku/i,
+          caller_pids: [self()]
+        )
+
+      assert shown.description == "Soft cotton club tee."
+      assert shown.image.id == image.id
+      assert is_nil(shown.image.upload_data)
+      assert fat_cols == 0
     end
   end
 

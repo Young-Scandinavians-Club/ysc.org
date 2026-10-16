@@ -202,4 +202,40 @@ defmodule Ysc.Merch.CartTest do
       assert %{count: 0} = Cart.summary(user)
     end
   end
+
+  test "omits image upload_data and unused catalog columns", %{
+    user: user,
+    variant: variant
+  } do
+    image =
+      image_fixture(%{
+        upload_data: %{"original" => "fat-json"},
+        content_hash: "abc123"
+      })
+
+    variant
+    |> Ecto.Changeset.change(%{
+      image_id: image.id,
+      sku: "TEE-BLK-M",
+      source_image_url: "https://printful.example/tee.png"
+    })
+    |> Repo.update!()
+
+    {:ok, _} = Cart.add(user, variant.id, 1)
+
+    {lines, fat_cols} =
+      Ysc.QueryCounter.with_query_counter(
+        fn -> Cart.list(user) end,
+        pattern: ~r/upload_data|content_hash|source_image_url|sku/i,
+        caller_pids: [self()]
+      )
+
+    [line] = lines
+    assert line.variant.id == variant.id
+    assert line.variant.printful_variant_id
+    assert line.variant.image.id == image.id
+    assert is_nil(line.variant.image.upload_data)
+    assert is_nil(line.variant.sku)
+    assert fat_cols == 0
+  end
 end

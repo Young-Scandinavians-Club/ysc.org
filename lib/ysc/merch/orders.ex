@@ -11,8 +11,24 @@ defmodule Ysc.Merch.Orders do
 
   alias Ecto.Multi
   alias Ysc.Accounts.User
-  alias Ysc.Merch.{Cart, Order, OrderItem, ShippingAddress}
+  alias Ysc.Media.Image
+  alias Ysc.Merch.{Cart, Order, OrderItem, ShippingAddress, Variant}
   alias Ysc.Repo
+
+  @user_order_fields [:id, :reference_id, :status, :total_amount, :inserted_at]
+  @user_order_item_fields [:id, :order_id, :name, :quantity, :variant_id]
+  @user_order_variant_fields [:id, :image_id]
+  @user_order_image_fields [
+    :id,
+    :title,
+    :alt_text,
+    :optimized_image_path,
+    :raw_image_path,
+    :thumbnail_path,
+    :blur_hash,
+    :width,
+    :height
+  ]
 
   @detail_preloads [
     items: [variant: [:image, product: :image]],
@@ -125,7 +141,7 @@ defmodule Ysc.Merch.Orders do
       where: o.inserted_at > ago(24, "hour"),
       order_by: [desc: o.inserted_at],
       limit: 5,
-      preload: [items: [variant: :image]]
+      preload: [:items]
     )
     |> Repo.all()
     |> Enum.find(&(order_signature(&1) == wanted))
@@ -212,9 +228,28 @@ defmodule Ysc.Merch.Orders do
       where:
         o.user_id == ^user_id and o.kind == :purchase and o.status != :pending,
       order_by: [desc: o.inserted_at],
-      preload: [items: [variant: :image]]
+      select: struct(o, ^@user_order_fields),
+      preload: [items: ^user_order_item_query()]
     )
     |> Repo.all()
+  end
+
+  defp user_order_item_query do
+    from(i in OrderItem,
+      select: struct(i, ^@user_order_item_fields),
+      preload: [variant: ^user_order_variant_query()]
+    )
+  end
+
+  defp user_order_variant_query do
+    from(v in Variant,
+      select: struct(v, ^@user_order_variant_fields),
+      preload: [image: ^user_order_image_query()]
+    )
+  end
+
+  defp user_order_image_query do
+    from(i in Image, select: struct(i, ^@user_order_image_fields))
   end
 
   defp preload_detail(nil), do: nil
@@ -258,7 +293,8 @@ defmodule Ysc.Merch.Orders do
         o.user_id == ^Fixtures.ulid() and o.kind == :purchase and
           o.status != :pending,
       order_by: [desc: o.inserted_at],
-      preload: [items: [variant: :image]]
+      select: struct(o, ^@user_order_fields),
+      preload: [items: ^user_order_item_query()]
     )
   end
 end

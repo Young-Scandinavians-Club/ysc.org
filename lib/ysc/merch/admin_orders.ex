@@ -36,6 +36,23 @@ defmodule Ysc.Merch.AdminOrders do
   @estimate_attempts 3
   @estimate_wait_ms 600
 
+  # List cards: who it's for, item names, money, status. Skip address / PI
+  # ids / Printful payload and a JOIN that would SELECT users.*.
+  @list_order_fields [
+    :id,
+    :reference_id,
+    :kind,
+    :status,
+    :recipient_name,
+    :total_amount,
+    :printful_cost,
+    :estimated_cost,
+    :inserted_at,
+    :user_id
+  ]
+  @list_user_fields [:id, :first_name, :last_name]
+  @list_item_fields [:id, :order_id, :name, :quantity]
+
   defp printful_client do
     Application.get_env(:ysc, :printful_client, Ysc.Printful.Client)
   end
@@ -48,15 +65,14 @@ defmodule Ysc.Merch.AdminOrders do
   def filters, do: [:all, :needs_attention, :club_paid, :purchases]
 
   @doc """
-  One page of orders, newest first, with who placed and received them, the
-  event and items loaded.
+  One page of orders, newest first, with recipient name and item names loaded.
 
   `search` matches the order number, recipient name or email, purpose, the
   member's name or email, and item names. `params` are Flop's (`"page"`,
-  `"page_size"`).
+  `"page_size"`). Search uses `EXISTS` so a `JOIN users` cannot `SELECT *`.
 
   Member purchases are only listed once paid, so abandoned checkouts do not
-  clutter the list.
+  clutter the list. Detail pages still use `Orders.get_order/1`.
   """
   @spec paginate_orders(filter(), String.t() | nil, map()) ::
           {:ok, {[Order.t()], Flop.Meta.t()}} | {:error, Flop.Meta.t()}
@@ -77,8 +93,23 @@ defmodule Ysc.Merch.AdminOrders do
     |> run_page(params)
   end
 
-  defp with_list_preloads(query),
-    do: preload(query, [:user, :granted_by, :event, :items])
+  defp with_list_preloads(query) do
+    from(o in query,
+      select: struct(o, ^@list_order_fields),
+      preload: [
+        user: ^list_user_query(),
+        items: ^list_item_query()
+      ]
+    )
+  end
+
+  defp list_user_query do
+    from(u in User, select: struct(u, ^@list_user_fields))
+  end
+
+  defp list_item_query do
+    from(i in OrderItem, select: struct(i, ^@list_item_fields))
+  end
 
   defp run_page(query, params) do
     Flop.validate_and_run(query, Map.take(params, ["page", "page_size"]),
@@ -91,25 +122,32 @@ defmodule Ysc.Merch.AdminOrders do
   defp apply_search(query, term) do
     pattern = like_pattern(String.trim(term))
 
-    query
-    |> join(:left, [o], u in assoc(o, :user), as: :member)
-    |> where(
-      [o, member: u],
+    where(
+      query,
+      [o],
       ilike(o.reference_id, ^pattern) or
         ilike(o.recipient_name, ^pattern) or
         ilike(o.email, ^pattern) or
         ilike(o.purpose, ^pattern) or
-        ilike(u.first_name, ^pattern) or
-        ilike(u.last_name, ^pattern) or
-        ilike(
-          fragment("concat(?, ' ', ?)", u.first_name, u.last_name),
-          ^pattern
+        exists(
+          from(u in User,
+            where: u.id == parent_as(:order).user_id,
+            where:
+              ilike(u.first_name, ^pattern) or
+                ilike(u.last_name, ^pattern) or
+                ilike(
+                  fragment("concat(?, ' ', ?)", u.first_name, u.last_name),
+                  ^pattern
+                ) or
+                ilike(fragment("(?::text)", u.email), ^pattern),
+            select: 1
+          )
         ) or
-        ilike(fragment("(?::text)", u.email), ^pattern) or
         exists(
           from(i in OrderItem,
             where:
-              i.order_id == parent_as(:order).id and ilike(i.name, ^pattern)
+              i.order_id == parent_as(:order).id and ilike(i.name, ^pattern),
+            select: 1
           )
         )
     )

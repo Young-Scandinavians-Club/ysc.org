@@ -158,6 +158,46 @@ defmodule Ysc.Merch.AdminOrdersTest do
         {:error, _meta} -> :ok
       end
     end
+
+    test "omits member secrets, addresses, and unused associations", %{
+      admin: admin
+    } do
+      member = member_fixture(%{first_name: "Astrid", last_name: "Lindgren"})
+
+      member
+      |> Ecto.Changeset.change(board_bio: "board bio the list must not load")
+      |> Repo.update!()
+
+      event = event_fixture()
+
+      order =
+        admin_order_fixture(admin, %{
+          user_id: member.id,
+          event_id: event.id,
+          purpose: "Gala giveaway",
+          address1: "1 Market St"
+        })
+
+      {{:ok, {orders, _meta}}, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> AdminOrders.paginate_orders(:all, nil, %{}) end,
+          pattern:
+            ~r/hashed_password|board_bio|address1|payment_intent_id|printful_order_id|raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      shown = Enum.find(orders, &(&1.id == order.id))
+      assert shown
+      assert shown.user.id == member.id
+      assert shown.user.first_name == "Astrid"
+      assert is_nil(shown.user.hashed_password)
+      assert is_nil(shown.user.board_bio)
+      assert is_nil(shown.address1)
+      refute Ecto.assoc_loaded?(shown.granted_by)
+      refute Ecto.assoc_loaded?(shown.event)
+      assert shown.items != []
+      assert fat_cols == 0
+    end
   end
 
   describe "search" do
@@ -202,6 +242,17 @@ defmodule Ysc.Merch.AdminOrdersTest do
       assert found("astrid") == [order.id]
       assert found("Astrid Lindgren") == [order.id]
       assert found(member.email) == [order.id]
+    end
+
+    test "member search does not SELECT users.*", %{member: member} do
+      {_ids, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> found(member.email) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert fat_cols == 0
     end
 
     test "by item name", %{by_item: order, by_member: other} do
