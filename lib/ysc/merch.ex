@@ -116,6 +116,15 @@ defmodule Ysc.Merch do
     )
   end
 
+  # Admin photo controls key off `source` (`:printful` vs `:admin`). The shop
+  # gallery query omits that enum so listing structs default it to `:admin`.
+  defp admin_gallery_images_query do
+    from(g in ProductImage,
+      order_by: [asc: g.position, asc: g.inserted_at],
+      preload: [image: ^shop_image_query()]
+    )
+  end
+
   defp shop_image_query do
     from(i in Image, select: struct(i, ^@shop_image_fields))
   end
@@ -263,7 +272,7 @@ defmodule Ysc.Merch do
             order_by: [asc: v.name],
             preload: [image: ^shop_image_query()]
           ),
-        gallery_images: ^gallery_images_query()
+        gallery_images: ^admin_gallery_images_query()
       ]
     )
     |> Repo.all()

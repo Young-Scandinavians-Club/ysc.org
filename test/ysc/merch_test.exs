@@ -186,4 +186,17 @@ defmodule Ysc.MerchTest do
 
     assert [%Product{variants: [_]}] = Merch.list_admin_products()
   end
+
+  test "admin list keeps Printful gallery source (not the :admin default)" do
+    product = product!()
+    variant!(product, "10")
+
+    photo =
+      gallery_photo_fixture(product, nil, %{source: :printful, color: "Black"})
+
+    assert [%Product{gallery_images: [loaded]}] = Merch.list_admin_products()
+    assert loaded.id == photo.id
+    assert loaded.source == :printful
+    assert loaded.color == "Black"
+  end
 end
