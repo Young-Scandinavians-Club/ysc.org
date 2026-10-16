@@ -1,0 +1,208 @@
+defmodule YscWeb.ShopListingTest do
+  use YscWeb.ConnCase, async: true
+
+  import Phoenix.LiveViewTest
+  import Ysc.MerchFixtures
+
+  setup %{conn: conn} do
+    tee = product_fixture(%{name: "Club Tee"})
+
+    for {color, size} <- [{"Black", "S"}, {"Black", "XL"}, {"Navy", "M"}] do
+      variant_fixture(tee, %{
+        name: "Club Tee / #{color} / #{size}",
+        color: color,
+        size: size,
+        retail_price: Money.new(:USD, "25")
+      })
+    end
+
+    sticker = product_fixture(%{name: "Sticker"})
+    variant_fixture(sticker, %{retail_price: Money.new(:USD, "3")})
+
+    hoodie = product_fixture(%{name: "Hoodie"})
+
+    variant_fixture(hoodie, %{
+      color: "Navy",
+      size: "M",
+      retail_price: Money.new(:USD, "55")
+    })
+
+    %{
+      conn: log_in_user(conn, member_fixture()),
+      tee: tee,
+      sticker: sticker,
+      hoodie: hoodie
+    }
+  end
+
+  defp product_ids(view) do
+    view
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query("#shop-products > li")
+    |> LazyHTML.attribute("id")
+  end
+
+  test "shows how many items there are", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/shop")
+    assert has_element?(view, "#shop-count", "3 items")
+  end
+
+  test "tiles show a swatch per color and details", %{
+    conn: conn,
+    tee: tee,
+    sticker: sticker
+  } do
+    {:ok, view, _html} = live(conn, ~p"/shop")
+
+    assert has_element?(view, "#shop-swatch-#{tee.id}-black[aria-pressed=true]")
+    assert has_element?(view, "#shop-swatch-#{tee.id}-navy[aria-pressed=false]")
+    assert has_element?(view, "#shop-details-#{tee.id}", "S–XL")
+    assert has_element?(view, "#shop-layer-#{tee.id}-navy")
+
+    # No colors, no swatches.
+    refute has_element?(view, "#shop-swatches-#{sticker.id}")
+  end
+
+  test "a tile opens the product in its color", %{conn: conn, tee: tee} do
+    {:ok, view, _html} = live(conn, ~p"/shop")
+
+    assert has_element?(
+             view,
+             "#shop-product-link-#{tee.id}[href='/shop/products/#{tee.id}?color=Black']"
+           )
+  end
+
+  test "the product page opens on the chosen color", %{conn: conn, tee: tee} do
+    {:ok, view, _html} = live(conn, ~p"/shop/products/#{tee.id}?color=Navy")
+    assert has_element?(view, "#color-navy[aria-pressed=true]")
+
+    {:ok, view, _html} = live(conn, ~p"/shop/products/#{tee.id}?color=Nonsense")
+    assert has_element?(view, "#color-black[aria-pressed=true]")
+  end
+
+  describe "sorting" do
+    test "orders the tiles and keeps the choice in the URL", %{
+      conn: conn,
+      tee: tee,
+      sticker: sticker,
+      hoodie: hoodie
+    } do
+      {:ok, view, _html} = live(conn, ~p"/shop")
+
+      view |> form("#shop-sort-form", %{sort: "price_desc"}) |> render_change()
+      assert_patch(view, ~p"/shop?#{[sort: "price_desc"]}")
+
+      assert product_ids(view) == [
+               "shop-product-#{hoodie.id}",
+               "shop-product-#{tee.id}",
+               "shop-product-#{sticker.id}"
+             ]
+    end
+
+    test "a link with a sort opens already sorted", %{
+      conn: conn,
+      sticker: sticker
+    } do
+      {:ok, view, _html} = live(conn, ~p"/shop?#{[sort: "price_asc"]}")
+      assert List.first(product_ids(view)) == "shop-product-#{sticker.id}"
+      assert has_element?(view, "#shop-sort option[value=price_asc][selected]")
+    end
+  end
+
+  describe "color filter" do
+    test "narrows the list and shows removable pills", %{
+      conn: conn,
+      tee: tee,
+      sticker: sticker,
+      hoodie: hoodie
+    } do
+      {:ok, view, _html} = live(conn, ~p"/shop")
+
+      view |> element("#shop-filter-color-black") |> render_click()
+      assert_patch(view, ~p"/shop?#{[colors: ["Black"]]}")
+
+      assert product_ids(view) == ["shop-product-#{tee.id}"]
+      assert has_element?(view, "#shop-count", "1 item")
+      assert has_element?(view, "#shop-filter-count", "1")
+      assert has_element?(view, "#shop-remove-filter-black")
+      refute has_element?(view, "#shop-product-#{sticker.id}")
+      refute has_element?(view, "#shop-product-#{hoodie.id}")
+    end
+
+    test "tiles open on the filtered color", %{conn: conn, tee: tee} do
+      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Navy"]]}")
+
+      assert has_element?(
+               view,
+               "#shop-swatch-#{tee.id}-navy[aria-pressed=true]"
+             )
+    end
+
+    test "colors combine, and pills remove one at a time", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Black", "Navy"]]}")
+      assert has_element?(view, "#shop-count", "2 items")
+
+      view |> element("#shop-remove-filter-black") |> render_click()
+      refute has_element?(view, "#shop-remove-filter-black")
+      assert has_element?(view, "#shop-remove-filter-navy")
+    end
+
+    test "Clear all brings everything back", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Black"]]}")
+      view |> element("#shop-clear-filters") |> render_click()
+
+      assert_patch(view, ~p"/shop")
+      assert has_element?(view, "#shop-count", "3 items")
+      refute has_element?(view, "#shop-active-filters")
+    end
+
+    test "ignores colors no product has", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Chartreuse"]]}")
+      assert has_element?(view, "#shop-count", "3 items")
+      refute has_element?(view, "#shop-active-filters")
+    end
+
+    test "sorting keeps the filter", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Navy"]]}")
+      view |> form("#shop-sort-form", %{sort: "name"}) |> render_change()
+
+      assert_patch(view, ~p"/shop?#{[sort: "name", colors: ["Navy"]]}")
+      assert has_element?(view, "#shop-count", "2 items")
+    end
+  end
+
+  describe "good to know" do
+    test "answers the questions members have, collapsed by default", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/shop")
+
+      assert has_element?(view, "#shop-faq")
+      assert has_element?(view, "#shop-faq-does-the-club-make-money summary")
+
+      assert has_element?(
+               view,
+               "#shop-faq-does-the-club-make-money",
+               "does not"
+             )
+
+      assert has_element?(view, "#shop-faq-delivery-time", "printed to order")
+      assert has_element?(view, "#shop-faq-contact[href='mailto:info@ysc.org']")
+      refute has_element?(view, "#shop-faq details[open]")
+    end
+
+    test "survives sorting and filtering", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/shop")
+      view |> element("#shop-filter-color-black") |> render_click()
+      assert has_element?(view, "#shop-faq")
+    end
+
+    test "is not shown while the shop is empty", %{conn: conn} do
+      Ysc.Repo.delete_all(Ysc.Merch.Variant)
+      {:ok, view, _html} = live(conn, ~p"/shop")
+      assert has_element?(view, "#shop-empty")
+      refute has_element?(view, "#shop-faq")
+    end
+  end
+end

@@ -62,6 +62,20 @@ defmodule Ysc.Ledgers.AdminDashboardRevenueTest do
       assert Enum.at(snapshot.sparkline, 6) |> Decimal.eq?(Decimal.new(0))
     end
 
+    test "counts merch sales as revenue" do
+      now = ~U[2026-08-20 12:00:00Z]
+      merch = Ledgers.get_account_by_name("merch_revenue")
+
+      insert_entry!(merch, :credit, 40, ~U[2026-08-10 08:00:00Z])
+      insert_entry!(merch, :debit, 15, ~U[2026-08-12 08:00:00Z])
+
+      snapshot = Ledgers.get_admin_dashboard_revenue(now)
+      totals = Map.fetch!(snapshot.totals_by_account_id, merch.id)
+
+      assert Decimal.eq?(totals.current_month, Decimal.new(25))
+      assert Decimal.eq?(snapshot.ytd_total, Decimal.new(25))
+    end
+
     test "returns zeroed sparkline and totals when no revenue entries exist" do
       now = ~U[2026-08-20 12:00:00Z]
       snapshot = Ledgers.get_admin_dashboard_revenue(now)
@@ -80,7 +94,8 @@ defmodule Ysc.Ledgers.AdminDashboardRevenueTest do
               "event_revenue",
               "tahoe_booking_revenue",
               "clear_lake_booking_revenue",
-              "donation_revenue"
+              "donation_revenue",
+              "merch_revenue"
             ]
         )
       )

@@ -4498,6 +4498,66 @@ defmodule Ysc.BookingsTest do
       assert String.starts_with?(refund_id, "re_test")
     end
 
+    test "refunds when booking was reverted to draft after a captured unapplied modification" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :draft})
+        |> Ysc.Repo.update!()
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_draft_mod_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        metadata: %{
+          "modification" => "true",
+          "booking_id" => to_string(booking.id),
+          "user_id" => to_string(user.id)
+        },
+        latest_charge: "ch_test_draft_mod"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_modification_payment(
+                 booking,
+                 payment_intent,
+                 :booking_canceled
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
+
+    test "refunds when booking was marked refunded after a captured unapplied modification" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :refunded})
+        |> Ysc.Repo.update!()
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_refunded_mod_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        metadata: %{
+          "modification" => "true",
+          "booking_id" => to_string(booking.id),
+          "user_id" => to_string(user.id)
+        },
+        latest_charge: "ch_test_refunded_mod"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_modification_payment(
+                 booking,
+                 payment_intent,
+                 :booking_canceled
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
+
     test "skips refund when payment intent is not a modification" do
       user = Ysc.AccountsFixtures.user_fixture()
 
@@ -5355,6 +5415,106 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  defp complete_booking_with_unapplied_mod_pi(user, date_offset) do
+    {checkin, checkout} = tahoe_booking_dates(date_offset)
+    extended_checkout = Date.add(checkout, 1)
+
+    assert {:ok, total, _} =
+             Bookings.calculate_booking_price(
+               :tahoe,
+               checkin,
+               checkout,
+               :buyout,
+               guests_count: 4
+             )
+
+    assert {:ok, booking} =
+             Ysc.Bookings.BookingLocker.create_admin_booking(
+               %{
+                 user_id: user.id,
+                 property: :tahoe,
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 booking_mode: :buyout,
+                 guests_count: 4,
+                 total_price: total
+               },
+               skip_email: true,
+               skip_reminders: true
+             )
+
+    attrs = %{
+      checkin_date: checkin,
+      checkout_date: extended_checkout,
+      guests_count: 4,
+      children_count: 0
+    }
+
+    assert {:ok, preview} =
+             Bookings.prepare_modification(booking, %{
+               "checkin_date" => Date.to_string(checkin),
+               "checkout_date" => Date.to_string(extended_checkout),
+               "guests_count" => "4",
+               "children_count" => "0"
+             })
+
+    assert Money.positive?(preview.delta)
+
+    assert {:ok, held} = Bookings.place_modification_hold(booking, attrs)
+
+    payment_intent_id =
+      "pi_complete_mod_#{date_offset}_#{System.unique_integer([:positive])}"
+
+    amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+    assert {:ok, _} =
+             Bookings.attach_modification_payment_intent(
+               held.id,
+               payment_intent_id
+             )
+
+    {held, checkout, payment_intent_id, amount_cents}
+  end
+
+  defp stub_succeeded_unapplied_mod_pi(
+         payment_intent_id,
+         booking,
+         user,
+         amount_cents
+       ) do
+    expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                      _opts ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :payment_intent_unexpected_state,
+         message:
+           "You cannot cancel this PaymentIntent because it has a status of succeeded",
+         extra: %{}
+       }}
+    end)
+
+    expect(
+      Ysc.StripeMock,
+      :retrieve_payment_intent,
+      2,
+      fn ^payment_intent_id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"},
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id),
+             "modification" => "true"
+           }
+         }}
+      end
+    )
+  end
+
   describe "bookings_overlap?/4" do
     test "returns true when ranges overlap with checkin1 before checkout2 and checkout1 after checkin2" do
       # From module doc: first booking includes Nov 3–4, second includes Nov 3–4 — overlap.
@@ -5936,6 +6096,121 @@ defmodule Ysc.BookingsTest do
 
         assert {:error, :payment_in_progress} =
                  Ysc.Bookings.BookingLocker.cancel_complete_booking(booking.id)
+
+        reloaded = Repo.reload!(booking)
+        assert reloaded.status == :complete
+        assert reloaded.modification_hold_expires_at
+
+        assert Bookings.modification_hold_payment_intent_id(reloaded) ==
+                 payment_intent_id
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "refunds a captured unapplied modification PaymentIntent before revert to draft",
+         %{user: user} do
+      {booking, original_checkout, payment_intent_id, amount_cents} =
+        complete_booking_with_unapplied_mod_pi(user, 142)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_succeeded_unapplied_mod_pi(
+          payment_intent_id,
+          booking,
+          user,
+          amount_cents
+        )
+
+        assert {:ok, draft} =
+                 Ysc.Bookings.BookingLocker.revert_complete_to_draft(booking.id)
+
+        assert draft.status == :draft
+        assert is_nil(draft.modification_hold_expires_at)
+        assert is_nil(draft.modification_hold_attrs)
+        assert draft.checkout_date == original_checkout
+
+        refute Bookings.modification_ledger_recorded?(
+                 booking.id,
+                 payment_intent_id
+               )
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "refunds a captured unapplied modification PaymentIntent before marking refunded",
+         %{user: user} do
+      {booking, original_checkout, payment_intent_id, amount_cents} =
+        complete_booking_with_unapplied_mod_pi(user, 143)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_succeeded_unapplied_mod_pi(
+          payment_intent_id,
+          booking,
+          user,
+          amount_cents
+        )
+
+        assert {:ok, refunded} =
+                 Ysc.Bookings.BookingLocker.refund_complete_booking(booking.id)
+
+        assert refunded.status == :refunded
+        assert is_nil(refunded.modification_hold_expires_at)
+        assert is_nil(refunded.modification_hold_attrs)
+        assert refunded.checkout_date == original_checkout
+
+        refute Bookings.modification_ledger_recorded?(
+                 booking.id,
+                 payment_intent_id
+               )
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "blocks refund_complete_booking while modification PaymentIntent is still processing",
+         %{user: user} do
+      {booking, _original_checkout, payment_intent_id, _amount_cents} =
+        complete_booking_with_unapplied_mod_pi(user, 144)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message:
+               "You cannot cancel this PaymentIntent because it has a status of processing",
+             extra: %{}
+           }}
+        end)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "processing",
+             amount: 10_000,
+             metadata: %{
+               "booking_id" => to_string(booking.id),
+               "modification" => "true"
+             }
+           }}
+        end)
+
+        assert {:error, :payment_in_progress} =
+                 Ysc.Bookings.BookingLocker.refund_complete_booking(booking.id)
 
         reloaded = Repo.reload!(booking)
         assert reloaded.status == :complete

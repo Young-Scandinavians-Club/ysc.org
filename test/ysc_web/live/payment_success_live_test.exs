@@ -630,7 +630,8 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
         assert_received {:cancel_payment_intent, ^payment_intent_id}
         assert conn.request_path == "/events/#{event.id}"
-        assert conn.query_params["payment_failed"] == "1"
+        assert conn.query_params["payment_canceled"] == "1"
+        refute Map.has_key?(conn.query_params, "payment_failed")
 
         assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
                  "Payment was canceled"

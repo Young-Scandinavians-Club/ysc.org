@@ -59,6 +59,33 @@ if config_env() != :test do
     webhook_token: System.get_env("FLOWROUTE_WEBHOOK_TOKEN")
 end
 
+# ## Printful (merch fulfillment)
+#
+# Without PRINTFUL_API_TOKEN the client returns {:error, :not_configured}
+# instead of calling the API. Not applied in :test so config/test.exs wins.
+if config_env() != :test do
+  config :ysc, :printful,
+    api_token: System.get_env("PRINTFUL_API_TOKEN"),
+    store_id: System.get_env("PRINTFUL_STORE_ID"),
+    webhook_secret: System.get_env("PRINTFUL_WEBHOOK_SECRET")
+end
+
+# The "Shop" link in the main navigation stays hidden until it is switched on
+# with SHOP_NAV_VISIBLE=true, so the shop can be tested in production by going
+# to /shop directly. Always shown in dev; tests set it themselves.
+if config_env() != :test do
+  config :ysc,
+         :shop_nav_visible,
+         config_env() == :dev or
+           System.get_env("SHOP_NAV_VISIBLE") in ["true", "1"]
+end
+
+# Without a Printful token, dev runs the merch shop against a built-in fake
+# Printful (Ysc.Printful.DemoClient) so everything works locally.
+if config_env() == :dev and System.get_env("PRINTFUL_API_TOKEN") in [nil, ""] do
+  config :ysc, :printful_client, Ysc.Printful.DemoClient
+end
+
 # Radar Maps — publishable key must be resolved at runtime so release builds pick up RADAR_PUBLIC_KEY
 # from the host (Fly secrets, etc.). Reading it only in config.exs would bake in the dev default at compile time.
 config :ysc, :radar,
@@ -711,6 +738,7 @@ if config_env() == :prod do
       # QuickBooks Item IDs for different entity types (optional - will auto-create if not set)
       event_item_id: System.get_env("QUICKBOOKS_EVENT_ITEM_ID"),
       donation_item_id: System.get_env("QUICKBOOKS_DONATION_ITEM_ID"),
+      merch_item_id: System.get_env("QUICKBOOKS_MERCH_ITEM_ID"),
       tahoe_booking_item_id: System.get_env("QUICKBOOKS_TAHOE_BOOKING_ITEM_ID"),
       clear_lake_booking_item_id:
         System.get_env("QUICKBOOKS_CLEAR_LAKE_BOOKING_ITEM_ID"),

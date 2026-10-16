@@ -2112,7 +2112,7 @@ defmodule YscWeb.UserSettingsLive do
                     id="payments-intro"
                     class="text-sm text-zinc-600 mt-1 max-w-2xl"
                   >
-                    View payments for cabin bookings, events, donations, and membership below. Unpaid cabin bookings won't appear here until checkout is complete — use the link in your email or return to the cabin page to finish. To see or use your event tickets, open Your event tickets.
+                    View payments for cabin bookings, events, donations, merch, and membership below. Unpaid cabin bookings won't appear here until checkout is complete — use the link in your email or return to the cabin page to finish. To see or use your event tickets, open Your event tickets.
                   </p>
                 </div>
                 <.link
@@ -2266,6 +2266,29 @@ defmodule YscWeb.UserSettingsLive do
                       ]}
                     />Membership
                   </button>
+                  <button
+                    id="payment-filter-merch"
+                    phx-click="filter-payments"
+                    phx-value-filter="merch"
+                    class={[
+                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
+                      if(@payment_filter == :merch,
+                        do: "bg-rose-600 text-white shadow-md",
+                        else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                      )
+                    ]}
+                  >
+                    <.icon
+                      name="hero-shopping-bag"
+                      class={[
+                        "w-4 h-4",
+                        if(@payment_filter == :merch,
+                          do: "text-white",
+                          else: "text-rose-600"
+                        )
+                      ]}
+                    />Merch
+                  </button>
                 </div>
                 <!-- Desktop Table View -->
                 <div class="hidden md:block overflow-x-auto">
@@ -2341,7 +2364,7 @@ defmodule YscWeb.UserSettingsLive do
                   class="text-center py-12"
                 >
                   <p class="text-zinc-600 text-sm">
-                    No payments yet. Cabin bookings, events, donations, and membership payments will show up here.
+                    No payments yet. Cabin bookings, events, donations, merch, and membership payments will show up here.
                   </p>
                 </div>
 
@@ -5789,6 +5812,10 @@ defmodule YscWeb.UserSettingsLive do
     JS.navigate(~p"/orders/#{id}/confirmation")
   end
 
+  defp payment_row_navigate_js(%{type: :merch, merch_order: %{id: id}}) do
+    JS.navigate(~p"/shop/orders/#{id}")
+  end
+
   defp payment_row_navigate_js(_), do: nil
 
   defp payment_row_navigate_aria_label(%{type: :booking}, %JS{}),
@@ -5796,6 +5823,9 @@ defmodule YscWeb.UserSettingsLive do
 
   defp payment_row_navigate_aria_label(%{type: :ticket}, %JS{}),
     do: "View ticket confirmation"
+
+  defp payment_row_navigate_aria_label(%{type: :merch}, %JS{}),
+    do: "View merch order"
 
   defp payment_row_navigate_aria_label(_, _), do: nil
 
@@ -5947,6 +5977,17 @@ defmodule YscWeb.UserSettingsLive do
         </div>
         """
 
+      payment_info.type == :merch && not is_nil(payment_info.merch_order) ->
+        assigns = Map.put(assigns, :merch_order, payment_info.merch_order)
+
+        ~H"""
+        <div class="flex flex-col text-sm text-zinc-500">
+          <p class="font-medium text-zinc-700">
+            {merch_items_summary(@merch_order)}
+          </p>
+        </div>
+        """
+
       payment_info.type == :membership && not is_nil(payment_info.subscription) ->
         # Ensure subscription_items are loaded before rendering
         subscription =
@@ -6041,6 +6082,15 @@ defmodule YscWeb.UserSettingsLive do
         </p>
         """
 
+      payment_info.type == :merch && not is_nil(payment_info.merch_order) ->
+        assigns = Map.put(assigns, :merch_order, payment_info.merch_order)
+
+        ~H"""
+        <p class="font-medium text-zinc-700">
+          {merch_items_summary(@merch_order)}
+        </p>
+        """
+
       payment_info.type == :membership && not is_nil(payment_info.subscription) ->
         # Ensure subscription_items are loaded before rendering
         subscription =
@@ -6092,6 +6142,20 @@ defmodule YscWeb.UserSettingsLive do
     </.badge>
     """
   end
+
+  # "Camp Mug × 2, Tee" — a short line for the payments list.
+  defp merch_items_summary(%{items: items})
+       when is_list(items) and items != [] do
+    Enum.map_join(items, ", ", fn
+      %{name: name, quantity: quantity} when quantity > 1 ->
+        "#{name} × #{quantity}"
+
+      %{name: name} ->
+        name
+    end)
+  end
+
+  defp merch_items_summary(_), do: "Merch order"
 
   defp payment_status_for_badge(%{payment: nil}), do: :completed
   defp payment_status_for_badge(%{payment: payment}), do: payment.status
@@ -6253,6 +6317,11 @@ defmodule YscWeb.UserSettingsLive do
   defp payment_dom_id(%{type: :membership, payment: payment})
        when not is_nil(payment) do
     "payment-membership-#{payment.id}"
+  end
+
+  defp payment_dom_id(%{type: :merch, merch_order: merch_order})
+       when not is_nil(merch_order) do
+    "payment-merch-#{merch_order.id}"
   end
 
   defp payment_dom_id(%{type: :donation, payment: payment})

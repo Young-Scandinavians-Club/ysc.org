@@ -1,0 +1,190 @@
+defmodule Ysc.Merch.GalleryTest do
+  use Ysc.DataCase, async: true
+
+  import Ysc.MerchFixtures
+
+  alias Ysc.Merch
+  alias Ysc.Merch.ProductImage
+
+  defp product_with_colors do
+    product = product_fixture(%{name: "Tee"})
+    black = variant_fixture(product, %{color: "Black", size: "M"})
+    white = variant_fixture(product, %{color: "White", size: "M"})
+    %{product: product, black: black, white: white}
+  end
+
+  defp loaded(product), do: Merch.get_shop_product(product.id)
+  defp ids(images), do: Enum.map(images, & &1.id)
+
+  describe "gallery/2" do
+    test "shows the selected color's photos first, then the general ones" do
+      %{product: product} = product_with_colors()
+      black_1 = image_fixture()
+      black_2 = image_fixture()
+      white_1 = image_fixture()
+      general = image_fixture()
+
+      gallery_photo_fixture(product, general, %{position: 0})
+      gallery_photo_fixture(product, black_2, %{color: "Black", position: 2})
+      gallery_photo_fixture(product, black_1, %{color: "Black", position: 1})
+      gallery_photo_fixture(product, white_1, %{color: "White", position: 3})
+
+      product = loaded(product)
+
+      assert product |> Merch.gallery("Black") |> ids() ==
+               ids([black_1, black_2, general])
+
+      assert product |> Merch.gallery("White") |> ids() ==
+               ids([white_1, general])
+    end
+
+    test "with no color chosen, only photos for every color" do
+      %{product: product} = product_with_colors()
+      general = image_fixture()
+      gallery_photo_fixture(product, general)
+      gallery_photo_fixture(product, image_fixture(), %{color: "Black"})
+
+      assert product |> loaded() |> Merch.gallery(nil) |> ids() == [general.id]
+    end
+
+    test "a color with no photos of its own falls back to the general ones" do
+      %{product: product} = product_with_colors()
+      general = image_fixture()
+      gallery_photo_fixture(product, general)
+
+      assert product |> loaded() |> Merch.gallery("White") |> ids() == [
+               general.id
+             ]
+    end
+
+    test "without a gallery it falls back to the color's variant image, then the product's" do
+      product =
+        product_fixture()
+        |> Ecto.Changeset.change(image_id: image_fixture().id)
+        |> Repo.update!()
+
+      variant_image = image_fixture()
+
+      variant_fixture(product, %{color: "Black"})
+      |> Ecto.Changeset.change(image_id: variant_image.id)
+      |> Repo.update!()
+
+      variant_fixture(product, %{color: "White"})
+
+      product = loaded(product)
+
+      assert product |> Merch.gallery("Black") |> ids() == [variant_image.id]
+      assert product |> Merch.gallery("White") |> ids() == [product.image_id]
+    end
+
+    test "is empty when there is nothing to show" do
+      product = product_fixture()
+      variant_fixture(product)
+      assert product |> loaded() |> Merch.gallery(nil) == []
+    end
+
+    test "a photo is never listed twice" do
+      %{product: product} = product_with_colors()
+      image = image_fixture()
+      gallery_photo_fixture(product, image, %{color: "Black"})
+
+      assert product |> loaded() |> Merch.gallery("Black") |> length() == 1
+    end
+  end
+
+  describe "admin photo management" do
+    test "add_product_photo appends to the end and can tie a color" do
+      %{product: product} = product_with_colors()
+      first = image_fixture()
+      second = image_fixture()
+
+      assert {:ok, %ProductImage{position: 0, color: nil, source: :admin}} =
+               Merch.add_product_photo(product, first.id)
+
+      assert {:ok, %ProductImage{position: 1, color: "Black"}} =
+               Merch.add_product_photo(product, second.id, "Black")
+    end
+
+    test "the same photo cannot be added twice" do
+      %{product: product} = product_with_colors()
+      image = image_fixture()
+      {:ok, _} = Merch.add_product_photo(product, image.id)
+
+      assert {:error, changeset} = Merch.add_product_photo(product, image.id)
+      assert %{product_id: [_]} = errors_on(changeset)
+    end
+
+    test "blank colors mean every color" do
+      %{product: product} = product_with_colors()
+      {:ok, photo} = Merch.add_product_photo(product, image_fixture().id, "  ")
+      assert photo.color == nil
+    end
+
+    test "remove deletes club photos but never Printful's" do
+      %{product: product} = product_with_colors()
+      mine = gallery_photo_fixture(product)
+      theirs = gallery_photo_fixture(product, nil, %{source: :printful})
+
+      assert :ok = Merch.remove_product_photo(mine.id)
+      assert Repo.get(ProductImage, mine.id) == nil
+
+      assert {:error, :managed_by_printful} =
+               Merch.remove_product_photo(theirs.id)
+
+      assert Repo.get(ProductImage, theirs.id)
+
+      assert {:error, :not_found} =
+               Merch.remove_product_photo(Ecto.ULID.generate())
+    end
+
+    test "removing the photo from the media library removes it from the gallery" do
+      %{product: product} = product_with_colors()
+      photo = gallery_photo_fixture(product)
+
+      Repo.delete!(photo.image)
+      assert Repo.get(ProductImage, photo.id) == nil
+    end
+
+    test "set_photo_color retargets club photos only" do
+      %{product: product} = product_with_colors()
+      mine = gallery_photo_fixture(product)
+
+      theirs =
+        gallery_photo_fixture(product, nil, %{source: :printful, color: "Black"})
+
+      assert {:ok, %ProductImage{color: "White"}} =
+               Merch.set_photo_color(mine.id, "White")
+
+      assert {:ok, %ProductImage{color: nil}} =
+               Merch.set_photo_color(mine.id, "")
+
+      assert {:error, :managed_by_printful} =
+               Merch.set_photo_color(theirs.id, "White")
+
+      assert {:error, :not_found} =
+               Merch.set_photo_color(Ecto.ULID.generate(), "White")
+    end
+
+    test "move_photo_first puts a photo at the front" do
+      %{product: product} = product_with_colors()
+      a = gallery_photo_fixture(product, nil, %{position: 0})
+      b = gallery_photo_fixture(product, nil, %{position: 1})
+      c = gallery_photo_fixture(product, nil, %{position: 2})
+
+      assert :ok = Merch.move_photo_first(c.id)
+
+      order = product |> loaded() |> Merch.gallery(nil) |> ids()
+      assert order == [c.image_id, a.image_id, b.image_id]
+      assert {:error, :not_found} = Merch.move_photo_first(Ecto.ULID.generate())
+    end
+
+    test "the shop loads gallery photos in order" do
+      %{product: product} = product_with_colors()
+      late = gallery_photo_fixture(product, nil, %{position: 5})
+      early = gallery_photo_fixture(product, nil, %{position: 1})
+
+      assert [%{id: first}, %{id: second}] = loaded(product).gallery_images
+      assert [first, second] == [early.id, late.id]
+    end
+  end
+end

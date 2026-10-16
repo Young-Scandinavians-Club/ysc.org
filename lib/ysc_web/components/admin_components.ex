@@ -3541,6 +3541,39 @@ defmodule YscWeb.AdminComponents do
 
                 <li :if={@role == :admin}>
                   <.link
+                    navigate="/admin/merch"
+                    title="Merch"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded-sm group transition-colors",
+                      if(@active_page == :merch,
+                        do:
+                          "bg-linear-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :merch}
+                  >
+                    <.icon
+                      :if={@active_page == :merch}
+                      name="hero-shopping-bag"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :merch}
+                      name="hero-shopping-bag"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :merch && "font-semibold"
+                    ]}>
+                      Merch
+                    </span>
+                  </.link>
+                </li>
+
+                <li :if={@role == :admin}>
+                  <.link
                     navigate="/admin/users"
                     title="Users"
                     class={[

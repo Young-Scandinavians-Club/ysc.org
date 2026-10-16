@@ -2468,4 +2468,68 @@ defmodule YscWeb.AdminMoneyLiveTest do
     })
     |> Repo.update!()
   end
+
+  describe "merch payments" do
+    setup [:create_admin]
+
+    setup do
+      Ledgers.ensure_basic_accounts()
+      member = Ysc.MerchFixtures.member_fixture()
+      order = Ysc.MerchFixtures.purchase_order_fixture(member, :submitted)
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: member.id,
+          amount: Money.new(:USD, "69.95"),
+          entity_type: :merch,
+          entity_id: order.id,
+          external_payment_id:
+            "pi_admin_merch_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(:USD, "2.30"),
+          description: "Merch - Order #{order.reference_id}",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      %{order: order, payment: payment}
+    end
+
+    test "the payments list names the type and order instead of Unknown", %{
+      conn: conn,
+      order: order,
+      payment: payment
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      row = "#payments-#{payment.id}"
+      assert has_element?(view, row, "Merch")
+      assert has_element?(view, row, order.reference_id)
+      assert has_element?(view, row, "2 items")
+      refute has_element?(view, row, "Unknown")
+    end
+
+    test "the payment modal links to the merch order", %{
+      conn: conn,
+      order: order,
+      payment: payment
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/money/payments/#{payment.id}")
+
+      assert has_element?(view, "#payment-related-merch-order")
+
+      assert has_element?(
+               view,
+               "#payment-related-merch-order-link[href='/admin/merch/orders/#{order.id}']",
+               order.reference_id
+             )
+    end
+
+    test "a merch payment can be refunded from the list", %{
+      conn: conn,
+      payment: payment
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+      assert has_element?(view, "#payment-refund-#{payment.id}")
+    end
+  end
 end

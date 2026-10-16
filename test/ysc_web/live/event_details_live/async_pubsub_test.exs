@@ -342,6 +342,74 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
                "try a different payment method"
              )
 
+      refute has_element?(view, "h2", "Payment canceled")
+      refute has_element?(view, "#payment-canceled-state")
+      refute has_element?(view, "h2", "Time ran out")
+    end
+
+    test "payment cancellation shows canceled state not payment failed",
+         %{
+           conn: conn,
+           user: user
+         } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      payment_intent =
+        build_payment_intent(%{
+          amount: money_to_cents(tier.price),
+          status: "requires_payment_method"
+        })
+
+      {:ok, order} =
+        Ysc.Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+
+      order =
+        order
+        |> Ecto.Changeset.change(%{payment_intent_id: payment_intent.id})
+        |> Repo.update!()
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        {:ok, %{payment_intent | id: id}}
+      end)
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/events/#{event.id}?checkout=payment&order_id=#{order.id}"
+        )
+
+      view = wait_for_async(view)
+      assert has_element?(view, "#payment-modal")
+      assert has_element?(view, "h2", "Complete Your Purchase")
+      assert has_element?(view, "#payment-modal", order.reference_id)
+
+      cancelled_event = %CheckoutSessionCancelled{
+        ticket_order: Repo.get!(TicketOrder, order.id),
+        event_id: event.id,
+        user_id: user.id,
+        reason: "Payment canceled"
+      }
+
+      :ok =
+        Phoenix.PubSub.broadcast(
+          Ysc.PubSub,
+          "tickets:user:#{user.id}",
+          {Ysc.Tickets, cancelled_event}
+        )
+
+      assert has_element?(view, "h2", "Payment canceled")
+      assert has_element?(view, "#payment-canceled-state", "Nobody was charged")
+      refute has_element?(view, "h2", "Payment failed")
+      refute has_element?(view, "#payment-failed-state")
+
+      refute has_element?(
+               view,
+               "#payment-canceled-state",
+               "different payment method"
+             )
+
       refute has_element?(view, "h2", "Time ran out")
     end
 

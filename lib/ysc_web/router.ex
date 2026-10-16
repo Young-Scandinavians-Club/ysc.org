@@ -128,6 +128,10 @@ defmodule YscWeb.Router do
     plug YscWeb.Plugs.FlowrouteWebhookRateLimitPlug
   end
 
+  pipeline :printful_webhook_rate_limit do
+    plug YscWeb.Plugs.PrintfulWebhookRateLimitPlug
+  end
+
   pipeline :mobile_api do
     plug :accepts, ["json"]
     plug YscWeb.Plugs.MobileAPIAuth
@@ -305,6 +309,7 @@ defmodule YscWeb.Router do
         live "/button-showcase", DevButtonShowcaseLive, :index
         live "/avatar-showcase", DevAvatarShowcaseLive, :index
         live "/notifications", DevNotificationsLive, :index
+        live "/merch", DevMerchLive, :index
       end
     end
   end
@@ -525,6 +530,15 @@ defmodule YscWeb.Router do
       live "/tickets/:order_id/qr", TicketQrLive, :index
       live "/events/:event_id/tickets/qr", TicketQrLive, :event
       live "/orders/:order_id/confirmation", OrderConfirmationLive, :index
+
+      # Merch shop (members only; see YscWeb.ShopAccess)
+      live "/shop", ShopLive, :index
+      live "/shop/products/:id", ShopProductLive, :show
+      live "/shop/cart", ShopCartLive, :index
+      live "/shop/checkout", ShopCheckoutLive, :index
+      live "/shop/orders", ShopOrdersLive, :index
+      live "/shop/orders/:id", ShopOrderLive, :show
+      live "/shop/orders/:id/confirmation", ShopOrderLive, :confirmation
       live "/bookings/:id", UserBookingDetailLive, :index
       live "/expensereport", ExpenseReportLive, :index
       live "/expensereports", ExpenseReportLive, :list
@@ -619,6 +633,7 @@ defmodule YscWeb.Router do
       live "/users/:id/details", AdminUserDetailsLive, :profile
       live "/users/:id/details/orders", AdminUserDetailsLive, :orders
       live "/users/:id/details/bookings", AdminUserDetailsLive, :bookings
+      live "/users/:id/details/merch", AdminUserDetailsLive, :merch
 
       live "/users/:id/details/booking-benefits",
            AdminUserDetailsLive,
@@ -658,6 +673,13 @@ defmodule YscWeb.Router do
 
       get "/events/:id/tv-poster/image", EventTvPosterController, :image
       get "/events/:id/tv-poster", EventTvPosterController, :show
+
+      # Merch shop catalog (Printful)
+      live "/merch", AdminMerchLive, :index
+      live "/merch/orders", AdminMerchOrdersLive, :index
+      live "/merch/orders/new", AdminMerchOrderNewLive, :new
+      live "/merch/orders/:id", AdminMerchOrdersLive, :show
+      live "/merch/products/:id/edit", AdminMerchLive, :edit_product
 
       # Tahoe and Clear Lake settings etc, see bookings
       live "/bookings", AdminBookingsLive, :index
@@ -752,6 +774,15 @@ defmodule YscWeb.Router do
 
     post "/quickbooks", QuickbooksWebhookController, :webhook
     post "/ses", SesWebhookController, :webhook
+  end
+
+  # Printful order/shipment events. Printful's v1 webhooks have no signature we
+  # can verify, so the URL carries a secret token (PRINTFUL_WEBHOOK_SECRET)
+  # checked by PrintfulWebhookController, behind a per-IP rate limit.
+  scope "/webhooks", YscWeb do
+    pipe_through [:api, :printful_webhook_rate_limit]
+
+    post "/printful/:token", PrintfulWebhookController, :handle
   end
 
   # FlowRoute callback URLs are configured per-type in the FlowRoute portal

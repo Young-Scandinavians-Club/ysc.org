@@ -43,6 +43,20 @@ defmodule Ysc.SentryScrubberTest do
       refute url =~ "super-secret-webhook-token"
       assert url =~ "/webhooks/flowroute/[REDACTED]/sms_dlr"
     end
+
+    test "redacts the Printful webhook token from the URL path (Finding 91)" do
+      conn =
+        Plug.Test.conn(
+          :post,
+          "/webhooks/printful/super-secret-printful-token"
+        )
+
+      url = SentryScrubber.scrub_url(conn)
+
+      refute url =~ "super-secret-printful-token"
+      assert url =~ "/webhooks/printful/[REDACTED]"
+      refute url =~ "/webhooks/printful/[REDACTED]/"
+    end
   end
 
   describe "scrub_params/1" do

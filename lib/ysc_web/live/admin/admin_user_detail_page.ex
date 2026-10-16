@@ -5,6 +5,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   import YscWeb.CoreComponents
   import YscWeb.Live.AsyncHelpers
+  import YscWeb.AdminMerchComponents, only: [merch_orders_table: 1]
   alias Phoenix.LiveView.JS
 
   alias Ysc.Accounts
@@ -160,6 +161,12 @@ defmodule YscWeb.AdminUserDetailsLive do
               patch={~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"}
             >
               Bookings
+            </.admin_tab>
+            <.admin_tab
+              active={@live_action == :merch}
+              patch={~p"/admin/users/#{@user_id}/details/merch?#{@list_params}"}
+            >
+              Merch
             </.admin_tab>
             <.admin_tab
               active={@live_action == :application}
@@ -779,6 +786,30 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
             </div>
           </div>
+        </div>
+
+        <div
+          :if={@live_action == :merch}
+          id="user-merch"
+          class="max-w-full py-8 px-2"
+        >
+          <h2 class="text-xl text-zinc-800 mb-4 type-subhead">Merch Orders</h2>
+          <.admin_table_skeleton :if={is_nil(@merch_orders)} rows={4} columns={5} />
+          <.merch_orders_table
+            :if={is_list(@merch_orders)}
+            id="user_merch_orders_list"
+            orders={@merch_orders}
+            show_recipient?={false}
+            row_navigate={&JS.navigate(~p"/admin/merch/orders/#{&1.id}")}
+            empty_title="No merch orders"
+            empty_suggestion="Merch this member bought, or that the club sent them, will appear here."
+          />
+          <.admin_flop_pagination
+            :if={@merch_meta}
+            meta={@merch_meta}
+            path={~p"/admin/users/#{@user_id}/details/merch"}
+            density={:comfortable}
+          />
         </div>
 
         <div :if={@live_action == :application} class="max-w-2xl py-8 px-2">
@@ -2476,6 +2507,13 @@ defmodule YscWeb.AdminUserDetailsLive do
                 Tickets.list_user_ticket_orders_paginated(user_id, params)
               end)
 
+            :merch ->
+              socket
+              |> assign(:merch_orders, nil)
+              |> start_async(:load_merch_orders, fn ->
+                Ysc.Merch.AdminOrders.paginate_for_user(user_id, params)
+              end)
+
             :bookings ->
               socket
               |> stream(:bookings, [], reset: true)
@@ -2579,6 +2617,24 @@ defmodule YscWeb.AdminUserDetailsLive do
      socket
      |> assign(:ticket_orders_meta, false)
      |> stream(:ticket_orders, [], reset: true)}
+  end
+
+  def handle_async(:load_merch_orders, {:ok, {:ok, {orders, meta}}}, socket) do
+    {:noreply,
+     socket |> assign(:merch_orders, orders) |> assign(:merch_meta, meta)}
+  end
+
+  def handle_async(:load_merch_orders, {:ok, {:error, meta}}, socket) do
+    {:noreply, socket |> assign(:merch_orders, []) |> assign(:merch_meta, meta)}
+  end
+
+  def handle_async(:load_merch_orders, {:exit, reason}, socket) do
+    Ysc.Logging.warning("Failed to load user merch orders",
+      error: inspect(reason),
+      extra: %{user_id: socket.assigns.user_id}
+    )
+
+    {:noreply, assign(socket, :merch_orders, [])}
   end
 
   def handle_async(:load_bookings, {:ok, {:ok, {bookings, meta}}}, socket) do
@@ -4867,6 +4923,8 @@ defmodule YscWeb.AdminUserDetailsLive do
     )
     |> assign(:ticket_orders_meta, nil)
     |> assign(:bookings_meta, nil)
+    |> assign(:merch_orders, nil)
+    |> assign(:merch_meta, nil)
     |> assign(:notifications, [])
     |> assign(:notifications_loading?, true)
     |> assign(:selected_notification, nil)

@@ -716,7 +716,10 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 #admin_reservations_list,
 #user_ticket_orders_list,
 #user_bookings_list,
-#admin_notices_list {
+#admin_notices_list,
+#admin_merch_orders_list,
+#user_merch_orders_list,
+#admin_merch_products_list {
     width: 100%;
     color: rgb(63 63 70);
     text-align: left;
@@ -730,7 +733,10 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 #admin_reservations_list thead,
 #user_ticket_orders_list thead,
 #user_bookings_list thead,
-#admin_notices_list thead {
+#admin_notices_list thead,
+#admin_merch_orders_list thead,
+#user_merch_orders_list thead,
+#admin_merch_products_list thead {
     font-size: 0.875rem;
     line-height: 1.25rem;
     text-transform: uppercase;
@@ -746,7 +752,10 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 #admin_reservations_list th,
 #user_ticket_orders_list th,
 #user_bookings_list th,
-#admin_notices_list th {
+#admin_notices_list th,
+#admin_merch_orders_list th,
+#user_merch_orders_list th,
+#admin_merch_products_list th {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
     padding-top: 0.75rem;
@@ -761,7 +770,10 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 #admin_reservations_list tr,
 #user_ticket_orders_list tr,
 #user_bookings_list tr,
-#admin_notices_list tr {
+#admin_notices_list tr,
+#admin_merch_orders_list tr,
+#user_merch_orders_list tr,
+#admin_merch_products_list tr {
     font-size: 0.875rem;
     line-height: 1.25rem;
     border-bottom-width: 1px;
@@ -775,7 +787,10 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 #admin_reservations_list tbody tr,
 #user_ticket_orders_list tbody tr,
 #user_bookings_list tbody tr,
-#admin_notices_list tbody tr {
+#admin_notices_list tbody tr,
+#admin_merch_orders_list tbody tr,
+#user_merch_orders_list tbody tr,
+#admin_merch_products_list tbody tr {
     border-bottom-color: rgb(244 244 245);
 }
 
@@ -787,7 +802,10 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 #admin_reservations_list tr:hover,
 #user_ticket_orders_list tr:hover,
 #user_bookings_list tr:hover,
-#admin_notices_list tr:hover {
+#admin_notices_list tr:hover,
+#admin_merch_orders_list tr:hover,
+#user_merch_orders_list tr:hover,
+#admin_merch_products_list tr:hover {
     background-color: rgb(250 250 250);
 }
 
@@ -799,7 +817,10 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 #admin_reservations_list td,
 #user_ticket_orders_list td,
 #user_bookings_list td,
-#admin_notices_list td {
+#admin_notices_list td,
+#admin_merch_orders_list td,
+#user_merch_orders_list td,
+#admin_merch_products_list td {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
     padding-top: 0.75rem;

@@ -189,7 +189,8 @@ defmodule Ysc.Quickbooks.PaymentLinkDonationSyncTest do
     assert_received {:created_account, "Sauna Roof Fund",
                      [
                        account_type: "Income",
-                       account_sub_type: "NonProfitIncome"
+                       account_sub_type: "NonProfitIncome",
+                       parent_account_id: "special_project"
                      ]}
 
     assert_received {:item, "Sauna Roof Fund", item_opts}
