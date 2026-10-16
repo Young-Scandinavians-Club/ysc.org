@@ -4150,10 +4150,9 @@ defmodule YscWeb.CoreComponents do
   (The cabin pages keep their own photo hero.)
 
   - `size={:default}` for section hubs (events, news, newsletters, history):
-    `text-3xl sm:text-4xl md:text-7xl`, top and bottom rules.
+    `text-3xl sm:text-4xl md:text-7xl`.
   - `size={:compact}` for content pages (board, choir, volunteer, contact,
-    legal and governance pages): `text-3xl md:text-4xl`, no rules or
-    padding of its own.
+    legal and governance pages): `text-3xl md:text-4xl`.
 
   Use the eyebrow to say what kind of page this is ("Events", "Governance",
   "Legal"); the title says what's on it. Use `subtitle` only when it adds
@@ -4234,11 +4233,10 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  # Section hubs get the full rule-bounded masthead; compact pages are
-  # unruled. Both own their bottom margin so the gap to the content is the
-  # same on every page (callers should not add their own).
+  # Neither size draws rules or padding: just a bottom margin, so the gap to
+  # the content is the same on every page (callers should not add their own).
   defp page_masthead_frame_class(:default),
-    do: "mb-10 border-y border-zinc-200 py-6 md:mb-16 md:py-12"
+    do: "mb-10 md:mb-16"
 
   defp page_masthead_frame_class(:compact),
     do: "mb-8 md:mb-10"
