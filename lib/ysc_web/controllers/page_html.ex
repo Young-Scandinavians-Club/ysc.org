@@ -45,8 +45,6 @@ defmodule YscWeb.PageHTML do
           {:summary,
            ~p"/annual_meetings/2024/YSC-Financials-2023-General-Meeting-Handout.pdf",
            "PDF • 57K"},
-          {:report, ~p"/annual_meetings/2024/YSC-AGM-2025_final.pdf",
-           "PDF • 158K"},
           {:minutes,
            "/annual_meetings/2024/YSC%20Annual%20General%20Meeting%2001.28.24.docx",
            "DOCX • 15K"}
