@@ -45,7 +45,7 @@ defmodule Ysc.PaymentUserMessages do
 
   def format_stripe_error(%Stripe.Error{code: code})
       when code in [:processing_error, "processing_error"] do
-    "Your bank couldn't process this payment. Please try again in a few minutes or use a different card."
+    "Your bank couldn't process this payment. Please try again in a few minutes or use a different payment method."
   end
 
   def format_stripe_error(%Stripe.Error{message: message})
