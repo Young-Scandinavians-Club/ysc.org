@@ -75,11 +75,16 @@ defmodule Ysc.PaymentUserMessagesTest do
              source: :api
            }) =~ "security code"
 
-    assert PaymentUserMessages.format_stripe_error(%Stripe.Error{
-             code: "processing_error",
-             message: "An error occurred while processing your card.",
-             source: :api
-           }) =~ "bank"
+    processing =
+      PaymentUserMessages.format_stripe_error(%Stripe.Error{
+        code: "processing_error",
+        message: "An error occurred while processing your card.",
+        source: :api
+      })
+
+    assert processing =~ "bank"
+    assert processing =~ "different payment method"
+    refute processing =~ "different card"
   end
 
   test "format_stripe_error infers guidance from raw message substrings" do
