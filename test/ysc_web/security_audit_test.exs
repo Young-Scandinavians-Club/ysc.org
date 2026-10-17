@@ -5873,6 +5873,55 @@ defmodule YscWeb.SecurityAuditTest do
       refute_received %Phoenix.Socket.Broadcast{event: "disconnect"}
     end
 
+    # Admin profile save that reactivates a rejected user uses
+    # update_user_with_address_and_rejection_override_note/4. Role can still
+    # change in the same params, so disconnect must run on this sibling too.
+    test "demoting via update_user_with_address_and_rejection_override_note broadcasts LiveView disconnect" do
+      admin = user_fixture(%{role: "admin"})
+      actor = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(admin)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address_and_rejection_override_note(
+                 admin,
+                 profile_save_params(admin, %{"role" => "member"}),
+                 "Override note for demotion coverage",
+                 actor
+               )
+
+      assert updated.role == :member
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      assert Accounts.get_user_by_session_token(token).id == admin.id
+    end
+
+    test "rejection-override save without demotion does not broadcast disconnect" do
+      admin = user_fixture(%{role: "admin", first_name: "StillAdminOverride"})
+      actor = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(admin)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address_and_rejection_override_note(
+                 admin,
+                 profile_save_params(admin, %{
+                   "first_name" => "StillAdminOverride"
+                 }),
+                 "Override note without role change",
+                 actor
+               )
+
+      assert updated.role == :admin
+      refute_received %Phoenix.Socket.Broadcast{event: "disconnect"}
+    end
+
     test "revoke_all_user_sessions broadcasts LiveView disconnect for web sessions" do
       admin = user_fixture(%{role: "admin"})
       token = Accounts.generate_user_session_token(admin)
