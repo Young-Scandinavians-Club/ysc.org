@@ -199,8 +199,12 @@ defmodule YscWeb.EventDetailsLive do
                   class="flex items-center gap-3"
                 >
                   <p class="text-xs text-blue-600 type-eyebrow">
-                    <span class="sm:hidden">{format_start_date_short(@event.start_date)}</span>
-                    <span class="hidden sm:inline">{format_start_date(@event.start_date)}</span>
+                    <span class="sm:hidden">{format_start_date_short(
+                      @event.start_date
+                    )}</span>
+                    <span class="hidden sm:inline">{format_start_date(
+                      @event.start_date
+                    )}</span>
                   </p>
                   <%= if @event_selling_fast && !@event_sold_out_for_user do %>
                     <span class="h-3 w-px bg-zinc-200"></span>
