@@ -5515,6 +5515,28 @@ defmodule Ysc.BookingsTest do
     )
   end
 
+  defp property_buyout_held?(property, days) do
+    Enum.all?(days, fn day ->
+      Repo.one!(
+        from(pi in Ysc.Bookings.PropertyInventory,
+          where: pi.property == ^property and pi.day == ^day,
+          select: pi.buyout_held
+        )
+      )
+    end)
+  end
+
+  defp property_buyout_booked?(property, days) do
+    Enum.all?(days, fn day ->
+      Repo.one!(
+        from(pi in Ysc.Bookings.PropertyInventory,
+          where: pi.property == ^property and pi.day == ^day,
+          select: pi.buyout_booked
+        )
+      )
+    end)
+  end
+
   describe "bookings_overlap?/4" do
     test "returns true when ranges overlap with checkin1 before checkout2 and checkout1 after checkin2" do
       # From module doc: first booking includes Nov 3–4, second includes Nov 3–4 — overlap.
@@ -6218,6 +6240,57 @@ defmodule Ysc.BookingsTest do
 
         assert Bookings.modification_hold_payment_intent_id(reloaded) ==
                  payment_intent_id
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "refund_complete_booking with release_inventory false still refunds unapplied modification PaymentIntent",
+         %{user: user} do
+      {booking, original_checkout, payment_intent_id, amount_cents} =
+        complete_booking_with_unapplied_mod_pi(user, 145)
+
+      original_days =
+        Date.range(booking.checkin_date, Date.add(original_checkout, -1))
+        |> Enum.to_list()
+
+      extra_night = original_checkout
+
+      assert property_buyout_booked?(:tahoe, original_days)
+      assert property_buyout_held?(:tahoe, [extra_night])
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        stub_succeeded_unapplied_mod_pi(
+          payment_intent_id,
+          booking,
+          user,
+          amount_cents
+        )
+
+        assert {:ok, refunded} =
+                 Ysc.Bookings.BookingLocker.refund_complete_booking(
+                   booking.id,
+                   false
+                 )
+
+        assert refunded.status == :refunded
+        assert is_nil(refunded.modification_hold_expires_at)
+        assert is_nil(refunded.modification_hold_attrs)
+        assert refunded.checkout_date == original_checkout
+
+        refute Bookings.modification_ledger_recorded?(
+                 booking.id,
+                 payment_intent_id
+               )
+
+        # Original stay stays booked when release_inventory is false.
+        assert property_buyout_booked?(:tahoe, original_days)
+
+        # Modification nights are not part of the booked stay and are always released.
+        refute property_buyout_held?(:tahoe, [extra_night])
       after
         Application.put_env(:ysc, :stripe_client, previous_client)
       end
