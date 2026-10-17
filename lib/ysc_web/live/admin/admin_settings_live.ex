@@ -252,24 +252,24 @@ defmodule YscWeb.AdminSettingsLive do
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  <.admin_th>
                     Property
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Type
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Company
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Description
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Incident Date
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Reported
-                  </th>
+                  </.admin_th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
@@ -415,30 +415,30 @@ defmodule YscWeb.AdminSettingsLive do
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  <.admin_th>
                     Job ID
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Worker
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Queue
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     State
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Processed At
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Execution
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Attempts
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th>
                     Actions
-                  </th>
+                  </.admin_th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">

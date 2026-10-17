@@ -556,6 +556,110 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_th/1" do
+    test "renders a left-aligned comfortable header by default" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <table>
+          <thead>
+            <tr>
+              <.admin_th>Reference</.admin_th>
+            </tr>
+          </thead>
+        </table>
+        """)
+
+      assert html =~ "Reference"
+      assert html =~ "type-eyebrow"
+      assert html =~ "px-6 py-3"
+      assert html =~ "text-left"
+      refute html =~ "text-right"
+    end
+
+    test "supports right alignment and compact density" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <table>
+          <thead>
+            <tr>
+              <.admin_th align={:right} density={:compact}>Amount</.admin_th>
+            </tr>
+          </thead>
+        </table>
+        """)
+
+      assert html =~ "Amount"
+      assert html =~ "text-right"
+      assert html =~ "px-4 py-2"
+      refute html =~ "px-6 py-3"
+    end
+
+    test "medium and tight densities use the matching padding" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <table>
+          <thead>
+            <tr>
+              <.admin_th density={:medium}>User</.admin_th>
+              <.admin_th density={:tight}>#</.admin_th>
+            </tr>
+          </thead>
+        </table>
+        """)
+
+      assert html =~ "px-4 py-3"
+      assert html =~ "px-2 py-2"
+    end
+  end
+
+  describe "admin_table_card/1" do
+    test "renders title, table body, and optional footer" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_table_card
+          id="recent-payments-section"
+          title="Recent Payments"
+          subtitle="All reports in the selected date range"
+        >
+          <table id="payments-table"></table>
+          <:footer>
+            <nav id="payments-pagination">Next</nav>
+          </:footer>
+        </.admin_table_card>
+        """)
+
+      assert html =~ ~s(id="recent-payments-section")
+      assert html =~ "Recent Payments"
+      assert html =~ "All reports in the selected date range"
+      assert html =~ ~s(id="payments-table")
+      assert html =~ ~s(id="payments-pagination")
+      assert html =~ "type-subhead"
+      assert html =~ "overflow-x-auto"
+    end
+
+    test "omits subtitle when it is not passed" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_table_card title="Ledger Entries">
+          <table></table>
+        </.admin_table_card>
+        """)
+
+      assert html =~ "Ledger Entries"
+      refute html =~ "<p class=\"text-sm text-zinc-500 mt-1\">"
+    end
+  end
+
   describe "admin_clipboard_button/1" do
     test "icon variant renders compact clipboard control" do
       assigns = %{}

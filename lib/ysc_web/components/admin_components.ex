@@ -2232,6 +2232,115 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_th
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Shared admin table header cell.
+
+  Applies the `type-eyebrow` column caption used on Money, Settings, and other
+  admin data tables. Pass `align={:right}` for numeric/action columns.
+
+  ## Densities
+
+    * `:comfortable` — `px-6 py-3` (default; full-page tables)
+    * `:medium` — `px-4 py-3` (scanner and user-detail tables)
+    * `:compact` — `px-4 py-2` (inbox and modal tables)
+    * `:tight` — `px-2 py-2` (dense nested tables)
+
+  ## Examples
+
+      <.admin_th>Reference</.admin_th>
+      <.admin_th align={:right}>Amount</.admin_th>
+      <.admin_th density={:compact}>User</.admin_th>
+  """
+  attr :align, :atom,
+    default: :left,
+    values: [:left, :right]
+
+  attr :density, :atom,
+    default: :comfortable,
+    values: [:comfortable, :medium, :compact, :tight]
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the `<th>`"
+
+  attr :rest, :global
+  slot :inner_block, required: true
+
+  def admin_th(assigns) do
+    ~H"""
+    <th
+      class={[
+        "text-xs text-zinc-500 type-eyebrow",
+        @density == :comfortable && "px-6 py-3",
+        @density == :medium && "px-4 py-3",
+        @density == :compact && "px-4 py-2",
+        @density == :tight && "px-2 py-2",
+        @align == :left && "text-left",
+        @align == :right && "text-right",
+        @class
+      ]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </th>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_table_card
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Bordered admin table section: heading, optional subtitle, scrollable table,
+  and optional footer (typically `<.admin_prev_next_pagination>`).
+
+  ## Examples
+
+      <.admin_table_card id="recent-payments-section" title="Recent Payments">
+        <table class="min-w-full divide-y divide-zinc-200">...</table>
+        <:footer>
+          <.admin_prev_next_pagination ... />
+        </:footer>
+      </.admin_table_card>
+  """
+  attr :id, :string, default: nil
+  attr :title, :string, required: true
+  attr :subtitle, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the card container"
+
+  slot :inner_block, required: true
+  slot :footer
+
+  def admin_table_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8",
+        @class
+      ]}
+    >
+      <div class="px-6 py-4 border-b border-zinc-100">
+        <h2 class="text-lg text-zinc-900 type-subhead">{@title}</h2>
+        <p :if={@subtitle} class="text-sm text-zinc-500 mt-1">
+          {@subtitle}
+        </p>
+      </div>
+      <div class="overflow-x-auto">
+        {render_slot(@inner_block)}
+      </div>
+      {render_slot(@footer)}
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_list_empty_state
   # ---------------------------------------------------------------------------
 

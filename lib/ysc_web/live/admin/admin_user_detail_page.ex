@@ -1313,21 +1313,21 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <table class="min-w-full divide-y divide-zinc-200">
                     <thead class="bg-zinc-50">
                       <tr>
-                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                        <.admin_th density={:medium}>
                           Date
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                        </.admin_th>
+                        <.admin_th density={:medium}>
                           Amount
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                        </.admin_th>
+                        <.admin_th density={:medium}>
                           Status
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                        </.admin_th>
+                        <.admin_th density={:medium}>
                           Invoice ID
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                        </.admin_th>
+                        <.admin_th density={:medium}>
                           Payment Method
-                        </th>
+                        </.admin_th>
                       </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-zinc-200">
@@ -1762,18 +1762,18 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <table class="min-w-full divide-y divide-zinc-200">
                     <thead class="bg-zinc-50">
                       <tr>
-                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                        <.admin_th density={:medium}>
                           Sent
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                        </.admin_th>
+                        <.admin_th density={:medium}>
                           Type
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                        </.admin_th>
+                        <.admin_th density={:medium}>
                           Template
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                        </.admin_th>
+                        <.admin_th density={:medium}>
                           Recipient
-                        </th>
+                        </.admin_th>
                       </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-zinc-200">
