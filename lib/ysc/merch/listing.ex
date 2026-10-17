@@ -56,10 +56,17 @@ defmodule Ysc.Merch.Listing do
           %{name: String.t(), slug: String.t(), hex: String.t() | nil}
         ]
   def available_colors(products) do
-    products
-    |> Enum.flat_map(&VariantSelection.colors(&1.variants))
-    |> Enum.uniq()
-    |> Enum.map(&%{name: &1, slug: slug(&1), hex: ColorSwatch.hex(&1)})
+    all_variants = Enum.flat_map(products, & &1.variants)
+
+    all_variants
+    |> VariantSelection.colors()
+    |> Enum.map(
+      &%{
+        name: &1,
+        slug: slug(&1),
+        hex: VariantSelection.color_hex(all_variants, &1)
+      }
+    )
   end
 
   @doc "Keeps products offered in at least one of `colors` (all when empty)."
@@ -125,7 +132,7 @@ defmodule Ysc.Merch.Listing do
         [first, second | _] -> {first, second}
       end
 
-    hex = ColorSwatch.hex(name)
+    hex = VariantSelection.color_hex(product.variants, name)
 
     %{
       name: name,

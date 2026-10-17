@@ -436,7 +436,7 @@ defmodule YscWeb.ShopProductLive do
                       @selection.color == color && "ring-2 ring-white/70"
                     ]
                   }
-                  style={"--swatch: #{Ysc.Merch.ColorSwatch.hex(color) || "#d4d4d8"}"}
+                  style={"--swatch: #{VariantSelection.color_hex(@product.variants, color) || "#d4d4d8"}"}
                   aria-hidden="true"
                 ></span>
                 {color}

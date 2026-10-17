@@ -40,6 +40,39 @@ defmodule Ysc.Printful.ClientTest do
     end
   end
 
+  describe "get_catalog_product/1" do
+    test "fetches the catalog product with its variants' colors" do
+      test_pid = self()
+
+      stub(fn conn ->
+        send(test_pid, {:path, conn.request_path})
+
+        Req.Test.json(conn, %{
+          "code" => 200,
+          "result" => %{
+            "product" => %{"id" => 586},
+            "variants" => [%{"id" => 15_114, "color_code" => "#1b1b1c"}]
+          }
+        })
+      end)
+
+      assert {:ok, %{"variants" => [%{"color_code" => "#1b1b1c"}]}} =
+               Client.get_catalog_product(586)
+
+      assert_received {:path, "/products/586"}
+    end
+
+    test "a catalog product Printful does not know is :not_found" do
+      stub(fn conn ->
+        conn
+        |> Plug.Conn.put_status(404)
+        |> Req.Test.json(%{"code" => 404, "result" => "Not Found"})
+      end)
+
+      assert {:error, %Error{type: :not_found}} = Client.get_catalog_product(1)
+    end
+  end
+
   describe "error mapping" do
     test "400 with an error body is a permanent :invalid error" do
       stub(fn conn ->

@@ -149,6 +149,13 @@ defmodule Ysc.Printful.DemoClient do
 
   ## Shipping and costs
 
+  # The demo store has no Printful catalog behind it; the shop then falls back
+  # to naming the color.
+  @impl true
+  def get_catalog_product(_catalog_product_id) do
+    {:error, %Ysc.Printful.Error{type: :not_found, message: "Not Found"}}
+  end
+
   @impl true
   def shipping_rates(recipient, items) do
     cond do

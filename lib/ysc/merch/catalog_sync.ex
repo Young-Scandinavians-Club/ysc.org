@@ -119,6 +119,8 @@ defmodule Ysc.Merch.CatalogSync do
 
     {gallery, cache} = resolve_gallery(sync_product, usable, uploader, cache)
 
+    color_codes = catalog_color_codes(usable)
+
     attrs =
       Map.merge(product_image, %{
         printful_product_id: printful_id,
@@ -148,7 +150,8 @@ defmodule Ysc.Merch.CatalogSync do
             product,
             usable,
             existing_variants,
-            Map.new(variant_images)
+            Map.new(variant_images),
+            color_codes
           )
 
         sync_gallery(product, gallery)
@@ -177,7 +180,13 @@ defmodule Ysc.Merch.CatalogSync do
     |> Map.new(&{&1.printful_sync_variant_id, &1})
   end
 
-  defp upsert_variants(product, usable, existing_variants, variant_images) do
+  defp upsert_variants(
+         product,
+         usable,
+         existing_variants,
+         variant_images,
+         color_codes
+       ) do
     kept_ids = Enum.map(usable, & &1["id"])
 
     Enum.each(usable, fn sync_variant ->
@@ -185,7 +194,8 @@ defmodule Ysc.Merch.CatalogSync do
         product,
         sync_variant,
         Map.get(existing_variants, sync_variant["id"]),
-        Map.fetch!(variant_images, sync_variant["id"])
+        Map.fetch!(variant_images, sync_variant["id"]),
+        Map.get(color_codes, sync_variant["variant_id"])
       )
     end)
 
@@ -201,7 +211,7 @@ defmodule Ysc.Merch.CatalogSync do
     length(usable)
   end
 
-  defp upsert_variant(product, sync_variant, existing, image_attrs) do
+  defp upsert_variant(product, sync_variant, existing, image_attrs, color_hex) do
     attrs =
       Map.merge(image_attrs, %{
         product_id: product.id,
@@ -215,10 +225,42 @@ defmodule Ysc.Merch.CatalogSync do
         available: available?(sync_variant)
       })
 
+    # Printful's lookup can fail; then keep the color we already stored.
+    attrs = if color_hex, do: Map.put(attrs, :color_hex, color_hex), else: attrs
+
     (existing || %Variant{})
     |> Variant.sync_changeset(attrs)
     |> Repo.insert_or_update!()
   end
+
+  ## Colors
+
+  # The real color of each blank, from Printful's catalog (one call per
+  # product), keyed by catalog variant id. Empty when the product has no
+  # catalog entry or the call fails; the shop then guesses from the name.
+  defp catalog_color_codes([]), do: %{}
+
+  defp catalog_color_codes([first | _]) do
+    catalog_id = get_in(first, ["product", "product_id"])
+
+    with true <- is_integer(catalog_id),
+         {:ok, %{"variants" => variants}} when is_list(variants) <-
+           printful_client().get_catalog_product(catalog_id) do
+      for %{"id" => id, "color_code" => code} <- variants,
+          hex = normalize_hex(code),
+          into: %{},
+          do: {id, hex}
+    else
+      _ -> %{}
+    end
+  end
+
+  defp normalize_hex(code) when is_binary(code) do
+    if Regex.match?(~r/\A#[0-9a-fA-F]{6}\z/, code),
+      do: String.downcase(code)
+  end
+
+  defp normalize_hex(_), do: nil
 
   ## Gallery
 
@@ -294,7 +336,10 @@ defmodule Ysc.Merch.CatalogSync do
           %ProductImage{} |> ProductImage.changeset(attrs) |> Repo.insert!()
 
         %ProductImage{source: :printful} = photo ->
-          photo |> ProductImage.changeset(attrs) |> Repo.update!()
+          # The club may have reordered it ("Make first"); a sync must not undo that.
+          photo
+          |> ProductImage.changeset(Map.delete(attrs, :position))
+          |> Repo.update!()
 
         %ProductImage{source: :admin} ->
           # The club already uses this photo; theirs wins.

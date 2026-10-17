@@ -14,7 +14,7 @@ defmodule YscWeb.ShopComponents do
   import Ysc.MoneyHelper, only: [format_price: 1]
 
   alias Phoenix.LiveView.JS
-  alias Ysc.Media.Image
+  alias Ysc.Media.{BlurPlaceholder, Image}
   alias Ysc.Merch.{Order, OrderItem}
 
   @doc """
@@ -231,7 +231,11 @@ defmodule YscWeb.ShopComponents do
     assigns = assign(assigns, :product, assigns.tile.product)
 
     ~H"""
-    <li id={"shop-product-#{@product.id}"} class="group/tile">
+    <li
+      id={"shop-product-#{@product.id}"}
+      class="group/tile"
+      phx-hook="ShopTile"
+    >
       <.link
         navigate={product_path(@product, @tile.active)}
         id={"shop-product-link-#{@product.id}"}
@@ -239,42 +243,23 @@ defmodule YscWeb.ShopComponents do
         aria-label={@product.name}
         class="block transition-transform motion-safe:active:scale-[0.98]"
       >
-        <div class="relative aspect-square overflow-hidden rounded-2xl bg-zinc-100">
+        <div class="shop-tile-photo relative aspect-square overflow-hidden rounded-2xl bg-zinc-100">
           <div
             :for={color <- @tile.colors}
             id={"shop-layer-#{@product.id}-#{color.slug}"}
             data-tile-layer
-            class={[
-              "absolute inset-0 motion-safe:transition-opacity motion-safe:duration-300",
-              if(color.slug == @tile.active.slug,
-                do: "opacity-100",
-                else: "opacity-0"
-              )
-            ]}
+            data-active={color.slug == @tile.active.slug}
+            class="shop-tile-layer absolute inset-0"
           >
-            <.live_component
+            <.shop_photo
               id={"shop-product-image-#{@product.id}-#{color.slug}"}
-              module={YscWeb.Components.Image}
               image={color.image || @product.image}
-              aspect_class="aspect-square"
-              preferred_type={:optimized}
-              sizes="(max-width: 768px) 50vw, 25vw"
-              loading="lazy"
-              rounded_class=""
+              placeholder?={true}
             />
-            <div
-              :if={color.hover_image}
-              class="absolute inset-0 opacity-0 motion-safe:transition-opacity motion-safe:duration-300 group-hover/tile:opacity-100"
-            >
-              <.live_component
+            <div :if={color.hover_image} class="shop-tile-hover absolute inset-0">
+              <.shop_photo
                 id={"shop-product-hover-#{@product.id}-#{color.slug}"}
-                module={YscWeb.Components.Image}
                 image={color.hover_image}
-                aspect_class="aspect-square"
-                preferred_type={:optimized}
-                sizes="(max-width: 768px) 50vw, 25vw"
-                loading="lazy"
-                rounded_class=""
               />
             </div>
           </div>
@@ -302,7 +287,6 @@ defmodule YscWeb.ShopComponents do
           aria-pressed={to_string(color.slug == @tile.active.slug)}
           title={color.name}
           phx-click={pick_color(@tile, color)}
-          phx-mouseenter={pick_color(@tile, color)}
           class="group/swatch flex size-8 items-center justify-center rounded-full outline-none"
         >
           <span
@@ -352,6 +336,57 @@ defmodule YscWeb.ShopComponents do
     """
   end
 
+  @doc """
+  A square photo that shows a blurred preview of itself, from the first byte
+  of HTML, until the real image has loaded.
+
+  Unlike `YscWeb.Components.Image`, whose blur placeholder is painted by a
+  JS hook and so stays an empty box until LiveView connects, the preview here
+  is a server-rendered background, and the `<img>` is visible as soon as the
+  browser has it. The `ShopTile` hook adds a fade for images that are still
+  loading once the page is live.
+  """
+  attr :id, :string, required: true
+  attr :image, :any, default: nil
+
+  attr :placeholder?, :boolean,
+    default: false,
+    doc: "render the blur preview (only photos that start out visible need it)"
+
+  attr :sizes, :string, default: "(max-width: 768px) 50vw, 25vw"
+
+  def shop_photo(assigns) do
+    image = assigns.image
+
+    assigns =
+      assign(assigns,
+        src: Image.display_path_with_fallback(image),
+        srcset: Image.responsive_srcset(image),
+        alt: image && (image.alt_text || image.title),
+        blur:
+          assigns.placeholder? && image &&
+            BlurPlaceholder.data_uri(image.blur_hash)
+      )
+
+    ~H"""
+    <div
+      class="shop-photo-bg size-full"
+      style={@blur && "--blur: url(#{@blur})"}
+    >
+      <img
+        id={@id}
+        src={@src}
+        srcset={@srcset}
+        sizes={@sizes}
+        alt={@alt || ""}
+        loading="lazy"
+        decoding="async"
+        class="shop-photo-img size-full object-cover"
+      />
+    </div>
+    """
+  end
+
   defp product_path(product, %{name: name}) when is_binary(name),
     do: ~p"/shop/products/#{product.id}?#{[color: name]}"
 
@@ -365,10 +400,11 @@ defmodule YscWeb.ShopComponents do
     layers = "#{scope} [data-tile-layer]"
     layer = "#shop-layer-#{id}-#{color.slug}"
 
-    JS.add_class("opacity-0", to: layers)
-    |> JS.remove_class("opacity-100", to: layers)
-    |> JS.remove_class("opacity-0", to: layer)
-    |> JS.add_class("opacity-100", to: layer)
+    # The photo on show stays underneath (data-prev) while the new one fades in.
+    JS.remove_attribute("data-prev", to: layers)
+    |> JS.set_attribute({"data-prev", ""}, to: "#{layers}[data-active]")
+    |> JS.remove_attribute("data-active", to: layers)
+    |> JS.set_attribute({"data-active", ""}, to: layer)
     |> JS.set_attribute({"aria-pressed", "false"},
       to: "#{scope} [data-tile-swatch]"
     )
@@ -517,8 +553,7 @@ defmodule YscWeb.ShopComponents do
         class="cart-peek w-[min(22rem,calc(100vw-2rem))] rounded-3xl bg-white p-5 shadow-2xl shadow-zinc-900/15"
         data-open={to_string(@open?)}
         aria-hidden={to_string(!@open?)}
-        phx-mouseenter="pause_cart_peek"
-        phx-mouseleave="resume_cart_peek"
+        phx-hook="CartPeekHover"
         phx-window-keydown="dismiss_cart_peek"
         phx-key="Escape"
       >

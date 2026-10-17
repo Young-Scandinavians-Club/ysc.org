@@ -64,6 +64,43 @@ defmodule YscWeb.ShopListingTest do
     refute has_element?(view, "#shop-swatches-#{sticker.id}")
   end
 
+  test "photos show a server-rendered blur preview until they load", %{
+    conn: conn,
+    tee: tee
+  } do
+    image = image_fixture(%{blur_hash: "LlMF%n00%#MwS|WCWEM{R*bbWBbH"})
+    gallery_photo_fixture(tee, image, %{color: "Black"})
+
+    {:ok, view, _html} = live(conn, ~p"/shop")
+
+    assert has_element?(
+             view,
+             "#shop-layer-#{tee.id}-black .shop-photo-bg[style*='data:image/png;base64,']"
+           )
+
+    assert has_element?(
+             view,
+             "#shop-layer-#{tee.id}-black img.shop-photo-img[loading=lazy]"
+           )
+  end
+
+  test "a photo with an unusable blur hash still renders, with no preview", %{
+    conn: conn,
+    tee: tee
+  } do
+    image = image_fixture(%{blur_hash: "not a blur hash"})
+    gallery_photo_fixture(tee, image, %{color: "Black"})
+
+    {:ok, view, _html} = live(conn, ~p"/shop")
+
+    assert has_element?(view, "#shop-layer-#{tee.id}-black img.shop-photo-img")
+
+    refute has_element?(
+             view,
+             "#shop-layer-#{tee.id}-black .shop-photo-bg[style*='data:image']"
+           )
+  end
+
   test "a tile opens the product in its color", %{conn: conn, tee: tee} do
     {:ok, view, _html} = live(conn, ~p"/shop")
 

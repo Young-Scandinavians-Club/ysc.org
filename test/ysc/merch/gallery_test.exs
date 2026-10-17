@@ -17,14 +17,14 @@ defmodule Ysc.Merch.GalleryTest do
   defp ids(images), do: Enum.map(images, & &1.id)
 
   describe "gallery/2" do
-    test "shows the selected color's photos first, then the general ones" do
+    test "orders the selected color's photos and the general ones by position" do
       %{product: product} = product_with_colors()
       black_1 = image_fixture()
       black_2 = image_fixture()
       white_1 = image_fixture()
       general = image_fixture()
 
-      gallery_photo_fixture(product, general, %{position: 0})
+      gallery_photo_fixture(product, general, %{position: 5})
       gallery_photo_fixture(product, black_2, %{color: "Black", position: 2})
       gallery_photo_fixture(product, black_1, %{color: "Black", position: 1})
       gallery_photo_fixture(product, white_1, %{color: "White", position: 3})
@@ -36,6 +36,44 @@ defmodule Ysc.Merch.GalleryTest do
 
       assert product |> Merch.gallery("White") |> ids() ==
                ids([white_1, general])
+    end
+
+    test "a general photo moved to the front leads every color" do
+      %{product: product} = product_with_colors()
+
+      black =
+        gallery_photo_fixture(product, nil, %{color: "Black", position: 0})
+
+      white =
+        gallery_photo_fixture(product, nil, %{color: "White", position: 0})
+
+      lifestyle = gallery_photo_fixture(product, nil, %{position: 1})
+
+      product = loaded(product)
+
+      assert product |> Merch.gallery("Black") |> ids() == [
+               black.image_id,
+               lifestyle.image_id
+             ]
+
+      assert :ok = Merch.move_photo_first(lifestyle.id)
+
+      product = loaded(product)
+
+      assert product |> Merch.gallery("Black") |> ids() ==
+               [lifestyle.image_id, black.image_id]
+
+      assert product |> Merch.gallery("White") |> ids() ==
+               [lifestyle.image_id, white.image_id]
+    end
+
+    test "a color's own photo wins a tie with a general one" do
+      %{product: product} = product_with_colors()
+      general = gallery_photo_fixture(product, nil, %{position: 0})
+      own = gallery_photo_fixture(product, nil, %{color: "Black", position: 0})
+
+      assert product |> loaded() |> Merch.gallery("Black") |> ids() ==
+               [own.image_id, general.image_id]
     end
 
     test "with no color chosen, only photos for every color" do
