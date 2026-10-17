@@ -27,7 +27,7 @@ defmodule YscWeb.NewsletterArchiveLive do
   def render(%{live_action: :index} = assigns) do
     ~H"""
     <div class="py-6 md:py-12">
-      <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-12">
+      <div class="max-w-(--breakpoint-lg) mx-auto px-4">
         <.page_masthead
           eyebrow="Archive"
           title="Newsletters"

@@ -53,8 +53,8 @@ defmodule YscWeb.ConductViolationReportLive do
         <%!-- Form State --%>
         <div :if={!@submitted}>
           <%!-- Header Section --%>
-          <div class="mb-8 text-center">
-            <div class="flex justify-center mb-6">
+          <div class="mb-8">
+            <div class="flex mb-6">
               <.link navigate={~p"/"} class="inline-block">
                 <.ysc_logo
                   no_circle={true}
@@ -64,13 +64,13 @@ defmodule YscWeb.ConductViolationReportLive do
                 />
               </.link>
             </div>
-            <p class="text-sm text-blue-600 mb-3 type-eyebrow">
-              Community standards
-            </p>
-            <h1 class="text-3xl md:text-5xl text-zinc-900 mb-4 type-display">
-              Report a concern
-            </h1>
-            <p class="text-lg text-zinc-600 max-w-xl mx-auto mb-4">
+            <.page_masthead
+              size={:compact}
+              eyebrow="Community standards"
+              title="Report a concern"
+              class="mb-6"
+            />
+            <p class="text-lg text-zinc-600 max-w-xl mb-4">
               We're here to help. If you've experienced or witnessed a violation of our Code of Conduct, please share the details below. The board reviews every report privately and with care.
             </p>
             <p class="text-sm text-zinc-500 mb-6">
@@ -91,7 +91,7 @@ defmodule YscWeb.ConductViolationReportLive do
             <%!-- Board member conflict notice --%>
             <div
               id="board-member-notice"
-              class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-left max-w-xl mx-auto"
+              class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg max-w-xl"
             >
               <div class="flex gap-3">
                 <.icon

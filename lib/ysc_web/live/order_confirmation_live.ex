@@ -168,7 +168,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 Order Cancelled
               </span>
             </div>
-            <h1 class="text-4xl text-zinc-900 type-display">
+            <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
               Order Cancelled
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
@@ -191,7 +191,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 Order Confirmed
               </span>
             </div>
-            <h1 class="text-4xl text-zinc-900 type-display">
+            <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
               <%= if @event_in_past do %>
                 Hope you had a blast, {@user_first_name}!
               <% else %>

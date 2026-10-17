@@ -12,7 +12,6 @@ defmodule YscWeb.ContactLive do
         size={:compact}
         eyebrow="Contact"
         title="Get in touch"
-        class="mb-5 lg:mb-6"
       />
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">

@@ -45,8 +45,8 @@ defmodule YscWeb.PostLive do
 
       <%!-- The "Journalist" Header Section --%>
       <div :if={@post != nil} class="max-w-(--breakpoint-lg) mx-auto px-4">
-        <div class="max-w-3xl mx-auto text-center mb-12">
-          <div class="flex items-center justify-center gap-3 mb-6">
+        <div class="max-w-3xl mx-auto mb-12">
+          <div class="flex items-center gap-3 mb-6">
             <span class="text-xs text-blue-600 type-eyebrow">
               Club News
             </span>
@@ -55,10 +55,10 @@ defmodule YscWeb.PostLive do
               {DateDisplay.format_date_in_zone(post_date(@post), @timezone)}
             </span>
           </div>
-          <h1 class="text-4xl md:text-6xl text-zinc-900 mb-8 type-display">
+          <h1 class="text-3xl md:text-5xl text-zinc-900 mb-8 type-display">
             {@post.title}
           </h1>
-          <div class="flex items-center justify-center gap-4 py-6 border-y border-zinc-100">
+          <div class="flex items-center gap-4 py-6 border-y border-zinc-100">
             <.user_avatar_image
               user={@post.author}
               class="w-10 h-10 rounded-full"

@@ -3,7 +3,7 @@ defmodule YscWeb.ShopComponents do
   Building blocks shared by the merch shop pages.
 
   Design language: the same page frame as the rest of the site (a plain
-  `page_masthead`, nothing inside it), a quiet row of links below it, white
+  `page_masthead`, nothing inside it), a segmented control and cart button below it, white
   background, generous whitespace, and soft filled surfaces (`bg-zinc-50`)
   instead of outlines. Separation comes from spacing, not borders.
   """
@@ -23,6 +23,8 @@ defmodule YscWeb.ShopComponents do
 
   Every page gets the same masthead (same size, no subtitle) so the title and
   the shop links never move as you go between pages.
+
+  The masthead sits close to the shop links so the two read as one header.
 
   The masthead, shop links and content all share one column, so every page
   lines up on the same left and right edges. Pages that want a narrower layout
@@ -44,11 +46,12 @@ defmodule YscWeb.ShopComponents do
   def shop_frame(assigns) do
     ~H"""
     <div id={@id} class="py-6 md:py-12">
-      <div class="mx-auto mb-8 max-w-(--breakpoint-xl) px-4 md:mb-12">
+      <div class="mx-auto max-w-(--breakpoint-xl) px-4">
         <.page_masthead
           id={"#{@id}-masthead"}
           eyebrow={@eyebrow}
           title={@title}
+          class="mb-6! md:mb-8!"
         />
       </div>
 
@@ -71,8 +74,9 @@ defmodule YscWeb.ShopComponents do
   end
 
   @doc """
-  Shop links: products, cart (with item count) and orders. Plain text; the
-  current page is just darker and bolder.
+  Shop links. Products and My orders are a segmented control (the same soft
+  `bg-zinc-100` surface as the toolbar below it); the cart is its own button on
+  the right, with the item count, since that is where people look for it.
   """
   attr :active, :atom, values: [:shop, :cart, :orders], required: true
   attr :cart_count, :integer, default: 0
@@ -83,43 +87,56 @@ defmodule YscWeb.ShopComponents do
     <nav
       id="shop-nav"
       aria-label="Shop"
-      class="mb-10 flex items-center gap-8 text-base md:mb-14"
+      class="mb-8 flex items-center justify-between gap-3 md:mb-10"
     >
-      <.shop_nav_link
-        id="shop-nav-products"
-        to={~p"/shop"}
-        active={@active == :shop}
-        page?={!@section_only?}
-      >
-        Products
-      </.shop_nav_link>
-      <.shop_nav_link
+      <div class="inline-flex items-center gap-1 rounded-xl bg-zinc-100 p-1">
+        <.shop_nav_link
+          id="shop-nav-products"
+          to={~p"/shop"}
+          icon="hero-squares-2x2"
+          active={@active == :shop}
+          page?={!@section_only?}
+        >
+          Products
+        </.shop_nav_link>
+        <.shop_nav_link
+          id="shop-nav-orders"
+          to={~p"/shop/orders"}
+          icon="hero-truck"
+          active={@active == :orders}
+        >
+          My orders
+        </.shop_nav_link>
+      </div>
+
+      <.link
         id="shop-nav-cart"
-        to={~p"/shop/cart"}
-        active={@active == :cart}
+        navigate={~p"/shop/cart"}
+        aria-current={@active == :cart && "page"}
+        class={[
+          "inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold transition motion-safe:active:scale-[0.97]",
+          if(@active == :cart,
+            do: "bg-zinc-900 text-white",
+            else: "bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
+          )
+        ]}
       >
-        Cart
+        <.icon name="hero-shopping-bag" class="size-5" /> Cart
         <span
           :if={@cart_count > 0}
           id="shop-cart-count"
-          class="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white"
+          class="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white"
         >
           {@cart_count}
         </span>
-      </.shop_nav_link>
-      <.shop_nav_link
-        id="shop-nav-orders"
-        to={~p"/shop/orders"}
-        active={@active == :orders}
-      >
-        My orders
-      </.shop_nav_link>
+      </.link>
     </nav>
     """
   end
 
   attr :id, :string, required: true
   attr :to, :string, required: true
+  attr :icon, :string, required: true
   attr :active, :boolean, default: false
   attr :page?, :boolean, default: true
   slot :inner_block, required: true
@@ -131,13 +148,14 @@ defmodule YscWeb.ShopComponents do
       navigate={@to}
       aria-current={@active && if(@page?, do: "page", else: "true")}
       class={[
-        "inline-flex min-h-11 items-center transition-colors",
+        "inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm transition-colors md:px-3.5",
         if(@active,
-          do: "font-semibold text-zinc-900",
-          else: "text-zinc-500 hover:text-zinc-900"
+          do: "bg-white font-semibold text-zinc-900 shadow-xs",
+          else: "font-medium text-zinc-600 hover:bg-zinc-200/60 hover:text-zinc-900"
         )
       ]}
     >
+      <.icon name={@icon} class={["size-4", @active && "text-blue-600"]} />
       {render_slot(@inner_block)}
     </.link>
     """
@@ -305,7 +323,7 @@ defmodule YscWeb.ShopComponents do
       <.link
         navigate={product_path(@product, @tile.active)}
         data-tile-link
-        class={["group block", if(@tile.active.name, do: "mt-1", else: "mt-4")]}
+        class={["group block", if(@tile.active.name, do: "mt-1", else: "mt-11")]}
       >
         <h2 class="type-subhead text-lg text-zinc-900 transition-colors group-hover:text-blue-700 md:text-xl">
           {@product.name}

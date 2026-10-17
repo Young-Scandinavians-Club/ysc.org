@@ -212,7 +212,7 @@ defmodule YscWeb.EventDetailsLive do
 
                 <h1
                   :if={@event.title != nil && @event.title != ""}
-                  class="text-2xl md:text-4xl lg:text-5xl text-zinc-900 transition type-display"
+                  class="text-2xl md:text-4xl text-zinc-900 transition type-display"
                 >
                   {@event.title}
                 </h1>

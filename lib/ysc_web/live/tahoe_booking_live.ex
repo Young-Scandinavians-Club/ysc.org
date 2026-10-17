@@ -4717,7 +4717,7 @@ defmodule YscWeb.TahoeBookingLive do
       <%!-- Main Content for Non-Logged-In Users --%>
       <section :if={!@user} class="bg-white py-6 md:py-12">
         <%!-- Section Header --%>
-        <div class="max-w-(--breakpoint-xl) mx-auto px-4 mb-8 md:mb-16">
+        <div class="max-w-(--breakpoint-xl) mx-auto px-4">
           <.page_masthead
             eyebrow="Since 1993"
             title="Experience Tahoe"

@@ -17,8 +17,10 @@ defmodule YscWeb.Components.PageMastheadTest do
       html = rendered_to_string(heex)
 
       assert html =~ ~s|id="events-masthead"|
-      assert html =~ "border-y border-zinc-200"
-      assert html =~ "py-6 md:py-12"
+      refute html =~ "border-"
+      refute html =~ "py-"
+      assert html =~ "mb-10 md:mb-16"
+      refute html =~ "text-center"
       assert html =~ "Events"
       assert html =~ "What&#39;s Next"
       assert html =~ "text-3xl sm:text-4xl md:text-7xl"
@@ -42,6 +44,8 @@ defmodule YscWeb.Components.PageMastheadTest do
 
       refute html =~ "border-zinc-200"
       refute html =~ "py-"
+      assert html =~ "mb-8 md:mb-10"
+      refute html =~ "text-center"
       assert html =~ "text-3xl md:text-4xl"
       assert html =~ "type-display"
       assert html =~ "Last updated: July 15, 2026"
