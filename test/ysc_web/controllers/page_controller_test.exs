@@ -251,4 +251,42 @@ defmodule YscWeb.PageControllerTest do
     conn = get(conn, ~p"/pending-review")
     assert redirected_to(conn) == ~p"/users/log-in"
   end
+
+  describe "GET /financials" do
+    setup :register_and_log_in_user
+
+    test "renders year sections and download cards", %{conn: conn} do
+      conn = get(conn, ~p"/financials")
+      html = html_response(conn, 200)
+      document = LazyHTML.from_fragment(html)
+
+      assert html =~ "Financials &amp; Annual Meetings"
+
+      assert document
+             |> LazyHTML.query("#year-2026")
+             |> Enum.count() == 1
+
+      assert document
+             |> LazyHTML.query("#financials-2026-summary")
+             |> Enum.count() == 1
+
+      assert document
+             |> LazyHTML.query("#financials-2026-report")
+             |> Enum.count() == 1
+
+      assert document
+             |> LazyHTML.query("#financials-2018-slides")
+             |> Enum.count() == 1
+
+      summary =
+        document
+        |> LazyHTML.query("a#financials-2026-summary")
+        |> LazyHTML.to_html()
+
+      assert summary =~ "Financials Summary 2025"
+      assert summary =~ "PDF • 70K"
+      assert summary =~ "target=\"_blank\""
+      assert summary =~ "YSC_ANNUAL_MEETING_REPORT_FY_2025.pdf"
+    end
+  end
 end
