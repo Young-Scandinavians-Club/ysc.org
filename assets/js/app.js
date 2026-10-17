@@ -68,6 +68,7 @@ import { createLiveToastHook } from "../vendor/live_toast.esm.js";
 import { ToastFlashBridge } from "./toast_flash_bridge";
 import InteractScrollbar from "./interact_scrollbar";
 import AccountNavScroll from "./account_nav_scroll";
+import "./open_details_anchor";
 import OtpInput from "./otp_input";
 import StopClick from "./stop_click";
 import DisableOnSubmit from "./disable_on_submit";

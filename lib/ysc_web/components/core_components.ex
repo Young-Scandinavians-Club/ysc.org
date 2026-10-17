@@ -4542,8 +4542,9 @@ defmodule YscWeb.CoreComponents do
   @doc """
   Year block wrapping a grid of `document_download_card/1` links.
 
-  `:featured` is a standalone card with a dark heading. `:archive` is a
-  padded inner block for the collapsible archive on `/financials`.
+  `:featured` is a standalone card with a light heading bar. `:archive` is a
+  padded inner block for the collapsible archive on `/financials`. `badge`
+  and `note` add a pill beside the title and a quiet label on the right.
 
   ## Examples
 
@@ -4553,6 +4554,8 @@ defmodule YscWeb.CoreComponents do
   """
   attr :id, :string, required: true
   attr :title, :string, required: true
+  attr :badge, :string, default: nil
+  attr :note, :string, default: nil
   attr :variant, :atom, default: :featured, values: [:featured, :archive]
   attr :class, :any, default: nil
   slot :inner_block, required: true

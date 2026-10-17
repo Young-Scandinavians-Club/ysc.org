@@ -72,21 +72,25 @@ defmodule YscWeb.Components.DocumentDownload do
       target="_blank"
       rel="noopener noreferrer"
       class={[
-        "group flex items-center p-4 border border-zinc-100 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition",
+        "group flex items-center gap-4 p-4 border border-zinc-200 rounded-lg bg-white hover:border-blue-500 hover:bg-blue-50 transition-colors motion-safe:active:scale-[0.99]",
         @class
       ]}
     >
-      <div class={["p-3 rounded-lg mr-4 shrink-0", @tone_class]}>
+      <div class={["p-3 rounded-lg shrink-0", @tone_class]}>
         <.icon name={@resolved_icon} class="w-6 h-6" />
       </div>
-      <div class="min-w-0">
-        <div class="font-bold text-zinc-900 group-hover:text-blue-700">
+      <div class="min-w-0 grow">
+        <div class="type-subhead text-base text-zinc-900 group-hover:text-blue-700 transition-colors">
           {@title}
         </div>
         <div class="text-xs text-zinc-500 mt-1 type-eyebrow">
           {@meta}
         </div>
       </div>
+      <.icon
+        name="hero-arrow-down-tray"
+        class="w-5 h-5 shrink-0 text-zinc-400 group-hover:text-blue-600 transition-colors"
+      />
     </.link>
     """
   end
@@ -94,12 +98,19 @@ defmodule YscWeb.Components.DocumentDownload do
   @doc """
   Year block wrapping a grid of `document_download_card/1` links.
 
-  `:featured` is a standalone card with a dark heading (recent years).
+  `:featured` is a standalone card with a light heading bar (recent years).
   `:archive` is a padded inner block used inside the collapsible archive.
+  `badge` is a small pill next to the title (e.g. "Latest") and `note` is a
+  quiet label on the right (e.g. "Reviews FY 2025").
 
   ## Examples
 
-      <.annual_meeting_section id="year-2026" title="2026 General Meeting">
+      <.annual_meeting_section
+        id="year-2026"
+        title="2026 General Meeting"
+        badge="Latest"
+        note="Reviews FY 2025"
+      >
         <.document_download_card title="Full Annual Report" ... />
       </.annual_meeting_section>
 
@@ -113,14 +124,19 @@ defmodule YscWeb.Components.DocumentDownload do
   """
   attr :id, :string, required: true
   attr :title, :string, required: true
+  attr :badge, :string, default: nil
+  attr :note, :string, default: nil
   attr :variant, :atom, default: :featured, values: [:featured, :archive]
   attr :class, :any, default: nil
   slot :inner_block, required: true
 
   def annual_meeting_section(%{variant: :archive} = assigns) do
     ~H"""
-    <div id={@id} class={["p-6", @class]}>
-      <h3 class="text-lg text-zinc-900 mb-4 type-subhead">{@title}</h3>
+    <div id={@id} class={["p-6 scroll-mt-24", @class]}>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 mb-4">
+        <h3 class="text-lg text-zinc-900 m-0 type-subhead">{@title}</h3>
+        <span :if={@note} class="type-eyebrow text-xs text-zinc-500">{@note}</span>
+      </div>
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {render_slot(@inner_block)}
       </div>
@@ -133,12 +149,21 @@ defmodule YscWeb.Components.DocumentDownload do
     <section
       id={@id}
       class={[
-        "bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden",
+        "scroll-mt-24 bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden",
         @class
       ]}
     >
-      <div class="bg-zinc-900 px-6 py-4">
-        <h2 class="text-white text-xl m-0 type-subhead">{@title}</h2>
+      <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-zinc-50 border-b border-zinc-200 px-6 py-4">
+        <div class="flex items-center gap-3">
+          <h2 class="text-zinc-900 text-xl m-0 type-subhead">{@title}</h2>
+          <span
+            :if={@badge}
+            class="type-eyebrow text-xs text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full"
+          >
+            {@badge}
+          </span>
+        </div>
+        <span :if={@note} class="type-eyebrow text-xs text-zinc-500">{@note}</span>
       </div>
       <div class="p-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {render_slot(@inner_block)}

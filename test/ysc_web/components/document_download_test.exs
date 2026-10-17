@@ -94,12 +94,17 @@ defmodule YscWeb.Components.DocumentDownloadTest do
   end
 
   describe "annual_meeting_section/1" do
-    test "featured variant renders a dark h2 and a document grid" do
+    test "featured variant renders a light h2 bar with badge, note and a document grid" do
       assigns = %{}
 
       html =
         rendered_to_string(~H"""
-        <.annual_meeting_section id="year-2026" title="2026 General Meeting">
+        <.annual_meeting_section
+          id="year-2026"
+          title="2026 General Meeting"
+          badge="Latest"
+          note="Reviews FY 2025"
+        >
           <.document_download_card
             href="/report.pdf"
             title="Full Annual Report"
@@ -112,12 +117,14 @@ defmodule YscWeb.Components.DocumentDownloadTest do
       assert html =~ "2026 General Meeting"
       assert html =~ "<h2"
       refute html =~ "<h3"
-      assert html =~ "bg-zinc-900"
+      refute html =~ "bg-zinc-900"
+      assert html =~ "Latest"
+      assert html =~ "Reviews FY 2025"
       assert html =~ "Full Annual Report"
       assert html =~ "sm:grid-cols-2 lg:grid-cols-3"
     end
 
-    test "archive variant renders a padded h3 block without the dark header" do
+    test "archive variant renders a padded h3 block without the heading bar" do
       assigns = %{}
 
       html =
@@ -140,7 +147,7 @@ defmodule YscWeb.Components.DocumentDownloadTest do
       assert html =~ "2018 General Meeting"
       assert html =~ "<h3"
       refute html =~ "<h2"
-      refute html =~ "bg-zinc-900"
+      refute html =~ "bg-zinc-50"
       assert html =~ "Financials Presentation"
       assert html =~ "bg-orange-100"
     end
