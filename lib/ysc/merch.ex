@@ -53,6 +53,44 @@ defmodule Ysc.Merch do
 
   @shop_gallery_fields [:id, :product_id, :image_id, :color, :position]
 
+  # Admin catalog table: name, status, prices, variant/gallery counts.
+  # Omits `description` (up to 5k) and Printful sync columns.
+  @admin_listing_product_fields [
+    :id,
+    :name,
+    :status,
+    :sort_order,
+    :image_id,
+    :synced_at,
+    :removed_from_printful_at,
+    :inserted_at
+  ]
+
+  # Edit modal also needs the club-written description.
+  @admin_product_fields @admin_listing_product_fields ++ [:description]
+
+  @admin_variant_fields [
+    :id,
+    :product_id,
+    :name,
+    :size,
+    :color,
+    :retail_price,
+    :available
+  ]
+
+  @admin_gallery_fields [
+    :id,
+    :product_id,
+    :image_id,
+    :color,
+    :position,
+    :source
+  ]
+
+  @orderable_product_fields [:id, :name, :sort_order]
+  @orderable_variant_fields [:id, :product_id, :name, :available]
+
   ## Catalog (member-facing)
 
   @doc """
@@ -121,7 +159,27 @@ defmodule Ysc.Merch do
   defp admin_gallery_images_query do
     from(g in ProductImage,
       order_by: [asc: g.position, asc: g.inserted_at],
+      select: struct(g, ^@admin_gallery_fields),
       preload: [image: ^shop_image_query()]
+    )
+  end
+
+  defp admin_gallery_count_query do
+    from(g in ProductImage, select: struct(g, [:id, :product_id]))
+  end
+
+  defp admin_variants_query do
+    from(v in Variant,
+      order_by: [asc: v.name],
+      select: struct(v, ^@admin_variant_fields)
+    )
+  end
+
+  defp orderable_variants_query do
+    from(v in Variant,
+      where: v.available == true,
+      order_by: [asc: v.name],
+      select: struct(v, ^@orderable_variant_fields)
     )
   end
 
@@ -260,22 +318,71 @@ defmodule Ysc.Merch do
   ## Catalog (admin)
 
   @doc """
-  Every product, including hidden and removed ones, with all variants.
+  Every product, including hidden and removed ones, for the admin catalog
+  table.
+
+  Listing columns, slim variants (counts / prices / colors), gallery ids for
+  the photo count, and display-image paths. Skips descriptions, Printful ids,
+  and gallery image blobs. The edit modal uses `get_admin_product/1`.
   """
   def list_admin_products do
-    from(p in Product,
-      order_by: [asc: p.sort_order, asc: p.name],
-      preload: [
-        image: ^shop_image_query(),
-        variants:
-          ^from(v in Variant,
-            order_by: [asc: v.name],
-            preload: [image: ^shop_image_query()]
-          ),
-        gallery_images: ^admin_gallery_images_query()
-      ]
+    admin_products_query(@admin_listing_product_fields,
+      gallery_images: admin_gallery_count_query()
     )
     |> Repo.all()
+  end
+
+  @doc """
+  One admin catalog product with its description, variants, and gallery, or
+  `nil` when the id is missing or not a product id.
+  """
+  def get_admin_product(id) do
+    admin_products_query(@admin_product_fields,
+      gallery_images: admin_gallery_images_query()
+    )
+    |> where([p], p.id == ^id)
+    |> Repo.one()
+  rescue
+    Ecto.Query.CastError -> nil
+  end
+
+  defp admin_products_query(product_fields, gallery_images: gallery_query) do
+    from(p in Product,
+      order_by: [asc: p.sort_order, asc: p.name],
+      select: struct(p, ^product_fields),
+      preload: [
+        image: ^shop_image_query(),
+        variants: ^admin_variants_query(),
+        gallery_images: ^gallery_query
+      ]
+    )
+  end
+
+  @doc """
+  Products an admin can put on a club-paid order: not removed from Printful,
+  with at least one available variant.
+
+  Name + available variant id/name only. Printful ids are loaded later by
+  fat `Orders.get_order/1` when submitting.
+  """
+  def list_orderable_products do
+    from(p in Product,
+      as: :product,
+      where: is_nil(p.removed_from_printful_at),
+      where:
+        exists(
+          from(v in Variant,
+            where:
+              v.product_id == parent_as(:product).id and v.available == true,
+            select: 1
+          )
+        ),
+      order_by: [asc: p.sort_order, asc: p.name],
+      select: struct(p, ^@orderable_product_fields),
+      preload: [variants: ^orderable_variants_query()]
+    )
+    |> Repo.all()
+    |> Enum.map(&{&1, &1.variants})
   end
 
   def get_product!(id), do: Repo.get!(Product, id)
@@ -303,4 +410,38 @@ defmodule Ysc.Merch do
   @doc false
   def ci_query_explain_query,
     do: shop_products_query(@shop_listing_product_fields)
+
+  @doc false
+  def ci_query_explain_admin_products_query do
+    admin_products_query(@admin_listing_product_fields,
+      gallery_images: admin_gallery_count_query()
+    )
+  end
+
+  @doc false
+  def ci_query_explain_admin_product_query do
+    admin_products_query(@admin_product_fields,
+      gallery_images: admin_gallery_images_query()
+    )
+    |> where([p], p.id == ^Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_orderable_products_query do
+    from(p in Product,
+      as: :product,
+      where: is_nil(p.removed_from_printful_at),
+      where:
+        exists(
+          from(v in Variant,
+            where:
+              v.product_id == parent_as(:product).id and v.available == true,
+            select: 1
+          )
+        ),
+      order_by: [asc: p.sort_order, asc: p.name],
+      select: struct(p, ^@orderable_product_fields),
+      preload: [variants: ^orderable_variants_query()]
+    )
+  end
 end

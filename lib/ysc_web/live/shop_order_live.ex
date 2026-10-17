@@ -57,7 +57,10 @@ defmodule YscWeb.ShopOrderLive do
       {:ok, paid} ->
         {:noreply,
          socket
-         |> assign(:order, Orders.get_order!(paid.id))
+         |> assign(
+           :order,
+           Orders.get_user_order(socket.assigns.current_user, paid.id) || paid
+         )
          |> assign(:payment_delayed?, false)}
 
       {:error, :not_succeeded} ->

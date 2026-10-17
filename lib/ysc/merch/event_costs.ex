@@ -9,8 +9,23 @@ defmodule Ysc.Merch.EventCosts do
   """
   import Ecto.Query, warn: false
 
-  alias Ysc.Merch.Order
+  alias Ysc.Accounts.User
+  alias Ysc.Merch.{Order, OrderItem}
   alias Ysc.Repo
+
+  # Cost table: who placed it, purpose, item qty, status, Printful cost.
+  # Skip address / Stripe / Printful payload and a full users.* granted_by.
+  @order_fields [
+    :id,
+    :purpose,
+    :status,
+    :printful_cost,
+    :estimated_cost,
+    :granted_by_id,
+    :inserted_at
+  ]
+  @granted_by_fields [:id, :first_name, :last_name]
+  @item_fields [:id, :order_id, :quantity]
 
   @doc """
   Billable club-paid orders linked to `event_id`, newest first, with the
@@ -48,8 +63,20 @@ defmodule Ysc.Merch.EventCosts do
         o.event_id == ^event_id and o.kind == :admin_comp and
           o.status in ^Order.billed_statuses(),
       order_by: [desc: o.inserted_at],
-      preload: [:granted_by, :items]
+      select: struct(o, ^@order_fields),
+      preload: [
+        granted_by: ^granted_by_query(),
+        items: ^items_query()
+      ]
     )
+  end
+
+  defp granted_by_query do
+    from(u in User, select: struct(u, ^@granted_by_fields))
+  end
+
+  defp items_query do
+    from(i in OrderItem, select: struct(i, ^@item_fields))
   end
 
   @doc false

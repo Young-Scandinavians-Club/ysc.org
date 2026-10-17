@@ -12,7 +12,7 @@ defmodule Ysc.Merch.Orders do
   alias Ecto.Multi
   alias Ysc.Accounts.User
   alias Ysc.Media.Image
-  alias Ysc.Merch.{Cart, Order, OrderItem, ShippingAddress, Variant}
+  alias Ysc.Merch.{Cart, Order, OrderItem, Shipment, ShippingAddress, Variant}
   alias Ysc.Repo
 
   @user_order_fields [:id, :reference_id, :status, :total_amount, :inserted_at]
@@ -28,6 +28,39 @@ defmodule Ysc.Merch.Orders do
     :blur_hash,
     :width,
     :height
+  ]
+
+  # Receipt page: address, totals, payment-intent polling. Skip Printful ids,
+  # the member User row, event, and granted_by (purchase orders have none).
+  @user_order_detail_fields [
+    :id,
+    :user_id,
+    :reference_id,
+    :kind,
+    :status,
+    :inserted_at,
+    :recipient_name,
+    :address1,
+    :address2,
+    :city,
+    :state_code,
+    :zip,
+    :subtotal,
+    :shipping_amount,
+    :total_amount,
+    :payment_intent_id
+  ]
+  @user_order_detail_item_fields @user_order_item_fields ++ [:unit_price]
+  @user_order_shipment_fields [
+    :id,
+    :order_id,
+    :carrier,
+    :service,
+    :tracking_number,
+    :tracking_url,
+    :status,
+    :shipped_at,
+    :delivered_at
   ]
 
   @detail_preloads [
@@ -196,12 +229,30 @@ defmodule Ysc.Merch.Orders do
 
   def get_order!(id), do: Order |> Repo.get!(id) |> preload_detail()
 
-  @doc "The member's own order, or `nil` (also for other members' orders)."
+  @doc """
+  The member's own order for the receipt page, or `nil` (also for other
+  members' orders).
+
+  Receipt columns, slim item thumbs, and tracking parcels. Printful
+  submission still uses fat `get_order/1`.
+  """
   def get_user_order(%User{id: user_id}, id) do
-    case get_order(id) do
-      %Order{user_id: ^user_id} = order -> order
-      _ -> nil
-    end
+    user_id
+    |> user_order_query(id)
+    |> Repo.one()
+  rescue
+    Ecto.Query.CastError -> nil
+  end
+
+  defp user_order_query(user_id, id) do
+    from(o in Order,
+      where: o.id == ^id and o.user_id == ^user_id,
+      select: struct(o, ^@user_order_detail_fields),
+      preload: [
+        items: ^user_order_detail_item_query(),
+        shipments: ^user_order_shipment_query()
+      ]
+    )
   end
 
   def get_order_by_payment_intent(payment_intent_id)
@@ -239,6 +290,17 @@ defmodule Ysc.Merch.Orders do
       select: struct(i, ^@user_order_item_fields),
       preload: [variant: ^user_order_variant_query()]
     )
+  end
+
+  defp user_order_detail_item_query do
+    from(i in OrderItem,
+      select: struct(i, ^@user_order_detail_item_fields),
+      preload: [variant: ^user_order_variant_query()]
+    )
+  end
+
+  defp user_order_shipment_query do
+    from(s in Shipment, select: struct(s, ^@user_order_shipment_fields))
   end
 
   defp user_order_variant_query do
@@ -296,5 +358,12 @@ defmodule Ysc.Merch.Orders do
       select: struct(o, ^@user_order_fields),
       preload: [items: ^user_order_item_query()]
     )
+  end
+
+  @doc false
+  def ci_query_explain_user_order_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    user_order_query(Fixtures.ulid(), Fixtures.ulid())
   end
 end
