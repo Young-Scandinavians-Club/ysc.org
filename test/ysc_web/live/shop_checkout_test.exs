@@ -357,6 +357,80 @@ defmodule YscWeb.ShopCheckoutTest do
       refute has_element?(view, "#checkout-payment")
     end
 
+    test "a processing Intent waits on confirmation instead of opening payment",
+         %{
+           conn: conn,
+           member: member
+         } do
+      {:ok, order} =
+        Orders.create_pending_purchase(
+          member,
+          Cart.list(member),
+          shipping_address_fixture(),
+          shipping_option_fixture()
+        )
+
+      {:ok, _} = Orders.attach_payment_intent(order, "pi_processing")
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_processing", _ ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_processing",
+           status: "processing",
+           amount: 6995
+         }}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      to_shipping(view)
+      view |> element("#continue-to-payment") |> render_click()
+
+      assert_redirect(
+        view,
+        ~p"/shop/orders/#{order.id}/confirmation"
+      )
+
+      assert %Order{payment_intent_id: "pi_processing", status: :pending} =
+               Orders.get_order!(order.id)
+    end
+
+    test "a processing Intent blocks a second checkout after the cart changes",
+         %{
+           conn: conn,
+           member: member
+         } do
+      extra = variant_fixture(nil, %{retail_price: Money.new(:USD, "25")})
+
+      {:ok, order} =
+        Orders.create_pending_purchase(
+          member,
+          Cart.list(member),
+          shipping_address_fixture(),
+          shipping_option_fixture()
+        )
+
+      {:ok, _} = Orders.attach_payment_intent(order, "pi_processing")
+      assert {:ok, _} = Cart.add(member, extra.id, 1)
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_processing", _ ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_processing",
+           status: "processing",
+           amount: 6995
+         }}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      to_shipping(view)
+      view |> element("#continue-to-payment") |> render_click()
+      render_async(view)
+
+      assert has_element?(view, "#shipping-error", "still processing")
+      refute has_element?(view, "#checkout-payment")
+      assert Repo.aggregate(Order, :count) == 1
+    end
+
     test "payment-success settles the order and opens the confirmation page", %{
       conn: conn
     } do

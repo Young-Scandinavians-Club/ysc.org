@@ -9,11 +9,22 @@ defmodule Ysc.Merch.Orders do
   """
   import Ecto.Query, warn: false
 
+  require Ysc.Logging
+
   alias Ecto.Multi
   alias Ysc.Accounts.User
   alias Ysc.Media.Image
   alias Ysc.Merch.{Cart, Order, OrderItem, ShippingAddress, Variant}
   alias Ysc.Repo
+
+  # Same statuses tickets refuse to cancel: a second payable order while one
+  # of these is open double-charges when ACH/3DS later succeeds.
+  @in_flight_pi_statuses ~w(
+    requires_action
+    processing
+    requires_confirmation
+    succeeded
+  )
 
   @user_order_fields [:id, :reference_id, :status, :total_amount, :inserted_at]
   @user_order_item_fields [:id, :order_id, :name, :quantity, :variant_id]
@@ -44,10 +55,18 @@ defmodule Ysc.Merch.Orders do
   `lines` are the cart lines being bought, `option` the shipping option the
   member chose (from `Ysc.Merch.Shipping.options/2`). If the member already has
   an identical pending order (same items, prices, address and shipping), that
-  one is returned instead of creating another.
+  one is returned instead of creating another — including pending checkouts
+  older than 24 hours. Abandoned unpaid rows are canceled by
+  `Ysc.Merch.StaleOrderWorker`; leftovers still pending are in-flight and
+  must be reused so a later ACH retry cannot mint a second payable order.
+
+  A *different* cart/address/shipping is refused with `:payment_in_progress`
+  when another pending purchase already has a PaymentIntent that is
+  processing, in 3DS, or succeeded. Otherwise the member could pay the new
+  order by card and still be charged when the first Intent settles.
 
   Errors: `:empty_cart`, `:unavailable_items` (a line is no longer sellable),
-  or an `Ecto.Changeset`.
+  `:payment_in_progress`, or an `Ecto.Changeset`.
   """
   @spec create_pending_purchase(
           User.t(),
@@ -56,7 +75,11 @@ defmodule Ysc.Merch.Orders do
           map()
         ) ::
           {:ok, Order.t()}
-          | {:error, :empty_cart | :unavailable_items | Ecto.Changeset.t()}
+          | {:error,
+             :empty_cart
+             | :unavailable_items
+             | :payment_in_progress
+             | Ecto.Changeset.t()}
   def create_pending_purchase(
         %User{} = user,
         lines,
@@ -74,8 +97,13 @@ defmodule Ysc.Merch.Orders do
         attrs = purchase_attrs(user, lines, address, option)
 
         case find_reusable_pending(user, lines, attrs) do
-          %Order{} = order -> {:ok, order}
-          nil -> insert_purchase(user, lines, attrs)
+          %Order{} = order ->
+            {:ok, order}
+
+          nil ->
+            with :ok <- reject_in_flight_pending(user) do
+              insert_purchase(user, lines, attrs)
+            end
         end
     end
   end
@@ -138,13 +166,54 @@ defmodule Ysc.Merch.Orders do
     from(o in Order,
       where:
         o.user_id == ^user.id and o.kind == :purchase and o.status == :pending,
-      where: o.inserted_at > ago(24, "hour"),
       order_by: [desc: o.inserted_at],
-      limit: 5,
       preload: [:items]
     )
     |> Repo.all()
     |> Enum.find(&(order_signature(&1) == wanted))
+  end
+
+  defp reject_in_flight_pending(user) do
+    in_flight =
+      from(o in Order,
+        where:
+          o.user_id == ^user.id and o.kind == :purchase and
+            o.status == :pending and not is_nil(o.payment_intent_id)
+      )
+      |> Repo.all()
+      |> Enum.find(&in_flight_payment_intent?(&1.payment_intent_id))
+
+    case in_flight do
+      nil ->
+        :ok
+
+      order ->
+        Ysc.Logging.warning(
+          "Refusing a second merch checkout while a PaymentIntent is in flight",
+          order_id: order.id,
+          payment_intent_id: order.payment_intent_id
+        )
+
+        {:error, :payment_in_progress}
+    end
+  end
+
+  defp in_flight_payment_intent?(payment_intent_id) do
+    case stripe_client().retrieve_payment_intent(payment_intent_id, %{}) do
+      {:ok, %{status: status}} when status in @in_flight_pi_statuses ->
+        true
+
+      {:ok, _open_or_canceled} ->
+        false
+
+      {:error, _reason} ->
+        # Fail closed: a retrieve blip must not mint a second payable order.
+        true
+    end
+  end
+
+  defp stripe_client do
+    Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
   end
 
   defp signature(lines, attrs) do
