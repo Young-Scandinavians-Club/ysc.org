@@ -20,6 +20,14 @@ defmodule Ysc.Printful.ClientBehaviour do
   @callback get_sync_product(printful_product_id :: integer()) :: result(map())
 
   @doc """
+  Fetches a Printful catalog product (the blank an item is printed on).
+  Returns `%{"product" => map, "variants" => [map]}`; each variant carries its
+  real `color_code`.
+  """
+  @callback get_catalog_product(catalog_product_id :: integer()) ::
+              result(map())
+
+  @doc """
   Quotes shipping options. `items` are `%{variant_id: catalog_id, quantity: n}`.
   """
   @callback shipping_rates(recipient :: map(), items :: [map()]) ::

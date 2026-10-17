@@ -46,6 +46,7 @@ defmodule Ysc.Merch do
     :name,
     :size,
     :color,
+    :color_hex,
     :retail_price,
     :available,
     :image_id
@@ -192,20 +193,25 @@ defmodule Ysc.Merch do
   @doc """
   The photos to show for `product` while `color` is selected, in display order.
 
-  Photos tied to that color come first, then photos that belong to every
-  color. With no gallery at all it falls back to the color's variant image,
-  then the product image. May be empty (the page then shows a placeholder).
+  That color's photos and the photos that belong to every color are ordered
+  together by position (so "Make first" on any photo puts it first). At the same
+  position a color's own photo wins. With no gallery at all it falls back to the
+  color's variant image, then the product image. May be empty (the page then
+  shows a placeholder).
 
   Expects `gallery_images` (with images) and `variants` to be loaded, as
   `get_shop_product/1` does.
   """
   @spec gallery(Product.t(), String.t() | nil) :: [struct()]
   def gallery(%Product{} = product, color) do
-    photos = product.gallery_images
-    specific = if color, do: Enum.filter(photos, &(&1.color == color)), else: []
-    general = Enum.filter(photos, &is_nil(&1.color))
+    # `sort_by` is stable, so equal keys keep the query's order (position, then
+    # when the photo was added).
+    applicable =
+      product.gallery_images
+      |> Enum.filter(&(is_nil(&1.color) or &1.color == color))
+      |> Enum.sort_by(&{&1.position, if(is_nil(&1.color), do: 1, else: 0)})
 
-    case Enum.uniq_by(specific ++ general, & &1.image_id) do
+    case Enum.uniq_by(applicable, & &1.image_id) do
       [] -> fallback_gallery(product, color)
       photos -> Enum.map(photos, & &1.image)
     end

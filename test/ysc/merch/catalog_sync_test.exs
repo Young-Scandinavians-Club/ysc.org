@@ -97,6 +97,122 @@ defmodule Ysc.Merch.CatalogSyncTest do
     assert Money.equal?(variant.retail_price, Money.new(:USD, "27.50"))
   end
 
+  test "a re-sync keeps a Printful photo the club moved to the front", %{
+    admin: admin
+  } do
+    black = fn ->
+      sync_variant(10, %{
+        "files" => [
+          %{"type" => "preview", "preview_url" => "https://img/black.png"}
+        ]
+      })
+    end
+
+    white = fn ->
+      sync_variant(11, %{
+        "color" => "White",
+        "files" => [
+          %{"type" => "preview", "preview_url" => "https://img/white.png"}
+        ]
+      })
+    end
+
+    stub(ClientMock, :list_sync_products, fn -> {:ok, [listed(1)]} end)
+
+    stub(ClientMock, :get_sync_product, fn 1 ->
+      detail(listed(1), [black.(), white.()])
+    end)
+
+    assert {:ok, _} = Merch.sync_catalog(admin)
+
+    product = Repo.get_by!(Product, printful_product_id: 1)
+
+    photos =
+      Repo.all(
+        from(g in Ysc.Merch.ProductImage, where: g.product_id == ^product.id)
+      )
+
+    white_photo = Enum.find(photos, &(&1.color == "White"))
+    assert :ok = Merch.move_photo_first(white_photo.id)
+    moved = Repo.get!(Ysc.Merch.ProductImage, white_photo.id).position
+    assert moved < 0
+
+    assert {:ok, _} = Merch.sync_catalog(admin)
+
+    assert Repo.get!(Ysc.Merch.ProductImage, white_photo.id).position == moved
+  end
+
+  describe "color dots" do
+    test "stores the real color from Printful's catalog", %{admin: admin} do
+      expect(ClientMock, :list_sync_products, fn -> {:ok, [listed(1)]} end)
+
+      expect(ClientMock, :get_sync_product, fn 1 ->
+        detail(listed(1), [
+          sync_variant(10, %{"product" => %{"product_id" => 586}}),
+          sync_variant(11, %{
+            "color" => "Latte",
+            "product" => %{"product_id" => 586}
+          }),
+          sync_variant(12, %{
+            "color" => "Mystery",
+            "product" => %{"product_id" => 586}
+          })
+        ])
+      end)
+
+      expect(ClientMock, :get_catalog_product, fn 586 ->
+        {:ok,
+         %{
+           "product" => %{"id" => 586},
+           "variants" => [
+             %{"id" => 4010, "color_code" => "#080808"},
+             %{"id" => 4011, "color_code" => "#B28A68"},
+             # Not a usable color: ignored rather than stored.
+             %{"id" => 4012, "color_code" => "n/a"}
+           ]
+         }}
+      end)
+
+      assert {:ok, %{failed: 0}} = Merch.sync_catalog(admin)
+
+      hex = fn id ->
+        Repo.get_by!(Variant, printful_sync_variant_id: id).color_hex
+      end
+
+      assert hex.(10) == "#080808"
+      assert hex.(11) == "#b28a68"
+      assert hex.(12) == nil
+    end
+
+    test "a failed catalog lookup neither fails the sync nor erases the color",
+         %{admin: admin} do
+      variant = fn ->
+        sync_variant(10, %{"product" => %{"product_id" => 586}})
+      end
+
+      expect(ClientMock, :list_sync_products, 2, fn -> {:ok, [listed(1)]} end)
+
+      expect(ClientMock, :get_sync_product, 2, fn 1 ->
+        detail(listed(1), [variant.()])
+      end)
+
+      expect(ClientMock, :get_catalog_product, fn 586 ->
+        {:ok, %{"variants" => [%{"id" => 4010, "color_code" => "#080808"}]}}
+      end)
+
+      assert {:ok, %{failed: 0}} = Merch.sync_catalog(admin)
+
+      expect(ClientMock, :get_catalog_product, fn 586 ->
+        {:error, %Error{type: :not_found, status: 404, message: "Not Found"}}
+      end)
+
+      assert {:ok, %{failed: 0}} = Merch.sync_catalog(admin)
+
+      assert Repo.get_by!(Variant, printful_sync_variant_id: 10).color_hex ==
+               "#080808"
+    end
+  end
+
   test "re-sync updates Printful fields but keeps club-owned fields", %{
     admin: admin
   } do

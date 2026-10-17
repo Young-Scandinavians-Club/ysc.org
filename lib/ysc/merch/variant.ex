@@ -18,6 +18,7 @@ defmodule Ysc.Merch.Variant do
     field :name, :string
     field :size, :string
     field :color, :string
+    field :color_hex, :string
     field :sku, :string
     field :retail_price, Money.Ecto.Composite.Type, default_currency: :USD
     field :source_image_url, :string
@@ -41,6 +42,7 @@ defmodule Ysc.Merch.Variant do
       :name,
       :size,
       :color,
+      :color_hex,
       :sku,
       :retail_price,
       :source_image_url,
@@ -55,6 +57,7 @@ defmodule Ysc.Merch.Variant do
       :retail_price
     ])
     |> validate_retail_price()
+    |> validate_format(:color_hex, ~r/\A#[0-9a-fA-F]{6}\z/)
     |> unique_constraint(:printful_sync_variant_id)
     |> foreign_key_constraint(:product_id)
     |> foreign_key_constraint(:image_id)

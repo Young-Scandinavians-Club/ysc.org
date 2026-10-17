@@ -86,6 +86,36 @@ defmodule Ysc.Merch.ListingTest do
     end
   end
 
+  describe "color dots" do
+    test "prefer Printful's real color over a guess from the name" do
+      product = product_fixture(%{name: "Hoodie Colors"})
+
+      for {color, hex} <- [{"Black", "#080808"}, {"Adobe", "#d06e26"}] do
+        variant_fixture(product, %{
+          color: color,
+          color_hex: hex,
+          size: "M",
+          retail_price: Money.new(:USD, "30")
+        })
+      end
+
+      loaded = loaded() |> Enum.find(&(&1.id == product.id))
+      tile = Listing.tile(loaded)
+
+      assert Enum.find(tile.colors, &(&1.name == "Black")).hex == "#080808"
+      # The name alone knows nothing about "Adobe".
+      assert Enum.find(tile.colors, &(&1.name == "Adobe")).hex == "#d06e26"
+
+      options = Listing.available_colors([loaded])
+      assert Enum.find(options, &(&1.name == "Adobe")).hex == "#d06e26"
+    end
+
+    test "fall back to the name when no real color was stored", %{tee: tee} do
+      tile = loaded() |> Enum.find(&(&1.id == tee.id)) |> Listing.tile()
+      assert Enum.find(tile.colors, &(&1.name == "Black")).hex == "#18181b"
+    end
+  end
+
   describe "tile/2" do
     test "has a swatch per color, size range and no swatches without colors",
          %{tee: tee, sticker: sticker} do

@@ -65,6 +65,11 @@ defmodule Ysc.Printful.Client do
   end
 
   @impl true
+  def get_catalog_product(catalog_product_id) do
+    result(request(:get, "/products/#{catalog_product_id}"))
+  end
+
+  @impl true
   def shipping_rates(recipient, items) do
     body = %{
       recipient: recipient,

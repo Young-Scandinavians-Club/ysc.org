@@ -19,6 +19,17 @@ defmodule Ysc.Merch.VariantSelection do
   end
 
   @doc """
+  The hex for `color`'s dot: Printful's real color when a variant carries it,
+  else a guess from the color's name (`nil` if even that is unknown).
+  """
+  @spec color_hex([Variant.t()], String.t() | nil) :: String.t() | nil
+  def color_hex(variants, color) do
+    Enum.find_value(variants, fn variant ->
+      if variant.color == color and variant.color_hex, do: variant.color_hex
+    end) || Ysc.Merch.ColorSwatch.hex(color)
+  end
+
+  @doc """
   Distinct sizes, in shopper order (XS to 5XL, then anything else by name).
   When `color` is given, only sizes offered in that color.
   """
