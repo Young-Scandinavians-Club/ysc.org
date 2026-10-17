@@ -3,21 +3,23 @@
   <.back_to_top />
 
   <div class="max-w-(--breakpoint-xl) mx-auto px-4">
-    <div class="prose prose-zinc prose-a:text-blue-600 mb-8 scroll-mt-24">
-      <h2 id="key-events">Key Events</h2>
+    <div class="prose prose-zinc prose-a:text-blue-600 mb-8">
+      <h2 id="key-events" class="mb-2">Key Events</h2>
+      <p class="mt-0 text-sm text-zinc-500 flex items-center gap-1.5">
+        <.icon name="hero-clock" class="w-4 h-4" /> About a 12 minute read
+      </p>
     </div>
 
-    <.timeline_filters />
+    <.timeline_filters decades={Enum.map(@timeline_decades, & &1.label)} />
 
     <.timeline>
-      <%= for event <- @timeline_events do %>
-        <%= case event.type do %>
-          <% :decade -> %>
-            <.timeline_decade label={event.year} />
-          <% _ -> %>
-            <.timeline_event_from_data event={event} />
-        <% end %>
-      <% end %>
+      <.timeline_decade
+        :for={decade <- @timeline_decades}
+        id={decade.id}
+        label={decade.label}
+      >
+        <.timeline_event_from_data :for={event <- decade.events} event={event} />
+      </.timeline_decade>
     </.timeline>
 
     <.presidents_section presidents={@past_presidents} />

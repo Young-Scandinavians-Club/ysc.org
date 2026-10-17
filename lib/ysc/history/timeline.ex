@@ -3,14 +3,15 @@ defmodule Ysc.History.Timeline do
   Static timeline data for the YSC history page.
   """
 
-  @type event_type :: :decade | :event | :milestone | :featured
+  @type event_type :: :event | :milestone | :featured
 
   @type image :: %{
           src: String.t(),
           alt: String.t(),
           caption: String.t() | nil,
           era: String.t() | nil,
-          aspect: String.t() | nil
+          aspect: String.t() | nil,
+          document: boolean()
         }
 
   @type event :: %{
@@ -26,13 +27,47 @@ defmodule Ysc.History.Timeline do
           extra_tags: [String.t()]
         }
 
+  @type decade_group :: %{
+          label: String.t(),
+          id: String.t(),
+          events: [event()]
+        }
+
   @doc """
-  Returns all timeline entries in display order.
+  Returns all timeline entries in chronological order.
+
+  Entries are authored by topic, so they are sorted here by their first year
+  (`"1979-1981"` sorts as 1979). The sort is stable, so entries sharing a year
+  keep their authored order.
   """
   @spec events() :: [event()]
   def events do
+    Enum.sort_by(raw_events(), &start_year/1)
+  end
+
+  @doc """
+  Returns the timeline grouped by decade, oldest first, each group carrying a
+  label (`"1960s"`) and a DOM-safe id (`"decade-1960s"`).
+  """
+  @spec decades() :: [decade_group()]
+  def decades do
+    events()
+    |> Enum.chunk_by(&decade_label/1)
+    |> Enum.map(fn [first | _] = events ->
+      label = decade_label(first)
+      %{label: label, id: "decade-#{label}", events: events}
+    end)
+  end
+
+  defp start_year(%{year: year}) do
+    {n, _} = Integer.parse(year)
+    n
+  end
+
+  defp decade_label(event), do: "#{div(start_year(event), 10) * 10}s"
+
+  defp raw_events do
     [
-      decade("1950s"),
       featured(
         "1950",
         "The Beginning: Five Friends, One Vision",
@@ -50,7 +85,8 @@ defmodule Ysc.History.Timeline do
             alt: "Arnold Rolkert's account of founding the YSC in 1950",
             caption: nil,
             era: "1950s",
-            aspect: nil
+            aspect: nil,
+            document: true
           }
         ]
       ),
@@ -60,7 +96,6 @@ defmodule Ysc.History.Timeline do
         ["cabin life", "organization"],
         "President Svend Svendsen led the club in beginning the annual tradition of renting seasonal properties at Clear Lake and in the Sierra Nevada—laying the groundwork for the cabin culture that would define YSC for decades."
       ),
-      decade("1960s"),
       event(
         "1960",
         "Incorporated as Non-Profit",
@@ -72,7 +107,8 @@ defmodule Ysc.History.Timeline do
             alt: "Nordic Highlight frontpage from 1960",
             caption: "Nordic Highlight newsletter from 1960",
             era: "1960s",
-            aspect: "3/4"
+            aspect: "3/4",
+            document: true
           }
         ]
       ),
@@ -146,7 +182,6 @@ defmodule Ysc.History.Timeline do
         ["cabin life"],
         "Clear Lake loan paid off. The cabin and its 3/4 acre lot is ours."
       ),
-      decade("1970s"),
       event(
         "1970",
         "20th Anniversary",
@@ -203,7 +238,6 @@ defmodule Ysc.History.Timeline do
         ledger:
           "Total Cost: $80,000\nPlumbing: Connections for two shower stalls and a toilet installed in the men's dressing room"
       ),
-      decade("1980s"),
       event(
         "1985",
         "35th Anniversary Celebration",
@@ -217,18 +251,19 @@ defmodule Ysc.History.Timeline do
             alt: "35th Anniversary celebration program cover",
             caption: "Anniversary program cover",
             era: "1980s",
-            aspect: "3/4"
+            aspect: "4/3",
+            document: true
           },
           %{
             src: "/images/history/35th_anniversary_program_2.webp",
             alt: "35th Anniversary celebration program inside",
             caption: "Program details",
             era: "1980s",
-            aspect: "3/4"
+            aspect: "4/3",
+            document: true
           }
         ]
       ),
-      decade("1990s"),
       event(
         "1985",
         "Lucia Celebration",
@@ -283,7 +318,6 @@ defmodule Ysc.History.Timeline do
         ["club leadership"],
         "Andrew Vik, 24, becomes youngest president in YSC history. Changes made to the bylaws to include Tahoe Cabin Manager on the Executive Committee and the Board of Trustees at six full members (formerly five plus an alternate)."
       ),
-      decade("2000s"),
       milestone(
         "2000",
         "YSC 50th Anniversary",
@@ -316,7 +350,6 @@ defmodule Ysc.History.Timeline do
         ["cabin life"],
         "Bathrooms finally remodeled according to 1982 scheme – move wall to add a toilet and a shower from men's to women's room, and installing two showers in men's room using existing plumbing. Purchase new gas stove, an electric double oven and a refrigerator for the pantry."
       ),
-      decade("2010s"),
       event(
         "2014",
         "Sauna in Tahoe",
@@ -359,7 +392,6 @@ defmodule Ysc.History.Timeline do
         ["club leadership"],
         "With six consecutive years, Peter Nordström becomes the longest serving president of the YSC to date."
       ),
-      decade("2020s"),
       event(
         "2020",
         "Covid-19 Pandemic",
@@ -402,21 +434,6 @@ defmodule Ysc.History.Timeline do
   @spec years_since_founding() :: integer()
   def years_since_founding do
     div(Date.utc_today().year - 1950, 5) * 5
-  end
-
-  defp decade(label) do
-    %{
-      type: :decade,
-      year: label,
-      title: nil,
-      tags: [],
-      body: nil,
-      body_html: nil,
-      images: [],
-      blockquote: nil,
-      ledger: nil,
-      extra_tags: []
-    }
   end
 
   defp event(year, title, tags, body, opts \\ []) do

@@ -20,80 +20,140 @@ defmodule YscWeb.Components.History.HistoryComponents do
       id="history-hero"
       class="max-w-(--breakpoint-xl) mx-auto px-4"
     >
-      <.page_masthead
-        id="history-masthead"
-        eyebrow="History"
-        title={"#{@years}+ Years"}
-        title_class="tracking-tighter"
-      >
-        <p class="history-serif text-zinc-500 italic text-sm mt-4 tracking-wide">
-          Established 1950
-        </p>
-        <p class="text-zinc-500 text-xs mt-2 type-eyebrow">
-          San Francisco, California
-        </p>
-      </.page_masthead>
+      <div class="lg:grid lg:grid-cols-12 lg:gap-16">
+        <div class="lg:col-span-7">
+          <.page_masthead
+            id="history-masthead"
+            eyebrow="History"
+            title={"#{@years}+ Years"}
+            title_class="tracking-tighter"
+          >
+            <p class="history-serif text-zinc-500 italic text-sm mt-4 tracking-wide">
+              Established 1950
+            </p>
+            <p class="text-zinc-500 text-xs mt-2 type-eyebrow">
+              San Francisco, California
+            </p>
+          </.page_masthead>
 
-      <div class="max-w-2xl">
-        <h2 class="text-2xl md:text-3xl font-medium text-zinc-900 mb-6 history-serif">
-          A Legacy of Friendship: The YSC Story
-        </h2>
+          <div class="max-w-2xl">
+            <h2 class="text-2xl md:text-3xl text-zinc-900 mb-6 history-serif type-title">
+              A Legacy of Friendship: The YSC Story
+            </h2>
 
-        <div class="space-y-5 text-lg text-zinc-600 leading-relaxed text-left">
-          <p>
-            The Young Scandinavians Club was founded in 1950 by <strong class="text-zinc-800">Arnold Rolkert</strong>, <strong class="text-zinc-800">Gunnar Engen</strong>, <strong class="text-zinc-800">Carlo Hojsgaard</strong>, <strong class="text-zinc-800">Peter Larsen Bernard</strong>, and <strong class="text-zinc-800">Ulla Lindberg</strong>.
-            The idea was to build a club for newly settled Scandinavians who were far from home—where they could speak their native language and celebrate time-honored Scandinavian traditions here in San Francisco.
-          </p>
-          <p>
-            The founding members also wanted to offer a fun, active, festive alternative to some of the more traditional Scandinavian lodges in the city. With an active social calendar, it became much easier for newly arrived Scandinavians to feel that they had a community in the Bay Area, far from home.
-          </p>
-          <p>
-            Members eventually wrote the bylaws and elected the club's first president in 1951: Arnold Rolkert, a Swede. By 1963, membership had grown significantly and the Clear Lake cabin was purchased. Thirty years later, in 1993, the Lake Tahoe cabin followed—giving the club two homes in Northern California.
-          </p>
+            <div class="space-y-5 text-lg text-zinc-600 leading-relaxed text-left">
+              <p>
+                The Young Scandinavians Club was founded in 1950 by <strong class="text-zinc-800">Arnold Rolkert</strong>, <strong class="text-zinc-800">Gunnar Engen</strong>, <strong class="text-zinc-800">Carlo Hojsgaard</strong>, <strong class="text-zinc-800">Peter Larsen Bernard</strong>, and <strong class="text-zinc-800">Ulla Lindberg</strong>.
+                The idea was to build a club for newly settled Scandinavians who were far from home—where they could speak their native language and celebrate time-honored Scandinavian traditions here in San Francisco.
+              </p>
+              <p>
+                The founding members also wanted to offer a fun, active, festive alternative to some of the more traditional Scandinavian lodges in the city. With an active social calendar, it became much easier for newly arrived Scandinavians to feel that they had a community in the Bay Area, far from home.
+              </p>
+              <p>
+                Members eventually wrote the bylaws and elected the club's first president in 1951: Arnold Rolkert, a Swede. By 1963, membership had grown significantly and the Clear Lake cabin was purchased. Thirty years later, in 1993, the Lake Tahoe cabin followed—giving the club two homes in Northern California.
+              </p>
+            </div>
+
+            <blockquote class="border-l-2 border-zinc-300 pl-6 italic text-zinc-600 max-w-xl history-serif mt-8">
+              <p class="text-base leading-relaxed">
+                Today the YSC remains one of the most active Scandinavian organizations in the Bay Area—offering endless opportunities to enjoy all that Northern California has to offer, and to share American culture with fellow Scandinavians along the way.
+              </p>
+            </blockquote>
+          </div>
         </div>
 
-        <blockquote class="border-l-2 border-zinc-300 pl-6 italic text-zinc-600 max-w-xl history-serif mt-8">
-          <p class="text-base leading-relaxed">
-            Today the YSC remains one of the most active Scandinavian organizations in the Bay Area—offering endless opportunities to enjoy all that Northern California has to offer, and to share American culture with fellow Scandinavians along the way.
-          </p>
-        </blockquote>
+        <aside class="mt-12 lg:mt-4 lg:col-span-5" aria-label="From the archive">
+          <figure
+            id="history-hero-photo"
+            class="era-1960s mx-auto max-w-md lg:max-w-none"
+          >
+            <div class="p-3 pb-4 bg-stone-50 border border-zinc-200 shadow-xs rotate-1 motion-safe:transition-transform motion-safe:duration-500 motion-safe:hover:rotate-0">
+              <img
+                src="/images/history/SAS 1963.webp"
+                alt="YSC members on the SAS flight to Scandinavia in 1963"
+                width="1024"
+                height="825"
+                class="w-full h-auto rounded-xs"
+                fetchpriority="high"
+                decoding="async"
+              />
+            </div>
+            <figcaption class="mt-5 text-center text-sm italic text-zinc-500 history-serif">
+              1963 — forty members on the club's legendary group flight back to Scandinavia
+            </figcaption>
+          </figure>
+        </aside>
       </div>
     </div>
     """
   end
 
+  attr :decades, :list,
+    required: true,
+    doc: "Decade labels (e.g. `\"1960s\"`) in display order, for the jump links"
+
   def timeline_filters(assigns) do
     ~H"""
-    <div class="not-prose mb-10">
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-zinc-200">
-        <div class="flex items-center gap-2 text-sm text-zinc-500">
-          <.icon name="hero-clock" class="w-4 h-4" />
-          <span>~12 min read</span>
+    <div
+      id="timeline-filters"
+      phx-hook="TimelineFilter"
+      class="history-toolbar not-prose sticky top-(--nav-height) z-30 -mx-4 mb-10 px-4 border-b border-zinc-200/80 bg-white/80 backdrop-blur-xl backdrop-saturate-150"
+    >
+      <div class="flex items-center justify-between gap-6 py-3">
+        <div
+          role="group"
+          aria-label="Filter the timeline by category"
+          class="flex min-w-0 items-center gap-2 overflow-x-auto no-scrollbar"
+        >
+          <.filter_button
+            filter="all"
+            label="All Events"
+            icon="hero-squares-2x2"
+            active={true}
+          />
+          <.filter_button filter="founding" label="Founding" icon="hero-sparkles" />
+          <.filter_button
+            filter="club leadership"
+            label="Leadership"
+            icon="hero-user-group"
+          />
+          <.filter_button
+            filter="cabin life"
+            label="Cabins"
+            icon="hero-home-modern"
+          />
+          <.filter_button
+            filter="anniversary"
+            label="Anniversaries"
+            icon="hero-cake"
+          />
+          <.filter_button
+            filter="organization"
+            label="Organization"
+            icon="hero-building-library"
+          />
         </div>
-        <div class="text-sm text-zinc-500 hidden sm:block">
-          <.icon name="hero-funnel" class="w-4 h-4 inline" /> Filter by category
-        </div>
-      </div>
 
-      <div
-        id="timeline-filters"
-        phx-hook="TimelineFilter"
-        class="flex flex-wrap gap-2 mt-4"
-      >
-        <.filter_button
-          filter="all"
-          label="All Events"
-          icon="hero-squares-2x2"
-          active={true}
-        />
-        <.filter_button filter="founding" label="Founding" icon="hero-sparkles" />
-        <.filter_button
-          filter="club leadership"
-          label="Leadership"
-          icon="hero-user-group"
-        />
-        <.filter_button filter="cabin life" label="Cabins" icon="hero-home-modern" />
-        <.filter_button filter="anniversary" label="Anniversaries" icon="hero-cake" />
+        <div class="hidden xl:flex shrink-0 items-center text-sm text-zinc-500">
+          <nav aria-label="Jump to a decade" class="flex items-center gap-0.5">
+            <a
+              :for={decade <- @decades}
+              href={"#decade-#{decade}"}
+              data-jump={"decade-#{decade}"}
+              data-decade-link={decade}
+              class="px-2 py-1 rounded-md font-medium transition-colors hover:bg-zinc-100 hover:text-zinc-900 aria-[current=true]:bg-zinc-900 aria-[current=true]:text-white"
+            >
+              {short_decade(decade)}
+            </a>
+            <a
+              href="#presidents"
+              data-jump="presidents"
+              class="ml-1 px-2 py-1 rounded-md font-medium text-blue-600 transition-colors hover:bg-blue-50 aria-[current=true]:bg-blue-600 aria-[current=true]:text-white"
+            >
+              Presidents
+            </a>
+          </nav>
+        </div>
       </div>
     </div>
     """
@@ -115,10 +175,12 @@ defmodule YscWeb.Components.History.HistoryComponents do
     ~H"""
     <button
       id={@filter_id}
+      type="button"
       data-filter={@filter}
       data-active={to_string(@active)}
+      aria-pressed={to_string(@active)}
       class={[
-        "px-4 py-2 rounded-md text-sm font-medium transition-colors duration-150",
+        "shrink-0 whitespace-nowrap px-3.5 py-1.5 rounded-md text-sm font-medium transition duration-150 active:scale-[0.97]",
         "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
         if(@active,
           do: "bg-blue-600 text-white border-blue-600",
@@ -136,23 +198,43 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
   def timeline(assigns) do
     ~H"""
-    <div id="history-timeline" class="post-render relative" phx-hook="GLightboxHook">
-      <div class="hidden md:block absolute left-8 top-0 bottom-0 w-px bg-zinc-200 z-0">
-      </div>
-      <div class="space-y-16 md:space-y-20">
-        {render_slot(@inner_block)}
-      </div>
+    <div
+      id="history-timeline"
+      class="post-render relative max-w-4xl mx-auto"
+      phx-hook="GLightboxHook"
+    >
+      {render_slot(@inner_block)}
     </div>
     """
   end
 
+  attr :id, :string, required: true
   attr :label, :string, required: true
+  slot :inner_block, required: true
 
   def timeline_decade(assigns) do
     ~H"""
-    <div class="relative py-4">
-      <div class="decade-watermark history-serif">{@label}</div>
-    </div>
+    <section
+      id={@id}
+      data-decade-section={@label}
+      aria-labelledby={"#{@id}-heading"}
+      class="mt-16 first:mt-0"
+    >
+      <h3
+        id={"#{@id}-heading"}
+        class="mb-6 pl-8 md:pl-0 text-5xl md:text-6xl text-zinc-300 history-serif type-display"
+      >
+        {@label}
+      </h3>
+      <div class="relative">
+        <div
+          aria-hidden="true"
+          class="absolute left-3 md:left-[9.5rem] top-0 bottom-0 w-px bg-zinc-200"
+        >
+        </div>
+        {render_slot(@inner_block)}
+      </div>
+    </section>
     """
   end
 
@@ -160,12 +242,13 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
   def timeline_event_from_data(assigns) do
     event = assigns.event
-    era = era_for_year(event.year)
 
     assigns =
       assigns
-      |> assign(:era, era)
-      |> assign(:tags_string, Enum.join(event.tags, ", "))
+      |> assign(:era, era_for_year(event.year))
+      |> assign(:featured, event.type in [:milestone, :featured])
+      |> assign(:compact, compact_event?(event))
+      |> assign(:single_image, length(event.images) == 1)
 
     ~H"""
     <.timeline_event
@@ -173,13 +256,13 @@ defmodule YscWeb.Components.History.HistoryComponents do
       title={@event.title}
       tags={@event.tags}
       extra_tags={@event.extra_tags}
-      tags_string={@tags_string}
-      type={@event.type}
+      featured={@featured}
+      compact={@compact}
     >
       <%= if @event.images != [] do %>
         <div class={[
-          "my-6",
-          if(length(@event.images) > 1, do: "grid md:grid-cols-2 gap-6", else: "")
+          "my-5",
+          if(@single_image, do: "", else: "grid sm:grid-cols-2 gap-4")
         ]}>
           <%= for image <- @event.images do %>
             <.archival_photo
@@ -188,28 +271,37 @@ defmodule YscWeb.Components.History.HistoryComponents do
               caption={image.caption}
               era={image.era || @era}
               aspect={image.aspect || "4/3"}
+              document={Map.get(image, :document, false)}
+              class={@single_image && single_photo_width(image)}
             />
           <% end %>
         </div>
       <% end %>
 
       <%= if @event.blockquote do %>
-        <blockquote class="border-l-2 border-zinc-300 pl-4 italic text-zinc-600 my-6 history-serif">
+        <blockquote class="border-l-2 border-zinc-300 pl-4 italic text-zinc-600 my-5 history-serif">
           <p>{@event.blockquote}</p>
         </blockquote>
       <% end %>
 
       <%= if @event.ledger do %>
-        <div class="ledger-callout my-6">
+        <div class="ledger-callout my-5">
           {raw(String.replace(@event.ledger, "\n", "<br />"))}
         </div>
       <% end %>
 
       <%= if @event.body_html do %>
-        <p class="text-zinc-600 leading-relaxed">{raw(@event.body_html)}</p>
+        <p class="text-zinc-600 leading-relaxed text-pretty">
+          {raw(@event.body_html)}
+        </p>
       <% else %>
         <%= if @event.body do %>
-          <p class="text-zinc-600 leading-relaxed">{@event.body}</p>
+          <p class={[
+            "text-zinc-600 leading-relaxed text-pretty",
+            @compact && "text-sm md:text-base"
+          ]}>
+            {@event.body}
+          </p>
         <% end %>
       <% end %>
     </.timeline_event>
@@ -220,60 +312,90 @@ defmodule YscWeb.Components.History.HistoryComponents do
   attr :title, :string, default: nil
   attr :tags, :list, default: []
   attr :extra_tags, :list, default: []
-  attr :tags_string, :string, default: ""
-  attr :type, :atom, default: :event
+
+  attr :featured, :boolean,
+    default: false,
+    doc: "Major milestone: larger node, serif heading and more breathing room"
+
+  attr :compact, :boolean,
+    default: false,
+    doc: "One-line note: condensed row with a small node"
 
   slot :inner_block, required: true
 
   def timeline_event(assigns) do
-    tags_string =
-      if assigns.tags_string == "" do
-        Enum.join(assigns.tags, ", ")
-      else
-        assigns.tags_string
-      end
-
-    assigns = assign(assigns, :tags_string, tags_string)
+    assigns = assign(assigns, :tags_string, Enum.join(assigns.tags, ", "))
 
     ~H"""
-    <div
+    <article
       data-timeline-item
       data-tags={@tags_string}
-      class="relative group md:pl-16"
+      class={[
+        "relative group pl-8 md:pl-0 md:grid md:grid-cols-[8rem_minmax(0,1fr)] md:gap-x-12",
+        cond do
+          @featured -> "py-6 md:py-8"
+          @compact -> "py-2"
+          true -> "py-4 md:py-5"
+        end
+      ]}
       phx-viewport-enter="[[&quot;transition-opacity&quot;, &quot;duration-1000&quot;, &quot;ease-out&quot;],[&quot;transition-transform&quot;, &quot;duration-1000&quot;, &quot;ease-out&quot;]]"
       phx-viewport-enter-start="opacity-0 translate-y-8"
       phx-viewport-enter-end="opacity-100 translate-y-0"
     >
-      <div class="hidden md:block absolute left-8 top-2 w-2 h-2 -translate-x-1/2 rounded-full bg-zinc-400 z-10">
-      </div>
+      <span
+        aria-hidden="true"
+        class={[
+          "absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full transition duration-200 motion-safe:group-hover:scale-125",
+          "left-3 md:left-[9.5rem]",
+          if(@featured,
+            do:
+              "top-[2.75rem] md:top-[3.25rem] w-3.5 h-3.5 bg-blue-600 ring-4 ring-blue-50",
+            else:
+              if(@compact,
+                do:
+                  "top-[1.125rem] w-1.5 h-1.5 bg-zinc-300 group-hover:bg-zinc-500",
+                else:
+                  "top-[2rem] md:top-[2.25rem] w-2 h-2 bg-zinc-400 group-hover:bg-zinc-600"
+              )
+          )
+        ]}
+      ></span>
 
-      <div class="mb-3 md:mb-4">
-        <span class="text-2xl md:text-3xl history-serif text-zinc-500 font-medium">
+      <div class="mb-2 md:mb-0 md:text-right">
+        <p class={[
+          "history-serif whitespace-nowrap",
+          cond do
+            @featured -> "text-3xl md:text-4xl leading-10 text-zinc-900"
+            @compact -> "text-lg leading-6 text-zinc-500"
+            true -> "text-xl md:text-2xl leading-8 text-zinc-500"
+          end
+        ]}>
           {@year}
-        </span>
-      </div>
-
-      <div class="md:pl-4">
+        </p>
         <div
           :if={@tags != [] or @extra_tags != []}
-          class="flex flex-wrap gap-2 mb-3"
+          class="mt-2 flex flex-wrap gap-1.5 md:flex-col md:items-end"
         >
-          <%= for tag <- @extra_tags do %>
-            <.timeline_tag label={tag} />
-          <% end %>
-          <%= for tag <- @tags do %>
-            <.timeline_tag label={tag} />
-          <% end %>
+          <span
+            :for={tag <- @extra_tags}
+            class="px-2 py-0.5 text-xs rounded-sm border border-amber-200/80 bg-amber-50/70 text-amber-900 type-eyebrow"
+          >
+            {format_tag(tag)}
+          </span>
+          <.timeline_tag :for={tag <- @tags} label={tag} />
         </div>
+      </div>
 
+      <div class="min-w-0 max-w-2xl">
         <h3
           :if={@title}
           class={[
-            "text-zinc-900 mb-4 type-subhead",
-            if(@type in [:milestone, :featured],
-              do: "text-2xl md:text-3xl font-medium history-serif",
-              else: "text-xl md:text-2xl font-medium"
-            )
+            "text-zinc-900 type-subhead text-pretty",
+            cond do
+              @featured -> "mb-4 text-2xl md:text-3xl history-serif"
+              @compact -> "mb-1 text-base md:text-lg"
+              true -> "mb-3 text-xl md:text-2xl"
+            end
           ]}
         >
           {@title}
@@ -281,7 +403,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
         {render_slot(@inner_block)}
       </div>
-    </div>
+    </article>
     """
   end
 
@@ -289,9 +411,14 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
   def timeline_tag(assigns) do
     ~H"""
-    <span class="px-2.5 py-0.5 text-xs text-zinc-500 border border-zinc-300 rounded-sm type-eyebrow">
+    <button
+      type="button"
+      data-filter-trigger={@label}
+      aria-label={"Show only #{format_tag(@label)} events"}
+      class="px-2 py-0.5 text-xs text-zinc-500 border border-zinc-300 rounded-sm type-eyebrow cursor-pointer transition-colors hover:border-blue-400 hover:text-blue-700 active:scale-[0.97] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600"
+    >
       {format_tag(@label)}
-    </span>
+    </button>
     """
   end
 
@@ -301,15 +428,38 @@ defmodule YscWeb.Components.History.HistoryComponents do
   attr :era, :string, default: nil
   attr :aspect, :string, default: "4/3"
 
+  attr :document, :boolean,
+    default: false,
+    doc:
+      "Scanned document: shown at its natural proportions on a paper mat so no text is cropped"
+
+  attr :class, :any, default: nil
+
   def archival_photo(assigns) do
     ~H"""
-    <figure class={["archival-photo", @era && "era-#{@era}"]}>
+    <%!-- The GLightboxHook wraps the <a> in its own <figure>, so this wrapper stays a <div>. --%>
+    <div class={["archival-photo group/photo", @era && "era-#{@era}", @class]}>
       <%!-- img must be a direct child of <a>; GLightboxHook moves caption to a single figcaption --%>
-      <a href={@src} class="block cursor-zoom-in">
+      <a
+        href={@src}
+        class={[
+          "archival-photo-link block relative cursor-zoom-in overflow-hidden rounded-sm",
+          @document && "bg-stone-100/60 border border-zinc-200 p-2"
+        ]}
+      >
         <img
           src={@src}
           alt={@alt}
-          class={["w-full object-cover rounded-sm", aspect_class(@aspect)]}
+          class={[
+            "w-full rounded-sm",
+            if(@document,
+              do: "h-auto object-contain",
+              else: [
+                "object-cover motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover/photo:scale-[1.02]",
+                aspect_class(@aspect)
+              ]
+            )
+          ]}
           loading="lazy"
           decoding="async"
         />
@@ -317,16 +467,23 @@ defmodule YscWeb.Components.History.HistoryComponents do
           {@caption}
         </span>
       </a>
-    </figure>
+    </div>
     """
   end
 
   attr :presidents, :list, required: true
 
   def presidents_section(assigns) do
+    {entries, _seen} =
+      Enum.map_reduce(assigns.presidents, MapSet.new(), fn {years, name},
+                                                           seen ->
+        {%{years: years, name: name, returning?: MapSet.member?(seen, name)},
+         MapSet.put(seen, name)}
+      end)
+
     presidents_by_decade =
-      assigns.presidents
-      |> Enum.group_by(fn {years, _} ->
+      entries
+      |> Enum.group_by(fn %{years: years} ->
         years
         |> String.split("-")
         |> List.first()
@@ -338,58 +495,75 @@ defmodule YscWeb.Components.History.HistoryComponents do
     assigns = assign(assigns, :presidents_by_decade, presidents_by_decade)
 
     ~H"""
-    <div class="mb-16 mt-20">
-      <div class="prose prose-zinc prose-a:text-blue-600 mb-8 scroll-mt-24">
-        <h2 id="presidents">YSC Presidents</h2>
+    <section
+      id="presidents"
+      aria-labelledby="presidents-heading"
+      class="mb-16 mt-20"
+    >
+      <div class="prose prose-zinc prose-a:text-blue-600 mb-8">
+        <h2 id="presidents-heading">YSC Presidents</h2>
       </div>
 
       <div class="not-prose">
         <%= for {decade, presidents} <- @presidents_by_decade do %>
           <div
-            class="mb-8 scroll-mt-24"
+            class="mb-8"
             id={"presidents-#{String.replace(decade, "s", "")}"}
           >
-            <h3 class="text-lg font-medium text-zinc-600 mb-4 history-serif">
+            <h3 class="text-lg text-zinc-600 mb-4 history-serif type-subhead">
               {decade}
             </h3>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              <%= for {years, president} <- presidents do %>
-                <.president_card years={years} name={president} />
+              <%= for entry <- presidents do %>
+                <.president_card
+                  years={entry.years}
+                  name={entry.name}
+                  returning={entry.returning?}
+                />
               <% end %>
               <.next_president_invite_card :if={decade == "2020s"} />
             </div>
           </div>
         <% end %>
       </div>
-    </div>
+    </section>
     """
   end
 
   attr :years, :string, required: true
   attr :name, :string, required: true
 
+  attr :returning, :boolean,
+    default: false,
+    doc:
+      "True when this person has already appeared as president earlier in the list"
+
   def president_card(assigns) do
     assigns =
       assigns
-      |> assign(:badge, president_badge(assigns.years, assigns.name))
-      |> assign(:icon, president_icon(assigns.years, assigns.name))
+      |> assign(
+        :badge,
+        president_badge(assigns.years, assigns.name, assigns.returning)
+      )
+      |> assign(:names, String.split(assigns.name, ", "))
 
     ~H"""
-    <div class="p-4 rounded-xl border border-zinc-200 bg-white flex flex-col items-center text-center relative">
-      <div :if={@icon} class="absolute top-2 right-2">
-        <.icon name={@icon} class="w-4 h-4 text-zinc-500" />
-      </div>
+    <div class="p-4 rounded-xl border border-zinc-200 bg-white flex flex-col h-full">
       <span class="text-xs text-zinc-500 mb-2 type-eyebrow">
         {@years}
       </span>
-      <h4 class="text-zinc-900 text-sm mb-1 type-subhead">
-        {@name}
+      <h4 class="text-zinc-900 text-sm type-subhead">
+        <span :for={name <- @names} class="block">{name}</span>
       </h4>
       <span
         :if={@badge}
-        class="text-xs px-2 py-0.5 rounded-sm border border-zinc-300 text-zinc-500 mt-1"
+        class={[
+          "mt-3 self-start inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-sm border",
+          badge_tone_class(elem(@badge, 2))
+        ]}
       >
-        {@badge}
+        <.icon name={elem(@badge, 1)} class="w-3.5 h-3.5" />
+        {elem(@badge, 0)}
       </span>
     </div>
     """
@@ -397,7 +571,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
 
   def next_president_invite_card(assigns) do
     ~H"""
-    <div class="p-4 rounded-xl border-2 border-dashed border-zinc-300 bg-stone-50 flex flex-col items-center text-center justify-center min-h-32">
+    <div class="p-4 rounded-xl border-2 border-dashed border-zinc-300 bg-stone-50 flex flex-col items-start justify-center min-h-32">
       <.icon name="hero-user-plus" class="w-5 h-5 text-zinc-500 mb-2" />
       <span class="text-xs text-zinc-500 mb-2 type-eyebrow">
         The Next Chapter
@@ -410,7 +584,7 @@ defmodule YscWeb.Components.History.HistoryComponents do
       </p>
       <.link
         navigate={
-          ~p"/contact?subject=Board%20of%20Directors&message=#{URI.encode("Hi, I'm interested in learning more about serving on the YSC Board of Directors—including the president role. I'd love to hear how I can get involved.")}"
+          ~p"/contact?#{[subject: "Board of Directors", message: "Hi, I'm interested in learning more about serving on the YSC Board of Directors—including the president role. I'd love to hear how I can get involved."]}"
         }
         class="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
       >
@@ -474,6 +648,21 @@ defmodule YscWeb.Components.History.HistoryComponents do
   defp aspect_class("4/3"), do: "aspect-4/3"
   defp aspect_class(_), do: "aspect-4/3"
 
+  # A lone portrait scan or document would otherwise stretch to the full column.
+  defp single_photo_width(%{aspect: "3/4"}), do: "max-w-sm"
+  defp single_photo_width(%{document: true}), do: "max-w-md"
+  defp single_photo_width(_image), do: nil
+
+  # Short, picture-less entries (a new dock, a bathroom remodel) get a condensed row.
+  defp compact_event?(%{type: :event} = event) do
+    event.images == [] and is_nil(event.ledger) and is_nil(event.blockquote) and
+      String.length(event.body || "") <= 120
+  end
+
+  defp compact_event?(_event), do: false
+
+  defp short_decade(decade), do: "’" <> String.slice(decade, 2, 2) <> "s"
+
   defp era_for_year(year) do
     cond do
       String.starts_with?(year, "195") -> "1950s"
@@ -488,27 +677,37 @@ defmodule YscWeb.Components.History.HistoryComponents do
     end
   end
 
-  defp president_badge(years, name) do
+  # {label, icon, tone}
+  defp president_badge(years, name, returning?) do
     cond do
-      founder?(name) -> "Founder"
-      longest_serving?(name) -> "Longest Serving"
-      youngest?(name) -> "Youngest"
-      clear_lake_purchase?(years, name) -> "Purchased Clear Lake"
-      tahoe_purchase?(years) -> "Purchased Tahoe"
-      true -> nil
+      founder?(name) and not returning? ->
+        {"Founder", "hero-star", :archival}
+
+      longest_serving?(years, name) ->
+        {"Longest Serving", "hero-trophy", :archival}
+
+      youngest?(name) ->
+        {"Youngest", "hero-sparkles", :archival}
+
+      clear_lake_purchase?(years, name) ->
+        {"Purchased Clear Lake", "hero-home", :archival}
+
+      tahoe_purchase?(years) ->
+        {"Purchased Tahoe", "hero-home-modern", :archival}
+
+      returning? ->
+        {"Returning", "hero-arrow-path", :returning}
+
+      true ->
+        nil
     end
   end
 
-  defp president_icon(years, name) do
-    cond do
-      founder?(name) -> "hero-star"
-      longest_serving?(name) -> "hero-trophy"
-      youngest?(name) -> "hero-sparkles"
-      clear_lake_purchase?(years, name) -> "hero-home"
-      tahoe_purchase?(years) -> "hero-home-modern"
-      true -> nil
-    end
-  end
+  defp badge_tone_class(:archival),
+    do: "bg-amber-50/70 text-amber-900 border-amber-200/80"
+
+  defp badge_tone_class(:returning),
+    do: "bg-blue-50 text-blue-800 border-blue-200"
 
   defp founder?(name) do
     String.contains?(name, "Arnold Rolkert") or
@@ -516,7 +715,10 @@ defmodule YscWeb.Components.History.HistoryComponents do
       String.contains?(name, "Carlo Hojsgaard")
   end
 
-  defp longest_serving?(name), do: String.contains?(name, "Peter Nordström")
+  defp longest_serving?(years, name) do
+    String.contains?(name, "Peter Nordström") and years == "2014-2019"
+  end
+
   defp youngest?(name), do: String.contains?(name, "Andrew Vik")
 
   defp clear_lake_purchase?(years, name) do
