@@ -62,7 +62,7 @@ defmodule YscWeb.PageController do
 
     conn
     |> assign(:past_presidents, past_presidents)
-    |> assign(:timeline_events, Ysc.History.Timeline.events())
+    |> assign(:timeline_decades, Ysc.History.Timeline.decades())
     |> assign(
       :years_since_founding,
       Ysc.History.Timeline.years_since_founding()

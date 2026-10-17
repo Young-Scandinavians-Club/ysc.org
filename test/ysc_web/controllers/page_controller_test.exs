@@ -15,6 +15,70 @@ defmodule YscWeb.PageControllerTest do
     end
   end
 
+  describe "GET /history" do
+    test "groups the timeline by decade with matching jump links", %{conn: conn} do
+      html = conn |> get(~p"/history") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      for decade <- ~w(1950s 1960s 1970s 1980s 1990s 2000s 2010s 2020s) do
+        assert Enum.count(LazyHTML.query(document, "section#decade-#{decade}")) ==
+                 1
+
+        assert Enum.count(
+                 LazyHTML.query(document, "a[href='#decade-#{decade}']")
+               ) == 1
+      end
+
+      assert Enum.count(LazyHTML.query(document, "section#presidents")) == 1
+
+      assert Enum.count(
+               LazyHTML.query(document, "#timeline-filter-organization")
+             ) == 1
+    end
+
+    test "each decade holds only its own events", %{conn: conn} do
+      html = conn |> get(~p"/history") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      count = fn decade ->
+        document
+        |> LazyHTML.query("section#decade-#{decade} [data-timeline-item]")
+        |> Enum.count()
+      end
+
+      assert count.("1970s") == 5
+      assert count.("1980s") == 6
+    end
+
+    test "invite card links to contact with a single-encoded message", %{
+      conn: conn
+    } do
+      html = conn |> get(~p"/history") |> html_response(200)
+      refute html =~ "%2520"
+      refute html =~ "%2527"
+
+      document = LazyHTML.from_fragment(html)
+
+      [href] =
+        document
+        |> LazyHTML.query("a[href^='/contact?']")
+        |> LazyHTML.attribute("href")
+
+      query = href |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+
+      assert query["subject"] == "Board of Directors"
+      assert query["message"] =~ "Hi, I'm interested"
+    end
+
+    test "archival photos do not nest figures", %{conn: conn} do
+      html = conn |> get(~p"/history") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      assert Enum.empty?(LazyHTML.query(document, "figure.archival-photo"))
+      refute Enum.empty?(LazyHTML.query(document, "div.archival-photo"))
+    end
+  end
+
   describe "GET /board" do
     test "embeds the public board meeting calendar", %{conn: conn} do
       conn = get(conn, ~p"/board")
