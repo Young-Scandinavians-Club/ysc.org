@@ -44,18 +44,19 @@ jobs:
 
       - name: Generate and publish release notes
         env:
-          GITHUB_REF_NAME: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: bash etc/scripts/update_github_release_notes.sh
+        run: bash etc/scripts/update_github_release_notes.sh "$RELEASE_TAG"
 
       - name: Send committee email via Resend
         if: ${{ inputs.send_email }}
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_REF_NAME: ${{ inputs.tag }}
-          GITHUB_SHA: ${{ steps.tag.outputs.sha }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_SHA: ${{ steps.tag.outputs.sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-        run: bash etc/scripts/notify_release_committee_resend.sh
+        # The runner resets GITHUB_REF_NAME / GITHUB_SHA to the dispatch branch, so set them inline.
+        run: GITHUB_REF_NAME="$RELEASE_TAG" GITHUB_SHA="$RELEASE_SHA" bash etc/scripts/notify_release_committee_resend.sh
