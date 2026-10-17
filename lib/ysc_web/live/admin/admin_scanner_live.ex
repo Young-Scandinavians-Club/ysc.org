@@ -315,36 +315,36 @@ defmodule YscWeb.AdminScannerLive do
               <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                   <tr>
-                    <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                    <.admin_th density={:medium}>
                       Name
-                    </th>
-                    <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:medium}>
                       Email
-                    </th>
-                    <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:medium}>
                       Time
-                    </th>
-                    <th
+                    </.admin_th>
+                    <.admin_th
                       :if={@detail_session.type == :membership}
-                      class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
+                      density={:medium}
                     >
                       Status
-                    </th>
-                    <th
+                    </.admin_th>
+                    <.admin_th
                       :if={@detail_session.type == :membership}
-                      class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
+                      density={:medium}
                     >
                       Type
-                    </th>
-                    <th
+                    </.admin_th>
+                    <.admin_th
                       :if={@detail_session.type == :event}
-                      class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
+                      density={:medium}
                     >
                       Check-in
-                    </th>
-                    <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:medium}>
                       Result
-                    </th>
+                    </.admin_th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-zinc-200">

@@ -1390,18 +1390,18 @@ defmodule YscWeb.AdminMoneyLive do
               <table class="min-w-full divide-y divide-zinc-200">
                 <thead class="bg-zinc-50">
                   <tr>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    <.admin_th density={:compact}>
                       User
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Purpose
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Submitted
-                    </th>
-                    <th class="px-4 py-2 text-right text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th align={:right} density={:compact}>
                       Actions
-                    </th>
+                    </.admin_th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-100">
@@ -1509,331 +1509,322 @@ defmodule YscWeb.AdminMoneyLive do
           />
         </div>
 
-        <div
-          id="recent-payments-section"
-          class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8"
-        >
-          <div class="px-6 py-4 border-b border-zinc-100">
-            <h2 class="text-lg text-zinc-900 type-subhead">Recent Payments</h2>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-zinc-200">
-              <thead class="bg-zinc-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Reference
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    User
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Payment Type
-                  </th>
-                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
-                    Amount
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Status
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Date
-                  </th>
-                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody
-                :if={@loading_money_data || !@tabs_loaded.overview}
-                id="recent-payments-loading"
-                role="status"
-                aria-live="polite"
-              >
-                <.table_rows_skeleton
-                  rows={5}
-                  colspan={7}
-                  label="Loading recent payments…"
-                />
-              </tbody>
-              <tbody
-                :if={
-                  @tabs_loaded.overview && !@loading_money_data &&
-                    @payments_empty?
-                }
-                id="recent-payments-empty"
-              >
-                <tr>
-                  <td
-                    colspan="7"
-                    class="px-6 py-8 text-center text-sm text-zinc-500"
-                  >
-                    No payments found for the selected date range.
-                  </td>
-                </tr>
-              </tbody>
-              <tbody
-                id="recent-payments"
-                phx-update="stream"
-                class={[
-                  "bg-white divide-y divide-zinc-200",
-                  (!@tabs_loaded.overview || @loading_money_data ||
-                     @payments_empty?) && "hidden"
-                ]}
-              >
-                <tr
-                  :for={{id, payment} <- @streams.payments}
-                  id={id}
-                  phx-click={
-                    if(payment.payment_type_info.type == "Payout",
-                      do: "show_payout_modal",
-                      else: "show_payment_modal"
-                    )
-                  }
-                  phx-value-payment_id={payment.id}
-                  class="cursor-pointer hover:bg-zinc-50 transition-colors"
+        <.admin_table_card id="recent-payments-section" title="Recent Payments">
+          <table class="min-w-full divide-y divide-zinc-200">
+            <thead class="bg-zinc-50">
+              <tr>
+                <.admin_th>
+                  Reference
+                </.admin_th>
+                <.admin_th>
+                  User
+                </.admin_th>
+                <.admin_th>
+                  Payment Type
+                </.admin_th>
+                <.admin_th align={:right}>
+                  Amount
+                </.admin_th>
+                <.admin_th>
+                  Status
+                </.admin_th>
+                <.admin_th>
+                  Date
+                </.admin_th>
+                <.admin_th align={:right}>
+                  Actions
+                </.admin_th>
+              </tr>
+            </thead>
+            <tbody
+              :if={@loading_money_data || !@tabs_loaded.overview}
+              id="recent-payments-loading"
+              role="status"
+              aria-live="polite"
+            >
+              <.table_rows_skeleton
+                rows={5}
+                colspan={7}
+                label="Loading recent payments…"
+              />
+            </tbody>
+            <tbody
+              :if={
+                @tabs_loaded.overview && !@loading_money_data &&
+                  @payments_empty?
+              }
+              id="recent-payments-empty"
+            >
+              <tr>
+                <td
+                  colspan="7"
+                  class="px-6 py-8 text-center text-sm text-zinc-500"
                 >
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
-                    {payment.reference_id}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    <div class="flex flex-col">
-                      <span class="font-medium text-zinc-900">
-                        {if Ecto.assoc_loaded?(payment.user) && payment.user do
-                          get_user_display_name(payment.user)
-                        else
-                          "System Transaction"
-                        end}
-                      </span>
-                      <span class="text-xs text-zinc-500">
-                        {if Ecto.assoc_loaded?(payment.user) && payment.user do
-                          payment.user.email
-                        else
-                          "System Transaction"
-                        end}
-                      </span>
-                    </div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    <div class="flex flex-col">
-                      <span class={"font-medium #{get_payment_type_color(payment.payment_type_info.type)}"}>
-                        {payment.payment_type_info.type}
-                      </span>
-                      <span class="text-xs text-zinc-500">
-                        {payment.payment_type_info.details}
-                      </span>
-                    </div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900 text-right tabular-nums">
-                    {Money.to_string!(payment.amount)}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <.badge type={
-                      AdminBadgeHelpers.ledger_payment_status_badge_type(
-                        payment.status
-                      )
-                    }>
-                      {payment.status}
-                    </.badge>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    {format_datetime(
-                      payment.payment_date,
-                      @timezone,
-                      "%Y-%m-%d %H:%M"
-                    )}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
-                    <.row_actions_dropdown
-                      id={"payment-actions-#{payment.id}"}
-                      label="Payment actions"
+                  No payments found for the selected date range.
+                </td>
+              </tr>
+            </tbody>
+            <tbody
+              id="recent-payments"
+              phx-update="stream"
+              class={[
+                "bg-white divide-y divide-zinc-200",
+                (!@tabs_loaded.overview || @loading_money_data ||
+                   @payments_empty?) && "hidden"
+              ]}
+            >
+              <tr
+                :for={{id, payment} <- @streams.payments}
+                id={id}
+                phx-click={
+                  if(payment.payment_type_info.type == "Payout",
+                    do: "show_payout_modal",
+                    else: "show_payment_modal"
+                  )
+                }
+                phx-value-payment_id={payment.id}
+                class="cursor-pointer hover:bg-zinc-50 transition-colors"
+              >
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
+                  {payment.reference_id}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  <div class="flex flex-col">
+                    <span class="font-medium text-zinc-900">
+                      {if Ecto.assoc_loaded?(payment.user) && payment.user do
+                        get_user_display_name(payment.user)
+                      else
+                        "System Transaction"
+                      end}
+                    </span>
+                    <span class="text-xs text-zinc-500">
+                      {if Ecto.assoc_loaded?(payment.user) && payment.user do
+                        payment.user.email
+                      else
+                        "System Transaction"
+                      end}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  <div class="flex flex-col">
+                    <span class={"font-medium #{get_payment_type_color(payment.payment_type_info.type)}"}>
+                      {payment.payment_type_info.type}
+                    </span>
+                    <span class="text-xs text-zinc-500">
+                      {payment.payment_type_info.details}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900 text-right tabular-nums">
+                  {Money.to_string!(payment.amount)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <.badge type={
+                    AdminBadgeHelpers.ledger_payment_status_badge_type(
+                      payment.status
+                    )
+                  }>
+                    {payment.status}
+                  </.badge>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  {format_datetime(
+                    payment.payment_date,
+                    @timezone,
+                    "%Y-%m-%d %H:%M"
+                  )}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                  <.row_actions_dropdown
+                    id={"payment-actions-#{payment.id}"}
+                    label="Payment actions"
+                  >
+                    <.dropdown_menu_item
+                      :if={payment.payment_type_info.type != "Payout"}
+                      id={"payment-view-#{payment.id}"}
+                      icon="hero-eye"
+                      phx-click="show_payment_modal"
+                      phx-value-payment_id={payment.id}
                     >
-                      <.dropdown_menu_item
-                        :if={payment.payment_type_info.type != "Payout"}
-                        id={"payment-view-#{payment.id}"}
-                        icon="hero-eye"
-                        phx-click="show_payment_modal"
-                        phx-value-payment_id={payment.id}
-                      >
-                        View
-                      </.dropdown_menu_item>
-                      <.dropdown_menu_item
-                        :if={payment.payment_type_info.type != "Payout"}
-                        id={"payment-refund-#{payment.id}"}
-                        icon="hero-arrow-uturn-left"
-                        tone={:danger}
-                        phx-click="show_refund_modal"
-                        phx-value-payment_id={payment.id}
-                        disabled={payment.status == :refunded}
-                      >
-                        Refund
-                      </.dropdown_menu_item>
-                      <.dropdown_menu_item
-                        :if={payment.payment_type_info.type == "Payout"}
-                        id={"payment-payout-#{payment.id}"}
-                        icon="hero-banknotes"
-                        phx-click="show_payout_modal"
-                        phx-value-payment_id={payment.id}
-                      >
-                        Payout Details
-                      </.dropdown_menu_item>
-                    </.row_actions_dropdown>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <.admin_prev_next_pagination
-            page={@payments_page}
-            entry_count={@payments_count}
-            prev_event="payments_prev-page"
-            next_event="payments_next-page"
-            prev_disabled?={@payments_page == 1}
-            next_disabled?={@payments_end?}
-          />
-        </div>
+                      View
+                    </.dropdown_menu_item>
+                    <.dropdown_menu_item
+                      :if={payment.payment_type_info.type != "Payout"}
+                      id={"payment-refund-#{payment.id}"}
+                      icon="hero-arrow-uturn-left"
+                      tone={:danger}
+                      phx-click="show_refund_modal"
+                      phx-value-payment_id={payment.id}
+                      disabled={payment.status == :refunded}
+                    >
+                      Refund
+                    </.dropdown_menu_item>
+                    <.dropdown_menu_item
+                      :if={payment.payment_type_info.type == "Payout"}
+                      id={"payment-payout-#{payment.id}"}
+                      icon="hero-banknotes"
+                      phx-click="show_payout_modal"
+                      phx-value-payment_id={payment.id}
+                    >
+                      Payout Details
+                    </.dropdown_menu_item>
+                  </.row_actions_dropdown>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <:footer>
+            <.admin_prev_next_pagination
+              page={@payments_page}
+              entry_count={@payments_count}
+              prev_event="payments_prev-page"
+              next_event="payments_next-page"
+              prev_disabled?={@payments_page == 1}
+              next_disabled?={@payments_end?}
+            />
+          </:footer>
+        </.admin_table_card>
       </div>
 
       <div :if={@active_tab == :expenses} id="money-expenses-tab">
-        <div class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8">
-          <div class="px-6 py-4 border-b border-zinc-100">
-            <h2 class="text-lg text-zinc-900 type-subhead">Expense Reports</h2>
-            <p class="text-sm text-zinc-500 mt-1">
-              All reports in the selected date range
-            </p>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-zinc-200">
-              <thead class="bg-zinc-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    ID
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    User
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Purpose
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Status
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    <span class="block max-w-28 whitespace-normal leading-tight">
-                      QuickBooks Sync Status
-                    </span>
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    <span class="block max-w-28 whitespace-normal leading-tight">
-                      QuickBooks Bill ID
-                    </span>
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Submitted At
-                  </th>
-                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-zinc-200">
-                <tr
-                  :for={expense_report <- @expense_reports}
-                  id={"expense-report-row-#{expense_report.id}"}
-                  phx-click="show_expense_report_status_modal"
-                  phx-value-expense_report_id={expense_report.id}
-                  class="cursor-pointer hover:bg-zinc-50 transition-colors"
-                >
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
-                    {String.slice(to_string(expense_report.id), 0..12)}...
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    <%= if Ecto.assoc_loaded?(expense_report.user) && expense_report.user do %>
-                      <div class="flex flex-col">
-                        <span class="font-medium text-zinc-900">
-                          {get_user_display_name(expense_report.user)}
-                        </span>
-                        <span class="text-xs text-zinc-500">
-                          {expense_report.user.email}
-                        </span>
-                      </div>
-                    <% else %>
-                      <span class="text-zinc-400">Unknown</span>
-                    <% end %>
-                  </td>
-                  <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
-                    <div class="truncate" title={expense_report.purpose}>
-                      {expense_report.purpose}
-                    </div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <.badge type={
-                      AdminBadgeHelpers.expense_report_status_badge_type(
-                        expense_report.status
-                      )
-                    }>
-                      {String.capitalize(expense_report.status || "unknown")}
-                    </.badge>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <.admin_quickbooks_sync_status
-                      status={expense_report.quickbooks_sync_status}
-                      error={expense_report.quickbooks_sync_error}
-                      default_label="unknown"
-                    />
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                    <%= if expense_report.quickbooks_bill_id do %>
-                      <span class="font-mono text-xs">
-                        {String.slice(expense_report.quickbooks_bill_id, 0..20)}...
+        <.admin_table_card
+          title="Expense Reports"
+          subtitle="All reports in the selected date range"
+        >
+          <table class="min-w-full divide-y divide-zinc-200">
+            <thead class="bg-zinc-50">
+              <tr>
+                <.admin_th>
+                  ID
+                </.admin_th>
+                <.admin_th>
+                  User
+                </.admin_th>
+                <.admin_th>
+                  Purpose
+                </.admin_th>
+                <.admin_th>
+                  Status
+                </.admin_th>
+                <.admin_th>
+                  <span class="block max-w-28 whitespace-normal leading-tight">
+                    QuickBooks Sync Status
+                  </span>
+                </.admin_th>
+                <.admin_th>
+                  <span class="block max-w-28 whitespace-normal leading-tight">
+                    QuickBooks Bill ID
+                  </span>
+                </.admin_th>
+                <.admin_th>
+                  Submitted At
+                </.admin_th>
+                <.admin_th align={:right}>
+                  Actions
+                </.admin_th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-zinc-200">
+              <tr
+                :for={expense_report <- @expense_reports}
+                id={"expense-report-row-#{expense_report.id}"}
+                phx-click="show_expense_report_status_modal"
+                phx-value-expense_report_id={expense_report.id}
+                class="cursor-pointer hover:bg-zinc-50 transition-colors"
+              >
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
+                  {String.slice(to_string(expense_report.id), 0..12)}...
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  <%= if Ecto.assoc_loaded?(expense_report.user) && expense_report.user do %>
+                    <div class="flex flex-col">
+                      <span class="font-medium text-zinc-900">
+                        {get_user_display_name(expense_report.user)}
                       </span>
-                    <% else %>
-                      <span class="text-zinc-400">—</span>
-                    <% end %>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    {format_datetime(
-                      expense_report.inserted_at,
-                      @timezone,
-                      "%Y-%m-%d %H:%M"
-                    )}
-                  </td>
-                  <td
-                    id={"expense-report-actions-stop-#{expense_report.id}"}
-                    phx-hook="StopClick"
-                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
+                      <span class="text-xs text-zinc-500">
+                        {expense_report.user.email}
+                      </span>
+                    </div>
+                  <% else %>
+                    <span class="text-zinc-400">Unknown</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
+                  <div class="truncate" title={expense_report.purpose}>
+                    {expense_report.purpose}
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <.badge type={
+                    AdminBadgeHelpers.expense_report_status_badge_type(
+                      expense_report.status
+                    )
+                  }>
+                    {String.capitalize(expense_report.status || "unknown")}
+                  </.badge>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <.admin_quickbooks_sync_status
+                    status={expense_report.quickbooks_sync_status}
+                    error={expense_report.quickbooks_sync_error}
+                    default_label="unknown"
+                  />
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                  <%= if expense_report.quickbooks_bill_id do %>
+                    <span class="font-mono text-xs">
+                      {String.slice(expense_report.quickbooks_bill_id, 0..20)}...
+                    </span>
+                  <% else %>
+                    <span class="text-zinc-400">—</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  {format_datetime(
+                    expense_report.inserted_at,
+                    @timezone,
+                    "%Y-%m-%d %H:%M"
+                  )}
+                </td>
+                <td
+                  id={"expense-report-actions-stop-#{expense_report.id}"}
+                  phx-hook="StopClick"
+                  class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
+                >
+                  <button
+                    type="button"
+                    id={"expense-report-view-#{expense_report.id}"}
+                    phx-click="show_expense_report_status_modal"
+                    phx-value-expense_report_id={expense_report.id}
+                    class="text-zinc-400 hover:text-blue-600 transition-colors"
+                    aria-label="View expense report"
                   >
-                    <button
-                      type="button"
-                      id={"expense-report-view-#{expense_report.id}"}
-                      phx-click="show_expense_report_status_modal"
-                      phx-value-expense_report_id={expense_report.id}
-                      class="text-zinc-400 hover:text-blue-600 transition-colors"
-                      aria-label="View expense report"
-                    >
-                      <.icon name="hero-eye" class="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-                <tr :if={Enum.empty?(@expense_reports)}>
-                  <td
-                    colspan="8"
-                    class="px-6 py-4 text-center text-sm text-zinc-500"
-                  >
-                    No expense reports found for the selected date range.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <.admin_prev_next_pagination
-            page={@expense_reports_page}
-            entry_count={length(@expense_reports)}
-            prev_event="expense_reports_prev-page"
-            next_event="expense_reports_next-page"
-            prev_disabled?={@expense_reports_page == 1}
-            next_disabled?={@expense_reports_end?}
-          />
-        </div>
+                    <.icon name="hero-eye" class="w-5 h-5" />
+                  </button>
+                </td>
+              </tr>
+              <tr :if={Enum.empty?(@expense_reports)}>
+                <td
+                  colspan="8"
+                  class="px-6 py-4 text-center text-sm text-zinc-500"
+                >
+                  No expense reports found for the selected date range.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <:footer>
+            <.admin_prev_next_pagination
+              page={@expense_reports_page}
+              entry_count={length(@expense_reports)}
+              prev_event="expense_reports_prev-page"
+              next_event="expense_reports_next-page"
+              prev_disabled?={@expense_reports_page == 1}
+              next_disabled?={@expense_reports_end?}
+            />
+          </:footer>
+        </.admin_table_card>
       </div>
 
       <div :if={@active_tab == :ledger} id="money-ledger-tab">
@@ -1893,220 +1884,212 @@ defmodule YscWeb.AdminMoneyLive do
           </div>
         </div>
 
-        <div class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8">
-          <div class="px-6 py-4 border-b border-zinc-100">
-            <h2 class="text-lg text-zinc-900 type-subhead">Ledger Entries</h2>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-zinc-200">
-              <thead class="bg-zinc-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Date
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Account
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Description
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Debit/Credit
-                  </th>
-                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
-                    Amount
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Payment
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Refund
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Entity
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={entry <- @ledger_entries} id={"ledger-entry-#{entry.id}"}>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    {format_datetime(
-                      entry.inserted_at,
-                      @timezone,
-                      "%Y-%m-%d %H:%M"
-                    )}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    <div class="flex flex-col">
-                      <span class="font-medium text-zinc-900">
-                        {entry.account.name}
-                      </span>
-                      <span class="text-xs text-zinc-500">
-                        {String.capitalize(to_string(entry.account.account_type))}
-                      </span>
-                    </div>
-                  </td>
-                  <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
-                    <div class="truncate" title={entry.description}>
-                      {entry.description}
-                    </div>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_debit_credit_badge_color(entry.debit_credit)}"}>
-                      {String.capitalize(to_string(entry.debit_credit))}
+        <.admin_table_card title="Ledger Entries">
+          <table class="min-w-full divide-y divide-zinc-200">
+            <thead class="bg-zinc-50">
+              <tr>
+                <.admin_th>
+                  Date
+                </.admin_th>
+                <.admin_th>
+                  Account
+                </.admin_th>
+                <.admin_th>
+                  Description
+                </.admin_th>
+                <.admin_th>
+                  Debit/Credit
+                </.admin_th>
+                <.admin_th align={:right}>
+                  Amount
+                </.admin_th>
+                <.admin_th>
+                  Payment
+                </.admin_th>
+                <.admin_th>
+                  Refund
+                </.admin_th>
+                <.admin_th>
+                  Entity
+                </.admin_th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-zinc-200">
+              <tr :for={entry <- @ledger_entries} id={"ledger-entry-#{entry.id}"}>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  {format_datetime(
+                    entry.inserted_at,
+                    @timezone,
+                    "%Y-%m-%d %H:%M"
+                  )}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  <div class="flex flex-col">
+                    <span class="font-medium text-zinc-900">
+                      {entry.account.name}
                     </span>
-                  </td>
-                  <td class={"px-6 py-4 whitespace-nowrap text-sm font-medium text-right tabular-nums #{get_debit_credit_amount_color(entry.debit_credit)}"}>
-                    {Money.to_string!(entry.amount)}
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                    <%= if entry.payment do %>
-                      <span class="font-mono text-xs">
-                        {entry.payment.reference_id}
+                    <span class="text-xs text-zinc-500">
+                      {String.capitalize(to_string(entry.account.account_type))}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
+                  <div class="truncate" title={entry.description}>
+                    {entry.description}
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_debit_credit_badge_color(entry.debit_credit)}"}>
+                    {String.capitalize(to_string(entry.debit_credit))}
+                  </span>
+                </td>
+                <td class={"px-6 py-4 whitespace-nowrap text-sm font-medium text-right tabular-nums #{get_debit_credit_amount_color(entry.debit_credit)}"}>
+                  {Money.to_string!(entry.amount)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                  <%= if entry.payment do %>
+                    <span class="font-mono text-xs">
+                      {entry.payment.reference_id}
+                    </span>
+                  <% else %>
+                    <span class="text-zinc-400">—</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                  <%= if entry.refund do %>
+                    <span class="font-mono text-xs">
+                      {entry.refund.reference_id}
+                    </span>
+                  <% else %>
+                    <span class="text-zinc-400">—</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                  <%= if entry.related_entity_type do %>
+                    <div class="flex flex-col">
+                      <span class="text-xs font-medium text-zinc-700">
+                        {String.capitalize(to_string(entry.related_entity_type))}
                       </span>
-                    <% else %>
-                      <span class="text-zinc-400">—</span>
-                    <% end %>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                    <%= if entry.refund do %>
-                      <span class="font-mono text-xs">
-                        {entry.refund.reference_id}
-                      </span>
-                    <% else %>
-                      <span class="text-zinc-400">—</span>
-                    <% end %>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                    <%= if entry.related_entity_type do %>
-                      <div class="flex flex-col">
-                        <span class="text-xs font-medium text-zinc-700">
-                          {String.capitalize(to_string(entry.related_entity_type))}
+                      <%= if entry.related_entity_id do %>
+                        <span class="text-xs font-mono text-zinc-500">
+                          {String.slice(to_string(entry.related_entity_id), 0..8)}...
                         </span>
-                        <%= if entry.related_entity_id do %>
-                          <span class="text-xs font-mono text-zinc-500">
-                            {String.slice(to_string(entry.related_entity_id), 0..8)}...
-                          </span>
-                        <% end %>
-                      </div>
-                    <% else %>
-                      <span class="text-zinc-400">—</span>
-                    <% end %>
-                  </td>
-                </tr>
-                <tr :if={Enum.empty?(@ledger_entries)}>
-                  <td
-                    colspan="8"
-                    class="px-6 py-4 text-center text-sm text-zinc-500"
-                  >
-                    No ledger entries found for the selected date range.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <.admin_prev_next_pagination
-            page={@ledger_entries_page}
-            entry_count={length(@ledger_entries)}
-            prev_event="ledger_entries_prev-page"
-            next_event="ledger_entries_next-page"
-            prev_disabled?={@ledger_entries_page == 1}
-            next_disabled?={@ledger_entries_end?}
-          />
-        </div>
+                      <% end %>
+                    </div>
+                  <% else %>
+                    <span class="text-zinc-400">—</span>
+                  <% end %>
+                </td>
+              </tr>
+              <tr :if={Enum.empty?(@ledger_entries)}>
+                <td
+                  colspan="8"
+                  class="px-6 py-4 text-center text-sm text-zinc-500"
+                >
+                  No ledger entries found for the selected date range.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <:footer>
+            <.admin_prev_next_pagination
+              page={@ledger_entries_page}
+              entry_count={length(@ledger_entries)}
+              prev_event="ledger_entries_prev-page"
+              next_event="ledger_entries_next-page"
+              prev_disabled?={@ledger_entries_page == 1}
+              next_disabled?={@ledger_entries_end?}
+            />
+          </:footer>
+        </.admin_table_card>
       </div>
 
       <div :if={@active_tab == :webhooks} id="money-webhooks-tab">
-        <div class="bg-white shadow-xs border border-zinc-100 rounded-lg overflow-hidden mb-8">
-          <div class="px-6 py-4 border-b border-zinc-100">
-            <h2 class="text-lg text-zinc-900 type-subhead">
-              Stripe Webhook Events
-            </h2>
-          </div>
-          <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-zinc-200">
-              <thead class="bg-zinc-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Event ID
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Event Type
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    State
-                  </th>
-                  <th class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                    Received At
-                  </th>
-                  <th class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-zinc-200">
-                <tr
-                  :for={webhook <- @webhook_events}
-                  id={"webhook-row-#{webhook.id}"}
-                  phx-click="show_webhook_modal"
-                  phx-value-webhook_id={webhook.id}
-                  class="cursor-pointer hover:bg-zinc-50 transition-colors"
+        <.admin_table_card title="Stripe Webhook Events">
+          <table class="min-w-full divide-y divide-zinc-200">
+            <thead class="bg-zinc-50">
+              <tr>
+                <.admin_th>
+                  Event ID
+                </.admin_th>
+                <.admin_th>
+                  Event Type
+                </.admin_th>
+                <.admin_th>
+                  State
+                </.admin_th>
+                <.admin_th>
+                  Received At
+                </.admin_th>
+                <.admin_th align={:right}>
+                  Actions
+                </.admin_th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-zinc-200">
+              <tr
+                :for={webhook <- @webhook_events}
+                id={"webhook-row-#{webhook.id}"}
+                phx-click="show_webhook_modal"
+                phx-value-webhook_id={webhook.id}
+                class="cursor-pointer hover:bg-zinc-50 transition-colors"
+              >
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
+                  {String.slice(webhook.event_id, 0..20)}...
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  <span class="font-medium">{webhook.event_type}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_webhook_state_color(webhook.state)}"}>
+                    {webhook.state}
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  {format_datetime(
+                    webhook.inserted_at,
+                    @timezone,
+                    "%Y-%m-%d %H:%M:%S"
+                  )}
+                </td>
+                <td
+                  id={"webhook-actions-stop-#{webhook.id}"}
+                  phx-hook="StopClick"
+                  class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
                 >
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
-                    {String.slice(webhook.event_id, 0..20)}...
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    <span class="font-medium">{webhook.event_type}</span>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap">
-                    <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_webhook_state_color(webhook.state)}"}>
-                      {webhook.state}
-                    </span>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    {format_datetime(
-                      webhook.inserted_at,
-                      @timezone,
-                      "%Y-%m-%d %H:%M:%S"
-                    )}
-                  </td>
-                  <td
-                    id={"webhook-actions-stop-#{webhook.id}"}
-                    phx-hook="StopClick"
-                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
+                  <button
+                    type="button"
+                    id={"webhook-view-#{webhook.id}"}
+                    phx-click="show_webhook_modal"
+                    phx-value-webhook_id={webhook.id}
+                    class="text-zinc-400 hover:text-blue-600 transition-colors"
+                    aria-label="View webhook details"
                   >
-                    <button
-                      type="button"
-                      id={"webhook-view-#{webhook.id}"}
-                      phx-click="show_webhook_modal"
-                      phx-value-webhook_id={webhook.id}
-                      class="text-zinc-400 hover:text-blue-600 transition-colors"
-                      aria-label="View webhook details"
-                    >
-                      <.icon name="hero-eye" class="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-                <tr :if={Enum.empty?(@webhook_events)}>
-                  <td
-                    colspan="5"
-                    class="px-6 py-4 text-center text-sm text-zinc-500"
-                  >
-                    No webhook events found for the selected date range.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <.admin_prev_next_pagination
-            page={@webhooks_page}
-            entry_count={length(@webhook_events)}
-            prev_event="webhooks_prev-page"
-            next_event="webhooks_next-page"
-            prev_disabled?={@webhooks_page == 1}
-            next_disabled?={@webhooks_end?}
-          />
-        </div>
+                    <.icon name="hero-eye" class="w-5 h-5" />
+                  </button>
+                </td>
+              </tr>
+              <tr :if={Enum.empty?(@webhook_events)}>
+                <td
+                  colspan="5"
+                  class="px-6 py-4 text-center text-sm text-zinc-500"
+                >
+                  No webhook events found for the selected date range.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <:footer>
+            <.admin_prev_next_pagination
+              page={@webhooks_page}
+              entry_count={length(@webhook_events)}
+              prev_event="webhooks_prev-page"
+              next_event="webhooks_next-page"
+              prev_disabled?={@webhooks_page == 1}
+              next_disabled?={@webhooks_end?}
+            />
+          </:footer>
+        </.admin_table_card>
       </div>
 
       <!-- Refund Modal -->
@@ -2663,24 +2646,24 @@ defmodule YscWeb.AdminMoneyLive do
             <table class="min-w-full divide-y divide-zinc-200 text-sm">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  <.admin_th density={:compact}>
                     Reference
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     User
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     Amount
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     Status
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     QB Status
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     Date
-                  </th>
+                  </.admin_th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
@@ -2776,27 +2759,27 @@ defmodule YscWeb.AdminMoneyLive do
             <table class="min-w-full divide-y divide-zinc-200 text-sm">
               <thead class="bg-zinc-50">
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  <.admin_th density={:compact}>
                     Reference
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     User
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     Amount
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     Reason
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     Status
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     QB Status
-                  </th>
-                  <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                  </.admin_th>
+                  <.admin_th density={:compact}>
                     Date
-                  </th>
+                  </.admin_th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
@@ -3276,24 +3259,24 @@ defmodule YscWeb.AdminMoneyLive do
               <table class="min-w-full divide-y divide-zinc-200 text-sm">
                 <thead class="bg-zinc-50">
                   <tr>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    <.admin_th density={:compact}>
                       Reference
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Amount
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Reason
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Status
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       QB Status
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Date
-                    </th>
+                    </.admin_th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-zinc-200">
@@ -3355,21 +3338,21 @@ defmodule YscWeb.AdminMoneyLive do
               <table class="min-w-full divide-y divide-zinc-200 text-sm">
                 <thead class="bg-zinc-50">
                   <tr>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    <.admin_th density={:compact}>
                       Account
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Description
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Debit/Credit
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Amount
-                    </th>
-                    <th class="px-4 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                    </.admin_th>
+                    <.admin_th density={:compact}>
                       Date
-                    </th>
+                    </.admin_th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-zinc-200">
@@ -4071,24 +4054,24 @@ defmodule YscWeb.AdminMoneyLive do
           <table class="min-w-full divide-y divide-zinc-200 text-sm">
             <thead class="bg-zinc-50">
               <tr>
-                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                <.admin_th density={:tight}>
                   #
-                </th>
-                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                </.admin_th>
+                <.admin_th density={:tight}>
                   Date
-                </th>
-                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                </.admin_th>
+                <.admin_th density={:tight}>
                   Vendor
-                </th>
-                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                </.admin_th>
+                <.admin_th density={:tight}>
                   Description
-                </th>
-                <th class="px-2 py-2 text-right text-xs text-zinc-500 type-eyebrow">
+                </.admin_th>
+                <.admin_th align={:right} density={:tight}>
                   Amount
-                </th>
-                <th class="px-2 py-2 text-left text-xs text-zinc-500 type-eyebrow">
+                </.admin_th>
+                <.admin_th density={:tight}>
                   Receipt
-                </th>
+                </.admin_th>
               </tr>
             </thead>
             <tbody class="divide-y divide-zinc-200 bg-white">
