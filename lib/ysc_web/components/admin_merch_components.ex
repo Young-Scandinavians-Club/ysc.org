@@ -14,6 +14,26 @@ defmodule YscWeb.AdminMerchComponents do
   alias Ysc.MoneyHelper
   alias YscWeb.ShopComponents
 
+  @doc "Banner telling admins the merch shop is not ready for real use yet."
+  def wip_banner(assigns) do
+    ~H"""
+    <div
+      id="merch-wip-banner"
+      role="alert"
+      class="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+    >
+      <.icon
+        name="hero-exclamation-triangle"
+        class="w-5 h-5 shrink-0 text-amber-600"
+      />
+      <p>
+        <span class="font-bold">Work in progress.</span>
+        Merch is still being built. Please don't use it yet.
+      </p>
+    </div>
+    """
+  end
+
   @doc """
   The Products / Orders tabs at the top of the merch admin pages. Orders shows
   how many failed orders are waiting for an admin.
