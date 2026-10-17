@@ -8,10 +8,13 @@
 #   GITHUB_REPOSITORY               (optional)  "owner/name"; inferred from `git remote` if unset
 #   OPENROUTER_MODEL                (optional)  default: deepseek/deepseek-v4-flash
 #   OPENROUTER_REFERER              (optional)  HTTP-Referer for OpenRouter (default: this repo on GitHub)
-#   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 100)
+#   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 50)
 #   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 200; use after git scope)
 #   OPENROUTER_PR_BODY_MAX          (optional)  max characters per PR body fetched from GitHub (default: 8000)
-#   OPENROUTER_MAX_TOKENS           (optional)  max completion tokens for the LLM response (default: 8192)
+#   OPENROUTER_MAX_TOKENS           (optional)  max completion tokens for the LLM response, including reasoning (default: 16384)
+#   OPENROUTER_REASONING_EFFORT     (optional)  OpenRouter reasoning.effort: low, minimal, none, medium, high (default: low)
+#   OPENROUTER_ATTEMPTS             (optional)  OpenRouter HTTP / empty-content retries (default: 3)
+#   OPENROUTER_RETRY_DELAY_SECONDS  (optional)  base delay between OpenRouter retries; doubles each attempt (default: 8)
 #   OPENROUTER_SMALL_RELEASE_MAX_COMMITS (opt.)  if previous tag exists and rev-list --count PREV..TAG is at most this, do not
 #                                   cap LLM input (no OPENROUTER_MAX_* trim; per-PR body fetch up to 1M chars) (default: 50; 0 disables)
 #   When a previous v* tag exists, PRs are scoped by git (PREV..TAG), not only by merge timestamps on GitHub
@@ -35,7 +38,10 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DRY_RUN="${DRY_RUN:-0}"
 OPENROUTER_MODEL="${OPENROUTER_MODEL:-deepseek/deepseek-v4-flash}"
 OPENROUTER_PR_BODY_MAX="${OPENROUTER_PR_BODY_MAX:-8000}"
-OPENROUTER_MAX_TOKENS="${OPENROUTER_MAX_TOKENS:-8192}"
+OPENROUTER_MAX_TOKENS="${OPENROUTER_MAX_TOKENS:-16384}"
+OPENROUTER_REASONING_EFFORT="${OPENROUTER_REASONING_EFFORT:-low}"
+OPENROUTER_ATTEMPTS="${OPENROUTER_ATTEMPTS:-3}"
+OPENROUTER_RETRY_DELAY_SECONDS="${OPENROUTER_RETRY_DELAY_SECONDS:-8}"
 GITHUB_API="${GITHUB_API:-https://api.github.com}"
 OPENROUTER_API="${OPENROUTER_API:-https://openrouter.ai/api/v1/chat/completions}"
 
@@ -336,7 +342,7 @@ pr_json_shrink_for_openrouter() {
   local f="$1"
   local no_cap="${2:-0}"
   local max_bodies max_prs n
-  max_bodies=${OPENROUTER_MAX_FULL_PR_BODIES:-100}
+  max_bodies=${OPENROUTER_MAX_FULL_PR_BODIES:-50}
   max_prs=${OPENROUTER_MAX_PRS:-200}
   if [ "$no_cap" = "1" ]; then
     max_bodies=999999
@@ -358,11 +364,80 @@ pr_json_shrink_for_openrouter() {
   fi
 }
 
-# pr_data_path: JSON object { merged_pull_requests, commits_in_range } (see write_openrouter_input_file).
-openrouter_changelog() {
-  local pr_data_path="$1"
-  local version="$2"
-  local prev_version="$3"
+# Assistant content from an OpenRouter chat.completions JSON file. Empty when the
+# model spent max_tokens on reasoning (finish_reason=length, content null) — job
+# 117468028260 / v2.47.0.
+openrouter_choice_text() {
+  jq -r '.choices[0].message.content // empty' "$1" 2>/dev/null || true
+}
+
+openrouter_content_usable() {
+  local text
+  text=$(openrouter_choice_text "$1")
+  [ -n "$text" ] && [ "$text" != "null" ]
+}
+
+openrouter_http_retryable() {
+  case "$1" in
+    429 | 500 | 502 | 503 | 504 | 000) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+openrouter_log_empty_response() {
+  local finish reasoning_tokens completion
+  finish=$(jq -r '.choices[0].finish_reason // empty' "$1" 2>/dev/null || true)
+  reasoning_tokens=$(jq -r '.usage.completion_tokens_details.reasoning_tokens // 0' "$1" 2>/dev/null || true)
+  completion=$(jq -r '.usage.completion_tokens // 0' "$1" 2>/dev/null || true)
+  echo "OpenRouter returned no assistant text (finish_reason=${finish:-unknown}, completion_tokens=${completion}, reasoning_tokens=${reasoning_tokens})." >&2
+}
+
+# Compact failure dump — full reasoning traces are tens of KB and not useful in CI.
+openrouter_log_response_summary() {
+  echo "${TEAL}Response summary:${RESET}" >&2
+  jq '{
+      id, model, provider,
+      finish_reason: .choices[0].finish_reason,
+      content_chars: ((.choices[0].message.content // "") | length),
+      reasoning_chars: ((.choices[0].message.reasoning // "") | length),
+      usage
+    }' "$1" >&2 2>/dev/null || cat "$1" >&2
+}
+
+drop_pr_bodies_in_openrouter_payload() {
+  local f="$1"
+  jq '.merged_pull_requests |= map(del(.body))' "$f" >"${f}.nb" && mv "${f}.nb" "$f"
+}
+
+# POST req JSON to OpenRouter; writes the body to resp and prints the HTTP status.
+# OPENROUTER_HTTP_POST_CMD, when set, is a bash snippet that reads OPENROUTER_REQ /
+# OPENROUTER_RESP (for --self-test). It must print the status code to stdout.
+openrouter_http_post() {
+  local req="$1" resp="$2" code referer
+  if [ -n "${OPENROUTER_HTTP_POST_CMD:-}" ]; then
+    OPENROUTER_REQ="$req" OPENROUTER_RESP="$resp" bash -c "${OPENROUTER_HTTP_POST_CMD}"
+    return 0
+  fi
+  referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG:-}}"
+  code=$(
+    curl -sS -o "$resp" -w "%{http_code}" \
+      -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
+      -H "Content-Type: application/json" \
+      -H "HTTP-Referer: ${referer}" \
+      -H "X-Title: ysc release notes" \
+      -d @"$req" \
+      "$OPENROUTER_API"
+  ) || code="000"
+  printf '%s\n' "$code"
+}
+
+write_openrouter_request_file() {
+  local out="$1"
+  local pr_data_path="$2"
+  local version="$3"
+  local prev_version="$4"
+  local max_tokens="$5"
+  local effort="$6"
   local system
   system="You write comprehensive GitHub release notes in Markdown for one production release.
 
@@ -382,20 +457,17 @@ Structure:
 Length and detail:
 - Be thorough and specific: prefer concrete user-visible outcomes over vague \"improvements\".
 - Aim for roughly one substantive bullet per PR on small releases; on large releases, group related PRs but ensure every PR number still appears.
-- Target roughly 500–3000 words depending on PR count — longer when there are many PRs. Do not artificially truncate coverage of the input.
+- Target roughly 400–1500 words. Group freely on large releases rather than writing thousands of words.
+- Put the Markdown in the assistant message content. Do not spend the completion budget only on internal planning — reasoning tokens count against max_tokens.
 - Output Markdown only, no preamble or code fences around the whole text."
 
-  local referer req_tmp
-  referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG}}"
-  req_tmp=$(mktemp)
-  or_rm_req() { rm -f "$req_tmp" 2>/dev/null; }
-
-  if ! jq -n \
+  jq -n \
     --arg model "$OPENROUTER_MODEL" \
     --arg sys "$system" \
     --arg ver "$version" \
     --arg prev "${prev_version:-<none: first v* release>}" \
-    --argjson max_tokens "$OPENROUTER_MAX_TOKENS" \
+    --argjson max_tokens "$max_tokens" \
+    --arg effort "$effort" \
     --rawfile payload "$pr_data_path" \
     '
     ($payload | fromjson) as $p
@@ -406,7 +478,7 @@ Length and detail:
           { role: "system", content: $sys },
           { role: "user", content: (
               {
-                instruction: "Write comprehensive user-facing release notes (see system rules). Cover every PR in the input.",
+                instruction: "Write the release notes as assistant content now (see system rules). Cover every PR in the input.",
                 new_version: $ver,
                 previous_version_tag: $prev,
                 merged_pull_requests: ($p.merged_pull_requests // []),
@@ -415,49 +487,103 @@ Length and detail:
             ) }
         ]
       }
-    ' >"$req_tmp"; then
-    or_rm_req
-    return 1
-  fi
+    | if ($effort | length) > 0 then . + {reasoning: {effort: $effort}} else . end
+    ' >"$out"
+}
 
-  local resp_tmp code text
+# pr_data_path: JSON object { merged_pull_requests, commits_in_range } (see write_openrouter_input_file).
+# Mutates the payload in place on empty-content retries (drops PR bodies).
+openrouter_changelog() {
+  local pr_data_path="$1"
+  local version="$2"
+  local prev_version="$3"
+  local attempt max_attempts max_tokens effort delay req_tmp resp_tmp code text
+
+  max_attempts="${OPENROUTER_ATTEMPTS:-3}"
+  max_tokens="$OPENROUTER_MAX_TOKENS"
+  effort="$OPENROUTER_REASONING_EFFORT"
+  delay="${OPENROUTER_RETRY_DELAY_SECONDS:-8}"
+
+  req_tmp=$(mktemp)
   resp_tmp=$(mktemp)
-  code=$(
-    curl -sS -o "$resp_tmp" -w "%{http_code}" \
-      -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
-      -H "Content-Type: application/json" \
-      -H "HTTP-Referer: ${referer}" \
-      -H "X-Title: ysc release notes" \
-      -d @"$req_tmp" \
-      "$OPENROUTER_API"
-  )
-  or_rm_req
-  if [ "$code" != "200" ]; then
-    echo "${RED}OpenRouter request failed: HTTP $code${RESET}" >&2
-    case "$code" in
-      401) echo "Invalid or missing API key (check OPENROUTER_API_KEY)." >&2 ;;
-      402)
-        echo "HTTP 402 from OpenRouter: add credits (https://openrouter.ai/credits), confirm billing," >&2
-        echo "  or use a different OPENROUTER_MODEL. Large first releases are trimmed by OPENROUTER_MAX_*; see script header." >&2
-        ;;
-      403) echo "Request forbidden: model or key may not be allowed for this call." >&2 ;;
-      429) echo "Rate limit — retry later." >&2 ;;
-    esac
-    echo "${TEAL}Response body:${RESET}" >&2
-    cat "$resp_tmp" >&2
-    echo >&2
-    rm -f "$resp_tmp"
-    return 1
-  fi
-  text=$(jq -r '.choices[0].message.content // empty' "$resp_tmp")
-  if [ -z "$text" ] || [ "$text" = "null" ]; then
-    echo "${RED}Error: OpenRouter returned no text. Response:${RESET}" >&2
-    jq . "$resp_tmp" 2>/dev/null || cat "$resp_tmp" >&2
-    rm -f "$resp_tmp"
-    return 1
-  fi
-  rm -f "$resp_tmp"
-  printf '%s\n' "$text"
+  or_rm() { rm -f "$req_tmp" "$resp_tmp" 2>/dev/null; }
+
+  attempt=1
+  while [ "$attempt" -le "$max_attempts" ]; do
+    if ! write_openrouter_request_file "$req_tmp" "$pr_data_path" "$version" "$prev_version" "$max_tokens" "$effort"; then
+      echo "${RED}Error: failed to build OpenRouter request JSON.${RESET}" >&2
+      or_rm
+      return 1
+    fi
+    echo "${TEAL}OpenRouter attempt ${attempt}/${max_attempts} (model: ${OPENROUTER_MODEL}, max_tokens: ${max_tokens}, reasoning.effort: ${effort:-<omit>}).${RESET}" >&2
+
+    code=$(openrouter_http_post "$req_tmp" "$resp_tmp")
+    if [ "$code" = "200" ] && openrouter_content_usable "$resp_tmp"; then
+      text=$(openrouter_choice_text "$resp_tmp")
+      or_rm
+      printf '%s\n' "$text"
+      return 0
+    fi
+
+    if [ "$code" = "200" ]; then
+      echo "${RED}OpenRouter returned no text on attempt ${attempt}.${RESET}" >&2
+      openrouter_log_empty_response "$resp_tmp"
+    else
+      echo "${RED}OpenRouter request failed: HTTP $code (attempt ${attempt})${RESET}" >&2
+      case "$code" in
+        401) echo "Invalid or missing API key (check OPENROUTER_API_KEY)." >&2 ;;
+        402)
+          echo "HTTP 402 from OpenRouter: add credits (https://openrouter.ai/credits), confirm billing," >&2
+          echo "  or use a different OPENROUTER_MODEL. Large first releases are trimmed by OPENROUTER_MAX_*; see script header." >&2
+          ;;
+        403) echo "Request forbidden: model or key may not be allowed for this call." >&2 ;;
+        429) echo "Rate limit — retry later." >&2 ;;
+      esac
+    fi
+
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      openrouter_log_response_summary "$resp_tmp"
+      or_rm
+      return 1
+    fi
+
+    # effort=none is rejected by some reasoning-mandatory models; omit the field and retry.
+    if [ "$code" = "400" ] && [ "$effort" = "none" ]; then
+      echo "${TEAL}HTTP 400 with reasoning.effort=none; retrying without a reasoning field.${RESET}" >&2
+      effort=""
+      attempt=$((attempt + 1))
+      continue
+    fi
+
+    if [ "$code" != "200" ] && ! openrouter_http_retryable "$code"; then
+      openrouter_log_response_summary "$resp_tmp"
+      echo "${TEAL}Response body:${RESET}" >&2
+      cat "$resp_tmp" >&2
+      echo >&2
+      or_rm
+      return 1
+    fi
+
+    if [ "$code" = "200" ]; then
+      echo "${TEAL}Retrying with PR bodies dropped, reasoning.effort=none, and a larger max_tokens.${RESET}" >&2
+      drop_pr_bodies_in_openrouter_payload "$pr_data_path"
+      max_tokens=$((max_tokens * 2))
+      if [ "$max_tokens" -gt 32768 ]; then
+        max_tokens=32768
+      fi
+      effort="none"
+    else
+      echo "${TEAL}Retrying in ${delay}s...${RESET}" >&2
+    fi
+
+    if [ "$delay" -gt 0 ]; then
+      sleep "$delay"
+    fi
+    delay=$((delay * 2))
+    attempt=$((attempt + 1))
+  done
+  or_rm
+  return 1
 }
 
 # Create GitHub release or set body on an existing one for this tag.
@@ -575,6 +701,180 @@ self_test() {
   fi
   if [ "$(jq '.commits_in_range | length' "$dir/out.json")" != "0" ]; then
     echo "update_github_release_notes.sh: large payload commits should be empty" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  # Request JSON caps reasoning so completion budget remains for the notes.
+  if ! write_openrouter_request_file "$dir/req.json" "$dir/out.json" "v9.0.0" "v8.0.0" "16384" "low"; then
+    echo "update_github_release_notes.sh: request JSON write failed" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq -r '.max_tokens' "$dir/req.json")" != "16384" ]; then
+    echo "update_github_release_notes.sh: request max_tokens mismatch" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq -r '.reasoning.effort' "$dir/req.json")" != "low" ]; then
+    echo "update_github_release_notes.sh: request reasoning.effort mismatch" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if ! write_openrouter_request_file "$dir/req-omit.json" "$dir/out.json" "v9.0.0" "v8.0.0" "8192" ""; then
+    echo "update_github_release_notes.sh: request JSON omit-reasoning write failed" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq 'has("reasoning")' "$dir/req-omit.json")" != "false" ]; then
+    echo "update_github_release_notes.sh: empty effort should omit reasoning" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  # v2.47.0 / job 117468028260: Relace spent max_tokens on reasoning, content null.
+  cat >"$dir/exhausted.json" <<'JSON'
+{
+  "id": "gen-test",
+  "model": "deepseek/deepseek-v4-flash",
+  "provider": "Relace",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "length",
+      "message": { "role": "assistant", "content": null, "reasoning": "planning..." }
+    }
+  ],
+  "usage": {
+    "completion_tokens": 8192,
+    "completion_tokens_details": { "reasoning_tokens": 8573 }
+  }
+}
+JSON
+  if openrouter_content_usable "$dir/exhausted.json"; then
+    echo "update_github_release_notes.sh: exhausted response should not be usable" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ -n "$(openrouter_choice_text "$dir/exhausted.json")" ]; then
+    echo "update_github_release_notes.sh: exhausted content should be empty" >&2
+    self_test_cleanup
+    return 1
+  fi
+  cat >"$dir/ok.json" <<'JSON'
+{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"## Highlights\n\n- notes"}}]}
+JSON
+  if ! openrouter_content_usable "$dir/ok.json"; then
+    echo "update_github_release_notes.sh: stop response should be usable" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if ! openrouter_http_retryable 429 || ! openrouter_http_retryable 502 || openrouter_http_retryable 401; then
+    echo "update_github_release_notes.sh: HTTP retryable classification failed" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  jq -n '{merged_pull_requests:[{number:1,title:"One",author:"bot",url:"https://example.invalid/1",body:"long body"}],commits_in_range:[]}' >"$dir/payload.json"
+  drop_pr_bodies_in_openrouter_payload "$dir/payload.json"
+  if [ "$(jq -r '.merged_pull_requests[0] | has("body")' "$dir/payload.json")" != "false" ]; then
+    echo "update_github_release_notes.sh: drop_pr_bodies did not remove body" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  # Shrink: 51 PRs with bodies exceed default OPENROUTER_MAX_FULL_PR_BODIES=50.
+  : >"$dir/nd51"
+  for i in $(seq 1 51); do
+    jq -n --argjson n "$i" '{number:$n, title:("PR "+($n|tostring)), author:"bot", url:"https://example.invalid/p", body:"desc"}' >>"$dir/nd51"
+  done
+  jq -s '.' "$dir/nd51" >"$dir/fiftyone.json"
+  OPENROUTER_MAX_FULL_PR_BODIES=50 pr_json_shrink_for_openrouter "$dir/fiftyone.json" 0
+  if [ "$(jq -r '.[0] | has("body")' "$dir/fiftyone.json")" != "false" ]; then
+    echo "update_github_release_notes.sh: 51 PRs should drop bodies at threshold 50" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq 'length' "$dir/fiftyone.json")" != "51" ]; then
+    echo "update_github_release_notes.sh: shrink should keep 51 title-only rows" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  # Retry: first OpenRouter reply is the v2.47.0 empty-content shape, second succeeds.
+  echo 0 >"$dir/http_count"
+  cat >"$dir/http.sh" <<'EOS'
+n=$(cat "$COUNTF")
+n=$((n + 1))
+echo "$n" >"$COUNTF"
+if [ "$n" -eq 1 ]; then
+  cat >"$OPENROUTER_RESP" <<'JSON'
+{
+  "choices": [{"finish_reason": "length", "message": {"role": "assistant", "content": null, "reasoning": "planning"}}],
+  "usage": {"completion_tokens": 8192, "completion_tokens_details": {"reasoning_tokens": 8192}}
+}
+JSON
+  echo 200
+  exit 0
+fi
+cat >"$OPENROUTER_RESP" <<'JSON'
+{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"## Highlights\n\n- recovered notes"}}]}
+JSON
+echo 200
+EOS
+  jq -n '{merged_pull_requests:[{number:1,title:"One",author:"bot",url:"https://example.invalid/1",body:"body text"}],commits_in_range:[]}' >"$dir/retry_payload.json"
+  notes=$(
+    COUNTF="$dir/http_count" \
+      OPENROUTER_HTTP_POST_CMD="COUNTF='$dir/http_count' bash '$dir/http.sh'" \
+      OPENROUTER_RETRY_DELAY_SECONDS=0 \
+      OPENROUTER_ATTEMPTS=3 \
+      OPENROUTER_MAX_TOKENS=8192 \
+      OPENROUTER_REASONING_EFFORT=low \
+      REPO_SLUG=test/repo \
+      openrouter_changelog "$dir/retry_payload.json" "v9.0.0" "v8.0.0"
+  ) || {
+    echo "update_github_release_notes.sh: changelog retry should succeed on second attempt" >&2
+    self_test_cleanup
+    return 1
+  }
+  if [[ "$notes" != *"recovered notes"* ]]; then
+    echo "update_github_release_notes.sh: unexpected changelog output: $notes" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(cat "$dir/http_count")" != "2" ]; then
+    echo "update_github_release_notes.sh: expected 2 HTTP posts, got $(cat "$dir/http_count")" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq -r '.merged_pull_requests[0] | has("body")' "$dir/retry_payload.json")" != "false" ]; then
+    echo "update_github_release_notes.sh: empty-content retry should drop PR bodies" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  # 401 is not retried.
+  echo 0 >"$dir/http_count"
+  cat >"$dir/http401.sh" <<'EOS'
+n=$(cat "$COUNTF")
+n=$((n + 1))
+echo "$n" >"$COUNTF"
+echo '{"error":"unauthorized"}' >"$OPENROUTER_RESP"
+echo 401
+EOS
+  jq -n '{merged_pull_requests:[],commits_in_range:[]}' >"$dir/auth_payload.json"
+  if COUNTF="$dir/http_count" \
+    OPENROUTER_HTTP_POST_CMD="COUNTF='$dir/http_count' bash '$dir/http401.sh'" \
+    OPENROUTER_RETRY_DELAY_SECONDS=0 \
+    OPENROUTER_ATTEMPTS=3 \
+    REPO_SLUG=test/repo \
+    openrouter_changelog "$dir/auth_payload.json" "v9.0.0" "v8.0.0" >/dev/null 2>"$dir/auth.err"; then
+    echo "update_github_release_notes.sh: 401 should fail" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(cat "$dir/http_count")" != "1" ]; then
+    echo "update_github_release_notes.sh: 401 should not retry, got $(cat "$dir/http_count") posts" >&2
     self_test_cleanup
     return 1
   fi
