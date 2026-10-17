@@ -287,7 +287,13 @@ defmodule Ysc.MixProject do
       # primary_key/1 take the schema module. Schema option accessors are gone
       # (use Flop.get_option/3 and Flop.allowed_fields/2). We paginate with
       # validate_and_run/3 + page pagination; join fields still declare ecto_type.
-      {:flop, "~> 0.29.0"},
+      # 0.29.1: InvalidParamsError/InvalidCursorError messages omit raw params
+      # and cursors (fields still hold them). get_field/3 on a plain map without
+      # the join path's first key falls back to the field name. Non-struct
+      # Flop.Schema + Ecto adapter raises. max_cursor_size applies to unvalidated
+      # cursors. We do not use cursor pagination or non-struct schemas; pin the
+      # patched floor.
+      {:flop, "~> 0.29.1"},
       # 0.27.0: requires Flop 0.29; sortable/filterable via allowed_fields/2.
       {:flop_phoenix, "~> 0.27.0"},
       {:gen_smtp, "~> 1.3"},
