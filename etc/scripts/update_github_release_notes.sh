@@ -11,7 +11,9 @@
 #   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 100)
 #   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 200; use after git scope)
 #   OPENROUTER_PR_BODY_MAX          (optional)  max characters per PR body fetched from GitHub (default: 8000)
-#   OPENROUTER_MAX_TOKENS           (optional)  max completion tokens for the LLM response (default: 8192)
+#   OPENROUTER_MAX_TOKENS           (optional)  max completion tokens per LLM response, reasoning included (default: 16384)
+#   OPENROUTER_CHUNK_PRS            (optional)  if more PRs than this, summarize them in chunks of this size, merge the sections
+#                                   locally, then make one short request for the intro/Highlights (default: 25; 0 disables)
 #   OPENROUTER_SMALL_RELEASE_MAX_COMMITS (opt.)  if previous tag exists and rev-list --count PREV..TAG is at most this, do not
 #                                   cap LLM input (no OPENROUTER_MAX_* trim; per-PR body fetch up to 1M chars) (default: 50; 0 disables)
 #   When a previous v* tag exists, PRs are scoped by git (PREV..TAG), not only by merge timestamps on GitHub
@@ -35,7 +37,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DRY_RUN="${DRY_RUN:-0}"
 OPENROUTER_MODEL="${OPENROUTER_MODEL:-deepseek/deepseek-v4-flash}"
 OPENROUTER_PR_BODY_MAX="${OPENROUTER_PR_BODY_MAX:-8000}"
-OPENROUTER_MAX_TOKENS="${OPENROUTER_MAX_TOKENS:-8192}"
+OPENROUTER_MAX_TOKENS="${OPENROUTER_MAX_TOKENS:-16384}"
+OPENROUTER_CHUNK_PRS="${OPENROUTER_CHUNK_PRS:-25}"
 GITHUB_API="${GITHUB_API:-https://api.github.com}"
 OPENROUTER_API="${OPENROUTER_API:-https://openrouter.ai/api/v1/chat/completions}"
 
@@ -358,6 +361,102 @@ pr_json_shrink_for_openrouter() {
   fi
 }
 
+# openrouter_complete SYSTEM USER_FILE — one chat completion with retries; prints the assistant text.
+# USER_FILE holds the raw user message. Fails (non-zero) on HTTP errors or an empty answer, with a
+# specific hint when the model spent its whole max_tokens budget (reasoning models) before answering.
+openrouter_complete() {
+  local system="$1" user_file="$2"
+  local referer req_tmp resp_tmp code text finish attempt
+  referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG}}"
+  req_tmp=$(mktemp)
+  resp_tmp=$(mktemp)
+
+  if ! jq -n \
+    --arg model "$OPENROUTER_MODEL" \
+    --arg sys "$system" \
+    --argjson max_tokens "$OPENROUTER_MAX_TOKENS" \
+    --rawfile user "$user_file" \
+    '{
+       model: $model,
+       max_tokens: $max_tokens,
+       messages: [
+         { role: "system", content: $sys },
+         { role: "user", content: $user }
+       ]
+     }' >"$req_tmp"; then
+    rm -f "$req_tmp" "$resp_tmp"
+    return 1
+  fi
+
+  for attempt in 1 2 3; do
+    code=$(
+      curl -sS -o "$resp_tmp" -w "%{http_code}" \
+        -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
+        -H "Content-Type: application/json" \
+        -H "HTTP-Referer: ${referer}" \
+        -H "X-Title: ysc release notes" \
+        -d @"$req_tmp" \
+        "$OPENROUTER_API"
+    ) || code=000
+
+    if [ "$code" = "200" ]; then
+      text=$(jq -r '.choices[0].message.content // empty' "$resp_tmp")
+      if [ -n "$text" ] && [ "$text" != "null" ]; then
+        rm -f "$req_tmp" "$resp_tmp"
+        printf '%s\n' "$text"
+        return 0
+      fi
+      finish=$(jq -r '.choices[0].finish_reason // "unknown"' "$resp_tmp" 2>/dev/null || echo unknown)
+      echo "${RED}Error: OpenRouter returned no text (finish_reason: ${finish}). Response:${RESET}" >&2
+      jq . "$resp_tmp" 2>/dev/null || cat "$resp_tmp" >&2
+      if [ "$finish" = "length" ]; then
+        echo "The model used all ${OPENROUTER_MAX_TOKENS} completion tokens (reasoning counts) before answering." >&2
+        echo "  Raise OPENROUTER_MAX_TOKENS or lower OPENROUTER_CHUNK_PRS so each request is smaller." >&2
+        break
+      fi
+    else
+      echo "${RED}OpenRouter request failed: HTTP $code${RESET}" >&2
+      case "$code" in
+        401) echo "Invalid or missing API key (check OPENROUTER_API_KEY)." >&2 ;;
+        402)
+          echo "HTTP 402 from OpenRouter: add credits (https://openrouter.ai/credits), confirm billing," >&2
+          echo "  or use a different OPENROUTER_MODEL. Large first releases are trimmed by OPENROUTER_MAX_*; see script header." >&2
+          ;;
+        403) echo "Request forbidden: model or key may not be allowed for this call." >&2 ;;
+        429) echo "Rate limit — retry later." >&2 ;;
+      esac
+      echo "${TEAL}Response body:${RESET}" >&2
+      cat "$resp_tmp" >&2
+      echo >&2
+      # Client errors other than rate limiting will not succeed on retry.
+      case "$code" in 401 | 402 | 403) break ;; esac
+    fi
+    if [ "$attempt" -lt 3 ]; then
+      echo "${YELLOW}Retrying OpenRouter request (attempt $((attempt + 1)) of 3)...${RESET}" >&2
+      sleep $((attempt * 5))
+    fi
+  done
+  rm -f "$req_tmp" "$resp_tmp"
+  return 1
+}
+
+# or_user_message PAYLOAD_JSON INSTRUCTION VERSION PREV_VERSION — prints the user message JSON text.
+or_user_message() {
+  local pr_data_path="$1" instruction="$2" version="$3" prev_version="$4"
+  jq -n \
+    --arg instruction "$instruction" \
+    --arg ver "$version" \
+    --arg prev "${prev_version:-<none: first v* release>}" \
+    --slurpfile p "$pr_data_path" \
+    '{
+       instruction: $instruction,
+       new_version: $ver,
+       previous_version_tag: $prev,
+       merged_pull_requests: ($p[0].merged_pull_requests // []),
+       commits_in_range: ($p[0].commits_in_range // [])
+     } | tojson' -r
+}
+
 # pr_data_path: JSON object { merged_pull_requests, commits_in_range } (see write_openrouter_input_file).
 openrouter_changelog() {
   local pr_data_path="$1"
@@ -385,79 +484,134 @@ Length and detail:
 - Target roughly 500–3000 words depending on PR count — longer when there are many PRs. Do not artificially truncate coverage of the input.
 - Output Markdown only, no preamble or code fences around the whole text."
 
-  local referer req_tmp
-  referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG}}"
-  req_tmp=$(mktemp)
-  or_rm_req() { rm -f "$req_tmp" 2>/dev/null; }
+  local user_tmp
+  user_tmp=$(mktemp)
+  or_user_message "$pr_data_path" \
+    "Write comprehensive user-facing release notes (see system rules). Cover every PR in the input." \
+    "$version" "$prev_version" >"$user_tmp" || {
+    rm -f "$user_tmp"
+    return 1
+  }
+  openrouter_complete "$system" "$user_tmp" || {
+    rm -f "$user_tmp"
+    return 1
+  }
+  rm -f "$user_tmp"
+}
 
-  if ! jq -n \
-    --arg model "$OPENROUTER_MODEL" \
-    --arg sys "$system" \
-    --arg ver "$version" \
-    --arg prev "${prev_version:-<none: first v* release>}" \
-    --argjson max_tokens "$OPENROUTER_MAX_TOKENS" \
-    --rawfile payload "$pr_data_path" \
-    '
-    ($payload | fromjson) as $p
-    | {
-        model: $model,
-        max_tokens: $max_tokens,
-        messages: [
-          { role: "system", content: $sys },
-          { role: "user", content: (
-              {
-                instruction: "Write comprehensive user-facing release notes (see system rules). Cover every PR in the input.",
-                new_version: $ver,
-                previous_version_tag: $prev,
-                merged_pull_requests: ($p.merged_pull_requests // []),
-                commits_in_range: ($p.commits_in_range // [])
-              } | tojson
-            ) }
-        ]
+# merge_release_sections FILE... — concatenates the bullets of each chunk's H2 sections under one
+# heading per section, in a fixed order. Unknown headings fold into Changed; Highlights/Summary and
+# text before the first heading are dropped (the final pass rewrites those).
+merge_release_sections() {
+  awk '
+    BEGIN {
+      n = split("Added|Changed|Fixed|Security|Internal / Technical", order, "|")
+      for (i = 1; i <= n; i++) canon[tolower(order[i])] = order[i]
+    }
+    FNR == 1 { cur = "" }
+    /^##[[:space:]]+/ {
+      h = $0
+      sub(/^##[[:space:]]+/, "", h)
+      sub(/[[:space:]]+$/, "", h)
+      key = tolower(h)
+      if (key in canon) cur = canon[key]
+      else if (key == "highlights" || key == "summary") cur = ""
+      else cur = "Changed"
+      next
+    }
+    cur == "" { next }
+    /^[[:space:]]*$/ { next }
+    { buf[cur] = buf[cur] $0 "\n" }
+    END {
+      for (i = 1; i <= n; i++) {
+        o = order[i]
+        if (buf[o] != "") printf "## %s\n\n%s\n", o, buf[o]
       }
-    ' >"$req_tmp"; then
-    or_rm_req
-    return 1
+    }
+  ' "$@"
+}
+
+# missing_pr_bullets MERGED_MD PRS_JSON — one bullet per PR whose number never appears in the notes,
+# so a chunk that skipped a PR still gets it listed.
+missing_pr_bullets() {
+  local merged="$1" prs="$2" n title url
+  while IFS=$'\t' read -r n title url; do
+    [ -z "$n" ] && continue
+    if ! grep -Eq "#${n}([^0-9]|$)" "$merged"; then
+      if [ -n "$url" ] && [ "$url" != "null" ]; then
+        printf -- '- %s ([#%s](%s))\n' "$title" "$n" "$url"
+      else
+        printf -- '- %s (#%s)\n' "$title" "$n"
+      fi
+    fi
+  done < <(jq -r '.[] | [.number, .title, .url] | @tsv' "$prs")
+}
+
+# openrouter_changelog_chunked PR_FILE VERSION PREV_VERSION CHUNK_SIZE
+# Map-reduce for big releases: each chunk of PRs is summarized into H2 sections separately (small
+# prompts, small answers), the sections are merged locally, and one short final request writes the
+# intro and Highlights from the merged notes. Every PR is guaranteed to appear in the result.
+openrouter_changelog_chunked() {
+  local pr_file="$1" version="$2" prev_version="$3" chunk_size="$4"
+  local total n_chunks i work part_system final_system
+  total=$(jq 'length' "$pr_file")
+  n_chunks=$(((total + chunk_size - 1) / chunk_size))
+  work=$(mktemp -d)
+
+  part_system="You write one PART of the GitHub release notes in Markdown for a production release. Other parts covering other PRs are written separately and merged afterwards.
+
+The user JSON has merged_pull_requests: the ONLY source. Do not mention features, tickets, or areas not supported by the PR titles/bodies. Never invent anything.
+
+Rules:
+- Document every PR in the input at least once. Prefer concrete user-visible outcomes over vague \"improvements\"; group closely related PRs into one bullet but keep every PR number.
+- Output ONLY these H2 sections, omitting empty ones: ## Added, ## Changed, ## Fixed, ## Security, ## Internal / Technical.
+- Do NOT write a summary, a title, a Highlights section, or any text outside those sections.
+- Under each section use bullets. Link PRs as [#NNN](url) when url is in the data, or #NNN otherwise.
+- Output Markdown only, no preamble or code fences."
+
+  final_system="You write the opening of GitHub release notes in Markdown. The user message contains the already-written sections of the notes for one release. Use ONLY that text; do not invent anything.
+
+Output exactly:
+1. A 1–2 sentence summary of the release's main themes (no heading).
+2. A blank line, then \"## Highlights\" followed by 3–5 bullets naming the most user-visible changes, keeping the [#NNN](url) links copied from the notes.
+
+Do not repeat the full sections. Output Markdown only, no code fences."
+
+  for ((i = 0; i < n_chunks; i++)); do
+    jq --argjson s "$chunk_size" --argjson i "$i" '.[($i * $s):(($i + 1) * $s)]' "$pr_file" >"$work/chunk.json"
+    write_openrouter_input_file "$work/payload.json" "$work/chunk.json" "" "" || {
+      rm -rf "$work"
+      return 1
+    }
+    echo "${TEAL}Release notes part $((i + 1))/${n_chunks}: $(jq 'length' "$work/chunk.json") PRs.${RESET}" >&2
+    or_user_message "$work/payload.json" \
+      "Write this part of the release notes (see system rules). Cover every PR in the input." \
+      "$version" "$prev_version" >"$work/user.txt" || {
+      rm -rf "$work"
+      return 1
+    }
+    openrouter_complete "$part_system" "$work/user.txt" >"$work/part_${i}.md" || {
+      rm -rf "$work"
+      return 1
+    }
+  done
+
+  merge_release_sections "$work"/part_*.md >"$work/merged.md"
+  local extra
+  extra=$(missing_pr_bullets "$work/merged.md" "$pr_file")
+  if [ -n "$extra" ]; then
+    echo "${YELLOW}Some PRs were skipped by the model; listing them under Other changes.${RESET}" >&2
+    printf '## Other changes\n\n%s\n' "$extra" >>"$work/merged.md"
   fi
 
-  local resp_tmp code text
-  resp_tmp=$(mktemp)
-  code=$(
-    curl -sS -o "$resp_tmp" -w "%{http_code}" \
-      -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
-      -H "Content-Type: application/json" \
-      -H "HTTP-Referer: ${referer}" \
-      -H "X-Title: ysc release notes" \
-      -d @"$req_tmp" \
-      "$OPENROUTER_API"
-  )
-  or_rm_req
-  if [ "$code" != "200" ]; then
-    echo "${RED}OpenRouter request failed: HTTP $code${RESET}" >&2
-    case "$code" in
-      401) echo "Invalid or missing API key (check OPENROUTER_API_KEY)." >&2 ;;
-      402)
-        echo "HTTP 402 from OpenRouter: add credits (https://openrouter.ai/credits), confirm billing," >&2
-        echo "  or use a different OPENROUTER_MODEL. Large first releases are trimmed by OPENROUTER_MAX_*; see script header." >&2
-        ;;
-      403) echo "Request forbidden: model or key may not be allowed for this call." >&2 ;;
-      429) echo "Rate limit — retry later." >&2 ;;
-    esac
-    echo "${TEAL}Response body:${RESET}" >&2
-    cat "$resp_tmp" >&2
-    echo >&2
-    rm -f "$resp_tmp"
-    return 1
+  if openrouter_complete "$final_system" "$work/merged.md" >"$work/intro.md"; then
+    cat "$work/intro.md"
+    echo
+  else
+    echo "${YELLOW}Could not generate the release summary; publishing sections only.${RESET}" >&2
   fi
-  text=$(jq -r '.choices[0].message.content // empty' "$resp_tmp")
-  if [ -z "$text" ] || [ "$text" = "null" ]; then
-    echo "${RED}Error: OpenRouter returned no text. Response:${RESET}" >&2
-    jq . "$resp_tmp" 2>/dev/null || cat "$resp_tmp" >&2
-    rm -f "$resp_tmp"
-    return 1
-  fi
-  rm -f "$resp_tmp"
-  printf '%s\n' "$text"
+  cat "$work/merged.md"
+  rm -rf "$work"
 }
 
 # Create GitHub release or set body on an existing one for this tag.
@@ -579,6 +733,26 @@ self_test() {
     return 1
   fi
 
+  printf '## Added\n- A ([#1](u))\n\n## Weird\n- B ([#2](u))\n' >"$dir/p1.md"
+  printf 'intro\n## Highlights\n- skip\n## Fixed\n- C (#3)\n## Added\n- D ([#4](u))\n' >"$dir/p2.md"
+  merge_release_sections "$dir/p1.md" "$dir/p2.md" >"$dir/merged.md"
+  if [ "$(grep -c '^## ' "$dir/merged.md")" != "3" ] ||
+    [ "$(grep '^## ' "$dir/merged.md" | tr '\n' '|')" != "## Added|## Changed|## Fixed|" ] ||
+    grep -q 'skip\|intro' "$dir/merged.md" ||
+    [ "$(awk '/^## Added/{f=1;next} /^## /{f=0} f&&/^- /' "$dir/merged.md" | wc -l | tr -d ' ')" != "2" ]; then
+    echo "update_github_release_notes.sh: merge_release_sections mismatch" >&2
+    cat "$dir/merged.md" >&2
+    self_test_cleanup
+    return 1
+  fi
+  echo '[{"number":2,"title":"B","url":"u"},{"number":5,"title":"E","url":"https://x/5"},{"number":30,"title":"F","url":null}]' >"$dir/mp.json"
+  printf '[#3](u) and #30\n' >"$dir/notes.md"
+  if [ "$(missing_pr_bullets "$dir/notes.md" "$dir/mp.json" | tr '\n' '|')" != "- B ([#2](u))|- E ([#5](https://x/5))|" ]; then
+    echo "update_github_release_notes.sh: missing_pr_bullets mismatch" >&2
+    self_test_cleanup
+    return 1
+  fi
+
   self_test_cleanup
   echo "update_github_release_notes.sh: self-test passed"
 }
@@ -690,7 +864,12 @@ else
 fi
 echo "${TEAL}Sending OpenRouter request (model: ${OPENROUTER_MODEL}, PRs: $(jq '.merged_pull_requests | length' "$or_payload"), commits_in_range: $(jq '.commits_in_range | length' "$or_payload")).${RESET}" >&2
 
-openrouter_changelog "$or_payload" "$TAG" "${PREV_TAG:-}" | tee "$notes_tmp"
+if [ "$OPENROUTER_CHUNK_PRS" -gt 0 ] && [ "$(jq 'length' "$pr_file")" -gt "$OPENROUTER_CHUNK_PRS" ]; then
+  echo "${TEAL}Large release: summarizing in chunks of ${OPENROUTER_CHUNK_PRS} PRs, then merging.${RESET}" >&2
+  openrouter_changelog_chunked "$pr_file" "$TAG" "${PREV_TAG:-}" "$OPENROUTER_CHUNK_PRS" | tee "$notes_tmp"
+else
+  openrouter_changelog "$or_payload" "$TAG" "${PREV_TAG:-}" | tee "$notes_tmp"
+fi
 
 if [ "$DRY_RUN" = "1" ]; then
   echo "${TEAL}DRY_RUN=1 — not updating GitHub release.${RESET}"
