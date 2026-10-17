@@ -185,12 +185,7 @@ defmodule Ysc.Merch.AdminOrders do
   order something that is not on sale to members.
   """
   def orderable_products do
-    Ysc.Merch.list_admin_products()
-    |> Enum.filter(&is_nil(&1.removed_from_printful_at))
-    |> Enum.map(fn product ->
-      {product, Enum.filter(product.variants, & &1.available)}
-    end)
-    |> Enum.reject(fn {_product, variants} -> variants == [] end)
+    Ysc.Merch.list_orderable_products()
   end
 
   @doc "The most recent events an order can be linked to, newest first."

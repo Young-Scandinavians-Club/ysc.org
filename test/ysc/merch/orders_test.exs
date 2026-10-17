@@ -143,6 +143,63 @@ defmodule Ysc.Merch.OrdersTest do
     assert Orders.get_user_order(user, "garbage") == nil
   end
 
+  test "get_user_order loads receipt fields and omits Printful ids and users.*",
+       %{user: user, lines: lines, tee: tee} do
+    image =
+      image_fixture(%{
+        upload_data: %{"original" => "fat-json"},
+        content_hash: "abc123"
+      })
+
+    tee |> Ecto.Changeset.change(image_id: image.id) |> Repo.update!()
+
+    {:ok, order} = create(user, lines)
+
+    order
+    |> Ecto.Changeset.change(%{
+      status: :shipped,
+      payment_intent_id: "pi_receipt",
+      printful_order_id: 90_001
+    })
+    |> Repo.update!()
+
+    shipment =
+      %Ysc.Merch.Shipment{}
+      |> Ysc.Merch.Shipment.changeset(%{
+        order_id: order.id,
+        printful_shipment_id: 91_001,
+        carrier: "USPS",
+        tracking_number: "9400111899223197428490",
+        tracking_url: "https://tools.usps.com/track?x=1",
+        shipped_at: ~U[2026-10-10 12:00:00Z]
+      })
+      |> Repo.insert!()
+
+    {shown, fat_cols} =
+      Ysc.QueryCounter.with_query_counter(
+        fn -> Orders.get_user_order(user, order.id) end,
+        pattern:
+          ~r/printful_order_id|printful_shipment_id|upload_data|content_hash|hashed_password|board_bio|raw_details/i,
+        caller_pids: [self()]
+      )
+
+    assert shown.id == order.id
+    assert shown.address1 == "1 Market St"
+    assert shown.payment_intent_id == "pi_receipt"
+    assert is_nil(shown.printful_order_id)
+    refute Ecto.assoc_loaded?(shown.user)
+    refute Ecto.assoc_loaded?(shown.event)
+    refute Ecto.assoc_loaded?(shown.granted_by)
+    item = Enum.find(shown.items, &(&1.variant_id == tee.id))
+    assert Money.equal?(item.unit_price, Money.new(:USD, "25"))
+    assert item.variant.image.id == image.id
+    assert is_nil(item.variant.image.upload_data)
+    assert [%{id: shipment_id, carrier: "USPS"}] = shown.shipments
+    assert shipment_id == shipment.id
+    assert is_nil(hd(shown.shipments).printful_shipment_id)
+    assert fat_cols == 0
+  end
+
   test "list_user_orders hides pending checkouts", %{user: user, lines: lines} do
     {:ok, order} = create(user, lines)
     assert Orders.list_user_orders(user) == []

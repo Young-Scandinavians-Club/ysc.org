@@ -109,4 +109,31 @@ defmodule Ysc.Merch.EventCostsTest do
     assert order.granted_by.id == admin.id
     assert [%{quantity: 20}] = order.items
   end
+
+  test "omits full user rows, addresses, and Printful ids", %{
+    admin: admin,
+    event: event
+  } do
+    admin_order_fixture(admin, %{
+      event_id: event.id,
+      status: :submitted,
+      purpose: "Giveaway",
+      estimated_cost: usd("50")
+    })
+
+    {orders, fat_cols} =
+      Ysc.QueryCounter.with_query_counter(
+        fn -> EventCosts.list_orders(event.id) end,
+        pattern:
+          ~r/hashed_password|board_bio|address1|payment_intent_id|printful_order_id/i,
+        caller_pids: [self()]
+      )
+
+    assert [order] = orders
+    assert order.granted_by.first_name == admin.first_name
+    assert is_nil(order.granted_by.hashed_password)
+    assert is_nil(order.address1)
+    assert is_nil(order.printful_order_id)
+    assert fat_cols == 0
+  end
 end

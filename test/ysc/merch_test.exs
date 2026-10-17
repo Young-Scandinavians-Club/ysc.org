@@ -180,23 +180,168 @@ defmodule Ysc.MerchTest do
     end
   end
 
-  test "admin list includes hidden products with all variants" do
-    hidden = product!(%{status: :hidden})
-    variant!(hidden, "10", %{available: false})
+  describe "list_admin_products/0" do
+    test "includes hidden products with all variants" do
+      hidden = product!(%{status: :hidden})
+      variant!(hidden, "10", %{available: false})
 
-    assert [%Product{variants: [_]}] = Merch.list_admin_products()
+      assert [%Product{variants: [_]}] = Merch.list_admin_products()
+    end
+
+    test "omits descriptions, Printful ids, and image upload_data" do
+      image =
+        image_fixture(%{
+          upload_data: %{"original" => "fat-json"},
+          content_hash: "abc123"
+        })
+
+      product =
+        product!()
+        |> Ecto.Changeset.change(%{
+          description: "Club-written copy the catalog table never shows.",
+          image_id: image.id
+        })
+        |> Repo.update!()
+
+      variant!(product, "20", %{
+        sku: "TEE-BLK-M",
+        source_image_url: "https://printful.example/tee.png",
+        image_id: image.id
+      })
+
+      gallery_photo_fixture(product, image, %{position: 0})
+
+      {listed, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Merch.list_admin_products() end,
+          pattern:
+            ~r/description|printful_product_id|printful_sync_variant_id|printful_variant_id|source_image_url|upload_data|content_hash|sku/i,
+          caller_pids: [self()]
+        )
+
+      shown = Enum.find(listed, &(&1.id == product.id))
+      assert shown
+      assert shown.name
+      assert is_nil(shown.description)
+      assert is_nil(shown.printful_product_id)
+      assert hd(shown.variants).printful_variant_id == nil
+      assert length(shown.gallery_images) == 1
+      assert shown.image.id == image.id
+      assert is_nil(shown.image.upload_data)
+      assert fat_cols == 0
+    end
   end
 
-  test "admin list keeps Printful gallery source (not the :admin default)" do
-    product = product!()
-    variant!(product, "10")
+  describe "get_admin_product/1" do
+    test "keeps the description, gallery source, and omits image upload_data" do
+      image = image_fixture(%{upload_data: %{"original" => "fat-json"}})
 
-    photo =
-      gallery_photo_fixture(product, nil, %{source: :printful, color: "Black"})
+      product =
+        product!()
+        |> Ecto.Changeset.change(%{
+          description: "Soft cotton club tee.",
+          image_id: image.id
+        })
+        |> Repo.update!()
 
-    assert [%Product{gallery_images: [loaded]}] = Merch.list_admin_products()
-    assert loaded.id == photo.id
-    assert loaded.source == :printful
-    assert loaded.color == "Black"
+      variant!(product, "10")
+
+      photo =
+        gallery_photo_fixture(product, image, %{
+          source: :printful,
+          color: "Black"
+        })
+
+      {shown, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Merch.get_admin_product(product.id) end,
+          pattern:
+            ~r/printful_product_id|printful_sync_variant_id|printful_variant_id|source_image_url|upload_data|content_hash|sku/i,
+          caller_pids: [self()]
+        )
+
+      assert shown.description == "Soft cotton club tee."
+
+      assert [%{id: photo_id, source: :printful, color: "Black"}] =
+               shown.gallery_images
+
+      assert photo_id == photo.id
+      assert shown.image.id == image.id
+      assert is_nil(shown.image.upload_data)
+      assert is_nil(shown.printful_product_id)
+      assert fat_cols == 0
+    end
+
+    test "returns nil for missing or invalid ids" do
+      assert Merch.get_admin_product(Ecto.ULID.generate()) == nil
+      assert Merch.get_admin_product("garbage") == nil
+    end
+  end
+
+  describe "list_orderable_products/0" do
+    test "includes hidden products and skips removed or sold-out ones" do
+      hidden = product!(%{status: :hidden})
+      hidden_variant = variant!(hidden, "10")
+
+      removed =
+        product!()
+        |> Ecto.Changeset.change(%{
+          removed_from_printful_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      variant!(removed, "10")
+
+      sold_out = product!()
+      variant!(sold_out, "10", %{available: false})
+
+      pairs = Merch.list_orderable_products()
+
+      assert [{product, [variant]}] =
+               Enum.filter(pairs, fn {p, _} -> p.id == hidden.id end)
+
+      assert product.name == hidden.name
+      assert variant.id == hidden_variant.id
+      refute Enum.any?(pairs, fn {p, _} -> p.id == removed.id end)
+      refute Enum.any?(pairs, fn {p, _} -> p.id == sold_out.id end)
+    end
+
+    test "omits descriptions, Printful ids, and images" do
+      image =
+        image_fixture(%{
+          upload_data: %{"original" => "fat-json"},
+          content_hash: "abc123"
+        })
+
+      product =
+        product!()
+        |> Ecto.Changeset.change(%{
+          description: "Not needed on the order form.",
+          image_id: image.id
+        })
+        |> Repo.update!()
+
+      variant!(product, "20", %{
+        sku: "TEE-BLK-M",
+        source_image_url: "https://printful.example/tee.png",
+        image_id: image.id
+      })
+
+      {pairs, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Merch.list_orderable_products() end,
+          pattern:
+            ~r/description|printful_product_id|printful_sync_variant_id|printful_variant_id|source_image_url|upload_data|content_hash|sku/i,
+          caller_pids: [self()]
+        )
+
+      {shown, [variant]} = Enum.find(pairs, fn {p, _} -> p.id == product.id end)
+      assert shown.name
+      assert is_nil(shown.description)
+      assert is_nil(shown.printful_product_id)
+      assert variant.printful_variant_id == nil
+      assert fat_cols == 0
+    end
   end
 end

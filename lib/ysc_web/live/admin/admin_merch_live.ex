@@ -33,7 +33,7 @@ defmodule YscWeb.AdminMerchLive do
 
   @impl true
   def handle_params(%{"id" => id}, _uri, socket) do
-    case Enum.find(socket.assigns.products, &(&1.id == id)) do
+    case Merch.get_admin_product(id) do
       nil ->
         {:noreply, push_patch(socket, to: ~p"/admin/merch")}
 
@@ -172,10 +172,7 @@ defmodule YscWeb.AdminMerchLive do
     socket = load_products(socket)
 
     case socket.assigns.editing_product &&
-           Enum.find(
-             socket.assigns.products,
-             &(&1.id == socket.assigns.editing_product.id)
-           ) do
+           Merch.get_admin_product(socket.assigns.editing_product.id) do
       nil -> socket
       product -> assign(socket, :editing_product, product)
     end
