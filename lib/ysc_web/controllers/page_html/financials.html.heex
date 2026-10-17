@@ -7,291 +7,137 @@
   />
 
   <%!-- Quick Stats Section (Current Year) --%>
-  <div class="mb-10 bg-linear-to-br from-blue-50 to-zinc-50 border border-blue-200 rounded-xl p-6 shadow-xs">
-    <.icon_heading id="financials-at-a-glance-heading">
-      <:leading>
-        <.icon name="hero-chart-bar" class="w-6 h-6 text-blue-600" />
-      </:leading>
-      2025 at a glance
-    </.icon_heading>
+  <div
+    id="financials-at-a-glance"
+    class="mb-8 bg-linear-to-br from-blue-50 to-zinc-50 border border-blue-200 rounded-xl p-6 shadow-xs"
+  >
+    <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 mb-4">
+      <.icon_heading id="financials-at-a-glance-heading" class="text-zinc-900">
+        <:leading>
+          <.icon name="hero-chart-bar" class="w-6 h-6 text-blue-600" />
+        </:leading>
+        2025 at a glance
+      </.icon_heading>
+      <span class="type-eyebrow text-xs text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">
+        Reported at the 2026 meeting
+      </span>
+    </div>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div class="bg-white rounded-xl p-4 border border-zinc-200">
-        <div class="text-sm text-zinc-500 mb-1 type-eyebrow">
+        <div class="flex items-center justify-between gap-2 text-sm text-zinc-500 mb-1 type-eyebrow">
           Active Members
+          <.icon name="hero-users" class="w-4 h-4 text-zinc-400" />
         </div>
         <div class="text-2xl text-zinc-900 type-title">550</div>
         <div class="text-xs text-zinc-500 mt-1">188 single, 181 families</div>
       </div>
       <div class="bg-white rounded-xl p-4 border border-zinc-200">
-        <div class="text-sm text-zinc-500 mb-1 type-eyebrow">
+        <div class="flex items-center justify-between gap-2 text-sm text-zinc-500 mb-1 type-eyebrow">
           Income after expenses
+          <.icon name="hero-banknotes" class="w-4 h-4 text-zinc-400" />
         </div>
         <div class="text-2xl text-zinc-900 type-title">$126,999.52</div>
         <div class="text-xs text-zinc-500 mt-1">Incl. $100K donation</div>
       </div>
       <div class="bg-white rounded-xl p-4 border border-zinc-200">
-        <div class="text-sm text-zinc-500 mb-1 type-eyebrow">
+        <div class="flex items-center justify-between gap-2 text-sm text-zinc-500 mb-1 type-eyebrow">
           Memberships
+          <.icon name="hero-arrow-trending-up" class="w-4 h-4 text-zinc-400" />
         </div>
-        <div class="text-2xl text-zinc-900 type-title">369</div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-2xl text-zinc-900 type-title">369</span>
+          <span class="text-xs font-semibold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-sm">
+            +11.8%
+          </span>
+        </div>
         <div class="text-xs text-zinc-500 mt-1">Up from 330 (146 new)</div>
       </div>
     </div>
   </div>
 
   <%!-- Jump to Year Navigation --%>
-  <div class="mb-8 bg-white border border-zinc-200 rounded-lg p-4 sticky top-4 z-10 shadow-xs">
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="text-sm font-semibold text-zinc-700 mr-2">
-        Jump to Year:
+  <nav
+    id="financials-year-nav"
+    aria-label="Jump to meeting year"
+    class="mb-8 bg-white/90 backdrop-blur-md border border-zinc-200 rounded-lg px-3 py-2 sticky top-4 z-10 shadow-xs"
+  >
+    <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+      <span class="type-eyebrow text-xs text-zinc-500 px-2 shrink-0">
+        Jump to
       </span>
-      <%= for {year, idx} <- Enum.with_index(2026..2018//-1) do %>
-        <span :if={idx > 0} class="text-zinc-400">|</span>
-        <.link
-          href={"#year-#{year}"}
-          class="text-sm text-blue-600 hover:text-blue-700 hover:underline font-medium"
-        >
-          {year}
-        </.link>
-      <% end %>
+      <.link
+        :for={meeting <- recent_meetings()}
+        href={"#year-#{meeting.year}"}
+        class="shrink-0 px-3 py-1.5 rounded-full text-sm font-medium text-zinc-700 bg-zinc-100 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+      >
+        {meeting.year}
+      </.link>
+      <span class="h-5 w-px bg-zinc-200 mx-1 shrink-0" aria-hidden="true"></span>
+      <.link
+        :for={meeting <- archived_meetings()}
+        href={"#year-#{meeting.year}"}
+        data-opens-details="financials-archive"
+        class="shrink-0 px-3 py-1.5 rounded-full text-sm font-medium text-zinc-500 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+      >
+        {meeting.year}
+      </.link>
     </div>
-  </div>
+  </nav>
 
   <%!-- Financial Reports by Year --%>
   <div class="space-y-6">
-    <.annual_meeting_section id="year-2026" title="2026 General Meeting">
+    <.annual_meeting_section
+      :for={{meeting, index} <- Enum.with_index(recent_meetings())}
+      id={"year-#{meeting.year}"}
+      title={"#{meeting.year} General Meeting"}
+      badge={if index == 0, do: "Latest"}
+      note={"Reviews FY #{meeting.fy}"}
+    >
       <.document_download_card
-        id="financials-2026-summary"
-        href={~p"/annual_meetings/2026/YSC_ANNUAL_MEETING_REPORT_FY_2025.pdf"}
-        title="Financials Summary 2025"
-        meta="PDF • 70K"
-        kind={:summary}
-      />
-      <.document_download_card
-        id="financials-2026-report"
-        href={~p"/annual_meetings/2026/YSC_ANNUAL_REPORT_FY_2025.pdf"}
-        title="Full Annual Report"
-        meta="PDF • 107K"
-        kind={:report}
-      />
-      <.document_download_card
-        id="financials-2026-minutes"
-        href={~p"/annual_meetings/2026/YSC_AGM_2026_meeting_minutes.pdf"}
-        title="Meeting Minutes"
-        meta="PDF • 104K"
-        kind={:minutes}
-      />
-    </.annual_meeting_section>
-
-    <.annual_meeting_section id="year-2025" title="2025 General Meeting">
-      <.document_download_card
-        id="financials-2025-summary"
-        href={
-          ~p"/annual_meetings/2025/annual_meeting_financials_2024_handout.pdf"
-        }
-        title="Financials Summary 2024"
-        meta="PDF • 70K"
-        kind={:summary}
-      />
-      <.document_download_card
-        id="financials-2025-report"
-        href={~p"/annual_meetings/2025/YSC_Annual_Report_2024.pdf"}
-        title="Full Annual Report"
-        meta="PDF • 106K"
-        kind={:report}
-      />
-      <.document_download_card
-        id="financials-2025-minutes"
-        href="/annual_meetings/2025/YSC_AGM%202025_meeting_minutes.docx"
-        title="Meeting Minutes"
-        meta="DOCX • 51K"
-        kind={:minutes}
-      />
-    </.annual_meeting_section>
-
-    <.annual_meeting_section id="year-2024" title="2024 General Meeting">
-      <.document_download_card
-        id="financials-2024-summary"
-        href={
-          ~p"/annual_meetings/2024/YSC-Financials-2023-General-Meeting-Handout.pdf"
-        }
-        title="Financials Summary 2023"
-        meta="PDF • 57K"
-        kind={:summary}
-      />
-      <.document_download_card
-        id="financials-2024-report"
-        href={~p"/annual_meetings/2024/YSC-AGM-2025_final.pdf"}
-        title="Full Annual Report"
-        meta="PDF • 158K"
-        kind={:report}
-      />
-      <.document_download_card
-        id="financials-2024-minutes"
-        href="/annual_meetings/2024/YSC%20Annual%20General%20Meeting%2001.28.24.docx"
-        title="Meeting Minutes"
-        meta="DOCX • 15K"
-        kind={:minutes}
-      />
-    </.annual_meeting_section>
-
-    <.annual_meeting_section id="year-2023" title="2023 General Meeting">
-      <.document_download_card
-        id="financials-2023-summary"
-        href={
-          ~p"/annual_meetings/2023/YSC-General-Meeting-Financials-Summary-2022.pdf"
-        }
-        title="Financials Summary 2022"
-        meta="PDF • 49K"
-        kind={:summary}
-      />
-      <.document_download_card
-        id="financials-2023-report"
-        href={~p"/annual_meetings/2023/YSC-Financials-2022.v2.pdf"}
-        title="Full Annual Report"
-        meta="PDF • 717K"
-        kind={:report}
-      />
-      <.document_download_card
-        id="financials-2023-minutes"
-        href={~p"/annual_meetings/2023/YSC-AGM-Minutes-02.27.22.pdf"}
-        title="Meeting Minutes"
-        meta="PDF • 90K"
-        kind={:minutes}
+        :for={{kind, href, meta} <- meeting.docs}
+        id={"financials-#{meeting.year}-#{kind}"}
+        href={href}
+        title={doc_title(kind, meeting.fy)}
+        meta={meta}
+        kind={kind}
       />
     </.annual_meeting_section>
 
     <%!-- Older Years (Collapsible) --%>
-    <details class="bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden">
-      <summary class="bg-zinc-800 px-6 py-4 cursor-pointer hover:bg-zinc-700 transition-colors flex items-center justify-between">
-        <h2 class="text-white text-xl m-0 type-subhead">
-          Archive (2022 - 2018)
-        </h2>
+    <details
+      id="financials-archive"
+      class="group/archive bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden"
+    >
+      <summary class="flex items-center justify-between gap-3 bg-zinc-50 px-6 py-4 cursor-pointer hover:bg-zinc-100 transition-colors list-none group-open/archive:border-b group-open/archive:border-zinc-200">
+        <div class="flex items-center gap-3">
+          <.icon name="hero-archive-box" class="w-5 h-5 text-zinc-500" />
+          <h2 class="text-zinc-900 text-xl m-0 type-subhead">
+            Archive (2022 – 2018)
+          </h2>
+          <span class="type-eyebrow text-xs text-zinc-600 bg-zinc-200 px-2 py-0.5 rounded-full">
+            {length(archived_meetings())} years
+          </span>
+        </div>
         <.icon
           name="hero-chevron-down"
-          class="w-5 h-5 text-white chevron-icon shrink-0"
+          class="w-5 h-5 text-zinc-500 shrink-0 transition-transform group-open/archive:rotate-180"
         />
       </summary>
-      <div class="divide-y divide-zinc-100">
+      <div class="divide-y divide-zinc-200">
         <.annual_meeting_section
-          id="year-2022"
-          title="2022 General Meeting"
+          :for={meeting <- archived_meetings()}
+          id={"year-#{meeting.year}"}
+          title={"#{meeting.year} General Meeting"}
+          note={"Reviews FY #{meeting.fy}"}
           variant={:archive}
         >
           <.document_download_card
-            id="financials-2022-summary"
-            href={
-              ~p"/annual_meetings/2022/YSC-Financials-2021-General-Meeting-Overview.pdf"
-            }
-            title="Financials Summary 2021"
-            meta="PDF • 49K"
-            kind={:summary}
-          />
-          <.document_download_card
-            id="financials-2022-report"
-            href={~p"/annual_meetings/2022/YSC-Financials-2021-2.18.22.pdf"}
-            title="Full Annual Report"
-            meta="PDF • 763K"
-            kind={:report}
-          />
-        </.annual_meeting_section>
-
-        <.annual_meeting_section
-          id="year-2021"
-          title="2021 General Meeting"
-          variant={:archive}
-        >
-          <.document_download_card
-            id="financials-2021-summary"
-            href={~p"/annual_meetings/2021/YSC-Annual-Meeting-2021.pdf"}
-            title="Financials Summary 2020"
-            meta="PDF • 7.9M"
-            kind={:summary}
-          />
-          <.document_download_card
-            id="financials-2021-report"
-            href={~p"/annual_meetings/2021/YSC-Financials-2020-1.10.21.pdf"}
-            title="Full Annual Report"
-            meta="PDF • 430K"
-            kind={:report}
-          />
-          <.document_download_card
-            id="financials-2021-minutes"
-            href={
-              ~p"/annual_meetings/2021/YSC-Annual-Meeting-Minutes-022121.pdf"
-            }
-            title="Meeting Minutes"
-            meta="PDF • 88K"
-            kind={:minutes}
-          />
-        </.annual_meeting_section>
-
-        <.annual_meeting_section
-          id="year-2020"
-          title="2020 General Meeting"
-          variant={:archive}
-        >
-          <.document_download_card
-            id="financials-2020-summary"
-            href={
-              ~p"/annual_meetings/2020/YSC-General-Meeting-Financials-2019-Summary-2.4.2020.pdf"
-            }
-            title="Financials Summary 2019"
-            meta="PDF • 79K"
-            kind={:summary}
-          />
-          <.document_download_card
-            id="financials-2020-report"
-            href={~p"/annual_meetings/2020/YSC-Financials-2019-2.4.2020.pdf"}
-            title="Full Annual Report"
-            meta="PDF • 484K"
-            kind={:report}
-          />
-        </.annual_meeting_section>
-
-        <.annual_meeting_section
-          id="year-2019"
-          title="2019 General Meeting"
-          variant={:archive}
-        >
-          <.document_download_card
-            id="financials-2019-summary"
-            href={
-              ~p"/annual_meetings/2019/YSC-General-Meeting-Financials-Summary-2018-v02.07.19.pdf"
-            }
-            title="Financials Summary 2018"
-            meta="PDF • 74K"
-            kind={:summary}
-          />
-          <.document_download_card
-            id="financials-2019-report"
-            href={~p"/annual_meetings/2019/YSC-Financials-2018-v02.07.19.pdf"}
-            title="Full Annual Report"
-            meta="PDF • 532K"
-            kind={:report}
-          />
-        </.annual_meeting_section>
-
-        <.annual_meeting_section
-          id="year-2018"
-          title="2018 General Meeting"
-          variant={:archive}
-        >
-          <.document_download_card
-            id="financials-2018-summary"
-            href={
-              ~p"/annual_meetings/2018/YSC-2017-financials-2018-02-14-CPA-approved.pdf"
-            }
-            title="Financials Summary 2017"
-            meta="PDF • 63K"
-            kind={:summary}
-          />
-          <.document_download_card
-            id="financials-2018-slides"
-            href={~p"/annual_meetings/2018/YSC-2017-financials.pptx"}
-            title="Financials Presentation"
-            meta="PPTX • 284K"
-            kind={:slides}
+            :for={{kind, href, meta} <- meeting.docs}
+            id={"financials-#{meeting.year}-#{kind}"}
+            href={href}
+            title={doc_title(kind, meeting.fy)}
+            meta={meta}
+            kind={kind}
           />
         </.annual_meeting_section>
       </div>

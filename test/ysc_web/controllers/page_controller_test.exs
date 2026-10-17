@@ -288,5 +288,36 @@ defmodule YscWeb.PageControllerTest do
       assert summary =~ "target=\"_blank\""
       assert summary =~ "YSC_ANNUAL_MEETING_REPORT_FY_2025.pdf"
     end
+
+    test "lists every meeting year and wires archive links to the details", %{
+      conn: conn
+    } do
+      html = conn |> get(~p"/financials") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      for year <- 2018..2026 do
+        assert Enum.count(LazyHTML.query(document, "#year-#{year}")) == 1
+
+        assert Enum.count(
+                 LazyHTML.query(document, "nav a[href='#year-#{year}']")
+               ) == 1
+      end
+
+      assert Enum.count(
+               LazyHTML.query(document, "details#financials-archive #year-2022")
+             ) ==
+               1
+
+      archive_links =
+        LazyHTML.query(
+          document,
+          "nav a[data-opens-details='financials-archive']"
+        )
+
+      assert Enum.count(archive_links) == 5
+
+      assert Enum.count(LazyHTML.query(document, "#year-2026 a[href$='.pdf']")) ==
+               3
+    end
   end
 end
