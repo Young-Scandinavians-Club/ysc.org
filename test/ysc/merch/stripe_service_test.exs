@@ -166,8 +166,7 @@ defmodule Ysc.Merch.StripeServiceTest do
       end)
 
       expect(StripeMock, :cancel_payment_intent, fn "pi_stale_amount", _ ->
-        {:ok,
-         %Stripe.PaymentIntent{id: "pi_stale_amount", status: "canceled"}}
+        {:ok, %Stripe.PaymentIntent{id: "pi_stale_amount", status: "canceled"}}
       end)
 
       expect(StripeMock, :create_payment_intent, fn params, _ ->
