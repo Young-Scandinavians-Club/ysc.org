@@ -12,6 +12,9 @@
 #   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 200; use after git scope)
 #   OPENROUTER_PR_BODY_MAX          (optional)  max characters per PR body fetched from GitHub (default: 8000)
 #   OPENROUTER_MAX_TOKENS           (optional)  max completion tokens per LLM response, reasoning included (default: 16384)
+#   OPENROUTER_REASONING_EFFORT     (optional)  OpenRouter reasoning.effort: low, minimal, none, medium, high (default: low)
+#   OPENROUTER_ATTEMPTS             (optional)  OpenRouter HTTP / empty-content retries (default: 3)
+#   OPENROUTER_RETRY_DELAY_SECONDS  (optional)  base delay between OpenRouter retries; doubles each attempt (default: 8)
 #   OPENROUTER_CHUNK_PRS            (optional)  if more PRs than this, summarize them in chunks of this size, merge the sections
 #                                   locally, then make one short request for the intro/Highlights (default: 25; 0 disables)
 #   OPENROUTER_SMALL_RELEASE_MAX_COMMITS (opt.)  if previous tag exists and rev-list --count PREV..TAG is at most this, do not
@@ -38,6 +41,9 @@ DRY_RUN="${DRY_RUN:-0}"
 OPENROUTER_MODEL="${OPENROUTER_MODEL:-deepseek/deepseek-v4-flash}"
 OPENROUTER_PR_BODY_MAX="${OPENROUTER_PR_BODY_MAX:-8000}"
 OPENROUTER_MAX_TOKENS="${OPENROUTER_MAX_TOKENS:-16384}"
+OPENROUTER_REASONING_EFFORT="${OPENROUTER_REASONING_EFFORT:-low}"
+OPENROUTER_ATTEMPTS="${OPENROUTER_ATTEMPTS:-3}"
+OPENROUTER_RETRY_DELAY_SECONDS="${OPENROUTER_RETRY_DELAY_SECONDS:-8}"
 OPENROUTER_CHUNK_PRS="${OPENROUTER_CHUNK_PRS:-25}"
 GITHUB_API="${GITHUB_API:-https://api.github.com}"
 OPENROUTER_API="${OPENROUTER_API:-https://openrouter.ai/api/v1/chat/completions}"
@@ -361,20 +367,82 @@ pr_json_shrink_for_openrouter() {
   fi
 }
 
-# openrouter_complete SYSTEM USER_FILE — one chat completion with retries; prints the assistant text.
-# USER_FILE holds the raw user message. Fails (non-zero) on HTTP errors or an empty answer, with a
-# specific hint when the model spent its whole max_tokens budget (reasoning models) before answering.
-openrouter_complete() {
-  local system="$1" user_file="$2"
-  local referer req_tmp resp_tmp code text finish attempt
-  referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG}}"
-  req_tmp=$(mktemp)
-  resp_tmp=$(mktemp)
+# Assistant content from an OpenRouter chat.completions JSON file. Empty when the
+# model spent max_tokens on reasoning (finish_reason=length, content null) — job
+# 117468028260 / v2.47.0.
+openrouter_choice_text() {
+  jq -r '.choices[0].message.content // empty' "$1" 2>/dev/null || true
+}
 
-  if ! jq -n \
+openrouter_content_usable() {
+  local text
+  text=$(openrouter_choice_text "$1")
+  [ -n "$text" ] && [ "$text" != "null" ]
+}
+
+openrouter_http_retryable() {
+  case "$1" in
+    429 | 500 | 502 | 503 | 504 | 000) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+openrouter_log_empty_response() {
+  local finish reasoning_tokens completion
+  finish=$(jq -r '.choices[0].finish_reason // empty' "$1" 2>/dev/null || true)
+  reasoning_tokens=$(jq -r '.usage.completion_tokens_details.reasoning_tokens // 0' "$1" 2>/dev/null || true)
+  completion=$(jq -r '.usage.completion_tokens // 0' "$1" 2>/dev/null || true)
+  echo "OpenRouter returned no assistant text (finish_reason=${finish:-unknown}, completion_tokens=${completion}, reasoning_tokens=${reasoning_tokens})." >&2
+  if [ "$finish" = "length" ]; then
+    echo "The model used all completion tokens (reasoning counts) before answering." >&2
+    echo "  Retrying with reasoning.effort=none and a larger max_tokens, or raise OPENROUTER_MAX_TOKENS / lower OPENROUTER_CHUNK_PRS." >&2
+  fi
+}
+
+# Compact failure dump — full reasoning traces are tens of KB and not useful in CI.
+openrouter_log_response_summary() {
+  echo "${TEAL}Response summary:${RESET}" >&2
+  jq '{
+      id, model, provider,
+      finish_reason: .choices[0].finish_reason,
+      content_chars: ((.choices[0].message.content // "") | length),
+      reasoning_chars: ((.choices[0].message.reasoning // "") | length),
+      usage
+    }' "$1" >&2 2>/dev/null || cat "$1" >&2
+}
+
+# POST req JSON to OpenRouter; writes the body to resp and prints the HTTP status.
+# OPENROUTER_HTTP_POST_CMD, when set, is a bash snippet that reads OPENROUTER_REQ /
+# OPENROUTER_RESP (for --self-test). It must print the status code to stdout.
+openrouter_http_post() {
+  local req="$1" resp="$2" code referer
+  if [ -n "${OPENROUTER_HTTP_POST_CMD:-}" ]; then
+    OPENROUTER_REQ="$req" OPENROUTER_RESP="$resp" bash -c "${OPENROUTER_HTTP_POST_CMD}"
+    return $?
+  fi
+  referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG:-}}"
+  code=$(
+    curl -sS -o "$resp" -w "%{http_code}" \
+      -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
+      -H "Content-Type: application/json" \
+      -H "HTTP-Referer: ${referer}" \
+      -H "X-Title: ysc release notes" \
+      -d @"$req" \
+      "$OPENROUTER_API"
+  ) || code="000"
+  printf '%s\n' "$code"
+}
+
+# write_openrouter_chat_request OUT SYSTEM USER_FILE MAX_TOKENS EFFORT
+# Builds the chat.completions JSON. Empty EFFORT omits the reasoning field (some
+# models reject reasoning.effort=none).
+write_openrouter_chat_request() {
+  local out="$1" system="$2" user_file="$3" max_tokens="$4" effort="$5"
+  jq -n \
     --arg model "$OPENROUTER_MODEL" \
     --arg sys "$system" \
-    --argjson max_tokens "$OPENROUTER_MAX_TOKENS" \
+    --argjson max_tokens "$max_tokens" \
+    --arg effort "$effort" \
     --rawfile user "$user_file" \
     '{
        model: $model,
@@ -383,39 +451,50 @@ openrouter_complete() {
          { role: "system", content: $sys },
          { role: "user", content: $user }
        ]
-     }' >"$req_tmp"; then
-    rm -f "$req_tmp" "$resp_tmp"
-    return 1
-  fi
+     }
+     | if ($effort | length) > 0 then . + {reasoning: {effort: $effort}} else . end' >"$out"
+}
 
-  for attempt in 1 2 3; do
-    code=$(
-      curl -sS -o "$resp_tmp" -w "%{http_code}" \
-        -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
-        -H "Content-Type: application/json" \
-        -H "HTTP-Referer: ${referer}" \
-        -H "X-Title: ysc release notes" \
-        -d @"$req_tmp" \
-        "$OPENROUTER_API"
-    ) || code=000
+# openrouter_complete SYSTEM USER_FILE — one chat completion with retries; prints the assistant text.
+# USER_FILE holds the raw user message. Fails (non-zero) on HTTP errors or an empty answer.
+# Caps reasoning.effort (default low). On empty content (v2.47.0: finish_reason=length,
+# content null), retries with effort=none and doubled max_tokens (cap 32768).
+openrouter_complete() {
+  local system="$1" user_file="$2"
+  local req_tmp resp_tmp code text attempt
+  local max_attempts max_tokens effort delay
+
+  max_attempts="${OPENROUTER_ATTEMPTS:-3}"
+  max_tokens="$OPENROUTER_MAX_TOKENS"
+  effort="$OPENROUTER_REASONING_EFFORT"
+  delay="${OPENROUTER_RETRY_DELAY_SECONDS:-8}"
+
+  req_tmp=$(mktemp)
+  resp_tmp=$(mktemp)
+  or_rm() { rm -f "$req_tmp" "$resp_tmp" 2>/dev/null; }
+
+  attempt=1
+  while [ "$attempt" -le "$max_attempts" ]; do
+    if ! write_openrouter_chat_request "$req_tmp" "$system" "$user_file" "$max_tokens" "$effort"; then
+      echo "${RED}Error: failed to build OpenRouter request JSON.${RESET}" >&2
+      or_rm
+      return 1
+    fi
+    echo "${TEAL}OpenRouter attempt ${attempt}/${max_attempts} (model: ${OPENROUTER_MODEL}, max_tokens: ${max_tokens}, reasoning.effort: ${effort:-<omit>}).${RESET}" >&2
+
+    code=$(openrouter_http_post "$req_tmp" "$resp_tmp")
+    if [ "$code" = "200" ] && openrouter_content_usable "$resp_tmp"; then
+      text=$(openrouter_choice_text "$resp_tmp")
+      or_rm
+      printf '%s\n' "$text"
+      return 0
+    fi
 
     if [ "$code" = "200" ]; then
-      text=$(jq -r '.choices[0].message.content // empty' "$resp_tmp")
-      if [ -n "$text" ] && [ "$text" != "null" ]; then
-        rm -f "$req_tmp" "$resp_tmp"
-        printf '%s\n' "$text"
-        return 0
-      fi
-      finish=$(jq -r '.choices[0].finish_reason // "unknown"' "$resp_tmp" 2>/dev/null || echo unknown)
-      echo "${RED}Error: OpenRouter returned no text (finish_reason: ${finish}). Response:${RESET}" >&2
-      jq . "$resp_tmp" 2>/dev/null || cat "$resp_tmp" >&2
-      if [ "$finish" = "length" ]; then
-        echo "The model used all ${OPENROUTER_MAX_TOKENS} completion tokens (reasoning counts) before answering." >&2
-        echo "  Raise OPENROUTER_MAX_TOKENS or lower OPENROUTER_CHUNK_PRS so each request is smaller." >&2
-        break
-      fi
+      echo "${RED}OpenRouter returned no text on attempt ${attempt}.${RESET}" >&2
+      openrouter_log_empty_response "$resp_tmp"
     else
-      echo "${RED}OpenRouter request failed: HTTP $code${RESET}" >&2
+      echo "${RED}OpenRouter request failed: HTTP $code (attempt ${attempt})${RESET}" >&2
       case "$code" in
         401) echo "Invalid or missing API key (check OPENROUTER_API_KEY)." >&2 ;;
         402)
@@ -425,18 +504,49 @@ openrouter_complete() {
         403) echo "Request forbidden: model or key may not be allowed for this call." >&2 ;;
         429) echo "Rate limit — retry later." >&2 ;;
       esac
+    fi
+
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      openrouter_log_response_summary "$resp_tmp"
+      or_rm
+      return 1
+    fi
+
+    # effort=none is rejected by some reasoning-mandatory models; omit the field and retry.
+    if [ "$code" = "400" ] && [ "$effort" = "none" ]; then
+      echo "${TEAL}HTTP 400 with reasoning.effort=none; retrying without a reasoning field.${RESET}" >&2
+      effort=""
+      attempt=$((attempt + 1))
+      continue
+    fi
+
+    if [ "$code" != "200" ] && ! openrouter_http_retryable "$code"; then
+      openrouter_log_response_summary "$resp_tmp"
       echo "${TEAL}Response body:${RESET}" >&2
       cat "$resp_tmp" >&2
       echo >&2
-      # Client errors other than rate limiting will not succeed on retry.
-      case "$code" in 401 | 402 | 403) break ;; esac
+      or_rm
+      return 1
     fi
-    if [ "$attempt" -lt 3 ]; then
-      echo "${YELLOW}Retrying OpenRouter request (attempt $((attempt + 1)) of 3)...${RESET}" >&2
-      sleep $((attempt * 5))
+
+    if [ "$code" = "200" ]; then
+      echo "${TEAL}Retrying with reasoning.effort=none and a larger max_tokens.${RESET}" >&2
+      max_tokens=$((max_tokens * 2))
+      if [ "$max_tokens" -gt 32768 ]; then
+        max_tokens=32768
+      fi
+      effort="none"
+    else
+      echo "${TEAL}Retrying in ${delay}s...${RESET}" >&2
     fi
+
+    if [ "$delay" -gt 0 ]; then
+      sleep "$delay"
+    fi
+    delay=$((delay * 2))
+    attempt=$((attempt + 1))
   done
-  rm -f "$req_tmp" "$resp_tmp"
+  or_rm
   return 1
 }
 
@@ -482,6 +592,7 @@ Length and detail:
 - Be thorough and specific: prefer concrete user-visible outcomes over vague \"improvements\".
 - Aim for roughly one substantive bullet per PR on small releases; on large releases, group related PRs but ensure every PR number still appears.
 - Target roughly 500–3000 words depending on PR count — longer when there are many PRs. Do not artificially truncate coverage of the input.
+- Put the Markdown in the assistant message content. Do not spend the completion budget only on internal planning — reasoning tokens count against max_tokens.
 - Output Markdown only, no preamble or code fences around the whole text."
 
   local user_tmp
@@ -567,6 +678,7 @@ Rules:
 - Output ONLY these H2 sections, omitting empty ones: ## Added, ## Changed, ## Fixed, ## Security, ## Internal / Technical.
 - Do NOT write a summary, a title, a Highlights section, or any text outside those sections.
 - Under each section use bullets. Link PRs as [#NNN](url) when url is in the data, or #NNN otherwise.
+- Put the Markdown in the assistant message content. Do not spend the completion budget only on internal planning — reasoning tokens count against max_tokens.
 - Output Markdown only, no preamble or code fences."
 
   final_system="You write the opening of GitHub release notes in Markdown. The user message contains the already-written sections of the notes for one release. Use ONLY that text; do not invent anything.
@@ -749,6 +861,152 @@ self_test() {
   printf '[#3](u) and #30\n' >"$dir/notes.md"
   if [ "$(missing_pr_bullets "$dir/notes.md" "$dir/mp.json" | tr '\n' '|')" != "- B ([#2](u))|- E ([#5](https://x/5))|" ]; then
     echo "update_github_release_notes.sh: missing_pr_bullets mismatch" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  printf 'user payload\n' >"$dir/user.txt"
+  if ! write_openrouter_chat_request "$dir/req.json" "sys" "$dir/user.txt" "16384" "low"; then
+    echo "update_github_release_notes.sh: request JSON write failed" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq -r '.max_tokens' "$dir/req.json")" != "16384" ]; then
+    echo "update_github_release_notes.sh: request max_tokens mismatch" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq -r '.reasoning.effort' "$dir/req.json")" != "low" ]; then
+    echo "update_github_release_notes.sh: request reasoning.effort mismatch" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if ! write_openrouter_chat_request "$dir/req-omit.json" "sys" "$dir/user.txt" "8192" ""; then
+    echo "update_github_release_notes.sh: request JSON omit-reasoning write failed" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(jq 'has("reasoning")' "$dir/req-omit.json")" != "false" ]; then
+    echo "update_github_release_notes.sh: empty effort should omit reasoning" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  # v2.47.0 / job 117468028260: Relace spent max_tokens on reasoning, content null.
+  cat >"$dir/exhausted.json" <<'JSON'
+{
+  "id": "gen-test",
+  "model": "deepseek/deepseek-v4-flash",
+  "provider": "Relace",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "length",
+      "message": { "role": "assistant", "content": null, "reasoning": "planning..." }
+    }
+  ],
+  "usage": {
+    "completion_tokens": 8192,
+    "completion_tokens_details": { "reasoning_tokens": 8573 }
+  }
+}
+JSON
+  if openrouter_content_usable "$dir/exhausted.json"; then
+    echo "update_github_release_notes.sh: exhausted response should not be usable" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ -n "$(openrouter_choice_text "$dir/exhausted.json")" ]; then
+    echo "update_github_release_notes.sh: exhausted content should be empty" >&2
+    self_test_cleanup
+    return 1
+  fi
+  cat >"$dir/ok.json" <<'JSON'
+{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"## Highlights\n\n- notes"}}]}
+JSON
+  if ! openrouter_content_usable "$dir/ok.json"; then
+    echo "update_github_release_notes.sh: stop response should be usable" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if ! openrouter_http_retryable 429 || ! openrouter_http_retryable 502 || openrouter_http_retryable 401; then
+    echo "update_github_release_notes.sh: HTTP retryable classification failed" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  # Retry: first OpenRouter reply is the v2.47.0 empty-content shape, second succeeds
+  # with effort=none and doubled max_tokens.
+  echo 0 >"$dir/http_count"
+  cat >"$dir/http.sh" <<'EOS'
+n=$(cat "$COUNTF")
+n=$((n + 1))
+echo "$n" >"$COUNTF"
+if [ "$n" -eq 1 ]; then
+  cat >"$OPENROUTER_RESP" <<'JSON'
+{
+  "choices": [{"finish_reason": "length", "message": {"role": "assistant", "content": null, "reasoning": "planning"}}],
+  "usage": {"completion_tokens": 8192, "completion_tokens_details": {"reasoning_tokens": 8192}}
+}
+JSON
+  echo 200
+  exit 0
+fi
+if ! jq -e '.reasoning.effort == "none" and .max_tokens == 16384' "$OPENROUTER_REQ" >/dev/null; then
+  echo "second request should use effort=none and doubled max_tokens" >&2
+  exit 1
+fi
+cat >"$OPENROUTER_RESP" <<'JSON'
+{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"## Highlights\n\n- recovered notes"}}]}
+JSON
+echo 200
+EOS
+  notes=$(
+    COUNTF="$dir/http_count" \
+      OPENROUTER_HTTP_POST_CMD="COUNTF='$dir/http_count' bash '$dir/http.sh'" \
+      OPENROUTER_RETRY_DELAY_SECONDS=0 \
+      OPENROUTER_ATTEMPTS=3 \
+      OPENROUTER_MAX_TOKENS=8192 \
+      OPENROUTER_REASONING_EFFORT=low \
+      REPO_SLUG=test/repo \
+      openrouter_complete "Write notes." "$dir/user.txt"
+  ) || {
+    echo "update_github_release_notes.sh: complete retry should succeed on second attempt" >&2
+    self_test_cleanup
+    return 1
+  }
+  if [[ "$notes" != *"recovered notes"* ]]; then
+    echo "update_github_release_notes.sh: unexpected complete output: $notes" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(cat "$dir/http_count")" != "2" ]; then
+    echo "update_github_release_notes.sh: expected 2 HTTP posts, got $(cat "$dir/http_count")" >&2
+    self_test_cleanup
+    return 1
+  fi
+
+  # 401 is not retried.
+  echo 0 >"$dir/http_count"
+  cat >"$dir/http401.sh" <<'EOS'
+n=$(cat "$COUNTF")
+n=$((n + 1))
+echo "$n" >"$COUNTF"
+echo '{"error":"unauthorized"}' >"$OPENROUTER_RESP"
+echo 401
+EOS
+  if COUNTF="$dir/http_count" \
+    OPENROUTER_HTTP_POST_CMD="COUNTF='$dir/http_count' bash '$dir/http401.sh'" \
+    OPENROUTER_RETRY_DELAY_SECONDS=0 \
+    OPENROUTER_ATTEMPTS=3 \
+    REPO_SLUG=test/repo \
+    openrouter_complete "Write notes." "$dir/user.txt" >/dev/null 2>"$dir/auth.err"; then
+    echo "update_github_release_notes.sh: 401 should fail" >&2
+    self_test_cleanup
+    return 1
+  fi
+  if [ "$(cat "$dir/http_count")" != "1" ]; then
+    echo "update_github_release_notes.sh: 401 should not retry, got $(cat "$dir/http_count") posts" >&2
     self_test_cleanup
     return 1
   fi
