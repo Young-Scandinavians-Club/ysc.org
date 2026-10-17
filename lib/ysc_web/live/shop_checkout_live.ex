@@ -284,7 +284,10 @@ defmodule YscWeb.ShopCheckoutLive do
          {:ok, order} <-
            Orders.create_pending_purchase(user, lines, address, quoted),
          {:ok, intent} <- StripeService.ensure_payment_intent(order, user) do
-      if intent.status == "succeeded" do
+      # ACH/bank stays `processing` for days. Reuse that Intent and wait on
+      # the confirmation page — opening Payment Element again invites a
+      # second confirmation against a settling charge.
+      if intent.status in ["succeeded", "processing"] do
         {:paid, order}
       else
         {:ok, order, intent, lines, quoted}
@@ -292,6 +295,10 @@ defmodule YscWeb.ShopCheckoutLive do
     else
       {:error, :empty_cart} ->
         {:error, "Your cart is empty."}
+
+      {:error, :payment_in_progress} ->
+        {:error,
+         "Your previous payment is still processing. Wait for an email confirmation before placing another order."}
 
       {:error, :unavailable_items} ->
         {:error,

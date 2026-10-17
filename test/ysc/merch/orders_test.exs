@@ -79,6 +79,23 @@ defmodule Ysc.Merch.OrdersTest do
     assert Repo.aggregate(Order, :count) == 1
   end
 
+  test "an identical pending checkout older than 24 hours is still reused", %{
+    user: user,
+    lines: lines
+  } do
+    {:ok, first} = create(user, lines)
+
+    stale =
+      DateTime.add(DateTime.utc_now(), -25, :hour) |> DateTime.truncate(:second)
+
+    from(o in Order, where: o.id == ^first.id)
+    |> Repo.update_all(set: [inserted_at: stale])
+
+    {:ok, second} = create(user, lines)
+    assert second.id == first.id
+    assert Repo.aggregate(Order, :count) == 1
+  end
+
   test "any change creates a new order", %{user: user, lines: lines, tee: tee} do
     {:ok, first} = create(user, lines)
 

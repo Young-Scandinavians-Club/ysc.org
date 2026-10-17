@@ -103,7 +103,28 @@ defmodule Ysc.Merch.StripeServiceTest do
                StripeService.ensure_payment_intent(order, user)
     end
 
-    test "replaces a canceled or stale-amount Intent", %{
+    test "reuses a processing Intent instead of minting a second charge", %{
+      order: order,
+      user: user
+    } do
+      {:ok, order} = Orders.attach_payment_intent(order, "pi_processing")
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_processing", _ ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_processing",
+           status: "processing",
+           amount: 5595
+         }}
+      end)
+
+      assert {:ok, %{id: "pi_processing", status: "processing"}} =
+               StripeService.ensure_payment_intent(order, user)
+
+      assert Orders.get_order!(order.id).payment_intent_id == "pi_processing"
+    end
+
+    test "replaces a canceled Intent", %{
       order: order,
       user: user
     } do
@@ -127,6 +148,89 @@ defmodule Ysc.Merch.StripeServiceTest do
                StripeService.ensure_payment_intent(order, user)
 
       assert Orders.get_order!(order.id).payment_intent_id == "pi_replacement"
+    end
+
+    test "Stripe-cancels a stale-amount Intent before minting a replacement", %{
+      order: order,
+      user: user
+    } do
+      {:ok, order} = Orders.attach_payment_intent(order, "pi_stale_amount")
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_stale_amount", _ ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_stale_amount",
+           status: "requires_payment_method",
+           amount: 100
+         }}
+      end)
+
+      expect(StripeMock, :cancel_payment_intent, fn "pi_stale_amount", _ ->
+        {:ok, %Stripe.PaymentIntent{id: "pi_stale_amount", status: "canceled"}}
+      end)
+
+      expect(StripeMock, :create_payment_intent, fn params, _ ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_fresh",
+           status: "requires_payment_method",
+           amount: params.amount
+         }}
+      end)
+
+      assert {:ok, %{id: "pi_fresh"}} =
+               StripeService.ensure_payment_intent(order, user)
+
+      assert Orders.get_order!(order.id).payment_intent_id == "pi_fresh"
+    end
+
+    test "returns an already-succeeded Intent when replace cancel reveals capture",
+         %{
+           order: order,
+           user: user
+         } do
+      {:ok, order} = Orders.attach_payment_intent(order, "pi_race")
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_race", _ ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_race",
+           status: "requires_payment_method",
+           amount: 100
+         }}
+      end)
+
+      expect(StripeMock, :cancel_payment_intent, fn "pi_race", _ ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message:
+             "You cannot cancel this PaymentIntent because it has a status of succeeded."
+         }}
+      end)
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_race", opts ->
+        assert opts[:expand] == ["latest_charge"]
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_race",
+           status: "succeeded",
+           amount: 5595,
+           latest_charge: %Stripe.Charge{
+             id: "ch_race",
+             refunded: false,
+             amount: 5595,
+             amount_refunded: 0
+           }
+         }}
+      end)
+
+      assert {:ok, %{id: "pi_race", status: "succeeded"}} =
+               StripeService.ensure_payment_intent(order, user)
+
+      assert Orders.get_order!(order.id).payment_intent_id == "pi_race"
     end
 
     test "rejects an Intent Stripe returns with the wrong amount", %{

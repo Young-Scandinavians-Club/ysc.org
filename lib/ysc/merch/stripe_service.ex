@@ -12,16 +12,21 @@ defmodule Ysc.Merch.StripeService do
   alias Ysc.Merch.{Order, Orders}
   alias Ysc.MoneyHelper
   alias Ysc.Stripe.Idempotency
+  alias Ysc.Tickets.CheckoutCancel
 
   defp stripe_client do
     Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
   end
 
-  # Statuses in which the member can still (re)attempt payment on the Intent.
+  # Statuses in which the member can still (re)attempt payment on the Intent,
+  # or must wait for a delayed method (ACH) to settle. `processing` must be
+  # reused — minting a second Intent while the first is settling orphans the
+  # later-succeeded charge (`:payment_intent_mismatch`, no refund).
   @reusable_statuses [
     "requires_payment_method",
     "requires_confirmation",
-    "requires_action"
+    "requires_action",
+    "processing"
   ]
 
   @doc """
@@ -57,8 +62,35 @@ defmodule Ysc.Merch.StripeService do
         # Already paid; the caller should finalize the order, not charge again.
         {:ok, intent}
 
-      _ ->
+      {:ok, %{status: "canceled"}} ->
+        # Terminal and unpaid — safe to mint a replacement without Stripe-cancel.
         create(order, user, amount_cents)
+
+      _ ->
+        # Stale amount, retrieve failure, or unexpected status: Stripe-cancel
+        # the stored Intent before overwrite. Blind create + attach left a
+        # displaced Intent payable; when it later succeeded, fulfillment
+        # returned `:payment_intent_mismatch` with no refund.
+        replace_after_stripe_cancel(order, user, amount_cents)
+    end
+  end
+
+  defp replace_after_stripe_cancel(order, user, amount_cents) do
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           order.payment_intent_id,
+           "merch_reuse_or_create"
+         ) do
+      {:cancel, _payment_intent} ->
+        create(order, user, amount_cents)
+
+      {:already_succeeded, payment_intent} ->
+        {:ok, payment_intent}
+
+      {:in_progress, payment_intent} ->
+        {:ok, payment_intent}
+
+      {:error, _reason} ->
+        {:error, Ysc.PaymentUserMessages.payment_setup_failed()}
     end
   end
 
