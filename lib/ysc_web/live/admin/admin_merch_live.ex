@@ -407,7 +407,7 @@ defmodule YscWeb.AdminMerchLive do
         </div>
       </div>
 
-      <div class="w-full pt-4">
+      <div class="w-full pb-16 pt-4">
         <.wip_banner />
 
         <p
