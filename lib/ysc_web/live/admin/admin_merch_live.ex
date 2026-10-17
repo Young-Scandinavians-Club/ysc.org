@@ -10,7 +10,7 @@ defmodule YscWeb.AdminMerchLive do
 
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
-  import YscWeb.AdminMerchComponents, only: [merch_tabs: 1]
+  import YscWeb.AdminMerchComponents, only: [merch_tabs: 1, wip_banner: 1]
 
   alias Ysc.Media.Image
   alias Ysc.Merch
@@ -408,6 +408,8 @@ defmodule YscWeb.AdminMerchLive do
       </div>
 
       <div class="w-full pt-4">
+        <.wip_banner />
+
         <p
           :if={@demo_mode?}
           id="merch-demo-banner"
