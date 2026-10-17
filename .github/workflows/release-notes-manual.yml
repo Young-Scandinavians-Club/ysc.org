@@ -1,0 +1,61 @@
+# Manually (re)generate the GitHub release notes for an existing v* tag and email the web committee.
+# Uses the scripts from the branch this workflow is dispatched on (normally main), not the tag's copy,
+# so a fixed script can republish notes for a release whose automatic notes job failed.
+#
+# Requires secrets: OPENROUTER_API_KEY, RESEND_API_KEY (same as fly-deploy-prod.yml).
+
+name: Release Notes (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag, e.g. v2.47.0"
+        required: true
+        type: string
+      send_email:
+        description: "Email the web committee after updating the release"
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  release_notes:
+    name: Update release notes and notify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (tags)
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve tag
+        id: tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "Tag must look like v1.2.3, got: $TAG" >&2
+            exit 1
+          fi
+          echo "sha=$(git rev-parse "refs/tags/${TAG}^{commit}")" >> "$GITHUB_OUTPUT"
+
+      - name: Generate and publish release notes
+        env:
+          GITHUB_REF_NAME: ${{ inputs.tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: bash etc/scripts/update_github_release_notes.sh
+
+      - name: Send committee email via Resend
+        if: ${{ inputs.send_email }}
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ inputs.tag }}
+          GITHUB_SHA: ${{ steps.tag.outputs.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: bash etc/scripts/notify_release_committee_resend.sh
