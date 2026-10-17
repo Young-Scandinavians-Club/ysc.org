@@ -85,7 +85,7 @@ defmodule YscWeb.EventDetailsLive do
       />
       <%!-- Split-Header: Event Cover Image with Floating Card --%>
       <div class="max-w-(--breakpoint-xl) mx-auto px-4 pt-8">
-        <div class="relative mb-4 lg:mb-24">
+        <div class="relative mb-4 lg:mb-0">
           <%!-- Image with rounded corners and gradient overlay --%>
           <div class={[
             "rounded-2xl overflow-hidden relative",
@@ -110,11 +110,10 @@ defmodule YscWeb.EventDetailsLive do
             <% end %>
           </div>
 
-          <%!-- Floating Card with Title/Date/Location - Overlaps bottom of image --%>
-          <div class={[
-            "relative -mt-16 mx-4 z-10 transition duration-500 ease-in-out",
-            "lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:translate-y-1/2 lg:mx-0 lg:px-8 lg:mt-0"
-          ]}>
+          <%!-- Floating Card with Title/Date/Location. Stays in normal flow and overlaps the
+               image by a fixed amount, so long titles push the content below down instead of
+               running into it. --%>
+          <div class="relative -mt-16 mx-4 z-10 transition duration-500 ease-in-out lg:-mt-24 lg:mx-8">
             <div class={[
               "bg-white rounded-xl shadow-md border p-6 lg:p-10 transform transition-transform duration-500",
               if(@event.state == :cancelled,
@@ -200,7 +199,8 @@ defmodule YscWeb.EventDetailsLive do
                   class="flex items-center gap-3"
                 >
                   <p class="text-xs text-blue-600 type-eyebrow">
-                    {format_start_date(@event.start_date)}
+                    <span class="sm:hidden">{format_start_date_short(@event.start_date)}</span>
+                    <span class="hidden sm:inline">{format_start_date(@event.start_date)}</span>
                   </p>
                   <%= if @event_selling_fast && !@event_sold_out_for_user do %>
                     <span class="h-3 w-px bg-zinc-200"></span>
