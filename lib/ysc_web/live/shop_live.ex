@@ -1,48 +1,120 @@
 defmodule YscWeb.ShopLive do
   @moduledoc """
   The merch shop: every product members can buy.
+
+  The first HTML is a skeleton. Catalog and cart-summary queries run after the
+  WebSocket connects so the HTTP response is never blocked on those loads, and
+  they run once instead of on both the disconnected and connected mounts.
   """
   use YscWeb, :live_view
 
   on_mount {YscWeb.ShopAccess, :ensure_member}
 
+  require Ysc.Logging
+
   import Ysc.MoneyHelper, only: [format_price: 1]
+  import YscWeb.Live.AsyncHelpers
   import YscWeb.ShopComponents
 
   alias Ysc.Merch
-  alias Ysc.Merch.Listing
+  alias Ysc.Merch.{Cart, Listing}
   alias Phoenix.LiveView.JS
   alias YscWeb.ShopCartPeek
 
   @impl true
   def mount(_params, _session, socket) do
-    user = socket.assigns.current_user
-    products = Merch.list_shop_products()
-
     {:ok,
      socket
      |> assign(:page_title, "Shop")
-     |> assign(:products, products)
-     |> assign(:color_options, Listing.available_colors(products))
-     |> ShopCartPeek.init(user)}
+     |> assign(:products, [])
+     |> assign(:color_options, [])
+     |> assign(:tiles, [])
+     |> assign(:sort, "featured")
+     |> assign(:selected_colors, [])
+     |> assign(:filter_colors_param, nil)
+     |> assign(:async_data_loaded, false)
+     |> assign(:catalog_task_started?, false)
+     |> ShopCartPeek.init_placeholder()}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    sort = Listing.parse_sort(params["sort"])
-    colors = parse_colors(params["colors"], socket.assigns.color_options)
+    socket = assign_listing_params(socket, params)
+
+    {:noreply,
+     cond do
+       not connected?(socket) ->
+         socket
+
+       socket.assigns.async_data_loaded ->
+         apply_listing(socket)
+
+       socket.assigns.catalog_task_started? ->
+         socket
+
+       true ->
+         load_catalog_async(socket)
+     end}
+  end
+
+  @impl true
+  def handle_async(
+        :load_shop,
+        {:ok, %{products: products, cart_summary: cart_summary}},
+        socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:async_data_loaded, true)
+     |> assign(:products, products)
+     |> assign(:color_options, Listing.available_colors(products))
+     |> assign(:cart_summary, cart_summary)
+     |> apply_listing()}
+  end
+
+  def handle_async(:load_shop, {:exit, reason}, socket) do
+    Ysc.Logging.error("ShopLive: failed to load catalog", error: reason)
+
+    {:noreply, assign(socket, :async_data_loaded, true)}
+  end
+
+  defp load_catalog_async(socket) do
+    user = socket.assigns.current_user
+
+    socket
+    |> assign(:catalog_task_started?, true)
+    |> start_async(:load_shop, fn ->
+      allow_sandbox_access()
+
+      %{
+        products: Merch.list_shop_products(),
+        cart_summary: Cart.summary(user)
+      }
+    end)
+  end
+
+  defp assign_listing_params(socket, params) do
+    socket
+    |> assign(:sort, Listing.parse_sort(params["sort"]))
+    |> assign(:filter_colors_param, params["colors"])
+  end
+
+  defp apply_listing(socket) do
+    colors =
+      parse_colors(
+        socket.assigns.filter_colors_param,
+        socket.assigns.color_options
+      )
 
     tiles =
       socket.assigns.products
       |> Listing.filter(colors)
-      |> Listing.sort(sort)
+      |> Listing.sort(socket.assigns.sort)
       |> Enum.map(&Listing.tile(&1, colors))
 
-    {:noreply,
-     socket
-     |> assign(:sort, sort)
-     |> assign(:selected_colors, colors)
-     |> assign(:tiles, tiles)}
+    socket
+    |> assign(:selected_colors, colors)
+    |> assign(:tiles, tiles)
   end
 
   @impl true
@@ -121,7 +193,19 @@ defmodule YscWeb.ShopLive do
       cart_count={@cart_summary.count}
     >
       <div
-        :if={@products == []}
+        :if={!@async_data_loaded}
+        id="shop-loading"
+        class="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 md:gap-x-8 md:gap-y-14 lg:grid-cols-4"
+      >
+        <div :for={_ <- 1..8} class="animate-pulse">
+          <div class="aspect-square rounded-2xl bg-zinc-200"></div>
+          <div class="mt-3 h-4 w-3/4 rounded-sm bg-zinc-200"></div>
+          <div class="mt-2 h-3 w-1/2 rounded-sm bg-zinc-100"></div>
+        </div>
+      </div>
+
+      <div
+        :if={@async_data_loaded && @products == []}
         id="shop-empty"
         class="rounded-3xl bg-zinc-50 px-6 py-24 text-center"
       >
@@ -132,7 +216,7 @@ defmodule YscWeb.ShopLive do
         </p>
       </div>
 
-      <div :if={@products != []} id="shop-toolbar">
+      <div :if={@async_data_loaded && @products != []} id="shop-toolbar">
         <div class="flex items-center justify-between gap-4">
           <p
             id="shop-count"
@@ -251,7 +335,7 @@ defmodule YscWeb.ShopLive do
       </div>
 
       <div
-        :if={@products != [] and @tiles == []}
+        :if={(@async_data_loaded && @products != []) and @tiles == []}
         id="shop-no-matches"
         class="mt-8 rounded-3xl bg-zinc-50 px-6 py-20 text-center"
       >
@@ -281,7 +365,7 @@ defmodule YscWeb.ShopLive do
       </ul>
 
       <section
-        :if={@products != []}
+        :if={@async_data_loaded && @products != []}
         id="shop-faq"
         aria-labelledby="shop-faq-title"
         class="mt-20 md:mt-28"

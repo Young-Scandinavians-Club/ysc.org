@@ -124,6 +124,73 @@ defmodule Ysc.Merch.StripeServiceTest do
       assert Orders.get_order!(order.id).payment_intent_id == "pi_processing"
     end
 
+    test "reuses a requires_action Intent instead of minting a second charge",
+         %{
+           order: order,
+           user: user
+         } do
+      {:ok, order} = Orders.attach_payment_intent(order, "pi_3ds")
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_3ds", _ ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_3ds",
+           status: "requires_action",
+           amount: 5595
+         }}
+      end)
+
+      assert {:ok, %{id: "pi_3ds", status: "requires_action"}} =
+               StripeService.ensure_payment_intent(order, user)
+
+      assert Orders.get_order!(order.id).payment_intent_id == "pi_3ds"
+    end
+
+    test "keeps a processing Intent when a stale-amount replace is refused", %{
+      order: order,
+      user: user
+    } do
+      {:ok, order} = Orders.attach_payment_intent(order, "pi_processing_stale")
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_processing_stale",
+                                                      _ ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_processing_stale",
+           status: "processing",
+           amount: 100
+         }}
+      end)
+
+      expect(StripeMock, :cancel_payment_intent, fn "pi_processing_stale", _ ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message:
+             "You cannot cancel this PaymentIntent because it has a status of processing."
+         }}
+      end)
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_processing_stale",
+                                                      opts ->
+        assert opts[:expand] == ["latest_charge"]
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_processing_stale",
+           status: "processing",
+           amount: 100
+         }}
+      end)
+
+      assert {:ok, %{id: "pi_processing_stale", status: "processing"}} =
+               StripeService.ensure_payment_intent(order, user)
+
+      assert Orders.get_order!(order.id).payment_intent_id ==
+               "pi_processing_stale"
+    end
+
     test "replaces a canceled Intent", %{
       order: order,
       user: user

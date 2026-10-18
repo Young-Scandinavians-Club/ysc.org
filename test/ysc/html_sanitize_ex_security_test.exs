@@ -107,4 +107,75 @@ defmodule Ysc.HtmlSanitizeExSecurityTest do
       assert out =~ "ok"
     end
   end
+
+  describe "1.5.6 CSS.scrub invalid escapes" do
+    test "does not crash on a CSS escape past U+10FFFF" do
+      out = Scrubber.CSS.scrub("color: red; font-family: \\2019CA")
+      assert out == "color: red; "
+    end
+
+    test "does not crash on a UTF-16 surrogate CSS escape" do
+      out = Scrubber.CSS.scrub("color: red; font-family: \\D800")
+      assert out == "color: red; "
+    end
+
+    test "still keeps allowed CSS after a valid hex escape" do
+      out = Scrubber.CSS.scrub("color: red;")
+      assert out == "color: red;"
+    end
+  end
+
+  describe "1.5.6 HTML5 object data= http(s)" do
+    test "strips https object data URLs" do
+      html =
+        ~s|<p>ok</p><object data="https://evil.example/payload.swf"></object>|
+
+      out = HtmlSanitizeEx.html5(html)
+      refute out =~ "evil.example"
+      refute out =~ "https:"
+      assert out =~ "ok"
+    end
+
+    test "strips http object data URLs" do
+      html =
+        ~s|<p>ok</p><object data="http://evil.example/payload.swf"></object>|
+
+      out = HtmlSanitizeEx.html5(html)
+      refute out =~ "evil.example"
+      refute out =~ "http:"
+      assert out =~ "ok"
+    end
+  end
+
+  describe "production scrubbers reject 1.5.6 HTML5-only vectors" do
+    test "TrixScrubber strips https object data" do
+      html =
+        ~s|<p>ok</p><object data="https://evil.example/payload.swf"></object>|
+
+      out = Scrubber.scrub(html, Ysc.TrixScrubber)
+      refute out =~ "<object"
+      refute out =~ "evil.example"
+      assert out =~ "ok"
+    end
+
+    test "BasicHTML strips https object data" do
+      html =
+        ~s|<p>ok</p><object data="https://evil.example/payload.swf"></object>|
+
+      out = Scrubber.scrub(html, Scrubber.BasicHTML)
+      refute out =~ "<object"
+      refute out =~ "evil.example"
+      assert out =~ "ok"
+    end
+
+    test "strip_tags strips https object markup" do
+      html =
+        ~s|<p>ok</p><object data="https://evil.example/payload.swf"></object>|
+
+      out = HtmlSanitizeEx.strip_tags(html)
+      refute out =~ "<object"
+      refute out =~ "evil.example"
+      assert out =~ "ok"
+    end
+  end
 end

@@ -946,6 +946,41 @@ defmodule Ysc.NewsletterTest do
                  date_to: today
                )
     end
+
+    test "slims creator to name/email and skips cover images" do
+      user = user_fixture()
+
+      image =
+        Ysc.MerchFixtures.image_fixture(%{
+          upload_data: %{"original" => "fat-json"}
+        })
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{
+            "title" => "Paged slim",
+            "subject" => "S",
+            "cover_image_id" => image.id
+          },
+          created_by_id: user.id
+        )
+
+      {{:ok, {rows, _meta}}, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Newsletter.list_paginated_editions(%{page: 1, page_size: 10})
+          end,
+          pattern: ~r/hashed_password|board_bio|upload_data/i,
+          caller_pids: [self()]
+        )
+
+      listed = Enum.find(rows, &(&1.id == edition.id))
+      assert listed
+      refute Ecto.assoc_loaded?(listed.cover_image)
+      assert listed.creator.id == user.id
+      assert is_nil(listed.creator.hashed_password)
+      assert fat_cols == 0
+    end
   end
 
   describe "email events and bounces" do
@@ -1757,6 +1792,7 @@ defmodule Ysc.NewsletterTest do
   describe "ci_query_explain_* helper queries" do
     test "return valid Ecto queries" do
       assert %Ecto.Query{} = Newsletter.ci_query_explain_query()
+      assert %Ecto.Query{} = Newsletter.ci_query_explain_editions_list_query()
       assert %Ecto.Query{} = Newsletter.ci_query_explain_notices_query()
 
       assert %Ecto.Query{} =

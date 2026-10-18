@@ -35,7 +35,15 @@ defmodule YscWeb.ShopListingTest do
     }
   end
 
+  defp live_shop(conn, path \\ ~p"/shop") do
+    {:ok, view, _html} = live(conn, path)
+    html = render_async(view)
+    {:ok, view, html}
+  end
+
   defp product_ids(view) do
+    render_async(view)
+
     view
     |> render()
     |> LazyHTML.from_fragment()
@@ -43,8 +51,17 @@ defmodule YscWeb.ShopListingTest do
     |> LazyHTML.attribute("id")
   end
 
+  test "static HTML paints a catalog skeleton before products load", %{
+    conn: conn
+  } do
+    html = conn |> get(~p"/shop") |> html_response(200)
+    assert html =~ ~s(id="shop-loading")
+    refute html =~ ~s(id="shop-products")
+    refute html =~ ~s(id="shop-empty")
+  end
+
   test "shows how many items there are", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/shop")
+    {:ok, view, _html} = live_shop(conn)
     assert has_element?(view, "#shop-count", "3 items")
   end
 
@@ -53,7 +70,7 @@ defmodule YscWeb.ShopListingTest do
     tee: tee,
     sticker: sticker
   } do
-    {:ok, view, _html} = live(conn, ~p"/shop")
+    {:ok, view, _html} = live_shop(conn)
 
     assert has_element?(view, "#shop-swatch-#{tee.id}-black[aria-pressed=true]")
     assert has_element?(view, "#shop-swatch-#{tee.id}-navy[aria-pressed=false]")
@@ -71,7 +88,7 @@ defmodule YscWeb.ShopListingTest do
     image = image_fixture(%{blur_hash: "LlMF%n00%#MwS|WCWEM{R*bbWBbH"})
     gallery_photo_fixture(tee, image, %{color: "Black"})
 
-    {:ok, view, _html} = live(conn, ~p"/shop")
+    {:ok, view, _html} = live_shop(conn)
 
     assert has_element?(
              view,
@@ -91,7 +108,7 @@ defmodule YscWeb.ShopListingTest do
     image = image_fixture(%{blur_hash: "not a blur hash"})
     gallery_photo_fixture(tee, image, %{color: "Black"})
 
-    {:ok, view, _html} = live(conn, ~p"/shop")
+    {:ok, view, _html} = live_shop(conn)
 
     assert has_element?(view, "#shop-layer-#{tee.id}-black img.shop-photo-img")
 
@@ -110,7 +127,7 @@ defmodule YscWeb.ShopListingTest do
     gallery_photo_fixture(tee, nil, %{color: "Black", position: 0})
     assert :ok = Ysc.Merch.move_photo_first(navy.id)
 
-    {:ok, view, _html} = live(conn, ~p"/shop")
+    {:ok, view, _html} = live_shop(conn)
 
     assert has_element?(view, "#shop-swatch-#{tee.id}-navy[aria-pressed=true]")
     assert has_element?(view, "#shop-layer-#{tee.id}-navy[data-active]")
@@ -125,7 +142,7 @@ defmodule YscWeb.ShopListingTest do
   end
 
   test "a tile opens the product in its color", %{conn: conn, tee: tee} do
-    {:ok, view, _html} = live(conn, ~p"/shop")
+    {:ok, view, _html} = live_shop(conn)
 
     assert has_element?(
              view,
@@ -148,7 +165,7 @@ defmodule YscWeb.ShopListingTest do
       sticker: sticker,
       hoodie: hoodie
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop")
+      {:ok, view, _html} = live_shop(conn)
 
       view |> form("#shop-sort-form", %{sort: "price_desc"}) |> render_change()
       assert_patch(view, ~p"/shop?#{[sort: "price_desc"]}")
@@ -164,7 +181,7 @@ defmodule YscWeb.ShopListingTest do
       conn: conn,
       sticker: sticker
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop?#{[sort: "price_asc"]}")
+      {:ok, view, _html} = live_shop(conn, ~p"/shop?#{[sort: "price_asc"]}")
       assert List.first(product_ids(view)) == "shop-product-#{sticker.id}"
       assert has_element?(view, "#shop-sort option[value=price_asc][selected]")
     end
@@ -177,7 +194,7 @@ defmodule YscWeb.ShopListingTest do
       sticker: sticker,
       hoodie: hoodie
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop")
+      {:ok, view, _html} = live_shop(conn)
 
       view |> element("#shop-filter-color-black") |> render_click()
       assert_patch(view, ~p"/shop?#{[colors: ["Black"]]}")
@@ -191,7 +208,7 @@ defmodule YscWeb.ShopListingTest do
     end
 
     test "tiles open on the filtered color", %{conn: conn, tee: tee} do
-      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Navy"]]}")
+      {:ok, view, _html} = live_shop(conn, ~p"/shop?#{[colors: ["Navy"]]}")
 
       assert has_element?(
                view,
@@ -200,7 +217,9 @@ defmodule YscWeb.ShopListingTest do
     end
 
     test "colors combine, and pills remove one at a time", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Black", "Navy"]]}")
+      {:ok, view, _html} =
+        live_shop(conn, ~p"/shop?#{[colors: ["Black", "Navy"]]}")
+
       assert has_element?(view, "#shop-count", "2 items")
 
       view |> element("#shop-remove-filter-black") |> render_click()
@@ -209,7 +228,7 @@ defmodule YscWeb.ShopListingTest do
     end
 
     test "Clear all brings everything back", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Black"]]}")
+      {:ok, view, _html} = live_shop(conn, ~p"/shop?#{[colors: ["Black"]]}")
       view |> element("#shop-clear-filters") |> render_click()
 
       assert_patch(view, ~p"/shop")
@@ -218,13 +237,15 @@ defmodule YscWeb.ShopListingTest do
     end
 
     test "ignores colors no product has", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Chartreuse"]]}")
+      {:ok, view, _html} =
+        live_shop(conn, ~p"/shop?#{[colors: ["Chartreuse"]]}")
+
       assert has_element?(view, "#shop-count", "3 items")
       refute has_element?(view, "#shop-active-filters")
     end
 
     test "sorting keeps the filter", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop?#{[colors: ["Navy"]]}")
+      {:ok, view, _html} = live_shop(conn, ~p"/shop?#{[colors: ["Navy"]]}")
       view |> form("#shop-sort-form", %{sort: "name"}) |> render_change()
 
       assert_patch(view, ~p"/shop?#{[sort: "name", colors: ["Navy"]]}")
@@ -236,7 +257,7 @@ defmodule YscWeb.ShopListingTest do
     test "answers the questions members have, collapsed by default", %{
       conn: conn
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop")
+      {:ok, view, _html} = live_shop(conn)
 
       assert has_element?(view, "#shop-faq")
       assert has_element?(view, "#shop-faq-does-the-club-make-money summary")
@@ -253,14 +274,14 @@ defmodule YscWeb.ShopListingTest do
     end
 
     test "survives sorting and filtering", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop")
+      {:ok, view, _html} = live_shop(conn)
       view |> element("#shop-filter-color-black") |> render_click()
       assert has_element?(view, "#shop-faq")
     end
 
     test "is not shown while the shop is empty", %{conn: conn} do
       Ysc.Repo.delete_all(Ysc.Merch.Variant)
-      {:ok, view, _html} = live(conn, ~p"/shop")
+      {:ok, view, _html} = live_shop(conn)
       assert has_element?(view, "#shop-empty")
       refute has_element?(view, "#shop-faq")
     end
