@@ -18,6 +18,16 @@ defmodule Ysc.Merch.Orders do
   alias Ysc.Repo
   alias Ysc.Tickets.CheckoutCancel
 
+  # Same statuses tickets refuse to cancel: Stripe will cancel `requires_action`
+  # (3DS in another tab), which would abort a payment the member is completing.
+  # Retrieve-first here, then CheckoutCancel for idle unpaid Intents.
+  @in_flight_pi_statuses ~w(
+    requires_action
+    processing
+    requires_confirmation
+    succeeded
+  )
+
   @user_order_fields [:id, :reference_id, :status, :total_amount, :inserted_at]
   @user_order_item_fields [:id, :order_id, :name, :quantity, :variant_id]
   @user_order_variant_fields [:id, :image_id]
@@ -202,9 +212,9 @@ defmodule Ysc.Merch.Orders do
     |> Enum.find(&(order_signature(&1) == wanted))
   end
 
-  # Ticket checkout cancels older pending sessions before opening a new one.
-  # Merch must do the same for unpaid Intents: otherwise a cart edit (or a
-  # second tab) leaves PI A payable while PI B is created, and both can succeed.
+  # Ticket `prepare_new_checkout_session/2` retrieve-first skips 3DS /
+  # processing / succeeded (Stripe will cancel `requires_action`), then
+  # CheckoutCancel-s the rest so a leftover unpaid Intent cannot be paid.
   defp supersede_other_pending_purchases(user) do
     from(o in Order,
       where:
@@ -221,20 +231,50 @@ defmodule Ysc.Merch.Orders do
   end
 
   defp supersede_pending_purchase(order) do
+    case order.payment_intent_id do
+      nil ->
+        local_cancel_superseded(order)
+
+      payment_intent_id ->
+        supersede_attached_payment_intent(order, payment_intent_id)
+    end
+  end
+
+  defp supersede_attached_payment_intent(order, payment_intent_id) do
+    case stripe_client().retrieve_payment_intent(payment_intent_id, %{}) do
+      {:ok, %{status: status} = payment_intent}
+      when status in @in_flight_pi_statuses ->
+        Ysc.Logging.warning(
+          "Refusing a second merch checkout while a PaymentIntent is in flight",
+          order_id: order.id,
+          payment_intent_id: payment_intent.id,
+          payment_intent_status: status
+        )
+
+        {:error, :payment_in_progress}
+
+      {:ok, _idle_or_canceled} ->
+        stripe_cancel_then_local(order)
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Refusing a second merch checkout; could not read prior PaymentIntent",
+          order_id: order.id,
+          payment_intent_id: payment_intent_id,
+          error: inspect(reason)
+        )
+
+        {:error, :payment_in_progress}
+    end
+  end
+
+  defp stripe_cancel_then_local(order) do
     case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
            order.payment_intent_id,
            "merch_supersede_pending"
          ) do
       {:cancel, _} ->
-        case cancel_pending(order, "Superseded by new checkout") do
-          :ok ->
-            :ok
-
-          {:error, :not_pending} ->
-            # Paid or canceled between cancel and local update — do not mint
-            # another payable order on top of a settling charge.
-            {:error, :payment_in_progress}
-        end
+        local_cancel_superseded(order)
 
       {:already_succeeded, payment_intent} ->
         Ysc.Logging.warning(
@@ -264,6 +304,22 @@ defmodule Ysc.Merch.Orders do
 
         {:error, :payment_in_progress}
     end
+  end
+
+  defp local_cancel_superseded(order) do
+    case cancel_pending(order, "Superseded by new checkout") do
+      :ok ->
+        :ok
+
+      {:error, :not_pending} ->
+        # Paid or canceled between Stripe cancel and local update — do not mint
+        # another payable order on top of a settling charge.
+        {:error, :payment_in_progress}
+    end
+  end
+
+  defp stripe_client do
+    Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
   end
 
   defp signature(lines, attrs) do
@@ -451,5 +507,17 @@ defmodule Ysc.Merch.Orders do
     alias Ysc.Ci.QueryExplain.Fixtures
 
     user_order_query(Fixtures.ulid(), Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_pending_purchases_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    from(o in Order,
+      where:
+        o.user_id == ^Fixtures.ulid() and o.kind == :purchase and
+          o.status == :pending,
+      order_by: [asc: o.inserted_at]
+    )
   end
 end
