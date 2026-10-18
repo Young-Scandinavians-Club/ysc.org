@@ -431,6 +431,40 @@ defmodule YscWeb.ShopCheckoutTest do
       assert Repo.aggregate(Order, :count) == 1
     end
 
+    test "a Stripe outage while checking the stored Intent blocks a second checkout",
+         %{
+           conn: conn,
+           member: member
+         } do
+      extra = variant_fixture(nil, %{retail_price: Money.new(:USD, "25")})
+
+      {:ok, order} =
+        Orders.create_pending_purchase(
+          member,
+          Cart.list(member),
+          shipping_address_fixture(),
+          shipping_option_fixture()
+        )
+
+      {:ok, _} = Orders.attach_payment_intent(order, "pi_outage")
+      assert {:ok, _} = Cart.add(member, extra.id, 1)
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_outage", _ ->
+        {:error,
+         %Stripe.Error{source: :stripe, code: :api_error, message: "down"}}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      to_shipping(view)
+      view |> element("#continue-to-payment") |> render_click()
+      render_async(view)
+
+      assert has_element?(view, "#shipping-error", "still processing")
+      refute has_element?(view, "#checkout-payment")
+      assert Repo.aggregate(Order, :count) == 1
+      assert Orders.get_order!(order.id).status == :pending
+    end
+
     test "payment-success settles the order and opens the confirmation page", %{
       conn: conn
     } do
