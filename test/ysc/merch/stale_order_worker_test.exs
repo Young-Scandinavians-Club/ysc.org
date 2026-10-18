@@ -177,4 +177,26 @@ defmodule Ysc.Merch.StaleOrderWorkerTest do
     run()
     assert Orders.get_order!(order.id).status == :pending
   end
+
+  test "does not cancel an abandoned-age order whose PaymentIntent is still processing",
+       %{order: order} do
+    order = age(order, 25 * 60, "pi_ach")
+
+    expect(StripeMock, :retrieve_payment_intent, fn "pi_ach", _ ->
+      {:ok, intent(order, "processing")}
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn "pi_ach", _ ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :invalid_request_error,
+         message:
+           "You cannot cancel this PaymentIntent because it has a status of processing."
+       }}
+    end)
+
+    run()
+    assert %Order{status: :pending} = Orders.get_order!(order.id)
+  end
 end
