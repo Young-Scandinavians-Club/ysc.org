@@ -45,4 +45,72 @@ defmodule YscWeb.TimeZoneTest do
       assert DateTime.to_date(shifted) == ~D[2024-11-30]
     end
   end
+
+  describe "format_datetime_local/2" do
+    test "formats a UTC instant as a Pacific datetime-local value" do
+      # June is PDT (UTC-7)
+      assert TimeZone.format_datetime_local(~U[2024-06-15 20:00:00Z]) ==
+               "2024-06-15T13:00"
+
+      # January is PST (UTC-8)
+      assert TimeZone.format_datetime_local(~U[2024-01-15 20:00:00Z]) ==
+               "2024-01-15T12:00"
+    end
+
+    test "accepts an explicit timezone" do
+      assert TimeZone.format_datetime_local(
+               ~U[2024-06-15 20:00:00Z],
+               "America/New_York"
+             ) == "2024-06-15T16:00"
+    end
+
+    test "falls back to Pacific time for an invalid zone" do
+      assert TimeZone.format_datetime_local(
+               ~U[2024-06-15 20:00:00Z],
+               "Not/AZone"
+             ) == "2024-06-15T13:00"
+    end
+
+    test "returns empty string for nil and passes through formatted binaries" do
+      assert TimeZone.format_datetime_local(nil) == ""
+
+      assert TimeZone.format_datetime_local("2024-06-15T13:00") ==
+               "2024-06-15T13:00"
+    end
+  end
+
+  describe "parse_datetime_local/2" do
+    test "parses a Pacific datetime-local value as UTC" do
+      assert {:ok, dt} = TimeZone.parse_datetime_local("2024-06-15T13:00")
+      assert dt == ~U[2024-06-15 20:00:00Z]
+
+      assert {:ok, dt} = TimeZone.parse_datetime_local("2024-01-15T12:00")
+      assert dt == ~U[2024-01-15 20:00:00Z]
+    end
+
+    test "accepts an explicit timezone" do
+      assert {:ok, dt} =
+               TimeZone.parse_datetime_local(
+                 "2024-06-15T16:00",
+                 "America/New_York"
+               )
+
+      assert dt == ~U[2024-06-15 20:00:00Z]
+    end
+
+    test "round-trips a UTC instant through format then parse" do
+      original = ~U[2024-06-15 20:00:00Z]
+      formatted = TimeZone.format_datetime_local(original)
+
+      assert {:ok, parsed} = TimeZone.parse_datetime_local(formatted)
+      assert DateTime.compare(parsed, original) == :eq
+    end
+
+    test "returns error for invalid or non-binary values" do
+      assert {:error, _} = TimeZone.parse_datetime_local("not-a-datetime")
+      assert {:error, _} = TimeZone.parse_datetime_local("")
+      assert {:error, :invalid_format} = TimeZone.parse_datetime_local(nil)
+      assert {:error, :invalid_format} = TimeZone.parse_datetime_local(123)
+    end
+  end
 end

@@ -34,7 +34,8 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias YscWeb.{
     Admin.DateTimeDisplay,
     AdminBadgeHelpers,
-    PaymentMethodFormatter
+    PaymentMethodFormatter,
+    TimeZone
   }
 
   alias YscWeb.Workers.MembershipRenewalReminderWorker
@@ -1226,11 +1227,11 @@ defmodule YscWeb.AdminUserDetailsLive do
                     label="New Period End Date"
                     value={
                       if @membership_form[:period_end_date].value do
-                        format_datetime_local(
+                        TimeZone.format_datetime_local(
                           @membership_form[:period_end_date].value
                         )
                       else
-                        format_datetime_local(
+                        TimeZone.format_datetime_local(
                           @active_subscription.current_period_end
                         )
                       end
@@ -1402,9 +1403,11 @@ defmodule YscWeb.AdminUserDetailsLive do
                   label="Awarded Date (can be in the past)"
                   value={
                     if @lifetime_form[:awarded_at].value do
-                      format_datetime_local(@lifetime_form[:awarded_at].value)
+                      TimeZone.format_datetime_local(
+                        @lifetime_form[:awarded_at].value
+                      )
                     else
-                      format_datetime_local(DateTime.utc_now())
+                      TimeZone.format_datetime_local(DateTime.utc_now())
                     end
                   }
                 />
@@ -3021,7 +3024,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
     update_params =
       if has_lifetime do
-        case parse_datetime(lifetime_params["awarded_at"]) do
+        case TimeZone.parse_datetime_local(lifetime_params["awarded_at"]) do
           {:ok, awarded_at} ->
             %{lifetime_membership_awarded_at: awarded_at}
 
@@ -3596,7 +3599,7 @@ defmodule YscWeb.AdminUserDetailsLive do
          title: "Membership period"
        )}
     else
-      case parse_datetime(membership_params["period_end_date"]) do
+      case TimeZone.parse_datetime_local(membership_params["period_end_date"]) do
         {:ok, new_end_date} ->
           case Subscriptions.update_period_end(
                  active_subscription,
@@ -4199,19 +4202,6 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   defp format_stored_payment_method(_), do: "Payment method"
 
-  defp format_datetime_local(%DateTime{} = datetime) do
-    # Convert UTC datetime to America/Los_Angeles for datetime-local input
-    # datetime-local inputs expect a naive datetime string in local timezone
-    datetime
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> DateTime.to_naive()
-    |> NaiveDateTime.truncate(:second)
-    |> Calendar.strftime("%Y-%m-%dT%H:%M")
-  end
-
-  defp format_datetime_local(nil), do: ""
-  defp format_datetime_local(datetime) when is_binary(datetime), do: datetime
-
   defp cancel_refund_preview(payments) do
     case CancelAndRefund.latest_refundable(payments) do
       {:ok, preview} -> preview
@@ -4599,23 +4589,6 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:family_members, family_members)
     |> assign(:pending_invites, pending_invites)
   end
-
-  defp parse_datetime(datetime_string) when is_binary(datetime_string) do
-    # Parse datetime-local string (assumed to be in America/Los_Angeles timezone)
-    # and convert to UTC for storage
-    case NaiveDateTime.from_iso8601("#{datetime_string}:00") do
-      {:ok, naive_dt} ->
-        # Create DateTime in America/Los_Angeles timezone
-        local_dt = DateTime.from_naive!(naive_dt, "America/Los_Angeles")
-        # Convert to UTC for storage
-        {:ok, DateTime.shift_zone!(local_dt, "Etc/UTC")}
-
-      error ->
-        error
-    end
-  end
-
-  defp parse_datetime(_), do: {:error, :invalid_format}
 
   defp lifetime_membership_changeset(params) do
     types = %{has_lifetime: :boolean, awarded_at: :utc_datetime}

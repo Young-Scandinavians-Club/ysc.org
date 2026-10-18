@@ -4,7 +4,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
   import YscWeb.AdminComponents
 
   alias Ysc.Events
-  alias YscWeb.AdminUserSearch
+  alias YscWeb.{AdminUserSearch, TimeZone}
 
   @impl true
   def render(assigns) do
@@ -304,16 +304,9 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
         params
 
       expires_at when is_binary(expires_at) ->
-        # Parse datetime-local format and convert to UTC
-        case NaiveDateTime.from_iso8601("#{expires_at}:00") do
-          {:ok, naive_dt} ->
-            # Assume local timezone (PST) and convert to UTC
-            local_dt = DateTime.from_naive!(naive_dt, "America/Los_Angeles")
-            utc_dt = DateTime.shift_zone!(local_dt, "Etc/UTC")
-            Map.put(params, "expires_at", utc_dt)
-
-          {:error, _} ->
-            Map.put(params, "expires_at", nil)
+        case TimeZone.parse_datetime_local(expires_at) do
+          {:ok, utc_dt} -> Map.put(params, "expires_at", utc_dt)
+          {:error, _} -> Map.put(params, "expires_at", nil)
         end
 
       _ ->

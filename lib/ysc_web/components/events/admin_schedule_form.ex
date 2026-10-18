@@ -2,6 +2,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
   use YscWeb, :live_component
 
   alias Ysc.Events.Event
+  alias YscWeb.TimeZone
 
   @impl true
   def render(assigns) do
@@ -39,7 +40,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
     attrs =
       case event.publish_at do
         %DateTime{} = dt ->
-          %{"publish_at" => format_datetime_local(dt)}
+          %{"publish_at" => TimeZone.format_datetime_local(dt)}
 
         _ ->
           %{}
@@ -57,16 +58,6 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
      socket
      |> assign(assigns)
      |> assign_form(changeset)}
-  end
-
-  defp format_datetime_local(%DateTime{} = datetime) do
-    # Convert UTC datetime to America/Los_Angeles for datetime-local input
-    # datetime-local inputs expect a naive datetime string in local timezone
-    datetime
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> DateTime.to_naive()
-    |> NaiveDateTime.truncate(:second)
-    |> Calendar.strftime("%Y-%m-%dT%H:%M")
   end
 
   @impl true

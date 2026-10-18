@@ -1,12 +1,14 @@
 defmodule YscWeb.TimeZone do
   @moduledoc """
-  Browser timezone resolution for LiveViews.
+  Browser timezone resolution for LiveViews, plus helpers for HTML
+  `datetime-local` inputs.
 
   LiveSocket sends the IANA name via connect params (`timezone`). Invalid or
   missing values fall back to Pacific time (`America/Los_Angeles`).
   """
 
   @default "America/Los_Angeles"
+  @datetime_local_format "%Y-%m-%dT%H:%M"
 
   @doc """
   Returns the configured default timezone (`America/Los_Angeles` unless overridden).
@@ -58,4 +60,53 @@ defmodule YscWeb.TimeZone do
   def shift(%DateTime{} = datetime, timezone) do
     DateTime.shift_zone!(datetime, from_name(timezone))
   end
+
+  @doc """
+  Formats a UTC datetime for an HTML `datetime-local` input in `timezone`.
+
+  `datetime-local` values are naive local timestamps (`YYYY-MM-DDTHH:MM`).
+  Defaults to Pacific time. Returns `""` for nil and passes through binaries
+  that are already formatted.
+
+      TimeZone.format_datetime_local(~U[2024-06-15 20:00:00Z])
+      #=> "2024-06-15T13:00"
+  """
+  def format_datetime_local(datetime, timezone \\ default())
+
+  def format_datetime_local(%DateTime{} = datetime, timezone) do
+    datetime
+    |> shift(timezone)
+    |> DateTime.to_naive()
+    |> NaiveDateTime.truncate(:second)
+    |> Calendar.strftime(@datetime_local_format)
+  end
+
+  def format_datetime_local(nil, _timezone), do: ""
+
+  def format_datetime_local(datetime, _timezone) when is_binary(datetime),
+    do: datetime
+
+  @doc """
+  Parses an HTML `datetime-local` value (`YYYY-MM-DDTHH:MM`) in `timezone`
+  and returns UTC.
+
+  Defaults to Pacific time. Returns `{:ok, datetime}` or `{:error, reason}`.
+
+      TimeZone.parse_datetime_local("2024-06-15T13:00")
+      #=> {:ok, ~U[2024-06-15 20:00:00Z]}
+  """
+  def parse_datetime_local(value, timezone \\ default())
+
+  def parse_datetime_local(value, timezone) when is_binary(value) do
+    case NaiveDateTime.from_iso8601("#{value}:00") do
+      {:ok, naive_dt} ->
+        local_dt = DateTime.from_naive!(naive_dt, from_name(timezone))
+        {:ok, DateTime.shift_zone!(local_dt, "Etc/UTC")}
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  def parse_datetime_local(_, _), do: {:error, :invalid_format}
 end

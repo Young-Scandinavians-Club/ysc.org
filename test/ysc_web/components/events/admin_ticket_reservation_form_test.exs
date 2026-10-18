@@ -313,4 +313,88 @@ defmodule YscWeb.AdminEventsLive.TicketReservationFormTest do
       assert Events.list_all_ticket_reservations_for_user(volunteer.id) == []
     end
   end
+
+  describe "expires_at datetime-local parsing" do
+    test "saves a Pacific datetime-local value as UTC" do
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      admin = user_fixture(%{role: "admin"})
+      member = user_fixture()
+
+      {:ok, socket} =
+        TicketReservationForm.update(
+          %{
+            id: "reserve-form",
+            ticket_tier: tier,
+            current_user: admin,
+            admin_role: :admin
+          },
+          new_socket(%{admin_role: :admin})
+        )
+
+      {:noreply, socket} =
+        TicketReservationForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
+
+      {:noreply, _socket} =
+        TicketReservationForm.handle_event(
+          "save",
+          %{
+            "ticket_reservation" => %{
+              "quantity" => "1",
+              "discount_percentage" => "0",
+              "expires_at" => "2030-06-15T13:00"
+            }
+          },
+          socket
+        )
+
+      [reservation] = Events.list_all_ticket_reservations_for_user(member.id)
+      assert reservation.expires_at == ~U[2030-06-15 20:00:00Z]
+    end
+
+    test "treats an unparseable expires_at as nil" do
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      admin = user_fixture(%{role: "admin"})
+      member = user_fixture()
+
+      {:ok, socket} =
+        TicketReservationForm.update(
+          %{
+            id: "reserve-form",
+            ticket_tier: tier,
+            current_user: admin,
+            admin_role: :admin
+          },
+          new_socket(%{admin_role: :admin})
+        )
+
+      {:noreply, socket} =
+        TicketReservationForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
+
+      {:noreply, _socket} =
+        TicketReservationForm.handle_event(
+          "save",
+          %{
+            "ticket_reservation" => %{
+              "quantity" => "1",
+              "discount_percentage" => "0",
+              "expires_at" => "not-a-datetime"
+            }
+          },
+          socket
+        )
+
+      [reservation] = Events.list_all_ticket_reservations_for_user(member.id)
+      assert reservation.expires_at == nil
+    end
+  end
 end
