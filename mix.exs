@@ -309,7 +309,11 @@ defmodule Ysc.MixProject do
       # pass a tree instead of a string); HTML5 also tightens meta http-equiv
       # and object data=. We use BasicHTML / TrixScrubber / strip_tags, not
       # HTML5, but pin the patched floor.
-      {:html_sanitize_ex, "~> 1.5.5"},
+      # 1.5.6: CSS.scrub decodes invalid CSS escapes (surrogates / > U+10FFFF)
+      # as U+FFFD instead of crashing; HTML5 object data= also rejects
+      # http(s) URLs (CVE to be published). We still do not use HTML5 or
+      # CSS.scrub in app code; pin the patched floor.
+      {:html_sanitize_ex, "~> 1.5.6"},
       {:image, "~> 0.72"},
       {:iso, "~> 1.4"},
       {:jason, "~> 1.4"},
