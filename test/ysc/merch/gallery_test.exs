@@ -16,6 +16,60 @@ defmodule Ysc.Merch.GalleryTest do
   defp loaded(product), do: Merch.get_shop_product(product.id)
   defp ids(images), do: Enum.map(images, & &1.id)
 
+  describe "colors/1" do
+    # Names that sort Adobe first among equally priced variants, like the real
+    # Printful hoodies where the default was Adobe, not Black.
+    defp hoodie do
+      product = product_fixture(%{name: "Hoodie"})
+
+      for color <- ["Adobe", "Black", "Khaki"] do
+        variant_fixture(product, %{
+          name: "Hoodie / #{color} / M",
+          color: color,
+          size: "M"
+        })
+      end
+
+      product
+    end
+
+    test "follow the variants when no photo says otherwise" do
+      assert product_colors(hoodie()) == ["Adobe", "Black", "Khaki"]
+    end
+
+    test "the color whose photo is first leads" do
+      product = hoodie()
+      gallery_photo_fixture(product, nil, %{color: "Adobe", position: 0})
+
+      black =
+        gallery_photo_fixture(product, nil, %{color: "Black", position: 0})
+
+      gallery_photo_fixture(product, nil, %{color: "Khaki", position: 0})
+
+      assert product_colors(product) == ["Adobe", "Black", "Khaki"]
+
+      assert :ok = Merch.move_photo_first(black.id)
+      assert product_colors(product) == ["Black", "Adobe", "Khaki"]
+    end
+
+    test "colors without photos follow the ones with photos" do
+      product = hoodie()
+      gallery_photo_fixture(product, nil, %{color: "Khaki", position: 3})
+
+      assert product_colors(product) == ["Khaki", "Adobe", "Black"]
+    end
+
+    test "photos for every color do not reorder colors" do
+      product = hoodie()
+      general = gallery_photo_fixture(product, nil, %{position: 0})
+      assert :ok = Merch.move_photo_first(general.id)
+
+      assert product_colors(product) == ["Adobe", "Black", "Khaki"]
+    end
+
+    defp product_colors(product), do: product |> loaded() |> Merch.colors()
+  end
+
   describe "gallery/2" do
     test "orders the selected color's photos and the general ones by position" do
       %{product: product} = product_with_colors()

@@ -9,7 +9,15 @@ defmodule Ysc.Merch do
   import Ecto.Query, warn: false
 
   alias Ysc.Media.Image
-  alias Ysc.Merch.{CatalogSync, Product, ProductImage, Variant}
+
+  alias Ysc.Merch.{
+    CatalogSync,
+    Product,
+    ProductImage,
+    Variant,
+    VariantSelection
+  }
+
   alias Ysc.Repo
 
   # Shop tiles and product pages only need display paths. Skipping
@@ -189,6 +197,29 @@ defmodule Ysc.Merch do
   end
 
   ## Gallery
+
+  @doc """
+  The product's colors in the order the shop shows them, which is also the
+  default: the color whose photo comes first leads ("Make first" in the admin
+  picks the default color), then the rest by photo position. Colors with no
+  photo of their own follow, in variant order.
+
+  Expects `gallery_images` and `variants` to be loaded.
+  """
+  @spec colors(Product.t()) :: [String.t()]
+  def colors(%Product{} = product) do
+    rank =
+      product.gallery_images
+      |> Enum.reject(&is_nil(&1.color))
+      |> Enum.group_by(& &1.color, & &1.position)
+      |> Map.new(fn {color, positions} -> {color, Enum.min(positions)} end)
+
+    # `sort_by` is stable, so colors that tie (or have no photo, ranked last as
+    # an atom) keep the variants' order.
+    product.variants
+    |> VariantSelection.colors()
+    |> Enum.sort_by(&Map.get(rank, &1, :no_photo))
+  end
 
   @doc """
   The photos to show for `product` while `color` is selected, in display order.

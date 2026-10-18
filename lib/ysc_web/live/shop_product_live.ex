@@ -43,11 +43,25 @@ defmodule YscWeb.ShopProductLive do
 
   # The listing links here with the color the shopper was looking at.
   defp initial_selection(product, color) do
-    default = VariantSelection.default(product.variants)
+    default = default_selection(product)
 
     if is_binary(color),
       do: VariantSelection.select_color(product.variants, default, color),
       else: default
+  end
+
+  # Opens on the color whose photo is first, so "Make first" in the admin sets
+  # the default color as well as the first photo.
+  defp default_selection(product) do
+    default = VariantSelection.default(product.variants)
+
+    case Merch.colors(product) do
+      [first | _] ->
+        VariantSelection.select_color(product.variants, default, first)
+
+      [] ->
+        default
+    end
   end
 
   defp fetch_product(id) do
@@ -268,7 +282,7 @@ defmodule YscWeb.ShopProductLive do
   def render(assigns) do
     assigns =
       assigns
-      |> assign(:colors, VariantSelection.colors(assigns.product.variants))
+      |> assign(:colors, Merch.colors(assigns.product))
       |> assign(
         :sizes,
         VariantSelection.sizes(
