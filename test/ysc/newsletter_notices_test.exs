@@ -70,7 +70,13 @@ defmodule Ysc.NewsletterNoticesTest do
         set: [updated_at: past]
       )
 
-      notices = Newsletter.list_notices()
+      {notices, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Newsletter.list_notices() end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
       names = Enum.map(notices, & &1.name)
 
       assert Enum.find_index(names, &(&1 == "Newer")) <
@@ -79,6 +85,8 @@ defmodule Ysc.NewsletterNoticesTest do
       listed = Enum.find(notices, &(&1.id == older.id))
       assert Ecto.assoc_loaded?(listed.creator)
       assert listed.creator.first_name == "Ada"
+      assert is_nil(listed.creator.hashed_password)
+      assert fat_cols == 0
     end
   end
 

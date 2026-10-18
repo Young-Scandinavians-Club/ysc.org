@@ -238,7 +238,7 @@ defmodule YscWeb.Workers.NewsletterSender do
             :ok
         end
 
-        Newsletter.broadcast_edition_sent(Repo.preload(sent_edition, :creator))
+        Newsletter.broadcast_edition_sent(sent_edition)
 
         # Schedule stats email to be sent 24 hours after newsletter was sent
         schedule_stats_email(sent_edition)

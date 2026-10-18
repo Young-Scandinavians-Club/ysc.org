@@ -15,6 +15,7 @@ defmodule Ysc.Newsletter do
   alias Ysc.Email.Suppression
   alias Ysc.Newsletter.Subscriber
   alias Ysc.Accounts.Email
+  alias Ysc.Accounts.User
   alias Ysc.Newsletter.Edition
   alias Ysc.Newsletter.EmailEvent
   alias Ysc.Newsletter.Notice
@@ -58,7 +59,7 @@ defmodule Ysc.Newsletter do
   defp preload_edition_creator(%Edition{} = edition) do
     if Ecto.assoc_loaded?(edition.creator),
       do: edition,
-      else: Repo.preload(edition, :creator)
+      else: Repo.preload(edition, creator: list_creator_query())
   end
 
   # Fields fetched in list queries — excludes :archived_html (large text).
@@ -80,6 +81,10 @@ defmodule Ysc.Newsletter do
     :inserted_at,
     :updated_at
   ]
+
+  # Admin list / notice cards only need the creator's name. Atom
+  # `preload(:creator)` would SELECT hashed_password / bios / Stripe ids.
+  @list_creator_fields [:id, :first_name, :last_name, :email]
 
   @doc """
   Subscribes an email to the newsletter.
@@ -714,13 +719,14 @@ defmodule Ysc.Newsletter do
 
   @doc """
   Lists all newsletter editions, newest first.
+
+  Listing columns plus a slim creator name. Cover images are unused on the
+  admin list UI.
   """
   def list_editions do
-    Edition
+    editions_list_query()
     |> order_by([e], desc: e.inserted_at)
-    |> select([e], struct(e, ^@edition_list_fields))
     |> Repo.all()
-    |> Repo.preload([:cover_image, :creator])
   end
 
   @doc """
@@ -735,9 +741,7 @@ defmodule Ysc.Newsletter do
     date_to = Keyword.get(opts, :date_to, "")
 
     base_query =
-      Edition
-      |> select([e], struct(e, ^@edition_list_fields))
-      |> preload([:cover_image, :creator])
+      editions_list_query()
       |> Ecto.Query.exclude(:order_by)
       |> maybe_filter_inserted_at_from(date_from)
       |> maybe_filter_inserted_at_to(date_to)
@@ -1053,22 +1057,27 @@ defmodule Ysc.Newsletter do
 
   @doc """
   Lists all saved notices, newest first.
+
+  Slims `creator` to name/email; the list UI never reads bios or Stripe ids.
   """
   def list_notices do
-    from(n in Notice, order_by: [desc: n.updated_at], preload: [:creator])
+    list_notices_query()
     |> Repo.all()
   end
 
   @doc false
   def list_notices_query do
-    from(n in Notice, order_by: [desc: n.updated_at], preload: [:creator])
+    from(n in Notice,
+      order_by: [desc: n.updated_at],
+      preload: [creator: ^list_creator_query()]
+    )
   end
 
   @doc """
   Gets a single notice by id. Raises if not found.
   """
   def get_notice!(id),
-    do: Repo.get!(Notice, id) |> Repo.preload(:creator)
+    do: Repo.get!(Notice, id) |> Repo.preload(creator: list_creator_query())
 
   @doc """
   Creates a saved notice.
@@ -1612,8 +1621,22 @@ defmodule Ysc.Newsletter do
     )
   end
 
+  defp editions_list_query do
+    from(e in Edition,
+      select: struct(e, ^@edition_list_fields),
+      preload: [creator: ^list_creator_query()]
+    )
+  end
+
+  defp list_creator_query do
+    from(u in User, select: struct(u, ^@list_creator_fields))
+  end
+
   @doc false
   def ci_query_explain_query, do: recent_sent_editions_query()
+
+  @doc false
+  def ci_query_explain_editions_list_query, do: editions_list_query()
 
   @doc false
   def ci_query_explain_notices_query, do: list_notices_query()
