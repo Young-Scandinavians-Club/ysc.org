@@ -252,6 +252,20 @@ defmodule Ysc.Accounts.User do
     |> validate_date_of_birth()
   end
 
+  @doc """
+  Changeset for phone number and SMS opt-in only.
+
+  Used by `Accounts.update_user_phone_and_sms/2` and the account-setup phone
+  step. Must not cast email, password, name, or other profile fields —
+  those belong on their own verified flows (Finding 93).
+  """
+  def phone_and_sms_changeset(user, attrs, opts \\ []) do
+    user
+    |> cast(attrs, [:phone_number, :sms_opt_in])
+    |> validate_phone_optional(opts)
+    |> set_sms_notifications_from_opt_in(attrs)
+  end
+
   @spec update_user_changeset(
           {map(), map()}
           | %{

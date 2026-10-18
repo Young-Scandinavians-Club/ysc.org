@@ -800,23 +800,15 @@ defmodule YscWeb.AccountSetupLive do
 
         phone_changeset =
           if user_needs.phone_setup or is_nil(user.phone_number) do
-            Ysc.Accounts.User.registration_changeset(
-              user,
-              %{"sms_opt_in" => "true"},
-              hash_password: false,
-              validate_email: false
-            )
+            Accounts.User.phone_and_sms_changeset(user, %{
+              "sms_opt_in" => "true"
+            })
           else
-            Ysc.Accounts.User.registration_changeset(
-              user,
-              %{
-                "phone_number" => user.phone_number,
-                "sms_opt_in" =>
-                  if(user.event_notifications_sms, do: "true", else: "false")
-              },
-              hash_password: false,
-              validate_email: false
-            )
+            Accounts.User.phone_and_sms_changeset(user, %{
+              "phone_number" => user.phone_number,
+              "sms_opt_in" =>
+                if(user.event_notifications_sms, do: "true", else: "false")
+            })
           end
 
         phone_verification_changeset = %{"verification_code" => ""} |> to_form()
@@ -1229,10 +1221,7 @@ defmodule YscWeb.AccountSetupLive do
     if setup_owner?(socket) && socket.assigns.current_step == 3 do
       phone_form =
         socket.assigns.user
-        |> Accounts.User.registration_changeset(user_params,
-          hash_password: false,
-          validate_email: false
-        )
+        |> Accounts.User.phone_and_sms_changeset(user_params)
         |> Map.put(:action, :validate)
         |> to_form()
 

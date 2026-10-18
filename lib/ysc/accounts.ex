@@ -1255,14 +1255,15 @@ defmodule Ysc.Accounts do
 
   @doc """
   Updates user phone number and SMS preferences.
+
+  Only phone/SMS fields are accepted (Finding 93). Callers must not pass
+  through a full registration params map — email, password, and profile
+  fields are ignored.
   """
   def update_user_phone_and_sms(user, attrs) do
     with {:ok, updated_user} <-
            user
-           |> User.registration_changeset(attrs,
-             hash_password: false,
-             validate_email: false
-           )
+           |> User.phone_and_sms_changeset(attrs)
            |> Repo.update() do
       invalidate_user_profile_cache(updated_user)
 

@@ -4590,6 +4590,32 @@ defmodule Ysc.AccountsTest do
 
       assert updated.phone_number == "+14155559876"
     end
+
+    test "update_user_phone_and_sms/2 ignores email and profile fields" do
+      user =
+        user_fixture(%{
+          phone_number: "+14159098608",
+          first_name: "Ada",
+          last_name: "Lovelace"
+        })
+
+      original_email = user.email
+
+      assert {:ok, updated} =
+               Accounts.update_user_phone_and_sms(user, %{
+                 "phone_number" => "+14155559876",
+                 "email" => "should-not-apply@example.com",
+                 "first_name" => "Eve",
+                 "last_name" => "Dropper",
+                 "date_of_birth" => "2001-02-03"
+               })
+
+      assert updated.phone_number == "+14155559876"
+      assert updated.email == original_email
+      assert updated.first_name == "Ada"
+      assert updated.last_name == "Lovelace"
+      assert updated.date_of_birth == user.date_of_birth
+    end
   end
 
   describe "authorization and signup application access" do

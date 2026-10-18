@@ -86,6 +86,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 90 (MEDIUM)   Passkey step-up skipped Finding 7's `sign_count` compare/update, so a cloned authenticator rejected at login could still pass reauth, and legitimate reauth never advanced the stored counter
   Finding 91 (MEDIUM)   Printful webhook secret lives in the URL path (`/webhooks/printful/:token`) but `Ysc.SentryScrubber` only redacted FlowRoute's path token, so Sentry request URLs leaked `PRINTFUL_WEBHOOK_SECRET`
   Finding 92 (MEDIUM)   Merch checkout quoted Printful shipping from mount-time cart lines, then created the pending order and Stripe PaymentIntent from a freshly loaded cart plus the stale `option.rate`, so a member could underpay shipping by adding items in another tab
+  Finding 93 (HIGH)     Account-setup / update_user_phone_and_sms reused User.registration_changeset with validate_email: false, so a client could mass-assign email (keeping email_verified_at), name, and DOB while saving a phone number — planting an account under a victim's unused address without the email-change reauth flow
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -364,6 +365,107 @@ defmodule YscWeb.SecurityAuditTest do
 
       refute url =~ "super-secret-printful-token"
       assert url =~ "/webhooks/printful/[REDACTED]"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 93 (HIGH): Phone update must not mass-assign email/profile fields
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 93: phone update ignores email and profile mass assignment" do
+    test "update_user_phone_and_sms/2 does not change email, name, or DOB" do
+      user =
+        user_fixture(%{
+          first_name: "Keep",
+          last_name: "Me",
+          date_of_birth: ~D[1990-05-15],
+          most_connected_country: "SE"
+        })
+
+      {:ok, user} = Accounts.mark_email_verified(user)
+      original_email = user.email
+      original_verified_at = user.email_verified_at
+
+      hijack_email =
+        "phone_mass_hijack_#{System.unique_integer([:positive])}@example.com"
+
+      assert {:ok, updated} =
+               Accounts.update_user_phone_and_sms(user, %{
+                 "phone_number" => "+14155559876",
+                 "sms_opt_in" => "true",
+                 "email" => hijack_email,
+                 "first_name" => "Hax",
+                 "last_name" => "Or",
+                 "date_of_birth" => "2010-01-01",
+                 "most_connected_country" => "XX",
+                 "password" => "supersecretpassword123"
+               })
+
+      assert updated.phone_number == "+14155559876"
+      assert updated.email == original_email
+      assert updated.email_verified_at == original_verified_at
+      assert updated.first_name == "Keep"
+      assert updated.last_name == "Me"
+      assert updated.date_of_birth == ~D[1990-05-15]
+      assert updated.most_connected_country == "SE"
+      assert updated.hashed_password == user.hashed_password
+    end
+
+    test "AccountSetupLive save_phone rejects email planting via phone params",
+         %{
+           conn: conn
+         } do
+      user =
+        user_fixture(%{
+          state: :pending_approval,
+          first_name: "Setup",
+          last_name: "User",
+          password_set_at: nil
+        })
+
+      {:ok, user} = Accounts.mark_email_verified(user)
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_f93_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_f93_#{System.unique_integer([:positive])}",
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      {:ok, user} =
+        Accounts.set_user_initial_password(user, %{
+          "password" => valid_user_password(),
+          "password_confirmation" => valid_user_password()
+        })
+
+      original_email = user.email
+
+      hijack_email =
+        "setup_phone_hijack_#{System.unique_integer([:positive])}@example.com"
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/account/setup/#{user.id}?step=3")
+
+      render_submit(view, "save_phone", %{
+        "user" => %{
+          "phone_number" => "+14155551299",
+          "sms_opt_in" => "true",
+          "email" => hijack_email,
+          "first_name" => "Planted",
+          "last_name" => "Victim"
+        }
+      })
+
+      reloaded = Accounts.get_user!(user.id)
+      assert reloaded.email == original_email
+      assert reloaded.first_name == "Setup"
+      assert reloaded.last_name == "User"
+      assert reloaded.phone_number == "+14155551299"
     end
   end
 
