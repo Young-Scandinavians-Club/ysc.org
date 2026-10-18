@@ -47,6 +47,10 @@ jobs:
           path: |
             deps
             _build/test
+          # Mix compile manifests live in hidden `_build/**/.mix/` dirs.
+          # Without this, later jobs recompile every dep; vix then
+          # re-downloads its NIF and can time out (run 39092969147).
+          include-hidden-files: true
           retention-days: 1
 
   build_dev:
@@ -85,6 +89,10 @@ jobs:
           path: |
             deps
             _build/dev
+          # Mix compile manifests live in hidden `_build/**/.mix/` dirs.
+          # Without this, later jobs recompile every dep; vix then
+          # re-downloads its NIF and can time out (run 39092969147).
+          include-hidden-files: true
           retention-days: 1
 
   test:
@@ -220,6 +228,9 @@ jobs:
 
       - name: flyctl_deploy_retry self-test
         run: ./etc/scripts/flyctl_deploy_retry.sh --self-test
+
+      - name: assert_mix_build_manifests self-test
+        run: ./etc/scripts/ci/assert_mix_build_manifests.sh --self-test
 
       - name: update_github_release_notes self-test
         run: ./etc/scripts/update_github_release_notes.sh --self-test
@@ -363,6 +374,9 @@ jobs:
       # fast no-op verification here since nothing actually needs re-fetching.
       - name: Install dependencies
         run: mix deps.get
+
+      - name: Verify Mix compile manifests restored
+        run: ./etc/scripts/ci/assert_mix_build_manifests.sh _build/dev
 
       - name: Hex audit (retired packages and advisories)
         run: mix hex.audit
