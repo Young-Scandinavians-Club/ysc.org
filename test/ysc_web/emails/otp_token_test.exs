@@ -76,6 +76,10 @@ defmodule YscWeb.Emails.OtpTokenTest do
       assert OtpToken.endpoint_origin(nil) == nil
     end
 
+    test "brackets IPv6 hosts when serializing the origin" do
+      assert OtpToken.endpoint_origin("https://[::1]") == "https://[::1]"
+    end
+
     test "derives a valid origin from the configured endpoint" do
       assert is_binary(OtpToken.endpoint_origin())
     end
@@ -93,6 +97,18 @@ defmodule YscWeb.Emails.OtpTokenTest do
     test "leaves the email untouched when no valid header can be built" do
       email = OtpToken.put_header(Swoosh.Email.new(), "123456", nil)
       refute Map.has_key?(email.headers, "OTP-Token")
+    end
+  end
+
+  describe "put_header/2" do
+    test "binds the code to the configured endpoint origin" do
+      origin = OtpToken.endpoint_origin()
+      email = OtpToken.put_header(Swoosh.Email.new(), "123456")
+
+      assert is_binary(origin)
+
+      assert email.headers["OTP-Token"] ==
+               ~s("123456"; origin="#{origin}")
     end
   end
 
