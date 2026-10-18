@@ -101,6 +101,29 @@ defmodule YscWeb.ShopListingTest do
            )
   end
 
+  test "making a color's photo first makes it the default color", %{
+    conn: conn,
+    tee: tee
+  } do
+    # "Black" sorts before "Navy" among equal prices, so Black leads by default.
+    navy = gallery_photo_fixture(tee, nil, %{color: "Navy", position: 0})
+    gallery_photo_fixture(tee, nil, %{color: "Black", position: 0})
+    assert :ok = Ysc.Merch.move_photo_first(navy.id)
+
+    {:ok, view, _html} = live(conn, ~p"/shop")
+
+    assert has_element?(view, "#shop-swatch-#{tee.id}-navy[aria-pressed=true]")
+    assert has_element?(view, "#shop-layer-#{tee.id}-navy[data-active]")
+
+    assert has_element?(
+             view,
+             "#shop-product-link-#{tee.id}[href='/shop/products/#{tee.id}?color=Navy']"
+           )
+
+    {:ok, view, _html} = live(conn, ~p"/shop/products/#{tee.id}")
+    assert has_element?(view, "#color-navy[aria-pressed=true]")
+  end
+
   test "a tile opens the product in its color", %{conn: conn, tee: tee} do
     {:ok, view, _html} = live(conn, ~p"/shop")
 

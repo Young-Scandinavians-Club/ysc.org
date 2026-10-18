@@ -104,7 +104,7 @@ defmodule Ysc.Merch.Listing do
   """
   @spec tile(Product.t(), [String.t()]) :: tile()
   def tile(%Product{} = product, preferred \\ []) do
-    names = VariantSelection.colors(product.variants)
+    names = Merch.colors(product)
     colors = Enum.map(names, &color(product, &1))
 
     {shown, rest} = Enum.split(colors, @max_swatches)
