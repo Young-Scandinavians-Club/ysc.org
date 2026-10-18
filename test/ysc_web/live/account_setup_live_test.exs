@@ -1267,7 +1267,7 @@ defmodule YscWeb.AccountSetupLiveTest do
   end
 
   describe "unpaid active users stay in pay funnel" do
-    test "shows activate CTA when active with payment method but no membership",
+    test "shows pay-dues CTA when active with payment method but no membership",
          %{
            conn: conn
          } do
@@ -1292,9 +1292,16 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       html = render(view)
 
-      assert has_element?(view, "#retry-membership-activation")
+      assert has_element?(
+               view,
+               "#retry-membership-activation",
+               "Pay your membership dues"
+             )
+
       assert has_element?(view, "#pay-on-membership-page")
-      assert html =~ "Activate Your Membership"
+      assert html =~ "Pay your membership dues"
+      refute html =~ "Activate Your Membership"
+      refute html =~ "Activate Membership Now"
       assert html =~ "Or pay on the Membership page"
 
       assert html =~
@@ -1316,7 +1323,8 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       html = render(view)
 
-      assert html =~ "Activate Your Membership"
+      assert html =~ "Pay your membership dues"
+      refute html =~ "Activate Your Membership"
       assert html =~ "Add or confirm a payment method"
 
       assert html =~
@@ -1366,7 +1374,8 @@ defmodule YscWeb.AccountSetupLiveTest do
       {:ok, _view, html} =
         live(conn, account_setup_path(user, %{"step" => "2"}))
 
-      assert html =~ "Activate Your Membership"
+      assert html =~ "Pay your membership dues"
+      refute html =~ "Activate Your Membership"
     end
 
     test "redirects home when membership activates on mount", %{conn: conn} do

@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Final Reminder: Complete Your Membership</strong>
+      <strong>Final reminder: Pay your membership dues</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -11,13 +11,13 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">This is a friendly reminder that your membership application to the Young Scandinavians Club was approved about a month ago, and we'd love to have you complete your membership payment to join our community.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">This is a friendly reminder that your membership application to the Young Scandinavians Club was approved about a month ago, and we'd love to have you pay your membership dues to join our community.</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" style="background-color: #FEF3C7; padding: 16px; border-radius: 6px; border-left: 4px solid #F59E0B;">
-      <strong>Your membership approval is still valid!</strong> Complete your payment anytime to unlock all member benefits.
+      <strong>Your membership approval is still valid!</strong> Pay your dues anytime to unlock member benefits.
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Complete Your Membership Payment → </mj-button>
+    <mj-button href="<%= @pay_membership_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Pay your membership dues →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">As a member, you'll have access to:</mj-text>
     <mj-text font-size="18px" align="left" line-height="1.5">

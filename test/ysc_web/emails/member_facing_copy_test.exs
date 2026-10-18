@@ -29,6 +29,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     MembershipEnded,
     MembershipPaymentConfirmation,
     MembershipPaymentFailure,
+    MembershipPaymentReminder7Day,
+    MembershipPaymentReminder30Day,
     MembershipRenewalPaymentMethodReminder,
     MembershipRenewalSuccess,
     OutageNotification,
@@ -57,6 +59,44 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "You're officially a Young Scandinavian"
       refute text =~ "Pay Your Membership"
       refute text =~ "completing your membership payment"
+    end
+
+    test "7-day payment reminder asks people to pay dues, matching the approval email" do
+      html =
+        MembershipPaymentReminder7Day.render(%{
+          first_name: "Jane",
+          pay_membership_url: "https://ysc.org/users/membership",
+          upcoming_events_url: "https://ysc.org/events"
+        })
+
+      text = html_text(html)
+
+      assert MembershipPaymentReminder7Day.get_subject() ==
+               "Reminder: Pay your membership dues to join YSC"
+
+      assert text =~ "Pay your membership dues"
+      assert text =~ "pay your annual membership dues"
+      refute text =~ "Complete Your Membership Payment"
+      refute text =~ "complete your membership payment"
+    end
+
+    test "30-day payment reminder asks people to pay dues, matching the approval email" do
+      html =
+        MembershipPaymentReminder30Day.render(%{
+          first_name: "Jane",
+          pay_membership_url: "https://ysc.org/users/membership",
+          upcoming_events_url: "https://ysc.org/events"
+        })
+
+      text = html_text(html)
+
+      assert MembershipPaymentReminder30Day.get_subject() ==
+               "Final reminder: Pay your membership dues to join YSC"
+
+      assert text =~ "Pay your membership dues"
+      assert text =~ "pay your membership dues"
+      refute text =~ "Complete Your Membership Payment"
+      refute text =~ "complete your membership payment"
     end
 
     test "family-linked approval subject glosses Velkommen" do

@@ -15,7 +15,7 @@ defmodule YscWeb.Emails.MembershipPaymentReminder30Day do
   end
 
   def get_subject() do
-    "Final Reminder: Complete Your YSC Membership"
+    "Final reminder: Pay your membership dues to join YSC"
   end
 
   def prepare_email_data(user), do: membership_payment_reminder_data(user)

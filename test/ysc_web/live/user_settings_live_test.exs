@@ -1570,6 +1570,31 @@ defmodule YscWeb.UserSettingsLiveTest do
              )
     end
 
+    test "first-time pay flow uses pay-dues language from the approval email",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{state: :active})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render_async(view)
+      html = render(view)
+
+      assert has_element?(view, "#membership_form")
+
+      assert has_element?(
+               view,
+               "#pay-membership-dues",
+               "Pay your membership dues"
+             )
+
+      assert html =~ "Used to pay your dues and all future automatic renewals."
+      assert html =~ "Add a payment method in step 2 to pay your dues."
+      refute html =~ "Complete Membership Purchase"
+      refute html =~ "complete your purchase"
+    end
+
     test "sub-account can leave family membership", %{conn: conn} do
       primary = user_fixture(%{phone_number: "+14159098401", state: :active})
 
