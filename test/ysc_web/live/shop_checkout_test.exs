@@ -372,6 +372,7 @@ defmodule YscWeb.ShopCheckoutTest do
 
       {:ok, _} = Orders.attach_payment_intent(order, "pi_processing")
 
+      # Same cart: reusable pending + ensure_payment_intent reuses processing.
       expect(StripeMock, :retrieve_payment_intent, fn "pi_processing", _ ->
         {:ok,
          %Stripe.PaymentIntent{
@@ -411,6 +412,15 @@ defmodule YscWeb.ShopCheckoutTest do
 
       {:ok, _} = Orders.attach_payment_intent(order, "pi_processing")
       assert {:ok, _} = Cart.add(member, extra.id, 1)
+
+      expect(StripeMock, :cancel_payment_intent, fn "pi_processing", _ ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message: "PaymentIntent is processing and cannot be canceled"
+         }}
+      end)
 
       expect(StripeMock, :retrieve_payment_intent, fn "pi_processing", _ ->
         {:ok,

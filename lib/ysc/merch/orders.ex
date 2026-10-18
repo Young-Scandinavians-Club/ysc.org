@@ -16,15 +16,7 @@ defmodule Ysc.Merch.Orders do
   alias Ysc.Media.Image
   alias Ysc.Merch.{Cart, Order, OrderItem, Shipment, ShippingAddress, Variant}
   alias Ysc.Repo
-
-  # Same statuses tickets refuse to cancel: a second payable order while one
-  # of these is open double-charges when ACH/3DS later succeeds.
-  @in_flight_pi_statuses ~w(
-    requires_action
-    processing
-    requires_confirmation
-    succeeded
-  )
+  alias Ysc.Tickets.CheckoutCancel
 
   @user_order_fields [:id, :reference_id, :status, :total_amount, :inserted_at]
   @user_order_item_fields [:id, :order_id, :name, :quantity, :variant_id]
@@ -93,10 +85,14 @@ defmodule Ysc.Merch.Orders do
   `Ysc.Merch.StaleOrderWorker`; leftovers still pending are in-flight and
   must be reused so a later ACH retry cannot mint a second payable order.
 
-  A *different* cart/address/shipping is refused with `:payment_in_progress`
-  when another pending purchase already has a PaymentIntent that is
-  processing, in 3DS, or succeeded. Otherwise the member could pay the new
-  order by card and still be charged when the first Intent settles.
+  A *different* cart/address/shipping Stripe-cancels any other unpaid pending
+  purchase first (same pattern as ticket `prepare_new_checkout_session/2`).
+  Leaving that Intent open while minting a second payable order double-charges
+  when the member pays both (two tabs, or cart edit after reaching payment).
+
+  When the prior Intent is processing, in 3DS, or already succeeded, the new
+  checkout is refused with `:payment_in_progress` instead — canceling those
+  would orphan a settling charge.
 
   Errors: `:empty_cart`, `:unavailable_items` (a line is no longer sellable),
   `:payment_in_progress`, or an `Ecto.Changeset`.
@@ -134,7 +130,7 @@ defmodule Ysc.Merch.Orders do
             {:ok, order}
 
           nil ->
-            with :ok <- reject_in_flight_pending(user) do
+            with :ok <- supersede_other_pending_purchases(user) do
               insert_purchase(user, lines, attrs)
             end
         end
@@ -206,47 +202,68 @@ defmodule Ysc.Merch.Orders do
     |> Enum.find(&(order_signature(&1) == wanted))
   end
 
-  defp reject_in_flight_pending(user) do
-    in_flight =
-      from(o in Order,
-        where:
-          o.user_id == ^user.id and o.kind == :purchase and
-            o.status == :pending and not is_nil(o.payment_intent_id)
-      )
-      |> Repo.all()
-      |> Enum.find(&in_flight_payment_intent?(&1.payment_intent_id))
+  # Ticket checkout cancels older pending sessions before opening a new one.
+  # Merch must do the same for unpaid Intents: otherwise a cart edit (or a
+  # second tab) leaves PI A payable while PI B is created, and both can succeed.
+  defp supersede_other_pending_purchases(user) do
+    from(o in Order,
+      where:
+        o.user_id == ^user.id and o.kind == :purchase and o.status == :pending,
+      order_by: [asc: o.inserted_at]
+    )
+    |> Repo.all()
+    |> Enum.reduce_while(:ok, fn order, :ok ->
+      case supersede_pending_purchase(order) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
 
-    case in_flight do
-      nil ->
-        :ok
+  defp supersede_pending_purchase(order) do
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           order.payment_intent_id,
+           "merch_supersede_pending"
+         ) do
+      {:cancel, _} ->
+        case cancel_pending(order, "Superseded by new checkout") do
+          :ok ->
+            :ok
 
-      order ->
+          {:error, :not_pending} ->
+            # Paid or canceled between cancel and local update — do not mint
+            # another payable order on top of a settling charge.
+            {:error, :payment_in_progress}
+        end
+
+      {:already_succeeded, payment_intent} ->
+        Ysc.Logging.warning(
+          "Refusing a second merch checkout; prior pending PaymentIntent already succeeded",
+          order_id: order.id,
+          payment_intent_id: payment_intent.id
+        )
+
+        {:error, :payment_in_progress}
+
+      {:in_progress, payment_intent} ->
         Ysc.Logging.warning(
           "Refusing a second merch checkout while a PaymentIntent is in flight",
           order_id: order.id,
-          payment_intent_id: order.payment_intent_id
+          payment_intent_id: payment_intent.id
+        )
+
+        {:error, :payment_in_progress}
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Refusing a second merch checkout; could not cancel prior PaymentIntent",
+          order_id: order.id,
+          payment_intent_id: order.payment_intent_id,
+          error: inspect(reason)
         )
 
         {:error, :payment_in_progress}
     end
-  end
-
-  defp in_flight_payment_intent?(payment_intent_id) do
-    case stripe_client().retrieve_payment_intent(payment_intent_id, %{}) do
-      {:ok, %{status: status}} when status in @in_flight_pi_statuses ->
-        true
-
-      {:ok, _open_or_canceled} ->
-        false
-
-      {:error, _reason} ->
-        # Fail closed: a retrieve blip must not mint a second payable order.
-        true
-    end
-  end
-
-  defp stripe_client do
-    Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
   end
 
   defp signature(lines, attrs) do

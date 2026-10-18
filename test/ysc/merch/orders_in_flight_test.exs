@@ -45,6 +45,15 @@ defmodule Ysc.Merch.OrdersInFlightTest do
     {:ok, first} = create(user, lines)
     {:ok, _} = Orders.attach_payment_intent(first, "pi_processing")
 
+    expect(StripeMock, :cancel_payment_intent, fn "pi_processing", _ ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :invalid_request_error,
+         message: "PaymentIntent is processing and cannot be canceled"
+       }}
+    end)
+
     expect(StripeMock, :retrieve_payment_intent, fn "pi_processing", _ ->
       {:ok,
        %Stripe.PaymentIntent{
@@ -69,6 +78,15 @@ defmodule Ysc.Merch.OrdersInFlightTest do
     {:ok, first} = create(user, lines)
     {:ok, _} = Orders.attach_payment_intent(first, "pi_processing")
 
+    expect(StripeMock, :cancel_payment_intent, fn "pi_processing", _ ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :invalid_request_error,
+         message: "PaymentIntent is processing and cannot be canceled"
+       }}
+    end)
+
     expect(StripeMock, :retrieve_payment_intent, fn "pi_processing", _ ->
       {:ok,
        %Stripe.PaymentIntent{
@@ -86,19 +104,20 @@ defmodule Ysc.Merch.OrdersInFlightTest do
     assert Repo.aggregate(Order, :count) == 1
   end
 
-  test "still allows a different cart when the stored Intent is unpaid", %{
-    user: user,
-    lines: lines,
-    tee: tee
-  } do
+  test "Stripe-cancels an unpaid prior Intent before a different-cart checkout",
+       %{
+         user: user,
+         lines: lines,
+         tee: tee
+       } do
     {:ok, first} = create(user, lines)
     {:ok, _} = Orders.attach_payment_intent(first, "pi_open")
 
-    expect(StripeMock, :retrieve_payment_intent, fn "pi_open", _ ->
+    expect(StripeMock, :cancel_payment_intent, fn "pi_open", _ ->
       {:ok,
        %Stripe.PaymentIntent{
          id: "pi_open",
-         status: "requires_payment_method",
+         status: "canceled",
          amount: 5595
        }}
     end)
@@ -106,5 +125,45 @@ defmodule Ysc.Merch.OrdersInFlightTest do
     {:ok, _} = Ysc.Merch.Cart.set_quantity(user, tee.id, 3)
     assert {:ok, second} = create(user, Ysc.Merch.Cart.list(user))
     refute second.id == first.id
+
+    first = Orders.get_order!(first.id)
+    assert first.status == :canceled
+    assert first.failure_reason == "Superseded by new checkout"
+    assert second.status == :pending
+  end
+
+  test "refuses a different cart when canceling the prior Intent fails", %{
+    user: user,
+    lines: lines,
+    tee: tee
+  } do
+    {:ok, first} = create(user, lines)
+    {:ok, _} = Orders.attach_payment_intent(first, "pi_flaky")
+
+    expect(StripeMock, :cancel_payment_intent, fn "pi_flaky", _ ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :api_error,
+         message: "stripe unavailable"
+       }}
+    end)
+
+    expect(StripeMock, :retrieve_payment_intent, fn "pi_flaky", _ ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :api_error,
+         message: "stripe unavailable"
+       }}
+    end)
+
+    {:ok, _} = Ysc.Merch.Cart.set_quantity(user, tee.id, 3)
+
+    assert {:error, :payment_in_progress} =
+             create(user, Ysc.Merch.Cart.list(user))
+
+    assert Orders.get_order!(first.id).status == :pending
+    assert Repo.aggregate(Order, :count) == 1
   end
 end
