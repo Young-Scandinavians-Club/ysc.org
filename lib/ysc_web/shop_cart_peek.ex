@@ -26,6 +26,23 @@ defmodule YscWeb.ShopCartPeek do
   def init(socket, user) do
     socket
     |> assign(:cart_summary, Cart.summary(user))
+    |> assign_peek_defaults()
+  end
+
+  @doc """
+  Placeholder dock assigns with no database round-trip.
+
+  Used while a LiveView paints its first HTML before the catalog (and cart
+  summary) load after the WebSocket connects.
+  """
+  def init_placeholder(socket) do
+    socket
+    |> assign(:cart_summary, Cart.summary(nil))
+    |> assign_peek_defaults()
+  end
+
+  defp assign_peek_defaults(socket) do
+    socket
     |> assign(:cart_peek, nil)
     |> assign(:cart_peek_open?, false)
     |> assign(:cart_peek_token, 0)

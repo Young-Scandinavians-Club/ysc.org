@@ -154,6 +154,43 @@ defmodule Ysc.NewsletterEditionsTest do
       older_idx = Enum.find_index(ids, &(&1 == e1.id))
       assert newer_idx < older_idx
     end
+
+    test "slims creator to name/email and skips cover images" do
+      user = admin_fixture()
+
+      image =
+        Ysc.MerchFixtures.image_fixture(%{
+          upload_data: %{"original" => "fat-json"},
+          content_hash: "abc123"
+        })
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{
+            "title" => "Slim list",
+            "subject" => "Weekly",
+            "cover_image_id" => image.id
+          },
+          created_by_id: user.id
+        )
+
+      {editions, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Newsletter.list_editions() end,
+          pattern: ~r/hashed_password|board_bio|upload_data|content_hash/i,
+          caller_pids: [self()]
+        )
+
+      listed = Enum.find(editions, &(&1.id == edition.id))
+      assert listed
+      assert listed.title == "Slim list"
+      refute Ecto.assoc_loaded?(listed.cover_image)
+      assert Ecto.assoc_loaded?(listed.creator)
+      assert listed.creator.id == user.id
+      assert listed.creator.first_name
+      assert is_nil(listed.creator.hashed_password)
+      assert fat_cols == 0
+    end
   end
 
   # ---------------------------------------------------------------------------
