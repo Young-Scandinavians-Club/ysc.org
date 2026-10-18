@@ -123,16 +123,16 @@ defmodule YscWeb.AccountSetupLive do
         }>
           <%= if @user.state == :active do %>
             <.header class="text-left">
-              Activate Your Membership
+              Pay your membership dues
               <:subtitle>
-                Your application is approved. Add or confirm a payment method to activate your membership and unlock member benefits.
+                Your application is approved. Add or confirm a payment method to pay your first year's dues and unlock member benefits.
               </:subtitle>
             </.header>
           <% else %>
             <.header class="text-left">
               Save your payment method
               <:subtitle>
-                Save a payment method so we can activate your membership if you're approved. You won't be charged until the board approves your application.
+                Save a payment method so we can charge your membership dues if you're approved. You won't be charged until the board approves your application.
               </:subtitle>
             </.header>
           <% end %>
@@ -166,10 +166,10 @@ defmodule YscWeb.AccountSetupLive do
                 id="retry-membership-activation"
                 type="button"
                 phx-click="retry_membership_activation"
-                phx-disable-with="Activating..."
+                phx-disable-with="Paying..."
                 color="blue"
               >
-                Activate Membership Now
+                Pay your membership dues
               </.button>
               <.link
                 id="pay-on-membership-page"
@@ -436,7 +436,7 @@ defmodule YscWeb.AccountSetupLive do
               <.header class="text-left">
                 One More Step
                 <:subtitle>
-                  Your application is approved — activate your membership to unlock member benefits.
+                  Your application is approved — pay your membership dues to unlock member benefits.
                 </:subtitle>
               </.header>
 
@@ -446,13 +446,13 @@ defmodule YscWeb.AccountSetupLive do
                   class="w-16 h-16 text-blue-600 mx-auto mb-4"
                 />
                 <p class="text-zinc-600 mb-4">
-                  Add a payment method to activate your membership.
+                  Add a payment method to pay your membership dues.
                 </p>
                 <.link
                   patch={~p"/account/setup/#{@user.id}?step=1"}
                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                 >
-                  Activate Membership
+                  Pay your membership dues
                 </.link>
               </div>
             <% true -> %>
@@ -1668,7 +1668,7 @@ defmodule YscWeb.AccountSetupLive do
         {:error, _reason} ->
           YscWeb.Flash.send_toast(
             :error,
-            "We couldn't activate your membership. Please try again, or pay on the Membership page.",
+            "We couldn't charge your membership dues. Please try again, or pay on the Membership page.",
             title: "Membership"
           )
 
@@ -1731,7 +1731,7 @@ defmodule YscWeb.AccountSetupLive do
             socket = refresh_setup_user_and_needs(socket)
 
             {socket,
-             "Payment method saved, but we couldn't activate membership yet. Use Activate Membership Now, or pay on the Membership page.",
+             "Payment method saved, but we couldn't charge your dues yet. Use Pay your membership dues, or pay on the Membership page.",
              false}
         end
       else

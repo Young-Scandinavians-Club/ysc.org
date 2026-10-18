@@ -1172,7 +1172,7 @@ defmodule YscWeb.UserSettingsLive do
                           Payment method
                         </h3>
                         <p class="text-sm text-zinc-500 mt-0.5">
-                          Used for this purchase and all future automatic renewals.
+                          Used to pay your dues and all future automatic renewals.
                         </p>
                       </div>
                     </div>
@@ -1264,13 +1264,14 @@ defmodule YscWeb.UserSettingsLive do
                       </div>
                       <div class="flex flex-col items-start sm:items-end gap-2">
                         <.button
+                          id="pay-membership-dues"
                           disabled={
                             @default_payment_method == nil || !@user_is_active
                           }
-                          phx-disable-with="Processing..."
+                          phx-disable-with="Paying..."
                         >
                           <.icon name="hero-shield-check" class="w-5 h-5" />
-                          Complete Membership Purchase
+                          Pay your membership dues
                         </.button>
                         <p class="text-xs text-zinc-500 flex items-center gap-1">
                           <.icon name="hero-lock-closed" class="w-3 h-3" />
@@ -1285,7 +1286,7 @@ defmodule YscWeb.UserSettingsLive do
                       }
                       class="mt-3 text-sm text-zinc-500"
                     >
-                      Add a payment method in step 2 to complete your purchase.
+                      Add a payment method in step 2 to pay your dues.
                     </p>
 
                     <p
@@ -1295,7 +1296,7 @@ defmodule YscWeb.UserSettingsLive do
                       }
                       class="mt-3 text-sm text-zinc-500"
                     >
-                      Membership purchase unlocks after the board approves your application.{" "}
+                      You can pay membership dues after the board approves your application.{" "}
                       <.link
                         navigate={~p"/pending-review"}
                         class="font-medium text-blue-600 hover:underline"
@@ -4921,7 +4922,7 @@ defmodule YscWeb.UserSettingsLive do
 
         {:error, _reason} ->
           {socket,
-           "Payment method saved. We couldn't activate membership automatically — choose a plan below to finish."}
+           "Payment method saved. We couldn't charge your dues automatically — choose a plan below and pay your membership dues."}
       end
     else
       {socket, "Payment method saved and set as default."}
