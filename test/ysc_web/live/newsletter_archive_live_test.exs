@@ -66,6 +66,21 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
       assert has_element?(view, ~s|a[href="/newsletters/#{edition.id}"]|)
     end
 
+    test "separates block-level intro_text elements with a space", %{conn: conn} do
+      admin = user_fixture()
+
+      _edition =
+        insert_sent_edition(admin, %{
+          "intro_text" =>
+            "<h2>Sauna and pool</h2><p>Tired of the foggy days</p>"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/newsletters")
+      html = render_async(view)
+
+      assert html =~ "Sauna and pool Tired of the foggy days"
+    end
+
     test "omits excerpt line when intro_text is empty", %{conn: conn} do
       admin = user_fixture()
 

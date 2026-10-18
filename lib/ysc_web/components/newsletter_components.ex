@@ -129,6 +129,7 @@ defmodule YscWeb.NewsletterComponents do
   attr :subscribed, :boolean, required: true
   attr :layout, :atom, default: :card, values: [:card, :compact]
   attr :event, :string, default: "toggle_newsletter_subscription"
+  attr :class, :any, default: nil
 
   def newsletter_member_status(%{layout: :compact} = assigns) do
     ~H"""
@@ -170,7 +171,10 @@ defmodule YscWeb.NewsletterComponents do
     ~H"""
     <div
       id={@id}
-      class="rounded-xl border border-zinc-200 bg-zinc-50 px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+      class={[
+        "rounded-xl border border-zinc-200 bg-zinc-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4",
+        @class
+      ]}
     >
       <div class="flex items-center gap-3">
         <div class={[
@@ -198,13 +202,9 @@ defmodule YscWeb.NewsletterComponents do
       </div>
       <.button
         phx-click={@event}
-        class={
-          if(@subscribed,
-            do:
-              "shrink-0 px-4 py-2 text-sm bg-white! text-zinc-700! border border-zinc-300 hover:bg-zinc-100!",
-            else: "shrink-0 px-4 py-2 text-sm"
-          )
-        }
+        variant={if(@subscribed, do: "outline", else: "solid")}
+        color={if(@subscribed, do: "zinc", else: "blue")}
+        class="shrink-0 px-4 py-2 text-sm"
         phx-disable-with="Saving..."
       >
         {if @subscribed, do: "Unsubscribe", else: "Subscribe"}

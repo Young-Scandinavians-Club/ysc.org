@@ -27,56 +27,58 @@ defmodule YscWeb.NewsletterArchiveLive do
   def render(%{live_action: :index} = assigns) do
     ~H"""
     <div class="py-6 md:py-12">
-      <div class="max-w-(--breakpoint-lg) mx-auto px-4">
-        <.page_masthead
-          eyebrow="Archive"
-          title="Newsletters"
-        />
-      </div>
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4">
+        <%!-- Header: title on the left, subscription control on the right --%>
+        <div class="mb-6 md:mb-10 pb-8 md:pb-10 border-b border-zinc-200 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+          <.page_masthead
+            eyebrow="Archive"
+            title="Newsletters"
+            subtitle="Club dispatches, cabin updates, and upcoming Bay Area and Tahoe gatherings sent to YSC members."
+            class="mb-0! md:mb-0!"
+          />
 
-      <%!-- Subscription widget --%>
-      <div class="max-w-(--breakpoint-lg) mx-auto px-4 mb-12">
-        <%= if @current_user do %>
-          <%= if @async_data_loaded do %>
-            <.newsletter_member_status
-              id="newsletter-member-status"
-              subscribed={@user_subscribed}
-              event="toggle_subscription"
-            />
-          <% else %>
-            <.subscription_widget_skeleton />
-          <% end %>
-        <% else %>
-          <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-6 py-8 text-center">
-            <.icon name="hero-envelope" class="w-8 h-8 mx-auto mb-3 text-blue-600" />
-            <h2 class="text-lg text-zinc-900 mb-1 type-subhead">
-              Stay in the loop
-            </h2>
-            <p class="text-sm text-zinc-500 mb-6">
-              Sign up to receive future newsletters directly in your inbox.
-            </p>
-            <.newsletter_subscribe_form
-              id="newsletter-subscribe-form"
-              email={@newsletter_email}
-              submitted={@newsletter_submitted}
-              error={@newsletter_error}
-              class="max-w-md mx-auto"
-            />
-          </div>
-        <% end %>
-      </div>
-
-      <div class="max-w-(--breakpoint-lg) mx-auto px-4">
-        <%!-- Loading skeletons --%>
-        <div :if={!@async_data_loaded} class="divide-y divide-zinc-100">
-          <div :for={_ <- 1..5} class="py-8 animate-pulse">
-            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-              <div class="flex-1 space-y-3">
-                <div class="h-3 w-24 bg-zinc-200 rounded-sm"></div>
-                <div class="h-5 w-2/3 bg-zinc-200 rounded-sm"></div>
-                <div class="h-4 w-full bg-zinc-100 rounded-sm"></div>
+          <div
+            id="newsletter-subscription"
+            class="w-full lg:w-auto lg:min-w-[26rem] lg:max-w-md"
+          >
+            <%= if @current_user do %>
+              <%= if @async_data_loaded do %>
+                <.newsletter_member_status
+                  id="newsletter-member-status"
+                  subscribed={@user_subscribed}
+                  event="toggle_subscription"
+                />
+              <% else %>
+                <.subscription_widget_skeleton />
+              <% end %>
+            <% else %>
+              <div class="rounded-xl border border-zinc-200 bg-zinc-50 px-6 py-6 text-center">
+                <h2 class="text-lg text-zinc-900 mb-1 type-subhead">
+                  Stay in the loop
+                </h2>
+                <p class="text-sm text-zinc-500 mb-4">
+                  Sign up to receive future newsletters directly in your inbox.
+                </p>
+                <.newsletter_subscribe_form
+                  id="newsletter-subscribe-form"
+                  email={@newsletter_email}
+                  submitted={@newsletter_submitted}
+                  error={@newsletter_error}
+                />
               </div>
-              <div class="h-4 w-12 bg-zinc-200 rounded-sm shrink-0 mt-1"></div>
+            <% end %>
+          </div>
+        </div>
+
+        <%!-- Loading skeletons --%>
+        <div :if={!@async_data_loaded} class="divide-y divide-zinc-200/80">
+          <div :for={_ <- 1..5} class="py-8 animate-pulse">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-8">
+              <div class="lg:col-span-3 h-3 w-28 bg-zinc-200 rounded-sm"></div>
+              <div class="lg:col-span-7 space-y-3">
+                <div class="h-5 w-2/3 bg-zinc-200 rounded-sm"></div>
+                <div class="h-4 w-full max-w-2xl bg-zinc-100 rounded-sm"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -89,36 +91,41 @@ defmodule YscWeb.NewsletterArchiveLive do
           No newsletters have been sent yet.
         </p>
 
-        <div id="editions" phx-update="stream" class="divide-y divide-zinc-100">
+        <div id="editions" phx-update="stream" class="divide-y divide-zinc-200/80">
           <article
             :for={{id, edition} <- @streams.editions}
             id={id}
-            class="py-8 group"
+            class="group py-3"
           >
             <.link
               navigate={~p"/newsletters/#{edition.id}"}
-              class="block hover:no-underline"
+              class="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-8 items-baseline rounded-xl -mx-4 px-4 py-5 hover:bg-zinc-50 hover:no-underline transition-colors"
             >
-              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div class="flex-1 min-w-0">
-                  <p class="text-xs text-blue-600 mb-2 type-eyebrow">
-                    {format_sent_date(edition.sent_at)}
-                  </p>
-                  <h2 class="text-xl text-zinc-900 group-hover:text-blue-600 transition-colors type-subhead">
-                    {edition.title}
-                  </h2>
-                  <p
-                    :if={edition_excerpt(edition) != ""}
-                    class="mt-2 text-sm text-zinc-500 line-clamp-2"
-                  >
-                    {edition_excerpt(edition)}
-                  </p>
-                </div>
-                <div class="shrink-0 mt-1">
-                  <span class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 group-hover:gap-2 transition-[gap]">
-                    Read <.icon name="hero-arrow-right" class="w-4 h-4" />
-                  </span>
-                </div>
+              <div class="lg:col-span-3 flex items-center gap-3">
+                <p class="text-xs text-blue-600 type-eyebrow">
+                  {format_sent_date(edition.sent_at)}
+                </p>
+                <span class="hidden group-first:inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                  Latest
+                </span>
+              </div>
+
+              <div class="lg:col-span-7 min-w-0">
+                <h2 class="text-xl sm:text-2xl text-zinc-900 group-hover:text-blue-600 transition-colors type-subhead">
+                  {edition.title}
+                </h2>
+                <p
+                  :if={edition_excerpt(edition) != ""}
+                  class="mt-2 max-w-2xl text-sm sm:text-base text-zinc-500 line-clamp-2"
+                >
+                  {edition_excerpt(edition)}
+                </p>
+              </div>
+
+              <div class="lg:col-span-2 flex lg:justify-end items-center">
+                <span class="inline-flex items-center gap-1 text-sm font-medium text-blue-600 group-hover:gap-2 transition-[gap]">
+                  Read issue <.icon name="hero-arrow-right" class="w-4 h-4" />
+                </span>
               </div>
             </.link>
           </article>
@@ -390,6 +397,7 @@ defmodule YscWeb.NewsletterArchiveLive do
 
   defp edition_excerpt(%{intro_text: html}) do
     html
+    |> String.replace(~r/<\/(p|div|h[1-6]|li|tr|blockquote)>|<br\s*\/?>/i, " ")
     |> HtmlSanitizeEx.strip_tags()
     |> String.replace(~r/\s+/, " ")
     |> String.trim()
