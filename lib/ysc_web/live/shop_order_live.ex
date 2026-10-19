@@ -314,10 +314,10 @@ defmodule YscWeb.ShopOrderLive do
             <section id="order-ship-to" class="rounded-3xl bg-zinc-50 p-6 md:p-8">
               <h2 class="type-subhead mb-3 text-xl text-zinc-900">Shipping to</h2>
               <p class="text-lg text-zinc-700">
-                {@order.recipient_name}<br />
-                {@order.address1}<br />
-                <span :if={@order.address2 not in [nil, ""]}>{@order.address2}<br /></span>
-                {@order.city}, {@order.state_code} {@order.zip}
+                <.shipping_address_lines
+                  address={@order}
+                  name={@order.recipient_name}
+                />
               </p>
             </section>
 

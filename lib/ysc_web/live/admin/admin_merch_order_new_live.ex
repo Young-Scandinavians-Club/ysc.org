@@ -12,6 +12,8 @@ defmodule YscWeb.AdminMerchOrderNewLive do
 
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
+  import YscWeb.ShopComponents, only: [shipping_address_lines: 1]
+
   alias Ysc.Merch.{AdminOrders, ShippingAddress}
   alias Ysc.Repo
   alias YscWeb.Admin.DateTimeDisplay
@@ -887,10 +889,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
           <div class="grid grid-cols-3 gap-4 p-4">
             <dt class="text-zinc-500">Ship to</dt>
             <dd id="review-address" class="col-span-2 text-zinc-900">
-              {@address.name}<br />
-              {@address.address1}<br />
-              <span :if={@address.address2 not in [nil, ""]}>{@address.address2}<br /></span>
-              {@address.city}, {@address.state_code} {@address.zip}
+              <.shipping_address_lines address={@address} name={@address.name} />
             </dd>
           </div>
           <div class="grid grid-cols-3 gap-4 p-4">

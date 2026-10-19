@@ -560,10 +560,7 @@ defmodule YscWeb.ShopCheckoutLive do
       class="mt-4 flex items-start justify-between gap-4"
     >
       <p class="text-lg text-zinc-700">
-        {@address.name}<br />
-        {@address.address1}<br />
-        <span :if={@address.address2 not in [nil, ""]}>{@address.address2}<br /></span>
-        {@address.city}, {@address.state_code} {@address.zip}
+        <.shipping_address_lines address={@address} name={@address.name} />
       </p>
       <button
         type="button"

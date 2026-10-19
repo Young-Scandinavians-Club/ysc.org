@@ -10,6 +10,7 @@ defmodule YscWeb.Emails.MerchAdminOrderBoardNotification do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers, only: [absolute_url: 1, format_money: 1]
+  import YscWeb.Emails.MerchHelpers, only: [address_lines: 1]
 
   alias Ysc.Accounts.UserDisplay
   alias Ysc.Merch.Order
@@ -64,15 +65,6 @@ defmodule YscWeb.Emails.MerchAdminOrderBoardNotification do
 
   defp recipient(%Order{recipient_name: name}),
     do: %{name: name, detail: "custom address, not a member"}
-
-  defp address_lines(order) do
-    [
-      order.address1,
-      order.address2,
-      "#{order.city}, #{order.state_code} #{order.zip}"
-    ]
-    |> Enum.reject(&(&1 in [nil, ""]))
-  end
 
   # Until Printful reports the real charge this is the quote from placement.
   defp estimated_cost(%Order{estimated_cost: %Money{} = cost}),

@@ -9,6 +9,7 @@ defmodule YscWeb.AdminMerchOrdersLive do
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
   import YscWeb.AdminMerchComponents
+  import YscWeb.ShopComponents, only: [shipping_address_lines: 1]
 
   alias Ysc.Accounts.UserDisplay
   alias Ysc.Merch.{AdminOrders, Orders}
@@ -334,9 +335,7 @@ defmodule YscWeb.AdminMerchOrdersLive do
                 <span class="font-semibold">{@order.recipient_name}</span>
                 (not a member)<br />
               <% end %>
-              {@order.address1}<br />
-              <span :if={@order.address2 not in [nil, ""]}>{@order.address2}<br /></span>
-              {@order.city}, {@order.state_code} {@order.zip}
+              <.shipping_address_lines address={@order} />
             </p>
             <p :if={@order.email} class="text-sm text-zinc-600">{@order.email}</p>
             <p :if={@order.phone} class="text-sm text-zinc-600">{@order.phone}</p>
