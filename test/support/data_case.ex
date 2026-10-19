@@ -12,12 +12,31 @@ defmodule Ysc.DataCase do
   PostgreSQL, you can even run database tests asynchronously
   by setting `use Ysc.DataCase, async: true`, although
   this option is not recommended for other databases.
+
+  ## Options
+
+    * `:mox_global_first` — when `true`, enables Mox global mode **before**
+      default HTTP/Stripe stubs run so Oban workers and other spawned processes
+      can call mocks. Only the process that enables global mode may define stubs
+      in shared mode. Resets to private mode when the test exits.
+
+      Pass together with `async: false`, per Mox requirements. Do not use
+      `setup :set_mox_global` in the test module: that callback runs *after*
+      DataCase stubs, so the next test flakes with
+      `only the process that set Mox to global can set expectations/stubs`.
+
+      Example:
+
+          use Ysc.DataCase, async: false, mox_global_first: true
+
   """
 
   use ExUnit.CaseTemplate
   import Mox
 
-  using do
+  using(opts) do
+    mox_global_first_flag = Keyword.get(opts, :mox_global_first, false)
+
     quote do
       use Oban.Testing, repo: Ysc.Repo
 
@@ -30,11 +49,28 @@ defmodule Ysc.DataCase do
       import Ysc.EmailValidatorTestHelper
       import Ysc.Test.Invoke
       import Mox
+
+      unquote(
+        if mox_global_first_flag do
+          quote do
+            @moduletag :mox_global_first
+          end
+        else
+          quote do
+          end
+        end
+      )
     end
   end
 
   setup tags do
     Ysc.Test.EnvHelper.reset_environment!()
+
+    if tags[:mox_global_first] do
+      Mox.set_mox_global()
+      on_exit(fn -> Mox.set_mox_private() end)
+    end
+
     owner = Ysc.DataCase.setup_sandbox(tags)
     # Ensure basic site settings exist, unless the test explicitly opts out.
     # Skip the DB round-trip when settings already exist (e.g. same sandbox process).
