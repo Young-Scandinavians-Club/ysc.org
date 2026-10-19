@@ -76,7 +76,14 @@ defmodule QueryConsole.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
-      {:dns_cluster, "~> 0.3.0"},
+      # 0.3.0: optional :resource_types (defaults [:a, :aaaa], also :srv).
+      # Fly 6PN uses AAAA on ${FLY_APP_NAME}.internal; we do not pass :srv.
+      # 0.3.1: look up the hostname of a `{basename, query}` tuple instead
+      # of passing the tuple to Resolver.lookup/2 (FunctionClauseError on
+      # the real resolver). We pass a string query (`DNS_CLUSTER_QUERY`)
+      # or `:ignore`, not a tuple, so the fix is unused. Public APIs
+      # unchanged.
+      {:dns_cluster, "~> 0.3.1"},
       # 1.12.5: EEF-CVE-2026-74836 (HIGH) bounds/cancels HTTP/2 sends blocked on
       # the connection window; EEF-CVE-2026-75484 (MEDIUM) rejects HTTP/2 header
       # values with CR/LF/NUL.
