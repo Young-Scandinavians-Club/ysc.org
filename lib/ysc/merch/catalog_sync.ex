@@ -467,7 +467,8 @@ defmodule Ysc.Merch.CatalogSync do
       |> Map.get("files", [])
       |> Enum.find(&(&1["type"] == "preview"))
 
-    preview && present(preview["preview_url"] || preview["thumbnail_url"])
+    preview &&
+      (present(preview["preview_url"]) || present(preview["thumbnail_url"]))
   end
 
   defp present(value) when value in [nil, ""], do: nil

@@ -82,6 +82,17 @@ while IFS= read -r file; do
       # and fail with :unknown).
       case "$base" in
         notifier | helpers | *_helpers | base_layout | header | footer | notification_settings_footer) ;;
+        # Builds the item rows of every merch email: not a template itself, so
+        # preview the merch emails it feeds instead.
+        merch_items)
+          templates+=(
+            merch_order_confirmation
+            merch_order_shipped
+            merch_order_update
+            merch_order_attention_board_notification
+            merch_admin_order_board_notification
+          )
+          ;;
         *)
           templates+=("$base")
           ;;

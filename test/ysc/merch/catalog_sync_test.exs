@@ -192,6 +192,28 @@ defmodule Ysc.Merch.CatalogSyncTest do
       assert variant_image_url(11) == "https://img/1.png"
     end
 
+    test "an empty preview_url falls back to the thumbnail_url of the same file",
+         %{admin: admin} do
+      expect(ClientMock, :list_sync_products, fn -> {:ok, [listed(1)]} end)
+
+      expect(ClientMock, :get_sync_product, fn 1 ->
+        detail(listed(1), [
+          sync_variant(10, %{
+            "files" => [
+              %{
+                "type" => "preview",
+                "preview_url" => "",
+                "thumbnail_url" => "https://img/thumb10.png"
+              }
+            ]
+          })
+        ])
+      end)
+
+      assert {:ok, %{failed: 0}} = Merch.sync_catalog(admin)
+      assert variant_image_url(10) == "https://img/thumb10.png"
+    end
+
     test "the catalog photo is the last resort", %{admin: admin} do
       expect(ClientMock, :list_sync_products, fn ->
         {:ok, [%{"id" => 1, "name" => "Bare", "thumbnail_url" => nil}]}
