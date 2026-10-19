@@ -153,7 +153,14 @@ defmodule Ysc.Merch.PrintfulEvents do
       when is_map(printful_order) do
     order = stamp(order, printful_order)
 
-    shipments = printful_order |> Map.get("shipments") |> List.wrap()
+    # Printful lists a shipment as soon as the order is placed (status
+    # "pending", no tracking number), long before anything leaves the building.
+    # Only parcels that have actually shipped count.
+    shipments =
+      printful_order
+      |> Map.get("shipments")
+      |> List.wrap()
+      |> Enum.filter(&shipped?/1)
 
     Enum.each(shipments, fn raw ->
       case record_shipment(order, raw, :shipped) do
@@ -202,6 +209,16 @@ defmodule Ysc.Merch.PrintfulEvents do
 
     :ok
   end
+
+  # By the shipment's own status when it has one; otherwise it counts if it has
+  # a ship date.
+  defp shipped?(%{"status" => status}) when is_binary(status),
+    do: status in ~w(shipped delivered returned)
+
+  defp shipped?(%{} = shipment),
+    do: is_integer(shipment["shipped_at"]) or is_binary(shipment["ship_date"])
+
+  defp shipped?(_), do: false
 
   ## Finding and stamping
 

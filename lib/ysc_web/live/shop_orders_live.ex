@@ -98,27 +98,34 @@ defmodule YscWeb.ShopOrdersLive do
         <li :for={order <- @orders} id={"order-#{order.id}"}>
           <.link
             navigate={~p"/shop/orders/#{order.id}"}
-            class="flex items-center gap-5 rounded-2xl p-4 transition hover:bg-zinc-50 motion-safe:active:scale-[0.99]"
+            class="flex items-center gap-3 rounded-2xl p-4 transition hover:bg-zinc-50 motion-safe:active:scale-[0.99] sm:gap-5"
           >
-            <div class="flex -space-x-4">
+            <div class="flex shrink-0 -space-x-3 sm:-space-x-4">
               <.shop_thumb
                 :for={item <- Enum.take(order.items, 3)}
                 image={item.variant && item.variant.image}
-                class="size-14 ring-4 ring-white"
+                class="size-10 ring-2 ring-white sm:size-14 sm:ring-4"
               />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-lg text-zinc-900">{order.reference_id}</p>
-              <p class="text-zinc-500">
-                {Calendar.strftime(order.inserted_at, "%B %-d, %Y")} · {Enum.sum(
-                  Enum.map(order.items, & &1.quantity)
-                )} items
+              <p class="break-words text-base text-zinc-900 sm:text-lg">
+                {order.reference_id}
+              </p>
+              <p class="text-sm text-zinc-500 sm:text-base">
+                <span class="whitespace-nowrap">
+                  {Calendar.strftime(order.inserted_at, "%B %-d, %Y")}
+                </span>
+                <span class="whitespace-nowrap">
+                  · {Enum.sum(Enum.map(order.items, & &1.quantity))} items
+                </span>
               </p>
             </div>
-            <.order_status_badge order={order} />
-            <p class="w-24 text-right text-lg text-zinc-900">
-              {format_price(order.total_amount)}
-            </p>
+            <div class="flex shrink-0 flex-col-reverse items-end gap-1.5 sm:flex-row sm:items-center sm:gap-5">
+              <.order_status_badge order={order} />
+              <p class="text-right text-base text-zinc-900 sm:w-24 sm:text-lg">
+                {format_price(order.total_amount)}
+              </p>
+            </div>
           </.link>
         </li>
       </ul>

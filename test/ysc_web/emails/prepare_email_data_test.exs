@@ -559,6 +559,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       assert exp_item.has_receipt == true
       assert inc_item.has_proof == true
       assert data.expense_report_url =~ "/expensereport/#{report.id}/success"
+      assert data.treasurer_email == Ysc.EmailConfig.treasurer_email()
     end
 
     test "reloads when associations missing", %{report: report} do

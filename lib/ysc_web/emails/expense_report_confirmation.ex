@@ -39,7 +39,8 @@ defmodule YscWeb.Emails.ExpenseReportConfirmation do
     %{
       first_name: member_greeting_name(report.user),
       expense_report: fields,
-      expense_report_url: ExpenseReportHelpers.member_url(report.id)
+      expense_report_url: ExpenseReportHelpers.member_url(report.id),
+      treasurer_email: Ysc.EmailConfig.treasurer_email()
     }
   end
 end

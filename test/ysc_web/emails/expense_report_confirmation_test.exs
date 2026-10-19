@@ -66,6 +66,7 @@ defmodule YscWeb.Emails.ExpenseReportConfirmationTest do
       assert data.expense_report.reimbursement_method == "Bank Transfer"
       assert data.expense_report.bank_account.last_4 == "7890"
       assert data.expense_report_url =~ to_string(report.id)
+      assert data.treasurer_email == Ysc.EmailConfig.treasurer_email()
     end
 
     test "reloads associations when given a bare struct", %{bare_report: bare} do
@@ -178,11 +179,16 @@ defmodule YscWeb.Emails.ExpenseReportConfirmationTest do
       assert row.has_receipt == false
 
       html = ExpenseReportConfirmation.render(data)
+      treasurer_email = Ysc.EmailConfig.treasurer_email()
+
       assert html =~ "Home to YSC Cabin — 20 mi"
       assert html =~ "Mileage — no receipt required"
       assert html =~ "Amount we will reimburse"
       assert html =~ "Treasurer is reviewing it"
       assert html =~ "Reference number"
+      assert html =~ "mailto:#{treasurer_email}"
+      assert html =~ treasurer_email
+      refute html =~ "please contact the Treasurer</"
       refute html =~ "Net Total"
       refute html =~ "No receipt attached"
       refute html =~ "being processed"

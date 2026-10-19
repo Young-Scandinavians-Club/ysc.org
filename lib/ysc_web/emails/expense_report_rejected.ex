@@ -47,7 +47,8 @@ defmodule YscWeb.Emails.ExpenseReportRejected do
       },
       rejection_note:
         presence(expense_report.rejection_note) || "No note was provided.",
-      new_expense_report_url: absolute_url("/expensereport")
+      new_expense_report_url: absolute_url("/expensereport"),
+      treasurer_email: Ysc.EmailConfig.treasurer_email()
     }
   end
 

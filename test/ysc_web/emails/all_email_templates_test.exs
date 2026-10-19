@@ -1067,7 +1067,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           event: nil,
           bank_account: nil
         },
-        expense_report_url: "https://example.com/expensereport/123"
+        expense_report_url: "https://example.com/expensereport/123",
+        treasurer_email: "treasurer@ysc.org"
       }
 
       html = ExpenseReportConfirmation.render(assigns)
@@ -1118,7 +1119,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           purpose: "Test expense report"
         },
         rejection_note: "The hotel receipt is missing.\nPlease re-upload it.",
-        new_expense_report_url: "https://example.com/expensereport"
+        new_expense_report_url: "https://example.com/expensereport",
+        treasurer_email: "treasurer@ysc.org"
       }
 
       html = YscWeb.Emails.ExpenseReportRejected.render(assigns)

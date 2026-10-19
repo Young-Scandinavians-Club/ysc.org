@@ -216,6 +216,38 @@ defmodule YscWeb.ExpenseReportLiveTest do
       refute has_element?(view, "#expense-report-success", "Report Rejected")
     end
 
+    test "success page shows how to email the Treasurer", %{
+      conn: conn,
+      user: user
+    } do
+      report =
+        insert_member_report!(user, %{
+          purpose: "Cabin groceries",
+          status: "submitted"
+        })
+
+      treasurer_email = Ysc.EmailConfig.treasurer_email()
+
+      {:ok, view, _html} = live(conn, ~p"/expensereport/#{report.id}/success")
+
+      assert has_element?(
+               view,
+               "#expense-report-contact-treasurer",
+               treasurer_email
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-contact-treasurer[href^='mailto:#{treasurer_email}']"
+             )
+
+      refute has_element?(
+               view,
+               "#expense-report-contact-treasurer",
+               "Contact Treasurer"
+             )
+    end
+
     test "My Reports lists a rejected report with the Rejected badge", %{
       conn: conn,
       user: user
