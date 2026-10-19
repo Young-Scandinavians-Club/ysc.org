@@ -29,6 +29,30 @@ defmodule Ysc.Merch.OrdersTest do
     )
   end
 
+  test "keeps the delivery estimate of the shipping option the member chose", %{
+    user: user,
+    lines: lines
+  } do
+    option =
+      shipping_option_fixture(%{
+        min_date: ~D[2026-10-26],
+        max_date: ~D[2026-10-29]
+      })
+
+    assert {:ok, order} = create(user, lines, option: option)
+    assert order.delivery_estimate_min == ~D[2026-10-26]
+    assert order.delivery_estimate_max == ~D[2026-10-29]
+
+    # An option without dates (an older quote) is fine too.
+    assert {:ok, other} =
+             create(
+               user_fixture(),
+               cart_lines_fixture(user_fixture(), [{variant_fixture(), 1}])
+             )
+
+    assert other.delivery_estimate_min == nil
+  end
+
   test "snapshots items, prices, address and totals", %{
     user: user,
     lines: lines

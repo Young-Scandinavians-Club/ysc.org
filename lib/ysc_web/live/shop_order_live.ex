@@ -157,6 +157,13 @@ defmodule YscWeb.ShopOrderLive do
               <p class="text-zinc-500">
                 Placed {Calendar.strftime(@order.inserted_at, "%B %-d, %Y")}
               </p>
+              <p
+                :if={delivery_estimate(@order)}
+                id="order-delivery-estimate"
+                class="text-lg text-zinc-900"
+              >
+                Estimated delivery {delivery_estimate(@order)}
+              </p>
             </header>
 
             <ol
@@ -355,4 +362,11 @@ defmodule YscWeb.ShopOrderLive do
   end
 
   defp status_banner(assigns), do: ~H""
+
+  # Only while something is still on its way.
+  defp delivery_estimate(%{status: status})
+       when status in [:failed, :canceled, :refunded, :delivered],
+       do: nil
+
+  defp delivery_estimate(order), do: Ysc.Merch.Shipping.delivery_estimate(order)
 end

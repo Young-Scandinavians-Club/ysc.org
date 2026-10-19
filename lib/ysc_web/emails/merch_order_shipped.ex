@@ -31,6 +31,7 @@ defmodule YscWeb.Emails.MerchOrderShipped do
         reshipment: shipment.reshipment
       },
       items: YscWeb.Emails.MerchItems.for_order(order),
+      delivery_estimate: Ysc.Merch.Shipping.delivery_estimate(order),
       ship_to: %{name: order.recipient_name, lines: address_lines(order)},
       order_url: order_url(order)
     }

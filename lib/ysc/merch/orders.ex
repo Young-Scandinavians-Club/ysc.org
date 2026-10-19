@@ -61,7 +61,9 @@ defmodule Ysc.Merch.Orders do
     :subtotal,
     :shipping_amount,
     :total_amount,
-    :payment_intent_id
+    :payment_intent_id,
+    :delivery_estimate_min,
+    :delivery_estimate_max
   ]
   @user_order_detail_item_fields @user_order_item_fields ++ [:unit_price]
   @user_order_shipment_fields [
@@ -155,6 +157,8 @@ defmodule Ysc.Merch.Orders do
     |> Map.update(:email, user.email, &(&1 || user.email))
     |> Map.merge(%{
       shipping_method: option.id,
+      delivery_estimate_min: Map.get(option, :min_date),
+      delivery_estimate_max: Map.get(option, :max_date),
       subtotal: subtotal,
       shipping_amount: option.rate,
       total_amount: Money.add!(subtotal, option.rate)
