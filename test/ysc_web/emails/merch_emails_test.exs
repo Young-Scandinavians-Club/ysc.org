@@ -95,6 +95,18 @@ defmodule YscWeb.Emails.MerchEmailsTest do
       assert html =~ ">Total<"
     end
 
+    test "the confirmation's order number label is bold, like the date's", %{
+      order: order
+    } do
+      html =
+        order
+        |> MerchOrderConfirmation.prepare_email_data()
+        |> MerchOrderConfirmation.render()
+
+      assert html =~ "<strong>Order number:</strong>"
+      assert html =~ "<strong>Ordered:</strong>"
+    end
+
     test "shipped", %{order: order} do
       order
       |> MerchOrderShipped.prepare_email_data(shipment())
