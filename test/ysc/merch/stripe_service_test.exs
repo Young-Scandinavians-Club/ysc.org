@@ -349,10 +349,55 @@ defmodule Ysc.Merch.StripeServiceTest do
       assert {:error, :not_payable} =
                StripeService.ensure_payment_intent(comp, user)
 
-      free = %{order | total_amount: Money.new(:USD, 0)}
+      free =
+        order
+        |> Ecto.Changeset.change(total_amount: Money.new(:USD, 0))
+        |> Repo.update!()
 
       assert {:error, :not_payable} =
                StripeService.ensure_payment_intent(free, user)
+    end
+
+    test "does not mint an Intent for an order canceled after checkout started",
+         %{
+           order: order,
+           user: user
+         } do
+      assert :ok = Orders.cancel_pending(order, "Superseded by new checkout")
+
+      assert {:error, :not_payable} =
+               StripeService.ensure_payment_intent(order, user)
+
+      assert Orders.get_order!(order.id).payment_intent_id == nil
+    end
+
+    test "cancels a newly created Intent when the order is no longer pending",
+         %{
+           order: order,
+           user: user
+         } do
+      expect(StripeMock, :create_payment_intent, fn params, _ ->
+        :ok = Orders.cancel_pending(order, "Superseded by new checkout")
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_orphan",
+           status: "requires_payment_method",
+           amount: params.amount
+         }}
+      end)
+
+      expect(StripeMock, :cancel_payment_intent, fn "pi_orphan", _ ->
+        {:ok, %Stripe.PaymentIntent{id: "pi_orphan", status: "canceled"}}
+      end)
+
+      assert {:error, message} =
+               StripeService.ensure_payment_intent(order, user)
+
+      assert is_binary(message)
+      canceled = Orders.get_order!(order.id)
+      assert canceled.status == :canceled
+      assert canceled.payment_intent_id == nil
     end
   end
 

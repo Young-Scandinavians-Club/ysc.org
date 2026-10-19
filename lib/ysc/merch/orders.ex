@@ -501,11 +501,36 @@ defmodule Ysc.Merch.Orders do
 
   ## Updates
 
-  @doc "Records the Stripe PaymentIntent used to pay for a pending order."
-  def attach_payment_intent(%Order{status: :pending} = order, payment_intent_id) do
-    order
-    |> Ecto.Changeset.change(payment_intent_id: payment_intent_id)
-    |> Repo.update()
+  @doc """
+  Records the Stripe PaymentIntent used to pay for a pending order.
+
+  Only pending rows are updated (ticket `update_payment_intent/2`). A stale
+  in-memory `:pending` struct can outlive `cancel_pending/2` when two checkout
+  tabs race: attaching anyway leaves a confirmable Intent on a canceled order,
+  and `process_successful_payment/1` then treats non-pending as already
+  settled — a captured charge with no Printful job.
+  """
+  def attach_payment_intent(%Order{id: id}, payment_intent_id)
+      when is_binary(payment_intent_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {count, _} =
+      from(o in Order, where: o.id == ^id and o.status == :pending)
+      |> Repo.update_all(
+        set: [payment_intent_id: payment_intent_id, updated_at: now]
+      )
+
+    if count == 1 do
+      {:ok, get_order!(id)}
+    else
+      Ysc.Logging.warning(
+        "Refusing to attach PaymentIntent to non-pending merch order",
+        order_id: id,
+        payment_intent_id: payment_intent_id
+      )
+
+      {:error, :not_pending}
+    end
   end
 
   def attach_payment_intent(%Order{}, _), do: {:error, :not_pending}
@@ -558,6 +583,15 @@ defmodule Ysc.Merch.Orders do
         o.user_id == ^Fixtures.ulid() and o.kind == :purchase and
           o.status == :pending,
       order_by: [asc: o.inserted_at]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_attach_payment_intent_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    from(o in Order,
+      where: o.id == ^Fixtures.ulid() and o.status == :pending
     )
   end
 end
