@@ -74,6 +74,22 @@ defmodule YscWeb.ShopComponents do
   end
 
   @doc """
+  Pulse placeholder shown while a shop page loads its data after first paint.
+  """
+  attr :id, :string, required: true
+
+  def shop_page_loading(assigns) do
+    ~H"""
+    <div id={@id} class="mt-8 animate-pulse space-y-6">
+      <div class="h-8 w-48 rounded-sm bg-zinc-200"></div>
+      <div class="aspect-[4/3] max-w-xl rounded-2xl bg-zinc-200"></div>
+      <div class="h-4 w-3/4 rounded-sm bg-zinc-200"></div>
+      <div class="h-4 w-1/2 rounded-sm bg-zinc-100"></div>
+    </div>
+    """
+  end
+
+  @doc """
   Shop links. Products and My orders are a segmented control (the same soft
   `bg-zinc-100` surface as the toolbar below it); the cart is its own button on
   the right, with the item count, since that is where people look for it.

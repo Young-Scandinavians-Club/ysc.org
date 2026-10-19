@@ -3,6 +3,7 @@ defmodule YscWeb.ShopListingTest do
 
   import Phoenix.LiveViewTest
   import Ysc.MerchFixtures
+  import YscWeb.ShopLiveHelpers
 
   setup %{conn: conn} do
     tee = product_fixture(%{name: "Club Tee"})
@@ -58,6 +59,15 @@ defmodule YscWeb.ShopListingTest do
     assert html =~ ~s(id="shop-loading")
     refute html =~ ~s(id="shop-products")
     refute html =~ ~s(id="shop-empty")
+  end
+
+  test "static HTML paints a product skeleton before the product loads", %{
+    conn: conn,
+    tee: tee
+  } do
+    html = conn |> get(~p"/shop/products/#{tee.id}") |> html_response(200)
+    assert html =~ ~s(id="shop-product-loading")
+    refute html =~ ~s(id="add-to-cart-form")
   end
 
   test "shows how many items there are", %{conn: conn} do
@@ -137,7 +147,7 @@ defmodule YscWeb.ShopListingTest do
              "#shop-product-link-#{tee.id}[href='/shop/products/#{tee.id}?color=Navy']"
            )
 
-    {:ok, view, _html} = live(conn, ~p"/shop/products/#{tee.id}")
+    {:ok, view, _html} = live_shop_page(conn, ~p"/shop/products/#{tee.id}")
     assert has_element?(view, "#color-navy[aria-pressed=true]")
   end
 
@@ -151,10 +161,14 @@ defmodule YscWeb.ShopListingTest do
   end
 
   test "the product page opens on the chosen color", %{conn: conn, tee: tee} do
-    {:ok, view, _html} = live(conn, ~p"/shop/products/#{tee.id}?color=Navy")
+    {:ok, view, _html} =
+      live_shop_page(conn, ~p"/shop/products/#{tee.id}?color=Navy")
+
     assert has_element?(view, "#color-navy[aria-pressed=true]")
 
-    {:ok, view, _html} = live(conn, ~p"/shop/products/#{tee.id}?color=Nonsense")
+    {:ok, view, _html} =
+      live_shop_page(conn, ~p"/shop/products/#{tee.id}?color=Nonsense")
+
     assert has_element?(view, "#color-black[aria-pressed=true]")
   end
 

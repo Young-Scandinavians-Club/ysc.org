@@ -313,4 +313,19 @@ defmodule Ysc.Merch.OrdersTest do
     paid = order |> Ecto.Changeset.change(status: :paid) |> Repo.update!()
     assert {:error, :not_pending} = Orders.attach_payment_intent(paid, "pi_2")
   end
+
+  test "attach_payment_intent refuses a stale pending struct after cancel", %{
+    user: user,
+    lines: lines
+  } do
+    {:ok, order} = create(user, lines)
+    assert :ok = Orders.cancel_pending(order, "Superseded by new checkout")
+
+    assert {:error, :not_pending} =
+             Orders.attach_payment_intent(order, "pi_stale")
+
+    canceled = Orders.get_order!(order.id)
+    assert canceled.status == :canceled
+    assert canceled.payment_intent_id == nil
+  end
 end

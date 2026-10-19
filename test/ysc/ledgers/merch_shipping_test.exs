@@ -1,6 +1,8 @@
 defmodule Ysc.Ledgers.MerchShippingTest do
-  # Mutates the QuickBooks client in global app env.
-  use Ysc.DataCase, async: false
+  # Mutates the QuickBooks client in global app env. Claim Mox shared mode
+  # before DataCase default stubs so the next test is not blocked by a leftover
+  # global owner (`setup :set_mox_global` runs too late and never resets).
+  use Ysc.DataCase, async: false, mox_global_first: true
 
   import Ecto.Query
   import Mox
