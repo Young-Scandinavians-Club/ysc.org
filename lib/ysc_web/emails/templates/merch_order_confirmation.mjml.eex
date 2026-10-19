@@ -23,7 +23,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Order details</mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Order number:
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Order number:</strong>
       <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
         <%= @order.reference_id %>
       </span>
