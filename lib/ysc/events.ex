@@ -1676,13 +1676,9 @@ defmodule Ysc.Events do
           dt
 
         {:error, _} ->
-          # Try parsing as datetime-local string (format: "YYYY-MM-DDTHH:MM") as PST and convert to UTC
-          case NaiveDateTime.from_iso8601("#{publish_at}:00") do
-            {:ok, naive_dt} ->
-              # Create DateTime in America/Los_Angeles timezone (PST)
-              local_dt = DateTime.from_naive!(naive_dt, "America/Los_Angeles")
-              # Convert to UTC for storage
-              DateTime.shift_zone!(local_dt, "Etc/UTC")
+          case YscWeb.TimeZone.parse_datetime_local(publish_at) do
+            {:ok, dt} ->
+              dt
 
             {:error, _} ->
               raise ArgumentError, "Invalid datetime format: #{publish_at}"

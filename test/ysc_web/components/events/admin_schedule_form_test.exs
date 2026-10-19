@@ -103,9 +103,8 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventFormTest do
           event_id: event.id
         })
 
-      # Should display PST time (UTC-7 or UTC-8 depending on DST)
-      # June 15 would be PDT (UTC-7), so 1 PM
-      assert html =~ "2024-06-15T13:00" or html =~ "value=\"2024-06-15T13:00\""
+      # June 15 is PDT (UTC-7), so 8 PM UTC displays as 1 PM local
+      assert html =~ ~s(value="2024-06-15T13:00")
     end
 
     test "handles nil publish_at" do
