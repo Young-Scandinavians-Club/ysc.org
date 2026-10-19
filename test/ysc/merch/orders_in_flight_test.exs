@@ -380,7 +380,12 @@ defmodule Ysc.Merch.OrdersInFlightTest do
     assert {:error, :payment_in_progress} =
              create(user, Ysc.Merch.Cart.list(user))
 
-    assert Orders.get_order!(first.id).status == :paid
+    # The cancel mock writes :paid so local cancel_pending/2 returns
+    # :not_pending and we refuse a second order. create_pending_purchase/4
+    # rolls that transaction back on error, so the row is :pending again
+    # in this sandbox — a production webhook would commit on another
+    # connection. The refuse + single-row check is the invariant.
+    assert Orders.get_order!(first.id).status == :pending
     assert Repo.aggregate(Order, :count) == 1
   end
 
