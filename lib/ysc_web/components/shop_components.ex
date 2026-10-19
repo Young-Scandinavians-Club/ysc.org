@@ -141,7 +141,7 @@ defmodule YscWeb.ShopComponents do
         <span
           :if={@cart_count > 0}
           id="shop-cart-count"
-          class="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white"
+          class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1 text-xs font-semibold leading-none tabular-nums text-white"
         >
           {@cart_count}
         </span>
@@ -660,7 +660,7 @@ defmodule YscWeb.ShopComponents do
           <.icon name="hero-shopping-bag" class="size-8 text-zinc-900" />
           <span
             id={"cart-dock-count-#{@summary.count}"}
-            class="cart-count-pop absolute -right-3 -top-3 inline-flex min-w-6 items-center justify-center rounded-full bg-blue-600 px-1.5 text-sm font-semibold text-white"
+            class="cart-count-pop absolute -right-3 -top-3 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-blue-600 px-1.5 text-sm font-semibold leading-none tabular-nums text-white"
           >
             {@summary.count}
           </span>
