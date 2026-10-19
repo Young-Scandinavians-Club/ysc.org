@@ -67,6 +67,8 @@ defmodule Ysc.Merch.Order do
     field :shipping_amount, Money.Ecto.Composite.Type, default_currency: :USD
     field :total_amount, Money.Ecto.Composite.Type, default_currency: :USD
     field :shipping_method, :string
+    field :delivery_estimate_min, :date
+    field :delivery_estimate_max, :date
 
     field :payment_intent_id, :string
 
@@ -135,6 +137,8 @@ defmodule Ysc.Merch.Order do
       :phone,
       :email,
       :shipping_method,
+      :delivery_estimate_min,
+      :delivery_estimate_max,
       :subtotal,
       :shipping_amount,
       :total_amount
@@ -182,6 +186,8 @@ defmodule Ysc.Merch.Order do
       :phone,
       :email,
       :shipping_method,
+      :delivery_estimate_min,
+      :delivery_estimate_max,
       :estimated_cost
     ])
     |> put_change(:granted_by_id, granted_by_id)

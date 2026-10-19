@@ -70,6 +70,9 @@
       <strong>What's next?</strong>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
+    <%= if @delivery_estimate do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• <strong>Estimated delivery: <%= @delivery_estimate %></strong></mj-text>
+    <% end %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• Everything is printed to order, which usually takes 2–5 business days before it ships</mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• We'll email you again, with tracking, as soon as it's on its way</mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• Questions? Reach out to us at <a href="mailto:info@ysc.org">info@ysc.org</a></mj-text>

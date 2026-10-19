@@ -216,9 +216,15 @@ defmodule Ysc.Printful.DemoClient do
       "rate" => Decimal.to_string(total),
       "currency" => "USD",
       "minDeliveryDays" => min,
-      "maxDeliveryDays" => max
+      "maxDeliveryDays" => max,
+      # Like Printful: dates include a couple of days to make the item.
+      "minDeliveryDate" => demo_delivery_date(min),
+      "maxDeliveryDate" => demo_delivery_date(max)
     }
   end
+
+  defp demo_delivery_date(days),
+    do: Date.utc_today() |> Date.add(days + 2) |> Date.to_iso8601()
 
   @impl true
   def estimate_costs(order) do

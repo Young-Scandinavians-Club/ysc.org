@@ -543,8 +543,12 @@ defmodule YscWeb.ShopCheckoutLive do
           />
           <span class="flex-1">
             <span class="block text-lg text-zinc-900">{option.name}</span>
-            <span :if={show_window?(option)} class="block text-zinc-500">
-              {Shipping.delivery_window(option)}
+            <span
+              :if={timing(option)}
+              id={"shipping-timing-#{option.id}"}
+              class="block text-zinc-500"
+            >
+              {timing(option)}
             </span>
           </span>
           <span class="text-lg text-zinc-900">{format_price(option.rate)}</span>
@@ -587,8 +591,8 @@ defmodule YscWeb.ShopCheckoutLive do
     >
       <p class="text-lg text-zinc-700">
         {@option.name} · {format_price(@option.rate)}
-        <span :if={show_window?(@option)} class="text-zinc-500">
-          ({Shipping.delivery_window(@option)})
+        <span :if={timing(@option)} class="text-zinc-500">
+          ({timing(@option)})
         </span>
       </p>
       <button
@@ -699,9 +703,18 @@ defmodule YscWeb.ShopCheckoutLive do
     """
   end
 
-  # Printful's own names usually already say "(3-5 business days)".
-  defp show_window?(option) do
-    Shipping.delivery_window(option) != nil and
-      not String.contains?(String.downcase(option.name), "day")
+  # When it should arrive: Printful's estimated dates ("Arrives Oct 21–23"),
+  # else the business-day window, unless the option's own name already says it.
+  defp timing(option) do
+    case Shipping.delivery_estimate(option) do
+      nil ->
+        window = Shipping.delivery_window(option)
+
+        if window && !String.contains?(String.downcase(option.name), "day"),
+          do: window
+
+      estimate ->
+        "Estimated delivery #{estimate}"
+    end
   end
 end

@@ -795,6 +795,7 @@
         %{name: "Club Tee", variant: "Black · M", quantity: 2, unit_price: "$25.00", line_total: "$50.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
         %{name: "Logo Sticker", variant: nil, quantity: 3, unit_price: "$3.50", line_total: "$10.50", thumbnail: nil}
       ],
+      delivery_estimate: "Oct 26–29",
       ship_to: %{
         name: "Astrid Lindgren",
         lines: ["1 Market St", "San Francisco, CA 94105"]
@@ -869,6 +870,7 @@
       subtotal: "$60.50",
       shipping: "$5.95",
       total: "$66.45",
+      delivery_estimate: "Oct 26–29",
       ship_to: %{
         name: "Astrid Lindgren",
         lines: ["1 Market St", "San Francisco, CA 94105"]
@@ -1007,7 +1009,8 @@
       first_name: "Astrid",
       reference_id: "MRC-PREVIEW-123",
       carrier: "USPS",
-      tracking_url: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223197428490"
+      tracking_url: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223197428490",
+      delivery_estimate: "Oct 26–29"
     },
     "merch_order_update" => %{
       first_name: "Astrid",

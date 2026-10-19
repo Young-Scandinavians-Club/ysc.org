@@ -17,13 +17,17 @@ defmodule YscWeb.Sms.MerchOrderShipped do
     reference_id = Map.get(variables, :reference_id, "")
     carrier = Map.get(variables, :carrier)
     tracking_url = Map.get(variables, :tracking_url)
+    estimate = Map.get(variables, :delivery_estimate)
 
     via = if carrier in [nil, ""], do: "", else: " via #{carrier}"
 
     track =
       if tracking_url in [nil, ""], do: "", else: " Track it: #{tracking_url}"
 
-    "Your YSC merch order #{reference_id} has shipped#{via}.#{track}"
+    eta =
+      if estimate in [nil, ""], do: "", else: " Est. delivery #{estimate}."
+
+    "Your YSC merch order #{reference_id} has shipped#{via}.#{eta}#{track}"
     |> Template.greeting(first_name)
     |> Template.format()
   end
@@ -33,7 +37,8 @@ defmodule YscWeb.Sms.MerchOrderShipped do
       first_name: first_name,
       reference_id: order.reference_id,
       carrier: shipment.carrier,
-      tracking_url: Ysc.Merch.Shipment.safe_tracking_url(shipment.tracking_url)
+      tracking_url: Ysc.Merch.Shipment.safe_tracking_url(shipment.tracking_url),
+      delivery_estimate: Ysc.Merch.Shipping.delivery_estimate(order)
     }
   end
 end

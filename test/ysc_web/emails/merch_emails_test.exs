@@ -216,6 +216,87 @@ defmodule YscWeb.Emails.MerchEmailsTest do
     end
   end
 
+  describe "estimated delivery" do
+    defp with_estimate(order) do
+      min = Date.add(Date.utc_today(), 5)
+
+      %{
+        order
+        | delivery_estimate_min: min,
+          delivery_estimate_max: Date.add(min, 2)
+      }
+    end
+
+    test "the confirmation says when it should arrive", %{order: order} do
+      order = with_estimate(order)
+      estimate = Ysc.Merch.Shipping.delivery_estimate(order)
+
+      html =
+        order
+        |> MerchOrderConfirmation.prepare_email_data()
+        |> MerchOrderConfirmation.render()
+
+      assert html =~ "Estimated delivery: #{estimate}"
+    end
+
+    test "the confirmation has no delivery line without an estimate", %{
+      order: order
+    } do
+      html =
+        order
+        |> MerchOrderConfirmation.prepare_email_data()
+        |> MerchOrderConfirmation.render()
+
+      refute html =~ "Estimated delivery"
+    end
+
+    test "the shipped email replaces its generic line with the estimate", %{
+      order: order
+    } do
+      order = with_estimate(order)
+      estimate = Ysc.Merch.Shipping.delivery_estimate(order)
+
+      html =
+        order
+        |> MerchOrderShipped.prepare_email_data(shipment())
+        |> MerchOrderShipped.render()
+
+      assert html =~ "Estimated delivery: #{estimate}"
+      refute html =~ "Delivery usually takes a few business days"
+    end
+
+    test "the shipped email keeps its generic line without one", %{order: order} do
+      html =
+        order
+        |> MerchOrderShipped.prepare_email_data(shipment())
+        |> MerchOrderShipped.render()
+
+      assert html =~ "Delivery usually takes a few business days"
+    end
+
+    test "the shipped text message includes it", %{order: order} do
+      order = with_estimate(order)
+      estimate = Ysc.Merch.Shipping.delivery_estimate(order)
+
+      text =
+        order
+        |> Sms.MerchOrderShipped.prepare_sms_data(shipment())
+        |> Sms.MerchOrderShipped.render()
+
+      assert text =~ "Est. delivery #{estimate}"
+      assert text =~ "has shipped via USPS"
+    end
+
+    test "the shipped text message is unchanged without one", %{order: order} do
+      text =
+        order
+        |> Sms.MerchOrderShipped.prepare_sms_data(shipment())
+        |> Sms.MerchOrderShipped.render()
+
+      refute text =~ "Est. delivery"
+    end
+  end
+
   describe "club-paid order board email" do
     setup do
       admin =

@@ -383,6 +383,8 @@ defmodule Ysc.Merch.AdminOrders do
         event_id: Map.get(params, :event_id),
         purpose: Map.get(params, :purpose),
         shipping_method: params.option.id,
+        delivery_estimate_min: Map.get(params.option, :min_date),
+        delivery_estimate_max: Map.get(params.option, :max_date),
         estimated_cost: Map.get(params, :estimated_cost)
       })
 

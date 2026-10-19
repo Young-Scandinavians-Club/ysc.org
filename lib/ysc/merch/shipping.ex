@@ -19,7 +19,9 @@ defmodule Ysc.Merch.Shipping do
           name: String.t(),
           rate: Money.t(),
           min_days: integer() | nil,
-          max_days: integer() | nil
+          max_days: integer() | nil,
+          min_date: Date.t() | nil,
+          max_date: Date.t() | nil
         }
 
   @doc """
@@ -89,7 +91,9 @@ defmodule Ysc.Merch.Shipping do
           name: clean_name(name),
           rate: money,
           min_days: Map.get(raw, "minDeliveryDays"),
-          max_days: Map.get(raw, "maxDeliveryDays")
+          max_days: Map.get(raw, "maxDeliveryDays"),
+          min_date: parse_date(Map.get(raw, "minDeliveryDate")),
+          max_date: parse_date(Map.get(raw, "maxDeliveryDate"))
         }
       ]
     else
@@ -98,6 +102,15 @@ defmodule Ysc.Merch.Shipping do
   end
 
   defp parse_rate(_), do: []
+
+  defp parse_date(value) when is_binary(value) do
+    case Date.from_iso8601(value) do
+      {:ok, date} -> date
+      _ -> nil
+    end
+  end
+
+  defp parse_date(_), do: nil
 
   # Printful names look like "Flat Rate (Estimated delivery: Oct 21\u2060-23) ":
   # an invisible word-joiner, a trailing space, and a date window that we show
@@ -159,4 +172,42 @@ defmodule Ysc.Merch.Shipping do
   end
 
   def delivery_window(_), do: nil
+
+  @doc """
+  The estimated delivery dates as a short range, e.g. `"Oct 26–29"` or
+  `"Oct 29 – Nov 2"`, from an option or an order. `nil` when there is no
+  estimate, or when it is already in the past (an order that sat unpaid, say):
+  a date that has gone by is worse than none.
+  """
+  def delivery_estimate(thing, today \\ Date.utc_today())
+
+  def delivery_estimate(%{min_date: min, max_date: max}, today),
+    do: format_range(min, max, today)
+
+  def delivery_estimate(
+        %{delivery_estimate_min: min, delivery_estimate_max: max},
+        today
+      ),
+      do: format_range(min, max, today)
+
+  def delivery_estimate(_, _today), do: nil
+
+  defp format_range(%Date{} = min, %Date{} = max, today) do
+    cond do
+      Date.compare(max, today) == :lt ->
+        nil
+
+      Date.compare(min, max) == :eq ->
+        Calendar.strftime(min, "%b %-d")
+
+      min.month == max.month ->
+        Calendar.strftime(min, "%b %-d") <> "–#{max.day}"
+
+      true ->
+        Calendar.strftime(min, "%b %-d") <>
+          " – " <> Calendar.strftime(max, "%b %-d")
+    end
+  end
+
+  defp format_range(_, _, _), do: nil
 end

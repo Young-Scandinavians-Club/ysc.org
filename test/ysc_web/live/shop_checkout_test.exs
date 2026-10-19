@@ -183,6 +183,64 @@ defmodule YscWeb.ShopCheckoutTest do
     end
   end
 
+  describe "delivery estimates in the shipping step" do
+    defp dated_rates do
+      {:ok, rates} = rates()
+      min = Date.utc_today() |> Date.add(6)
+      max = Date.add(min, 2)
+
+      {:ok,
+       Enum.map(rates, fn
+         %{"id" => "STANDARD"} = rate ->
+           Map.merge(rate, %{
+             "minDeliveryDate" => Date.to_iso8601(min),
+             "maxDeliveryDate" => Date.to_iso8601(max)
+           })
+
+         rate ->
+           rate
+       end)}
+    end
+
+    test "each option with dates says when it should arrive", %{conn: conn} do
+      stub(ClientMock, :shipping_rates, fn _, _ -> dated_rates() end)
+      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      submit_address(view)
+
+      assert has_element?(
+               view,
+               "#shipping-timing-STANDARD",
+               "Estimated delivery"
+             )
+
+      assert has_element?(
+               view,
+               "#shipping-timing-STANDARD",
+               Ysc.Merch.Shipping.delivery_estimate(%{
+                 min_date: Date.add(Date.utc_today(), 6),
+                 max_date: Date.add(Date.utc_today(), 8)
+               })
+             )
+    end
+
+    test "without dates it falls back to the business-day window", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      to_shipping(view)
+
+      assert has_element?(
+               view,
+               "#shipping-timing-STANDARD",
+               "3-5 business days"
+             )
+
+      refute has_element?(
+               view,
+               "#shipping-timing-STANDARD",
+               "Estimated delivery"
+             )
+    end
+  end
+
   describe "shipping step" do
     test "offers Printful's options cheapest first, preselected", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/shop/checkout")

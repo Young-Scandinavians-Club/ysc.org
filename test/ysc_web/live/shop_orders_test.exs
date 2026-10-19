@@ -149,6 +149,55 @@ defmodule YscWeb.ShopOrdersTest do
     end
   end
 
+  describe "estimated delivery" do
+    defp with_estimate(order, status \\ nil) do
+      min = Date.add(Date.utc_today(), 5)
+
+      changes = [
+        delivery_estimate_min: min,
+        delivery_estimate_max: Date.add(min, 2)
+      ]
+
+      changes = if status, do: [{:status, status} | changes], else: changes
+
+      order |> Ecto.Changeset.change(changes) |> Ysc.Repo.update!()
+    end
+
+    test "is shown while the order is on its way", %{conn: conn, member: member} do
+      order = member |> order_for(:submitted) |> with_estimate()
+      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+
+      assert has_element?(
+               view,
+               "#order-delivery-estimate",
+               "Estimated delivery"
+             )
+
+      assert has_element?(
+               view,
+               "#order-delivery-estimate",
+               Ysc.Merch.Shipping.delivery_estimate(order)
+             )
+    end
+
+    test "is not shown for an order that will not arrive or already did", %{
+      conn: conn,
+      member: member
+    } do
+      for status <- [:canceled, :failed, :refunded, :delivered] do
+        order = member |> order_for(:submitted) |> with_estimate(status)
+        {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+        refute has_element?(view, "#order-delivery-estimate")
+      end
+    end
+
+    test "is left out when there is no estimate", %{conn: conn, member: member} do
+      order = order_for(member, :submitted)
+      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+      refute has_element?(view, "#order-delivery-estimate")
+    end
+  end
+
   describe "tracking" do
     test "lists each parcel with a safe tracking link", %{
       conn: conn,

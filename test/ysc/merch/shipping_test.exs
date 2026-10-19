@@ -200,6 +200,81 @@ defmodule Ysc.Merch.ShippingTest do
     end
   end
 
+  describe "delivery estimates" do
+    test "options carry Printful's estimated delivery dates" do
+      variant = variant_fixture()
+
+      expect(ClientMock, :shipping_rates, fn _, _ ->
+        {:ok,
+         [
+           %{
+             "id" => "STANDARD",
+             "name" => "Flat Rate",
+             "rate" => "5.95",
+             "currency" => "USD",
+             "minDeliveryDays" => 4,
+             "maxDeliveryDays" => 6,
+             "minDeliveryDate" => "2026-10-21",
+             "maxDeliveryDate" => "2026-10-23"
+           },
+           %{
+             "id" => "ODD",
+             "name" => "Odd",
+             "rate" => "9.00",
+             "minDeliveryDate" => "soon"
+           }
+         ]}
+      end)
+
+      assert {:ok, [standard, odd]} =
+               Shipping.options(address(), [%{variant: variant, quantity: 1}])
+
+      assert standard.min_date == ~D[2026-10-21]
+      assert standard.max_date == ~D[2026-10-23]
+      # A date we cannot read is no date, not a crash.
+      assert odd.min_date == nil
+    end
+
+    test "formats a range, compactly when it stays in one month" do
+      today = ~D[2026-10-15]
+      est = &Shipping.delivery_estimate(&1, today)
+
+      assert est.(%{min_date: ~D[2026-10-21], max_date: ~D[2026-10-23]}) ==
+               "Oct 21–23"
+
+      assert est.(%{min_date: ~D[2026-10-29], max_date: ~D[2026-11-02]}) ==
+               "Oct 29 – Nov 2"
+
+      assert est.(%{min_date: ~D[2026-10-21], max_date: ~D[2026-10-21]}) ==
+               "Oct 21"
+    end
+
+    test "reads an order's stored estimate too" do
+      order = %{
+        delivery_estimate_min: ~D[2026-10-26],
+        delivery_estimate_max: ~D[2026-10-29]
+      }
+
+      assert Shipping.delivery_estimate(order, ~D[2026-10-20]) == "Oct 26–29"
+    end
+
+    test "is nil with no dates, or once the window has passed" do
+      assert Shipping.delivery_estimate(%{min_date: nil, max_date: nil}) == nil
+      assert Shipping.delivery_estimate(%{min_days: 3, max_days: 5}) == nil
+
+      assert Shipping.delivery_estimate(
+               %{min_date: ~D[2026-10-01], max_date: ~D[2026-10-03]},
+               ~D[2026-10-15]
+             ) == nil
+
+      # The last day still counts.
+      assert Shipping.delivery_estimate(
+               %{min_date: ~D[2026-10-13], max_date: ~D[2026-10-15]},
+               ~D[2026-10-15]
+             ) == "Oct 13–15"
+    end
+  end
+
   describe "requote/3" do
     test "returns the same method priced for the current lines (Finding 92)" do
       variant = variant_fixture()

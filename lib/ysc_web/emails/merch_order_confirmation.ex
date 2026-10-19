@@ -45,6 +45,7 @@ defmodule YscWeb.Emails.MerchOrderConfirmation do
       subtotal: format_money(order.subtotal),
       shipping: format_money(order.shipping_amount),
       total: format_money(order.total_amount),
+      delivery_estimate: Ysc.Merch.Shipping.delivery_estimate(order),
       ship_to: %{
         name: order.recipient_name,
         lines: address_lines(order)
