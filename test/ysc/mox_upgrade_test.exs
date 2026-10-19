@@ -11,7 +11,7 @@ defmodule Ysc.MoxUpgradeTest do
   raising `CaseClauseError`.
 
   We use `defmock`, `expect`, `stub`, `stub_with`, `verify!`,
-  `set_mox_global` (`mox_global_first` on LiveView cases),
+  `set_mox_global` (`mox_global_first` on LiveView and DataCase),
   `set_mox_from_context`, and `verify_on_exit!`. Public APIs are unchanged.
   """
   use ExUnit.Case, async: false
@@ -187,6 +187,31 @@ defmodule Ysc.MoxUpgradeTest do
 
       assert data_case =~ "stub_with(Stripe.PaymentMethodMock"
       assert data_case =~ "stub_with(Stripe.SubscriptionMock"
+    end
+
+    test "DataCase mox_global_first claims shared mode before default stubs" do
+      data_case =
+        File.read!(Path.expand("../../test/support/data_case.ex", __DIR__))
+
+      setup_fn = hd(String.split(data_case, "def stub_default_external_mocks"))
+      assert setup_fn =~ "if tags[:mox_global_first]"
+      assert setup_fn =~ "Mox.set_mox_global()"
+      assert setup_fn =~ "Mox.set_mox_private()"
+
+      global_at = setup_fn |> :binary.match("Mox.set_mox_global()") |> elem(0)
+
+      stub_at =
+        setup_fn |> :binary.match("stub_default_external_mocks()") |> elem(0)
+
+      assert global_at < stub_at
+    end
+
+    test "merch shipping tests use mox_global_first instead of late set_mox_global" do
+      source =
+        File.read!(Path.expand("ledgers/merch_shipping_test.exs", __DIR__))
+
+      assert source =~ "mox_global_first: true"
+      refute source =~ ~r/^  setup :set_mox_global/m
     end
   end
 end
