@@ -647,6 +647,20 @@ defmodule Ysc.Merch.PrintfulEventsTest do
       assert_email_sent(subject: ~r/on its way/)
     end
 
+    test "a malformed entry in the shipments list is skipped, not fatal", %{
+      order: order
+    } do
+      assert :ok =
+               PrintfulEvents.sync_order(order, %{
+                 "id" => order.printful_order_id,
+                 "status" => "pending",
+                 "shipments" => [nil, "oops", pending_shipment()]
+               })
+
+      assert shipments(order) == []
+      assert status(order) == :submitted
+    end
+
     test "a shipment with no status but a ship date counts as shipped", %{
       order: order
     } do
