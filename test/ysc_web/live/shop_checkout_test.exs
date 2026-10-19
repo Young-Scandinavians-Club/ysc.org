@@ -549,6 +549,66 @@ defmodule YscWeb.ShopCheckoutTest do
                Enum.sort_by(Repo.all(Order), & &1.status, :desc)
     end
 
+    test "a prior Intent that succeeds between retrieve and cancel blocks a second checkout",
+         %{
+           conn: conn,
+           member: member
+         } do
+      extra = variant_fixture(nil, %{retail_price: Money.new(:USD, "25")})
+
+      {:ok, order} =
+        Orders.create_pending_purchase(
+          member,
+          Cart.list(member),
+          shipping_address_fixture(),
+          shipping_option_fixture()
+        )
+
+      {:ok, _} = Orders.attach_payment_intent(order, "pi_raced_paid")
+      assert {:ok, _} = Cart.add(member, extra.id, 1)
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_raced_paid", _ ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_raced_paid",
+           status: "requires_payment_method",
+           amount: 6995
+         }}
+      end)
+
+      expect(StripeMock, :cancel_payment_intent, fn "pi_raced_paid", _ ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :payment_intent_unexpected_state,
+           message: "cannot cancel",
+           extra: %{}
+         }}
+      end)
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_raced_paid", opts ->
+        assert opts[:expand] == ["latest_charge"]
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_raced_paid",
+           status: "succeeded",
+           amount: 6995
+         }}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      to_shipping(view)
+      view |> element("#continue-to-payment") |> render_click()
+      render_async(view)
+
+      assert has_element?(view, "#shipping-error", "still processing")
+      refute has_element?(view, "#checkout-payment")
+      assert Repo.aggregate(Order, :count) == 1
+      assert Orders.get_order!(order.id).status == :pending
+      assert Orders.get_order!(order.id).payment_intent_id == "pi_raced_paid"
+    end
+
     test "a Stripe outage while checking the stored Intent blocks a second checkout",
          %{
            conn: conn,

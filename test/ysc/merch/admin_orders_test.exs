@@ -542,6 +542,22 @@ defmodule Ysc.Merch.AdminOrdersTest do
       assert id == order.id
     end
 
+    test "keeps the delivery estimate of the shipping option", %{admin: admin} do
+      printful_accepts()
+
+      option =
+        shipping_option_fixture(%{
+          min_date: ~D[2026-10-26],
+          max_date: ~D[2026-10-29]
+        })
+
+      {:ok, order} =
+        AdminOrders.create_comp_order(admin, params(%{option: option}))
+
+      assert order.delivery_estimate_min == ~D[2026-10-26]
+      assert order.delivery_estimate_max == ~D[2026-10-29]
+    end
+
     test "only full admins can place orders" do
       volunteer = user_fixture(%{role: "volunteer"})
       member = member_fixture()
