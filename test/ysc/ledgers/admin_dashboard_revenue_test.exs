@@ -76,6 +76,18 @@ defmodule Ysc.Ledgers.AdminDashboardRevenueTest do
       assert Decimal.eq?(snapshot.ytd_total, Decimal.new(25))
     end
 
+    test "counts merch shipping as revenue too" do
+      now = ~U[2026-08-20 12:00:00Z]
+      shipping = Ledgers.get_account_by_name("merch_shipping_revenue")
+
+      insert_entry!(shipping, :credit, 6, ~U[2026-08-10 08:00:00Z])
+
+      snapshot = Ledgers.get_admin_dashboard_revenue(now)
+      totals = Map.fetch!(snapshot.totals_by_account_id, shipping.id)
+
+      assert Decimal.eq?(totals.current_month, Decimal.new(6))
+    end
+
     test "returns zeroed sparkline and totals when no revenue entries exist" do
       now = ~U[2026-08-20 12:00:00Z]
       snapshot = Ledgers.get_admin_dashboard_revenue(now)
@@ -95,7 +107,8 @@ defmodule Ysc.Ledgers.AdminDashboardRevenueTest do
               "tahoe_booking_revenue",
               "clear_lake_booking_revenue",
               "donation_revenue",
-              "merch_revenue"
+              "merch_revenue",
+              "merch_shipping_revenue"
             ]
         )
       )

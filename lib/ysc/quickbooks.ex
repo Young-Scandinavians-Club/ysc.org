@@ -353,7 +353,7 @@ defmodule Ysc.Quickbooks do
         _ -> Decimal.new(1)
       end
 
-    total_amt = Decimal.mult(quantity, unit_price)
+    main_total = Decimal.mult(quantity, unit_price)
 
     sales_item_detail = %{
       item_ref: %{value: params.item_id},
@@ -379,7 +379,7 @@ defmodule Ysc.Quickbooks do
         else: sales_item_detail
 
     line_item = %{
-      amount: total_amt,
+      amount: main_total,
       detail_type: "SalesItemLineDetail",
       sales_item_line_detail: sales_item_detail
     }
@@ -388,6 +388,32 @@ defmodule Ysc.Quickbooks do
       if params[:description],
         do: Map.put(line_item, :description, params.description),
         else: line_item
+
+    # Further lines on the same refund (e.g. the shipping part of a merch
+    # order), each `%{item_id, amount, description}` and sharing the class.
+    extra_lines =
+      Enum.map(params[:extra_lines] || [], fn extra ->
+        detail = %{
+          item_ref: %{value: extra.item_id},
+          quantity: Decimal.new(1),
+          unit_price: Decimal.abs(extra.amount)
+        }
+
+        detail =
+          if params[:class_ref],
+            do: Map.put(detail, :class_ref, params.class_ref),
+            else: detail
+
+        %{
+          amount: Decimal.abs(extra.amount),
+          detail_type: "SalesItemLineDetail",
+          sales_item_line_detail: detail,
+          description: extra[:description] || "Refund"
+        }
+      end)
+
+    total_amt =
+      Enum.reduce(extra_lines, main_total, &Decimal.add(&2, &1.amount))
 
     # Build refund_from_account_ref with name if provided
     refund_from_account_ref =
@@ -402,7 +428,7 @@ defmodule Ysc.Quickbooks do
 
     refund_receipt_params = %{
       customer_ref: %{value: params.customer_id},
-      line: [line_item],
+      line: [line_item | extra_lines],
       total_amt: total_amt,
       refund_from_account_ref: refund_from_account_ref
     }

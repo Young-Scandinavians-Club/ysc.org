@@ -170,6 +170,37 @@ defmodule Ysc.Merch.FulfillmentTest do
       assert entity_id == order.id
     end
 
+    test "books the shipping the member paid to its own revenue account", %{
+      order: order
+    } do
+      printful_accepts()
+
+      {:ok, paid} =
+        Fulfillment.process_successful_payment(payment_intent(order))
+
+      amounts =
+        Repo.all(
+          from(e in Ysc.Ledgers.LedgerEntry,
+            join: a in assoc(e, :account),
+            where:
+              e.payment_id == ^paid.payment_id and
+                a.name in ["merch_revenue", "merch_shipping_revenue"],
+            select: {a.name, e.amount}
+          )
+        )
+        |> Map.new()
+
+      assert Money.equal?(
+               amounts["merch_shipping_revenue"],
+               paid.shipping_amount
+             )
+
+      {:ok, total} =
+        Money.add(amounts["merch_revenue"], amounts["merch_shipping_revenue"])
+
+      assert Money.equal?(total, paid.total_amount)
+    end
+
     test "syncs the sale to QuickBooks as a merch item", %{order: order} do
       printful_accepts()
       {:ok, _} = Fulfillment.process_successful_payment(payment_intent(order))

@@ -205,7 +205,8 @@ defmodule Ysc.Ledgers do
     "tahoe_booking_revenue",
     "clear_lake_booking_revenue",
     "donation_revenue",
-    "merch_revenue"
+    "merch_revenue",
+    "merch_shipping_revenue"
   ]
 
   alias YscWeb.Workers.{
@@ -235,6 +236,8 @@ defmodule Ysc.Ledgers do
      "Revenue from Clear Lake cabin bookings"},
     {"donation_revenue", "revenue", "credit", "Revenue from donations"},
     {"merch_revenue", "revenue", "credit", "Revenue from merch shop sales"},
+    {"merch_shipping_revenue", "revenue", "credit",
+     "Shipping charged on merch shop orders"},
 
     # Expense accounts (debit-normal)
     {"stripe_fees", "expense", "debit", "Stripe processing fees"},
@@ -325,6 +328,8 @@ defmodule Ysc.Ledgers do
   - `description`: Description of the payment
   - `property`: Property for booking payments (:tahoe, :clear_lake, or nil)
   - `payment_method_id`: ID of the payment method used (optional)
+  - `shipping_amount`: For merch, the part of `amount` that is shipping (optional).
+    It is booked to `merch_shipping_revenue` instead of `merch_revenue`.
   """
   def process_payment(attrs) do
     %{
@@ -376,7 +381,8 @@ defmodule Ysc.Ledgers do
               entity_id: entity_id,
               stripe_fee: stripe_fee,
               description: description,
-              property: property
+              property: property,
+              shipping_amount: Map.get(attrs, :shipping_amount)
             })
           end
         })
@@ -769,6 +775,8 @@ defmodule Ysc.Ledgers do
       property: property
     } = attrs
 
+    shipping_amount = Map.get(attrs, :shipping_amount)
+
     # Determine revenue account based on entity type and property
     revenue_account_name =
       case entity_type do
@@ -824,17 +832,45 @@ defmodule Ysc.Ledgers do
         related_entity_id: entity_id
       })
 
-    # Entry 2: Credit Revenue (explicit credit with positive amount)
+    # Entry 2: Credit Revenue (explicit credit with positive amount). Shipping
+    # charged on a merch order is its own revenue, not product sales.
+    {revenue_amount, shipping_revenue_amount} =
+      split_shipping(entity_type, amount, shipping_amount)
+
     {:ok, revenue_entry} =
       create_entry(%{
         account_id: revenue_account.id,
         payment_id: payment.id,
-        amount: amount,
+        amount: revenue_amount,
         debit_credit: :credit,
         description: "Revenue from #{entity_type}: #{description}",
         related_entity_type: entity_type,
         related_entity_id: entity_id
       })
+
+    shipping_revenue_entries =
+      if shipping_revenue_amount do
+        shipping_account = get_account_by_name("merch_shipping_revenue")
+
+        if !shipping_account do
+          raise "Revenue account 'merch_shipping_revenue' not found"
+        end
+
+        {:ok, shipping_entry} =
+          create_entry(%{
+            account_id: shipping_account.id,
+            payment_id: payment.id,
+            amount: shipping_revenue_amount,
+            debit_credit: :credit,
+            description: "Shipping revenue from merch: #{description}",
+            related_entity_type: entity_type,
+            related_entity_id: entity_id
+          })
+
+        [shipping_entry]
+      else
+        []
+      end
 
     # Entry 3: If there's a Stripe fee, track the flow through Stripe account
     entries =
@@ -879,16 +915,30 @@ defmodule Ysc.Ledgers do
 
         [
           stripe_receivable_entry,
-          revenue_entry,
-          fee_expense_entry,
-          stripe_fee_deduction_entry
-        ]
+          revenue_entry
+        ] ++
+          shipping_revenue_entries ++
+          [fee_expense_entry, stripe_fee_deduction_entry]
       else
-        [stripe_receivable_entry, revenue_entry]
+        [stripe_receivable_entry, revenue_entry] ++ shipping_revenue_entries
       end
 
     entries
   end
+
+  # Returns `{revenue_amount, shipping_amount | nil}`. Only merch orders split
+  # off shipping, and only when there is some and it is less than the whole
+  # payment (a shipping-only payment would leave nothing for product sales).
+  defp split_shipping(:merch, amount, %Money{} = shipping) do
+    if Money.positive?(shipping) and Money.compare(shipping, amount) == :lt do
+      {:ok, rest} = Money.sub(amount, shipping)
+      {rest, shipping}
+    else
+      {amount, nil}
+    end
+  end
+
+  defp split_shipping(_entity_type, amount, _shipping), do: {amount, nil}
 
   @doc """
   Creates double-entry ledger entries for a mixed event/donation payment.
@@ -1628,12 +1678,14 @@ defmodule Ysc.Ledgers do
     original_entries = get_entries_by_payment(payment.id)
 
     # Find the revenue entry (should be a credit entry)
-    revenue_entry =
-      Enum.find(original_entries, fn entry ->
+    revenue_credits =
+      Enum.filter(original_entries, fn entry ->
         # Convert to strings to handle EctoEnum atoms
         to_string(entry.account.account_type) == "revenue" &&
           to_string(entry.debit_credit) == "credit"
       end)
+
+    revenue_entry = List.first(revenue_credits)
 
     if !revenue_entry do
       raise "Cannot process refund: no revenue entry found for payment #{payment.id}"
@@ -1645,18 +1697,27 @@ defmodule Ysc.Ledgers do
       raise "Cannot process refund: stripe_account not found"
     end
 
-    # Entry 1: Debit revenue account (reverses original revenue)
-    {:ok, revenue_reversal_entry} =
-      create_entry(%{
-        account_id: revenue_entry.account_id,
-        payment_id: payment.id,
-        refund_id: refund.id,
-        amount: refund_amount,
-        debit_credit: :debit,
-        description: "Revenue reversal for refund: #{reason}",
-        related_entity_type: revenue_entry.related_entity_type,
-        related_entity_id: revenue_entry.related_entity_id
-      })
+    # Entry 1: Debit revenue account(s) (reverses original revenue). A merch
+    # payment has product sales and shipping revenue; the refund reverses both
+    # in proportion.
+    revenue_reversal_entries =
+      revenue_credits
+      |> refund_allocations(refund_amount)
+      |> Enum.map(fn {entry, amount} ->
+        {:ok, reversal} =
+          create_entry(%{
+            account_id: entry.account_id,
+            payment_id: payment.id,
+            refund_id: refund.id,
+            amount: amount,
+            debit_credit: :debit,
+            description: "Revenue reversal for refund: #{reason}",
+            related_entity_type: entry.related_entity_type,
+            related_entity_id: entry.related_entity_id
+          })
+
+        reversal
+      end)
 
     # Entry 2: Credit stripe_account (reduces receivable)
     {:ok, stripe_credit_entry} =
@@ -1671,7 +1732,45 @@ defmodule Ysc.Ledgers do
         related_entity_id: revenue_entry.related_entity_id
       })
 
-    [revenue_reversal_entry, stripe_credit_entry]
+    revenue_reversal_entries ++ [stripe_credit_entry]
+  end
+
+  # How to spread `refund_amount` over a payment's revenue credits. Everything
+  # goes to the one revenue entry, except a merch payment that booked shipping
+  # separately: then product sales and shipping share the refund by their share
+  # of the payment (shipping gets the remainder so the parts add up exactly).
+  defp refund_allocations([only], refund_amount), do: [{only, refund_amount}]
+
+  defp refund_allocations([first | _] = credits, refund_amount) do
+    merch? = Enum.all?(credits, &(to_string(&1.related_entity_type) == "merch"))
+
+    shipping =
+      Enum.find(credits, &(&1.account.name == "merch_shipping_revenue"))
+
+    sales = Enum.find(credits, &(&1.account.name == "merch_revenue"))
+
+    if (merch? and shipping) && sales do
+      total =
+        Decimal.add(
+          Money.to_decimal(sales.amount),
+          Money.to_decimal(shipping.amount)
+        )
+
+      sales_part =
+        refund_amount
+        |> Money.to_decimal()
+        |> Decimal.mult(Money.to_decimal(sales.amount))
+        |> Decimal.div(total)
+        |> Decimal.round(2)
+
+      sales_part = Money.new(refund_amount.currency, sales_part)
+      {:ok, shipping_part} = Money.sub(refund_amount, sales_part)
+
+      [{sales, sales_part}, {shipping, shipping_part}]
+      |> Enum.filter(fn {_entry, amount} -> Money.positive?(amount) end)
+    else
+      [{first, refund_amount}]
+    end
   end
 
   ## Stripe Payout Management

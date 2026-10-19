@@ -1132,7 +1132,16 @@ defmodule Ysc.Quickbooks.Sync do
               nil
             end
 
-          {:ok, %{entity_type: entity_type, property: property, entry: entry}}
+          info = %{entity_type: entity_type, property: property, entry: entry}
+
+          # A merch payment books shipping to its own revenue account.
+          info =
+            if entity_type == :merch,
+              do:
+                Map.put(info, :shipping_amount, merch_shipping_amount(entries)),
+              else: info
+
+          {:ok, info}
 
         # Default to membership if no entity type found
         true ->
@@ -1150,6 +1159,15 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     result
+  end
+
+  # The shipping part of a merch payment's revenue entries, or nil if it was
+  # booked as a single amount (every payment before shipping was split out).
+  defp merch_shipping_amount(entries) do
+    case Enum.find(entries, &(&1.account.name == "merch_shipping_revenue")) do
+      nil -> nil
+      entry -> entry.amount
+    end
   end
 
   defp get_membership_type_from_entity_id(nil), do: nil
@@ -1846,6 +1864,32 @@ defmodule Ysc.Quickbooks.Sync do
     result
   end
 
+  # A merch order that charged shipping is two lines: the items on the Merch
+  # Sales item and the shipping on its own item (and income account).
+  defp create_payment_sales_receipt(
+         payment,
+         customer_id,
+         item_id,
+         %{entity_type: :merch, shipping_amount: %Money{} = shipping} =
+           entity_info
+       ) do
+    if Money.positive?(shipping) do
+      create_merch_payment_sales_receipt(
+        payment,
+        customer_id,
+        item_id,
+        shipping
+      )
+    else
+      create_payment_sales_receipt(
+        payment,
+        customer_id,
+        item_id,
+        Map.delete(entity_info, :shipping_amount)
+      )
+    end
+  end
+
   defp create_payment_sales_receipt(payment, customer_id, item_id, entity_info) do
     Ysc.Logging.debug(
       "[QB Sync] create_payment_sales_receipt: Creating sales receipt",
@@ -2010,6 +2054,127 @@ defmodule Ysc.Quickbooks.Sync do
   defp sales_receipt_description(payment, _entity_info) do
     "Payment #{payment.reference_id}"
   end
+
+  defp create_merch_payment_sales_receipt(
+         payment,
+         customer_id,
+         item_id,
+         shipping
+       ) do
+    with {:ok, shipping_item_id} <- get_merch_shipping_item_id() do
+      {:ok, sales_amount} = Money.sub(payment.amount, shipping)
+      class = @account_class_mapping[:merch].class
+
+      line_items = [
+        build_sales_line_item(
+          item_id,
+          money_dollars(sales_amount),
+          "Merch - Order #{payment.reference_id}",
+          class
+        ),
+        build_sales_line_item(
+          shipping_item_id,
+          money_dollars(shipping),
+          "Shipping - Order #{payment.reference_id}",
+          class
+        )
+      ]
+
+      params = %{
+        customer_ref: %{value: customer_id},
+        line: line_items,
+        total_amt: money_dollars(payment.amount),
+        txn_date:
+          format_payment_date(payment.payment_date || payment.inserted_at),
+        memo: "Payment: #{payment.reference_id}",
+        private_note: "External Payment ID: #{payment.external_payment_id}"
+      }
+
+      client_module().create_sales_receipt(params,
+        idempotency_key: qb_idempotency_key("sr_pay", payment)
+      )
+    end
+  end
+
+  # The QuickBooks product that shipping charged to members is sold under.
+  defp get_merch_shipping_item_id do
+    if Application.get_env(:ysc, :quickbooks, [])[:merch_shipping_item_id] do
+      get_or_create_item_with_fallback(
+        "Merch Shipping",
+        :merch_shipping_item_id,
+        nil
+      )
+    else
+      get_or_create_item_with_fallback(
+        "Merch Shipping",
+        :merch_shipping_item_id,
+        merch_shipping_income_account_name()
+      )
+    end
+  end
+
+  # The first of these income accounts that exists in QuickBooks, so a new item
+  # always has somewhere to post. Falls back to Merch Sales, as before shipping
+  # had its own account.
+  defp merch_shipping_income_account_name do
+    names = [
+      "Merch Shipping Income",
+      "Shipping Income",
+      "Shipping and delivery income"
+    ]
+
+    Enum.find(names, fn name ->
+      match?({:ok, _}, client_module().query_account_by_name(name))
+    end) || @account_class_mapping[:merch].account
+  end
+
+  # A refund of a merch order that charged shipping gives the shipping part
+  # back on its own line. The split is the one the ledger recorded for this
+  # refund (see Ledgers.create_refund_entries/1).
+  defp add_merch_shipping_refund_line(
+         params,
+         refund,
+         %{entity_type: :merch, shipping_amount: %Money{}}
+       ) do
+    shipping = refund_shipping_amount(refund)
+
+    if shipping && Money.positive?(shipping) do
+      with {:ok, shipping_item_id} <- get_merch_shipping_item_id() do
+        shipping_dollars = money_dollars(shipping)
+
+        {:ok,
+         params
+         |> Map.update!(:unit_price, &Decimal.sub(&1, shipping_dollars))
+         |> Map.put(:extra_lines, [
+           %{
+             item_id: shipping_item_id,
+             amount: shipping_dollars,
+             description: "Shipping refund #{refund.reference_id}"
+           }
+         ])}
+      end
+    else
+      {:ok, params}
+    end
+  end
+
+  defp add_merch_shipping_refund_line(params, _refund, _entity_info),
+    do: {:ok, params}
+
+  defp refund_shipping_amount(%Refund{id: refund_id}) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.refund_id == ^refund_id,
+      where: a.name == "merch_shipping_revenue",
+      where: e.debit_credit == "debit",
+      select: e.amount,
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  defp money_dollars(%Money{} = money),
+    do: money |> Money.to_decimal() |> Decimal.round(2)
 
   defp create_mixed_payment_sales_receipt(payment, customer_id, entity_info) do
     Ysc.Logging.debug(
@@ -2663,9 +2828,12 @@ defmodule Ysc.Quickbooks.Sync do
     )
 
     result =
-      Quickbooks.create_refund_receipt(params,
-        idempotency_key: qb_idempotency_key("rr_ref", refund)
-      )
+      with {:ok, params} <-
+             add_merch_shipping_refund_line(params, refund, entity_info) do
+        Quickbooks.create_refund_receipt(params,
+          idempotency_key: qb_idempotency_key("rr_ref", refund)
+        )
+      end
 
     Ysc.Logging.debug(
       "[QB Sync] create_refund_sales_receipt: Quickbooks.create_refund_receipt result",
