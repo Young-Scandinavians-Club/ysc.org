@@ -12,6 +12,7 @@ defmodule YscWeb.ExpenseReportLive do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.User
+  alias Ysc.EmailConfig
   alias Ysc.Events
   alias YscWeb.DateDisplay
   alias YscWeb.Validators.FileValidator
@@ -139,6 +140,7 @@ defmodule YscWeb.ExpenseReportLive do
         "Your expense report has been submitted to Young Scandinavians Club."
       )
       |> assign(:show_confetti, show_confetti)
+      |> assign(:treasurer_email, EmailConfig.treasurer_email())
 
     if connected?(socket) do
       user = socket.assigns.current_user
@@ -1692,10 +1694,11 @@ defmodule YscWeb.ExpenseReportLive do
               </.link>
               <span class="text-zinc-300">·</span>
               <.link
-                href={"mailto:treasurer@ysc.org?subject=Question about Expense Report #{@expense_report.id}&body=Hi Treasurer,%0D%0A%0D%0AI have a question regarding my expense report (ID: #{@expense_report.id}).%0D%0A%0D%0A[Please describe your question or issue here]%0D%0A%0D%0AThank you!"}
+                id="expense-report-contact-treasurer"
+                href={"mailto:#{@treasurer_email}?subject=Question about Expense Report #{@expense_report.id}&body=Hi Treasurer,%0D%0A%0D%0AI have a question regarding my expense report (ID: #{@expense_report.id}).%0D%0A%0D%0A[Please describe your question or issue here]%0D%0A%0D%0AThank you!"}
                 class="px-3 py-2 text-zinc-600 hover:text-blue-600 transition-colors"
               >
-                Contact Treasurer
+                Email {@treasurer_email}
               </.link>
             </div>
           </div>

@@ -75,8 +75,9 @@
       border-radius="4px"
     >Submit a new expense report →</mj-button>
     <mj-spacer height="24px"></mj-spacer>
+    <% treasurer_email = assigns[:treasurer_email] || Ysc.EmailConfig.treasurer_email() %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      If you have questions about this feedback, reply to this email or contact us at <a href="mailto:info@ysc.org">info@ysc.org</a>.
+      If you have questions about this feedback, reply to this email or contact the Treasurer at <a href="mailto:<%= treasurer_email %>"><%= treasurer_email %></a>.
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">

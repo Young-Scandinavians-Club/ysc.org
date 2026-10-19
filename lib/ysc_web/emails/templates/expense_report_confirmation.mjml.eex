@@ -108,7 +108,8 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• Your expense report has been submitted and is now being reviewed by our Treasurer</mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• We'll email you when the money is on the way</mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If you have any questions, please contact the Treasurer</mj-text>
+    <% treasurer_email = assigns[:treasurer_email] || Ysc.EmailConfig.treasurer_email() %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">• If you have any questions, please contact the Treasurer at <a href="mailto:<%= treasurer_email %>"><%= treasurer_email %></a></mj-text>
     <mj-spacer height="36px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thank you for your submission!</mj-text>
     <mj-spacer height="24px"></mj-spacer>

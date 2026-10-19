@@ -479,7 +479,8 @@
           postal_code: "94102"
         }
       },
-      expense_report_url: "http://localhost:4000/expensereport/preview"
+      expense_report_url: "http://localhost:4000/expensereport/preview",
+      treasurer_email: "treasurer@ysc.org"
     },
     "expense_report_rejected" => %{
       first_name: "Astrid",
@@ -489,7 +490,8 @@
       },
       rejection_note:
         "The receipt for the $60.00 grocery line is missing — please re-upload it.\n\nAlso, the mileage route needs a start and end address, not just \"Board meeting\".",
-      new_expense_report_url: "http://localhost:4000/expensereport"
+      new_expense_report_url: "http://localhost:4000/expensereport",
+      treasurer_email: "treasurer@ysc.org"
     },
     "expense_report_treasurer_notification" => %{
       expense_report: %{
