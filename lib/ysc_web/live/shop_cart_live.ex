@@ -1,27 +1,68 @@
 defmodule YscWeb.ShopCartLive do
   @moduledoc """
   The member's merch cart.
+
+  The first HTML is a skeleton. Cart lines load after the WebSocket connects
+  so the HTTP response is never blocked on that query, and it runs once
+  instead of on both the disconnected and connected mounts.
   """
   use YscWeb, :live_view
 
   on_mount {YscWeb.ShopAccess, :ensure_member}
 
+  require Ysc.Logging
+
   import Ysc.MoneyHelper, only: [format_price: 1]
+  import YscWeb.Live.AsyncHelpers
   import YscWeb.ShopComponents
 
   alias Ysc.Merch.{Cart, CartItem}
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:page_title, "Your cart")
-     |> load_cart()}
+    socket =
+      socket
+      |> assign(:page_title, "Your cart")
+      |> assign(:async_data_loaded, false)
+      |> assign(:lines, [])
+      |> assign(:subtotal, Money.new(0, :USD))
+      |> assign(:cart_count, 0)
+      |> assign(:can_checkout?, false)
+
+    {:ok, maybe_load_cart(socket)}
+  end
+
+  defp maybe_load_cart(socket) do
+    if connected?(socket) do
+      user = socket.assigns.current_user
+
+      start_async(socket, :load_cart, fn ->
+        allow_sandbox_access()
+        Cart.list(user)
+      end)
+    else
+      socket
+    end
+  end
+
+  @impl true
+  def handle_async(:load_cart, {:ok, lines}, socket) do
+    {:noreply, socket |> assign(:async_data_loaded, true) |> assign_cart(lines)}
+  end
+
+  def handle_async(:load_cart, {:exit, reason}, socket) do
+    Ysc.Logging.error("ShopCartLive: failed to load cart", error: reason)
+
+    {:noreply, assign(socket, :async_data_loaded, true)}
   end
 
   defp load_cart(socket) do
-    lines = Cart.list(socket.assigns.current_user)
+    socket.assigns.current_user
+    |> Cart.list()
+    |> then(&assign_cart(socket, &1))
+  end
 
+  defp assign_cart(socket, lines) do
     socket
     |> assign(:lines, lines)
     |> assign(:subtotal, Cart.subtotal(lines))
@@ -30,6 +71,14 @@ defmodule YscWeb.ShopCartLive do
   end
 
   @impl true
+  def handle_event(
+        _event,
+        _params,
+        %{assigns: %{async_data_loaded: false}} = socket
+      ) do
+    {:noreply, socket}
+  end
+
   def handle_event(
         "set_quantity",
         %{"variant_id" => variant_id, "quantity" => quantity},
@@ -59,8 +108,10 @@ defmodule YscWeb.ShopCartLive do
       active={:cart}
       cart_count={@cart_count}
     >
+      <.shop_page_loading :if={!@async_data_loaded} id="shop-cart-loading" />
+
       <div
-        :if={@lines == []}
+        :if={@async_data_loaded && @lines == []}
         id="cart-empty"
         class="rounded-3xl bg-zinc-50 px-6 py-24 text-center"
       >
@@ -77,7 +128,7 @@ defmodule YscWeb.ShopCartLive do
       </div>
 
       <div
-        :if={@lines != []}
+        :if={@async_data_loaded && @lines != []}
         class="grid grid-cols-1 gap-12 lg:grid-cols-3 lg:gap-16"
       >
         <ul id="cart-lines" class="space-y-10 lg:col-span-2">

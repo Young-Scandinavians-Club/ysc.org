@@ -6,9 +6,16 @@ defmodule YscWeb.ShopOrderLive do
   Stripe sends members back here after paying. The page never trusts the
   query string; it asks `Ysc.Merch.Fulfillment` to settle the order from
   Stripe's own record, which is idempotent with the webhook.
+
+  The first HTML is a skeleton. Receipt and cart-count queries run after the
+  WebSocket connects so the HTTP response is never blocked on those loads, and
+  they run once instead of on both the disconnected and connected mounts.
   """
   use YscWeb, :live_view
 
+  require Ysc.Logging
+
+  import YscWeb.Live.AsyncHelpers
   import YscWeb.ShopComponents
 
   alias Ysc.Merch.{Cart, Fulfillment, Orders}
@@ -18,32 +25,73 @@ defmodule YscWeb.ShopOrderLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    user = socket.assigns.current_user
+    socket =
+      socket
+      |> assign(:page_title, "Your Order")
+      |> assign(:order_id, id)
+      |> assign(:async_data_loaded, false)
+      |> assign(:order, nil)
+      |> assign(:rechecks, 0)
+      |> assign(:payment_delayed?, false)
+      |> assign(:cart_count, 0)
 
-    case Orders.get_user_order(user, id) do
-      nil ->
-        {:ok,
-         socket
-         |> YscWeb.Flash.put_toast(:error, "We couldn't find that order.",
-           title: "Shop"
-         )
-         |> push_navigate(to: ~p"/shop/orders")}
+    {:ok, maybe_load_order(socket)}
+  end
 
-      order ->
-        socket =
-          socket
-          |> assign(:page_title, "Order #{order.reference_id}")
-          |> assign(:order, order)
-          |> assign(:rechecks, 0)
-          |> assign(:payment_delayed?, false)
-          |> assign(:cart_count, Cart.count(user))
+  defp maybe_load_order(socket) do
+    if connected?(socket) do
+      user = socket.assigns.current_user
+      id = socket.assigns.order_id
 
-        if connected?(socket) and awaiting_payment?(order) do
-          send(self(), :settle_payment)
-        end
+      start_async(socket, :load_order, fn ->
+        allow_sandbox_access()
 
-        {:ok, socket}
+        %{
+          order: Orders.get_user_order(user, id),
+          cart_count: Cart.count(user)
+        }
+      end)
+    else
+      socket
     end
+  end
+
+  @impl true
+  def handle_async(:load_order, {:ok, %{order: nil}}, socket) do
+    {:noreply, redirect_missing_order(socket)}
+  end
+
+  def handle_async(
+        :load_order,
+        {:ok, %{order: order, cart_count: cart_count}},
+        socket
+      ) do
+    socket =
+      socket
+      |> assign(:async_data_loaded, true)
+      |> assign(:page_title, "Order #{order.reference_id}")
+      |> assign(:order, order)
+      |> assign(:cart_count, cart_count)
+
+    if awaiting_payment?(order) do
+      send(self(), :settle_payment)
+    end
+
+    {:noreply, socket}
+  end
+
+  def handle_async(:load_order, {:exit, reason}, socket) do
+    Ysc.Logging.error("ShopOrderLive: failed to load order", error: reason)
+
+    {:noreply, redirect_missing_order(socket)}
+  end
+
+  defp redirect_missing_order(socket) do
+    socket
+    |> YscWeb.Flash.put_toast(:error, "We couldn't find that order.",
+      title: "Shop"
+    )
+    |> push_navigate(to: ~p"/shop/orders")
   end
 
   defp awaiting_payment?(order),
@@ -130,6 +178,19 @@ defmodule YscWeb.ShopOrderLive do
   end
 
   @impl true
+  def render(%{async_data_loaded: false} = assigns) do
+    ~H"""
+    <.shop_frame
+      id="shop-order-page"
+      title="Your Order"
+      active={:orders}
+      cart_count={@cart_count}
+    >
+      <.shop_page_loading id="shop-order-loading" />
+    </.shop_frame>
+    """
+  end
+
   def render(assigns) do
     ~H"""
     <.shop_frame

@@ -4,6 +4,7 @@ defmodule YscWeb.ShopBrowseTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.MerchFixtures
+  import YscWeb.ShopLiveHelpers
 
   alias Ysc.Merch.Cart
 
@@ -53,7 +54,7 @@ defmodule YscWeb.ShopBrowseTest do
 
     test "a lapsed member can still see their orders", %{conn: conn} do
       {:ok, view, _html} =
-        live(log_in_user(conn, user_fixture()), ~p"/shop/orders")
+        live_shop_page(log_in_user(conn, user_fixture()), ~p"/shop/orders")
 
       assert has_element?(view, "#orders-empty")
     end
@@ -163,7 +164,8 @@ defmodule YscWeb.ShopBrowseTest do
 
     test "has a way back to the catalog, and does not claim to be the Products page",
          %{conn: conn, product: product} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       assert has_element?(
                view,
@@ -178,7 +180,8 @@ defmodule YscWeb.ShopBrowseTest do
     end
 
     test "needs a size before it can be added", %{conn: conn, product: product} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       assert has_element?(view, "#add-to-cart[disabled]", "Choose a size")
       assert has_element?(view, "#shop-colors")
@@ -189,7 +192,8 @@ defmodule YscWeb.ShopBrowseTest do
       conn: conn,
       product: product
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#size-xl") |> render_click()
 
@@ -198,7 +202,8 @@ defmodule YscWeb.ShopBrowseTest do
     end
 
     test "sizes a color lacks are disabled", %{conn: conn, product: product} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#color-white") |> render_click()
       assert has_element?(view, "#size-xl[disabled]")
@@ -209,7 +214,8 @@ defmodule YscWeb.ShopBrowseTest do
       conn: conn,
       product: product
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#size-xl") |> render_click()
       refute has_element?(view, "#add-to-cart[disabled]")
@@ -224,7 +230,8 @@ defmodule YscWeb.ShopBrowseTest do
       member: member,
       variants: variants
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#size-m") |> render_click()
       view |> form("#add-to-cart-form", %{quantity: "3"}) |> render_change()
@@ -237,7 +244,8 @@ defmodule YscWeb.ShopBrowseTest do
     end
 
     test "quantity is clamped", %{conn: conn, product: product, member: member} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#size-m") |> render_click()
       view |> form("#add-to-cart-form", %{quantity: "9999"}) |> render_change()
@@ -248,7 +256,9 @@ defmodule YscWeb.ShopBrowseTest do
 
     test "an option that sold out meanwhile sends the member back to the shop",
          %{conn: conn, product: product, variants: variants} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       view |> element("#size-m") |> render_click()
 
       black_m = Enum.find(variants, &(&1.color == "Black" and &1.size == "M"))
@@ -259,17 +269,20 @@ defmodule YscWeb.ShopBrowseTest do
     end
 
     test "unknown and hidden products go back to the shop", %{conn: conn} do
-      assert {:error, {:live_redirect, %{to: "/shop"}}} =
-               live(conn, ~p"/shop/products/#{Ecto.ULID.generate()}")
+      {:ok, view, html} =
+        live(conn, ~p"/shop/products/#{Ecto.ULID.generate()}")
 
-      assert {:error, {:live_redirect, %{to: "/shop"}}} =
-               live(conn, ~p"/shop/products/not-an-id")
+      assert html =~ ~s(id="shop-product-loading")
+      assert_redirect(view, ~p"/shop")
+
+      {:ok, view, _html} = live(conn, ~p"/shop/products/not-an-id")
+      assert_redirect(view, ~p"/shop")
 
       hidden = product_fixture(%{status: :hidden})
       variant_fixture(hidden)
 
-      assert {:error, {:live_redirect, %{to: "/shop"}}} =
-               live(conn, ~p"/shop/products/#{hidden.id}")
+      {:ok, view, _html} = live(conn, ~p"/shop/products/#{hidden.id}")
+      assert_redirect(view, ~p"/shop")
     end
 
     test "products without options can be added straight away", %{
@@ -279,7 +292,9 @@ defmodule YscWeb.ShopBrowseTest do
       sticker = product_fixture(%{name: "Sticker"})
       variant = variant_fixture(sticker, %{color: nil, size: nil})
 
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{sticker.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{sticker.id}")
+
       refute has_element?(view, "#shop-colors")
       refute has_element?(view, "#shop-sizes")
       refute has_element?(view, "#add-to-cart[disabled]")
@@ -313,7 +328,9 @@ defmodule YscWeb.ShopBrowseTest do
       render_async(view)
       refute has_element?(view, "#cart-dock")
 
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       refute has_element?(view, "#cart-dock")
     end
 
@@ -338,7 +355,9 @@ defmodule YscWeb.ShopBrowseTest do
       conn: conn,
       product: product
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       add_tee(view, "#size-m", "2")
 
       assert has_element?(view, ~s(#cart-peek[data-open="true"]))
@@ -360,7 +379,9 @@ defmodule YscWeb.ShopBrowseTest do
 
     test "the card can be dismissed, and stays rendered so it can animate out",
          %{conn: conn, product: product} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       add_tee(view)
 
       view |> element("#cart-peek-dismiss") |> render_click()
@@ -372,7 +393,9 @@ defmodule YscWeb.ShopBrowseTest do
     end
 
     test "Escape dismisses it", %{conn: conn, product: product} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       add_tee(view)
 
       render_keydown(view, "dismiss_cart_peek", %{"key" => "Escape"})
@@ -380,7 +403,9 @@ defmodule YscWeb.ShopBrowseTest do
     end
 
     test "closes itself when its timer fires", %{conn: conn, product: product} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       add_tee(view)
 
       token = :sys.get_state(view.pid).socket.assigns.cart_peek_token
@@ -393,7 +418,9 @@ defmodule YscWeb.ShopBrowseTest do
       conn: conn,
       product: product
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       add_tee(view)
       stale = :sys.get_state(view.pid).socket.assigns.cart_peek_token
 
@@ -419,7 +446,9 @@ defmodule YscWeb.ShopBrowseTest do
       conn: conn,
       product: product
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       add_tee(view, "#size-m")
       first = :sys.get_state(view.pid).socket.assigns.cart_peek_token
 
@@ -438,7 +467,9 @@ defmodule YscWeb.ShopBrowseTest do
 
     test "resuming after the card was dismissed does not reopen or schedule it",
          %{conn: conn, product: product} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       add_tee(view)
       view |> element("#cart-peek-dismiss") |> render_click()
       token = :sys.get_state(view.pid).socket.assigns.cart_peek_token
@@ -455,7 +486,7 @@ defmodule YscWeb.ShopBrowseTest do
       variants: [v | _]
     } do
       {:ok, _} = Cart.add(member, v.id, 1)
-      {:ok, view, _html} = live(conn, ~p"/shop/cart")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/cart")
       refute has_element?(view, "#cart-dock")
     end
   end
@@ -492,7 +523,8 @@ defmodule YscWeb.ShopBrowseTest do
       product: product,
       black_front: front
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       assert has_element?(view, "#image-product-photo-#{front.id}")
       assert has_element?(view, "#photo-thumbs li", "")
@@ -505,7 +537,8 @@ defmodule YscWeb.ShopBrowseTest do
       conn: conn,
       product: product
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       assert has_element?(
                view,
@@ -532,7 +565,8 @@ defmodule YscWeb.ShopBrowseTest do
       conn: conn,
       product: product
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#photo-thumb-1") |> render_click()
       assert has_element?(view, "#product-gallery[data-index='1']")
@@ -547,7 +581,8 @@ defmodule YscWeb.ShopBrowseTest do
       product: product,
       black_back: back
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#photo-thumb-1") |> render_click()
 
@@ -562,7 +597,8 @@ defmodule YscWeb.ShopBrowseTest do
       black_front: front,
       black_back: back
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#photo-next") |> render_click()
       assert has_element?(view, "#image-product-photo-#{back.id}")
@@ -580,7 +616,8 @@ defmodule YscWeb.ShopBrowseTest do
       white_front: white,
       black_back: back
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#photo-thumb-1") |> render_click()
       assert has_element?(view, "#image-product-photo-#{back.id}")
@@ -596,7 +633,8 @@ defmodule YscWeb.ShopBrowseTest do
     end
 
     test "a bogus photo index is clamped", %{conn: conn, product: product} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       render_click(view, "select_photo", %{"index" => "99"})
       assert has_element?(view, "#photo-counter", "2 / 2")
@@ -613,7 +651,8 @@ defmodule YscWeb.ShopBrowseTest do
       variant_fixture(product, %{color: nil, size: nil})
       gallery_photo_fixture(product)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       refute has_element?(view, "#photo-thumbs")
       refute has_element?(view, "#photo-next")
@@ -624,7 +663,9 @@ defmodule YscWeb.ShopBrowseTest do
       product = product_fixture(%{name: "Plain"})
       variant_fixture(product, %{color: nil, size: nil})
 
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       assert has_element?(view, "#product-gallery")
       refute has_element?(view, "#photo-thumbs")
     end
@@ -633,7 +674,8 @@ defmodule YscWeb.ShopBrowseTest do
       conn: conn,
       product: product
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       assert has_element?(view, ~s(#color-dot-black[style="--swatch: #18181b"]))
       assert has_element?(view, ~s(#color-dot-white[style="--swatch: #ffffff"]))
@@ -645,7 +687,8 @@ defmodule YscWeb.ShopBrowseTest do
       variant_fixture(product, %{color: "Mystery Mist", size: nil})
       variant_fixture(product, %{color: "Black", size: nil})
 
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       assert has_element?(
                view,
@@ -657,7 +700,8 @@ defmodule YscWeb.ShopBrowseTest do
       conn: conn,
       product: product
     } do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       assert has_element?(view, "#quantity-decrement[disabled]")
       assert has_element?(view, ~s(#quantity[value="1"]))
@@ -681,7 +725,8 @@ defmodule YscWeb.ShopBrowseTest do
 
     test "the stepper's quantity is what gets added, and the button shows the total",
          %{conn: conn, product: product, member: member} do
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       view |> element("#size-m") |> render_click()
       assert has_element?(view, "#add-to-cart-total", "$25.00")
@@ -704,7 +749,8 @@ defmodule YscWeb.ShopBrowseTest do
 
       variant_fixture(product, %{color: nil, size: nil})
 
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
 
       assert has_element?(view, "#product-description p", "Heavyweight fleece.")
 
@@ -727,7 +773,9 @@ defmodule YscWeb.ShopBrowseTest do
       product = product_fixture(%{name: "Bare"})
       variant_fixture(product, %{color: nil, size: nil})
 
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{product.id}")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/products/#{product.id}")
+
       refute has_element?(view, "#product-description")
     end
   end
@@ -738,8 +786,15 @@ defmodule YscWeb.ShopBrowseTest do
       %{conn: log_in_user(conn, member), member: member}
     end
 
+    test "static HTML paints a cart skeleton before lines load", %{conn: conn} do
+      html = conn |> get(~p"/shop/cart") |> html_response(200)
+      assert html =~ ~s(id="shop-cart-loading")
+      refute html =~ ~s(id="cart-empty")
+      refute html =~ ~s(id="cart-lines")
+    end
+
     test "empty state", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop/cart")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/cart")
       assert has_element?(view, "#cart-empty")
       refute has_element?(view, "#cart-checkout")
     end
@@ -749,7 +804,7 @@ defmodule YscWeb.ShopBrowseTest do
       sticker = variant_fixture(nil, %{retail_price: Money.new(:USD, "3.50")})
       cart_lines_fixture(member, [{tee, 2}, {sticker, 4}])
 
-      {:ok, view, _html} = live(conn, ~p"/shop/cart")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/cart")
 
       assert has_element?(view, "#cart-line-#{tee.id}")
       assert has_element?(view, "#cart-line-#{sticker.id}")
@@ -763,7 +818,7 @@ defmodule YscWeb.ShopBrowseTest do
     } do
       tee = variant_fixture(nil, %{retail_price: Money.new(:USD, "25")})
       cart_lines_fixture(member, [{tee, 2}])
-      {:ok, view, _html} = live(conn, ~p"/shop/cart")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/cart")
 
       view
       |> form("#cart-qty-form-#{tee.id}", %{quantity: "5"})
@@ -785,7 +840,7 @@ defmodule YscWeb.ShopBrowseTest do
     } do
       tee = variant_fixture(nil, %{retail_price: Money.new(:USD, "25")})
       cart_lines_fixture(member, [{tee, 1}])
-      {:ok, view, _html} = live(conn, ~p"/shop/cart")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/cart")
 
       # Nothing to take away at 1; removing is the trash button's job.
       assert has_element?(view, "#cart-qty-decrement-#{tee.id}[disabled]")
@@ -802,7 +857,7 @@ defmodule YscWeb.ShopBrowseTest do
     test "remove deletes the line", %{conn: conn, member: member} do
       tee = variant_fixture()
       cart_lines_fixture(member, [{tee, 1}])
-      {:ok, view, _html} = live(conn, ~p"/shop/cart")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/cart")
 
       view |> element("#cart-remove-#{tee.id}") |> render_click()
       assert has_element?(view, "#cart-empty")
@@ -818,7 +873,7 @@ defmodule YscWeb.ShopBrowseTest do
       cart_lines_fixture(member, [{keep, 1}, {gone, 1}])
       gone |> Ecto.Changeset.change(available: false) |> Ysc.Repo.update!()
 
-      {:ok, view, _html} = live(conn, ~p"/shop/cart")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/cart")
 
       assert has_element?(view, "#cart-unavailable-#{gone.id}")
       refute has_element?(view, "#cart-qty-form-#{gone.id}")
@@ -834,7 +889,7 @@ defmodule YscWeb.ShopBrowseTest do
       cart_lines_fixture(member, [{gone, 1}])
       gone |> Ecto.Changeset.change(available: false) |> Ysc.Repo.update!()
 
-      {:ok, view, _html} = live(conn, ~p"/shop/cart")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/cart")
       assert has_element?(view, "#cart-checkout[disabled]")
     end
   end
