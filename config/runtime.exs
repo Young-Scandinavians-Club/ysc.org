@@ -739,6 +739,8 @@ if config_env() == :prod do
       event_item_id: System.get_env("QUICKBOOKS_EVENT_ITEM_ID"),
       donation_item_id: System.get_env("QUICKBOOKS_DONATION_ITEM_ID"),
       merch_item_id: System.get_env("QUICKBOOKS_MERCH_ITEM_ID"),
+      merch_shipping_item_id:
+        System.get_env("QUICKBOOKS_MERCH_SHIPPING_ITEM_ID"),
       tahoe_booking_item_id: System.get_env("QUICKBOOKS_TAHOE_BOOKING_ITEM_ID"),
       clear_lake_booking_item_id:
         System.get_env("QUICKBOOKS_CLEAR_LAKE_BOOKING_ITEM_ID"),

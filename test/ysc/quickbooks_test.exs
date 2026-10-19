@@ -631,6 +631,39 @@ defmodule Ysc.QuickbooksTest do
     end
   end
 
+  describe "create_refund_receipt/1 with extra lines" do
+    test "adds each extra line, with the class, and counts it in the total" do
+      expect(ClientMock, :create_refund_receipt, fn params, _opts ->
+        assert [main, shipping] = params.line
+        assert main.amount == Decimal.new("8.33")
+        assert shipping.amount == Decimal.new("1.67")
+        assert shipping.description == "Shipping refund"
+        assert shipping.sales_item_line_detail.item_ref == %{value: "ship_item"}
+        assert shipping.sales_item_line_detail.class_ref == %{value: "c1"}
+        assert params.total_amt == Decimal.new("10.00")
+
+        {:ok, %{"Id" => "rr_3"}}
+      end)
+
+      assert {:ok, _} =
+               Quickbooks.create_refund_receipt(%{
+                 customer_id: "c",
+                 item_id: "i",
+                 quantity: 1,
+                 unit_price: Decimal.new("8.33"),
+                 refund_from_account_id: "uf",
+                 class_ref: %{value: "c1"},
+                 extra_lines: [
+                   %{
+                     item_id: "ship_item",
+                     amount: Decimal.new("1.67"),
+                     description: "Shipping refund"
+                   }
+                 ]
+               })
+    end
+  end
+
   describe "create_stripe_payout_deposit/1" do
     test "creates deposit with required params" do
       expect(ClientMock, :create_deposit, fn params, _opts ->

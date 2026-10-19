@@ -131,7 +131,8 @@ defmodule Ysc.Merch.Fulfillment do
         stripe_fee: fee,
         description: "Merch - Order #{order.reference_id}",
         property: nil,
-        payment_method_id: nil
+        payment_method_id: nil,
+        shipping_amount: order.shipping_amount
       })
 
     case result do
