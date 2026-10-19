@@ -213,4 +213,100 @@ defmodule Ysc.Merch.OrdersInFlightTest do
     assert Orders.get_order!(first.id).status == :pending
     assert Repo.aggregate(Order, :count) == 1
   end
+
+  test "refuses a different cart when the unpaid Intent succeeds between retrieve and cancel",
+       %{
+         user: user,
+         lines: lines,
+         tee: tee
+       } do
+    {:ok, first} = create(user, lines)
+    {:ok, _} = Orders.attach_payment_intent(first, "pi_raced_paid")
+
+    expect_idle_then_uncancellable("pi_raced_paid", "succeeded")
+
+    {:ok, _} = Ysc.Merch.Cart.set_quantity(user, tee.id, 3)
+
+    assert {:error, :payment_in_progress} =
+             create(user, Ysc.Merch.Cart.list(user))
+
+    assert Repo.aggregate(Order, :count) == 1
+    assert Orders.get_order!(first.id).status == :pending
+    assert Orders.get_order!(first.id).payment_intent_id == "pi_raced_paid"
+  end
+
+  test "refuses a different cart when the unpaid Intent starts processing between retrieve and cancel",
+       %{
+         user: user,
+         lines: lines,
+         tee: tee
+       } do
+    {:ok, first} = create(user, lines)
+    {:ok, _} = Orders.attach_payment_intent(first, "pi_raced_ach")
+
+    expect_idle_then_uncancellable("pi_raced_ach", "processing")
+
+    {:ok, _} = Ysc.Merch.Cart.set_quantity(user, tee.id, 3)
+
+    assert {:error, :payment_in_progress} =
+             create(user, Ysc.Merch.Cart.list(user))
+
+    assert Repo.aggregate(Order, :count) == 1
+    assert Orders.get_order!(first.id).status == :pending
+    assert Orders.get_order!(first.id).payment_intent_id == "pi_raced_ach"
+  end
+
+  test "refuses a different cart when Stripe cancel succeeds but the pending row is already gone",
+       %{
+         user: user,
+         lines: lines,
+         tee: tee
+       } do
+    {:ok, first} = create(user, lines)
+    {:ok, _} = Orders.attach_payment_intent(first, "pi_raced_row")
+
+    expect(StripeMock, :retrieve_payment_intent, fn "pi_raced_row", _ ->
+      intent("pi_raced_row", "requires_payment_method")
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn "pi_raced_row", _ ->
+      order = Repo.get!(Order, first.id)
+
+      {:ok, _} =
+        order
+        |> Ecto.Changeset.change(status: :paid)
+        |> Repo.update()
+
+      intent("pi_raced_row", "canceled")
+    end)
+
+    {:ok, _} = Ysc.Merch.Cart.set_quantity(user, tee.id, 3)
+
+    assert {:error, :payment_in_progress} =
+             create(user, Ysc.Merch.Cart.list(user))
+
+    assert Orders.get_order!(first.id).status == :paid
+    assert Repo.aggregate(Order, :count) == 1
+  end
+
+  defp expect_idle_then_uncancellable(payment_intent_id, later_status) do
+    expect(StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _ ->
+      intent(payment_intent_id, "requires_payment_method")
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn ^payment_intent_id, _ ->
+      {:error,
+       %Stripe.Error{
+         source: :stripe,
+         code: :payment_intent_unexpected_state,
+         message: "cannot cancel",
+         extra: %{}
+       }}
+    end)
+
+    expect(StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, opts ->
+      assert opts[:expand] == ["latest_charge"]
+      intent(payment_intent_id, later_status)
+    end)
+  end
 end
