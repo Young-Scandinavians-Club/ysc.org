@@ -4,6 +4,7 @@ defmodule YscWeb.ShopCheckoutTest do
   import Mox
   import Phoenix.LiveViewTest
   import Ysc.MerchFixtures
+  import YscWeb.ShopLiveHelpers
 
   alias Ysc.Merch.{Cart, Order, Orders}
   alias Ysc.Printful.{ClientMock, Error}
@@ -110,13 +111,22 @@ defmodule YscWeb.ShopCheckoutTest do
   test "an empty cart goes back to the cart page", %{conn: conn, member: member} do
     Cart.clear(member)
 
-    assert {:error, {:live_redirect, %{to: "/shop/cart"}}} =
-             live(conn, ~p"/shop/checkout")
+    {:ok, view, html} = live(conn, ~p"/shop/checkout")
+    assert html =~ ~s(id="shop-checkout-loading")
+    assert_redirect(view, ~p"/shop/cart")
+  end
+
+  test "static HTML paints a checkout skeleton before the cart loads", %{
+    conn: conn
+  } do
+    html = conn |> get(~p"/shop/checkout") |> html_response(200)
+    assert html =~ ~s(id="shop-checkout-loading")
+    refute html =~ ~s(id="address-form")
   end
 
   describe "address step" do
     test "starts with the member's details and the order summary", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
 
       assert has_element?(view, "#checkout-address")
       assert has_element?(view, "#summary-subtotal", "$64.00")
@@ -125,7 +135,7 @@ defmodule YscWeb.ShopCheckoutTest do
     end
 
     test "shows validation errors and does not call Printful", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
 
       html =
         view
@@ -158,7 +168,7 @@ defmodule YscWeb.ShopCheckoutTest do
          }}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       submit_address(view)
 
       assert has_element?(view, "#checkout-address")
@@ -175,7 +185,7 @@ defmodule YscWeb.ShopCheckoutTest do
         {:error, %Error{type: :server, status: 503, message: "down"}}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       submit_address(view)
 
       assert has_element?(view, "#address-error", "try again")
@@ -204,7 +214,7 @@ defmodule YscWeb.ShopCheckoutTest do
 
     test "each option with dates says when it should arrive", %{conn: conn} do
       stub(ClientMock, :shipping_rates, fn _, _ -> dated_rates() end)
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       submit_address(view)
 
       assert has_element?(
@@ -224,7 +234,7 @@ defmodule YscWeb.ShopCheckoutTest do
     end
 
     test "without dates it falls back to the business-day window", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
 
       assert has_element?(
@@ -243,7 +253,7 @@ defmodule YscWeb.ShopCheckoutTest do
 
   describe "shipping step" do
     test "offers Printful's options cheapest first, preselected", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
 
       assert has_element?(view, "#checkout-address-summary", "Ada Lovelace")
@@ -254,7 +264,7 @@ defmodule YscWeb.ShopCheckoutTest do
     end
 
     test "choosing a method updates the total", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
 
       view |> element("#shipping-option-EXPRESS input") |> render_click()
@@ -262,7 +272,7 @@ defmodule YscWeb.ShopCheckoutTest do
     end
 
     test "the address can be edited", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
 
       view |> element("#edit-address") |> render_click()
@@ -271,7 +281,7 @@ defmodule YscWeb.ShopCheckoutTest do
     end
 
     test "ignores a shipping method Printful never offered", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
 
       render_click(view, "select_shipping", %{"id" => "FREE_OVERNIGHT"})
@@ -297,7 +307,7 @@ defmodule YscWeb.ShopCheckoutTest do
          }}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
       render_async(view)
@@ -335,7 +345,7 @@ defmodule YscWeb.ShopCheckoutTest do
          }}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
       render_async(view)
@@ -382,7 +392,7 @@ defmodule YscWeb.ShopCheckoutTest do
          }}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       submit_address(view)
 
       assert has_element?(view, "#summary-shipping", "$5.95")
@@ -406,7 +416,7 @@ defmodule YscWeb.ShopCheckoutTest do
          %Stripe.Error{source: :stripe, code: :api_error, message: "boom"}}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
       render_async(view)
@@ -440,7 +450,7 @@ defmodule YscWeb.ShopCheckoutTest do
          }}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
 
@@ -480,7 +490,7 @@ defmodule YscWeb.ShopCheckoutTest do
          }}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
       render_async(view)
@@ -527,7 +537,7 @@ defmodule YscWeb.ShopCheckoutTest do
 
       stub_payment_intent()
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
       render_async(view)
@@ -562,7 +572,7 @@ defmodule YscWeb.ShopCheckoutTest do
          %Stripe.Error{source: :stripe, code: :api_error, message: "down"}}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
       render_async(view)
@@ -577,7 +587,7 @@ defmodule YscWeb.ShopCheckoutTest do
       conn: conn
     } do
       stub_payment_intent()
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
       render_async(view)
@@ -606,7 +616,7 @@ defmodule YscWeb.ShopCheckoutTest do
 
     test "the Stripe element readiness events are accepted", %{conn: conn} do
       stub_payment_intent()
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
       render_async(view)

@@ -4,6 +4,7 @@ defmodule YscWeb.ShopOrdersTest do
   import Mox
   import Phoenix.LiveViewTest
   import Ysc.MerchFixtures
+  import YscWeb.ShopLiveHelpers
 
   alias Ysc.Merch.{Order, Orders}
   alias Ysc.Printful.{ClientMock, Error}
@@ -75,9 +76,19 @@ defmodule YscWeb.ShopOrdersTest do
   end
 
   describe "order page" do
+    test "static HTML paints a receipt skeleton before the order loads", %{
+      conn: conn,
+      member: member
+    } do
+      order = order_for(member, :shipped)
+      html = conn |> get(~p"/shop/orders/#{order.id}") |> html_response(200)
+      assert html =~ ~s(id="shop-order-loading")
+      refute html =~ ~s(id="order-reference")
+    end
+
     test "shows the receipt, address and status", %{conn: conn, member: member} do
       order = order_for(member, :shipped)
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
 
       assert has_element?(view, "#order-summary-#{order.id}", "Club Tee")
       assert has_element?(view, "#order-summary-#{order.id}", "Black · M")
@@ -104,19 +115,20 @@ defmodule YscWeb.ShopOrdersTest do
       order = order_for(member, :shipped)
       other = log_in_user(build_conn(), member_fixture())
 
-      assert {:error, {:live_redirect, %{to: "/shop/orders"}}} =
-               live(other, ~p"/shop/orders/#{order.id}")
+      {:ok, view, html} = live(other, ~p"/shop/orders/#{order.id}")
+      assert html =~ ~s(id="shop-order-loading")
+      assert_redirect(view, ~p"/shop/orders")
 
-      assert {:error, {:live_redirect, %{to: "/shop/orders"}}} =
-               live(conn, ~p"/shop/orders/#{Ecto.ULID.generate()}")
+      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{Ecto.ULID.generate()}")
+      assert_redirect(view, ~p"/shop/orders")
 
-      assert {:error, {:live_redirect, %{to: "/shop/orders"}}} =
-               live(conn, ~p"/shop/orders/garbage")
+      {:ok, view, _html} = live(conn, ~p"/shop/orders/garbage")
+      assert_redirect(view, ~p"/shop/orders")
     end
 
     test "failed orders explain the problem", %{conn: conn, member: member} do
       order = order_for(member, :failed)
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
 
       assert has_element?(view, "#order-banner-failed")
       refute has_element?(view, "#order-progress")
@@ -127,11 +139,11 @@ defmodule YscWeb.ShopOrdersTest do
       member: member
     } do
       canceled = order_for(member, :canceled)
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{canceled.id}")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{canceled.id}")
       assert has_element?(view, "#order-banner-closed", "canceled")
 
       refunded = order_for(member, :refunded)
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{refunded.id}")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{refunded.id}")
       assert has_element?(view, "#order-banner-closed", "refunded")
     end
 
@@ -140,7 +152,7 @@ defmodule YscWeb.ShopOrdersTest do
       order = order_for(lapsed, :delivered)
 
       {:ok, view, _html} =
-        live(log_in_user(conn, lapsed), ~p"/shop/orders/#{order.id}")
+        live_shop_page(log_in_user(conn, lapsed), ~p"/shop/orders/#{order.id}")
 
       assert has_element?(
                view,
@@ -165,7 +177,7 @@ defmodule YscWeb.ShopOrdersTest do
 
     test "is shown while the order is on its way", %{conn: conn, member: member} do
       order = member |> order_for(:submitted) |> with_estimate()
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
 
       assert has_element?(
                view,
@@ -186,14 +198,14 @@ defmodule YscWeb.ShopOrdersTest do
     } do
       for status <- [:canceled, :failed, :refunded, :delivered] do
         order = member |> order_for(:submitted) |> with_estimate(status)
-        {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+        {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
         refute has_element?(view, "#order-delivery-estimate")
       end
     end
 
     test "is left out when there is no estimate", %{conn: conn, member: member} do
       order = order_for(member, :submitted)
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
       refute has_element?(view, "#order-delivery-estimate")
     end
   end
@@ -231,7 +243,7 @@ defmodule YscWeb.ShopOrdersTest do
         })
         |> Repo.insert!()
 
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
 
       assert has_element?(view, "#shipment-#{shipped.id}", "USPS")
       assert has_element?(view, "#shipment-#{shipped.id}", "Shipped Oct 10")
@@ -256,7 +268,7 @@ defmodule YscWeb.ShopOrdersTest do
       member: member
     } do
       order = order_for(member, :submitted)
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
       refute has_element?(view, "#order-tracking")
     end
 
@@ -272,7 +284,7 @@ defmodule YscWeb.ShopOrdersTest do
         })
         |> Repo.insert!()
 
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
 
       assert has_element?(
                view,
@@ -293,7 +305,9 @@ defmodule YscWeb.ShopOrdersTest do
         {:ok, succeeded(order)}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}/confirmation")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/orders/#{order.id}/confirmation")
+
       render(view)
 
       assert has_element?(view, "#order-banner-confirmed", "Thank you")
@@ -312,7 +326,7 @@ defmodule YscWeb.ShopOrdersTest do
       end)
 
       {:ok, view, _html} =
-        live(
+        live_shop_page(
           conn,
           ~p"/shop/orders/#{order.id}/confirmation?payment_intent=pi_attacker&redirect_status=succeeded"
         )
@@ -337,7 +351,9 @@ defmodule YscWeb.ShopOrdersTest do
          }}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}/confirmation")
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/orders/#{order.id}/confirmation")
+
       render(view)
 
       assert has_element?(
@@ -354,13 +370,24 @@ defmodule YscWeb.ShopOrdersTest do
       member: member
     } do
       order = order_for(member, :submitted, "pi_hook")
-      {:ok, view, _html} = live(conn, ~p"/shop/orders/#{order.id}/confirmation")
+
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/orders/#{order.id}/confirmation")
 
       assert has_element?(view, "#order-banner-confirmed")
     end
   end
 
   describe "order history" do
+    test "static HTML paints an orders skeleton before the list loads", %{
+      conn: conn
+    } do
+      html = conn |> get(~p"/shop/orders") |> html_response(200)
+      assert html =~ ~s(id="shop-orders-loading")
+      refute html =~ ~s(id="orders-empty")
+      refute html =~ ~s(id="orders-list")
+    end
+
     test "lists purchases newest first and hides unfinished checkouts", %{
       conn: conn,
       member: member
@@ -368,7 +395,7 @@ defmodule YscWeb.ShopOrdersTest do
       shipped = order_for(member, :shipped)
       _pending = order_for(member, :pending)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/orders")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders")
 
       assert has_element?(view, "#order-#{shipped.id}", shipped.reference_id)
       assert has_element?(view, "#order-#{shipped.id}", "Shipped")
@@ -381,7 +408,7 @@ defmodule YscWeb.ShopOrdersTest do
       other = member_fixture()
       theirs = order_for(other, :shipped)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/orders")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders")
       assert has_element?(view, "#orders-empty")
       refute has_element?(view, "#order-#{theirs.id}")
     end

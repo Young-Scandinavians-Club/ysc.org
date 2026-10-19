@@ -1,12 +1,19 @@
 defmodule YscWeb.ShopProductLive do
   @moduledoc """
   A single merch product: pick a color and size, then add it to the cart.
+
+  The first HTML is a skeleton. Product and cart-summary queries run after the
+  WebSocket connects so the HTTP response is never blocked on those loads, and
+  they run once instead of on both the disconnected and connected mounts.
   """
   use YscWeb, :live_view
 
   on_mount {YscWeb.ShopAccess, :ensure_member}
 
+  require Ysc.Logging
+
   import Ysc.MoneyHelper, only: [format_price: 1]
+  import YscWeb.Live.AsyncHelpers
   import YscWeb.ShopComponents
 
   alias Ysc.Media.Image
@@ -16,29 +23,80 @@ defmodule YscWeb.ShopProductLive do
 
   @impl true
   def mount(%{"id" => id} = params, _session, socket) do
-    case fetch_product(id) do
-      nil ->
-        {:ok,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "That product isn't available any more.",
-           title: "Shop"
-         )
-         |> push_navigate(to: ~p"/shop")}
+    socket =
+      socket
+      |> assign(:page_title, "Shop")
+      |> assign(:product_id, id)
+      |> assign(:requested_color, params["color"])
+      |> assign(:async_data_loaded, false)
+      |> assign(:product, nil)
+      |> assign(:selection, nil)
+      |> assign(:quantity, 1)
+      |> assign(:photo_index, 0)
+      |> assign(:variant, nil)
+      |> assign(:gallery, [])
+      |> ShopCartPeek.init_placeholder()
 
-      product ->
-        {:ok,
-         socket
-         |> assign(:page_title, product.name)
-         |> assign(:product, product)
-         |> assign(:selection, initial_selection(product, params["color"]))
-         |> assign(:quantity, 1)
-         |> assign(:photo_index, 0)
-         |> ShopCartPeek.init(socket.assigns.current_user)
-         |> assign_selected_variant()
-         |> assign_gallery()}
+    {:ok, maybe_load_product(socket)}
+  end
+
+  defp maybe_load_product(socket) do
+    if connected?(socket) do
+      user = socket.assigns.current_user
+      id = socket.assigns.product_id
+
+      start_async(socket, :load_product, fn ->
+        allow_sandbox_access()
+
+        %{product: fetch_product(id), cart_summary: Cart.summary(user)}
+      end)
+    else
+      socket
     end
+  end
+
+  @impl true
+  def handle_async(
+        :load_product,
+        {:ok, %{product: nil}},
+        socket
+      ) do
+    {:noreply, redirect_unavailable(socket)}
+  end
+
+  def handle_async(
+        :load_product,
+        {:ok, %{product: product, cart_summary: cart_summary}},
+        socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:async_data_loaded, true)
+     |> assign(:page_title, product.name)
+     |> assign(:product, product)
+     |> assign(
+       :selection,
+       initial_selection(product, socket.assigns.requested_color)
+     )
+     |> assign(:cart_summary, cart_summary)
+     |> assign_selected_variant()
+     |> assign_gallery()}
+  end
+
+  def handle_async(:load_product, {:exit, reason}, socket) do
+    Ysc.Logging.error("ShopProductLive: failed to load product", error: reason)
+
+    {:noreply, redirect_unavailable(socket)}
+  end
+
+  defp redirect_unavailable(socket) do
+    socket
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "That product isn't available any more.",
+      title: "Shop"
+    )
+    |> push_navigate(to: ~p"/shop")
   end
 
   # The listing links here with the color the shopper was looking at.
@@ -82,6 +140,14 @@ defmodule YscWeb.ShopProductLive do
   end
 
   @impl true
+  def handle_event(
+        _event,
+        _params,
+        %{assigns: %{async_data_loaded: false}} = socket
+      ) do
+    {:noreply, socket}
+  end
+
   def handle_event("select_color", %{"color" => color}, socket) do
     selection =
       VariantSelection.select_color(
@@ -279,6 +345,20 @@ defmodule YscWeb.ShopProductLive do
     do: Money.mult!(variant.retail_price, quantity)
 
   @impl true
+  def render(%{async_data_loaded: false} = assigns) do
+    ~H"""
+    <.shop_frame
+      id="shop-product-page"
+      title="Shop"
+      active={:shop}
+      section_only?={true}
+      cart_count={@cart_summary.count}
+    >
+      <.shop_page_loading id="shop-product-loading" />
+    </.shop_frame>
+    """
+  end
+
   def render(assigns) do
     assigns =
       assigns
