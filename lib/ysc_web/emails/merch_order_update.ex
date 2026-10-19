@@ -7,7 +7,8 @@ defmodule YscWeb.Emails.MerchOrderUpdate do
     mjml_template: "templates/merch_order_update.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+  import YscWeb.Emails.MerchHelpers,
+    only: [greeting_name: 1, member_order_url: 1]
 
   alias Ysc.Merch.{Order, UpdateCopy}
 
@@ -28,20 +29,7 @@ defmodule YscWeb.Emails.MerchOrderUpdate do
       paragraphs: paragraphs,
       order: %{reference_id: order.reference_id},
       items: YscWeb.Emails.MerchItems.for_order(order),
-      order_url: order_url(order)
+      order_url: member_order_url(order)
     }
   end
-
-  defp greeting_name(%Order{user: %{} = user}), do: member_greeting_name(user)
-
-  defp greeting_name(%Order{recipient_name: name}),
-    do:
-      name
-      |> to_string()
-      |> String.split(" ", trim: true)
-      |> List.first()
-      |> member_greeting_name()
-
-  defp order_url(%Order{user_id: nil}), do: absolute_url("/shop")
-  defp order_url(%Order{id: id}), do: absolute_url("/shop/orders/#{id}")
 end

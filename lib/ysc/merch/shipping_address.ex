@@ -168,6 +168,31 @@ defmodule Ysc.Merch.ShippingAddress do
     }
   end
 
+  @doc """
+  Street lines for display: `address1`, optional `address2`, then
+  `City, ST ZIP`. Blank lines are omitted.
+
+  Accepts `%ShippingAddress{}`, `%Ysc.Merch.Order{}`, and any map with those
+  keys. Used by shop/admin views and merch emails.
+
+      display_lines(address)
+      # => ["1 Market St", "San Francisco, CA 94105"]
+  """
+  def display_lines(%{
+        address1: address1,
+        address2: address2,
+        city: city,
+        state_code: state_code,
+        zip: zip
+      }) do
+    [
+      address1,
+      address2,
+      "#{city}, #{state_code} #{zip}"
+    ]
+    |> Enum.reject(&(&1 in [nil, ""]))
+  end
+
   defp normalize_state(nil), do: nil
   defp normalize_state(state), do: state |> String.trim() |> String.upcase()
 

@@ -80,6 +80,27 @@ defmodule Ysc.Merch.ShippingTest do
       refute Map.has_key?(recipient, :email)
       assert recipient.state_code == "CA"
     end
+
+    test "display_lines omits a blank address2" do
+      assert ShippingAddress.display_lines(address()) == [
+               "1 Market St",
+               "San Francisco, CA 94105"
+             ]
+    end
+
+    test "display_lines keeps address2 and works for order-shaped maps" do
+      assert ShippingAddress.display_lines(%{
+               address1: "1 Market St",
+               address2: "Ste 200",
+               city: "San Francisco",
+               state_code: "CA",
+               zip: "94105"
+             }) == [
+               "1 Market St",
+               "Ste 200",
+               "San Francisco, CA 94105"
+             ]
+    end
   end
 
   describe "options/2" do

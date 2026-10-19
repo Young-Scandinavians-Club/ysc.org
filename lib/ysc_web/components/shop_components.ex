@@ -15,7 +15,7 @@ defmodule YscWeb.ShopComponents do
 
   alias Phoenix.LiveView.JS
   alias Ysc.Media.{BlurPlaceholder, Image}
-  alias Ysc.Merch.{Order, OrderItem}
+  alias Ysc.Merch.{Order, OrderItem, ShippingAddress}
 
   @doc """
   The frame every shop page shares: title section like every other page, then
@@ -449,6 +449,42 @@ defmodule YscWeb.ShopComponents do
       loading="lazy"
       class={["shrink-0 rounded-xl bg-zinc-100 object-cover", @class]}
     />
+    """
+  end
+
+  @doc """
+  Street lines of a merch delivery address.
+
+  Renders `address1`, optional `address2`, then `City, ST ZIP`, omitting
+  blanks. Pass `name` to put the recipient on the first line (shop order
+  and checkout); omit it when the name is already rendered (admin order
+  detail, where it may be a member link).
+
+  ## Examples
+
+      <.shipping_address_lines address={@order} name={@order.recipient_name} />
+      <.shipping_address_lines address={@address} />
+  """
+  attr :address, :map, required: true
+
+  attr :name, :string,
+    default: nil,
+    doc: "Optional first line (recipient name)"
+
+  def shipping_address_lines(assigns) do
+    assigns =
+      assign(assigns, :lines, ShippingAddress.display_lines(assigns.address))
+
+    ~H"""
+    <%= if @name not in [nil, ""] do %>
+      {@name}<br />
+    <% end %>
+    <%= for {line, idx} <- Enum.with_index(@lines) do %>
+      <%= if idx > 0 do %>
+        <br />
+      <% end %>
+      {line}
+    <% end %>
     """
   end
 

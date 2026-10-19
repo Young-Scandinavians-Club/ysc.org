@@ -10,13 +10,10 @@ defmodule YscWeb.Emails.MerchOrderConfirmation do
     mjml_template: "templates/merch_order_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers,
-    only: [
-      absolute_url: 1,
-      format_datetime: 1,
-      format_money: 1,
-      member_greeting_name: 1
-    ]
+  import YscWeb.Emails.Helpers, only: [format_datetime: 1, format_money: 1]
+
+  import YscWeb.Emails.MerchHelpers,
+    only: [address_lines: 1, greeting_name: 1, member_order_url: 1]
 
   alias Ysc.Merch.Order
   alias YscWeb.Emails.MerchItems
@@ -50,31 +47,7 @@ defmodule YscWeb.Emails.MerchOrderConfirmation do
         name: order.recipient_name,
         lines: address_lines(order)
       },
-      order_url: order_url(order)
+      order_url: member_order_url(order)
     }
   end
-
-  defp greeting_name(%Order{user: %{} = user}), do: member_greeting_name(user)
-
-  defp greeting_name(%Order{recipient_name: name}),
-    do: name |> first_word() |> member_greeting_name()
-
-  defp first_word(nil), do: nil
-
-  defp first_word(name),
-    do: name |> String.split(" ", trim: true) |> List.first()
-
-  defp address_lines(order) do
-    [
-      order.address1,
-      order.address2,
-      "#{order.city}, #{order.state_code} #{order.zip}"
-    ]
-    |> Enum.reject(&(&1 in [nil, ""]))
-  end
-
-  # Members get a link to their order page; the order page is member-only, so
-  # custom-address admin orders without a member link to the shop instead.
-  defp order_url(%Order{user_id: nil}), do: absolute_url("/shop")
-  defp order_url(%Order{id: id}), do: absolute_url("/shop/orders/#{id}")
 end
