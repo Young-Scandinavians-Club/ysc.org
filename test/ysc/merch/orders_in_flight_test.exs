@@ -175,6 +175,101 @@ defmodule Ysc.Merch.OrdersInFlightTest do
     assert Orders.get_order!(first.id).payment_intent_id == "pi_outage"
   end
 
+  test "concurrent identical checkouts reuse one pending order", %{
+    sandbox_owner: owner,
+    user: user,
+    lines: lines
+  } do
+    parent = self()
+
+    tasks =
+      for i <- 1..2 do
+        Task.async(fn ->
+          Ysc.DataCase.allow_sandbox(self(), owner)
+          send(parent, {:ready, i})
+
+          receive do
+            :go -> create(user, lines)
+          after
+            5_000 -> {:error, :timeout}
+          end
+        end)
+      end
+
+    for _ <- 1..2, do: assert_receive({:ready, _}, 5_000)
+    Enum.each(tasks, &send(&1.pid, :go))
+    results = Task.await_many(tasks, 15_000)
+
+    assert Enum.all?(results, &match?({:ok, %Order{}}, &1))
+
+    ids =
+      results
+      |> Enum.map(fn {:ok, order} -> order.id end)
+      |> Enum.uniq()
+
+    assert length(ids) == 1
+
+    pending =
+      from(o in Order, where: o.status == :pending)
+      |> Repo.all()
+
+    assert length(pending) == 1
+    assert hd(pending).id == hd(ids)
+  end
+
+  test "concurrent different-cart checkouts leave one pending order", %{
+    sandbox_owner: owner,
+    user: user,
+    tee: tee,
+    lines: lines
+  } do
+    {:ok, _} = Ysc.Merch.Cart.set_quantity(user, tee.id, 3)
+    other_lines = Ysc.Merch.Cart.list(user)
+    parent = self()
+
+    tasks = [
+      Task.async(fn ->
+        Ysc.DataCase.allow_sandbox(self(), owner)
+        send(parent, {:ready, 1})
+
+        receive do
+          :go -> create(user, lines)
+        after
+          5_000 -> {:error, :timeout}
+        end
+      end),
+      Task.async(fn ->
+        Ysc.DataCase.allow_sandbox(self(), owner)
+        send(parent, {:ready, 2})
+
+        receive do
+          :go -> create(user, other_lines)
+        after
+          5_000 -> {:error, :timeout}
+        end
+      end)
+    ]
+
+    for _ <- 1..2, do: assert_receive({:ready, _}, 5_000)
+    Enum.each(tasks, &send(&1.pid, :go))
+    results = Task.await_many(tasks, 15_000)
+
+    assert Enum.all?(results, &match?({:ok, %Order{}}, &1))
+
+    pending =
+      from(o in Order, where: o.status == :pending)
+      |> Repo.all()
+
+    canceled =
+      from(o in Order, where: o.status == :canceled)
+      |> Repo.all()
+
+    # Without the advisory lock both inserts could land as pending before either
+    # supersede ran — two payable carts. Serialized: one pending, one canceled.
+    assert length(pending) == 1
+    assert length(canceled) == 1
+  end
+
   test "refuses a different cart when canceling the prior Intent fails", %{
     user: user,
     lines: lines,
