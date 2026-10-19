@@ -41,12 +41,21 @@ defmodule Ysc.Merch.StripeService do
         %Order{kind: :purchase, status: :pending} = order,
         %User{} = user
       ) do
-    amount_cents = MoneyHelper.money_to_cents(order.total_amount)
+    # Re-read: a second tab can cancel this row after create_pending_purchase
+    # returns and before we mint an Intent. Trusting the stale struct would
+    # create a confirmable PI for a superseded order.
+    case Orders.get_order(order.id) do
+      %Order{kind: :purchase, status: :pending} = fresh ->
+        amount_cents = MoneyHelper.money_to_cents(fresh.total_amount)
 
-    cond do
-      amount_cents <= 0 -> {:error, :not_payable}
-      order.payment_intent_id -> reuse_or_create(order, user, amount_cents)
-      true -> create(order, user, amount_cents)
+        cond do
+          amount_cents <= 0 -> {:error, :not_payable}
+          fresh.payment_intent_id -> reuse_or_create(fresh, user, amount_cents)
+          true -> create(fresh, user, amount_cents)
+        end
+
+      _ ->
+        {:error, :not_payable}
     end
   end
 
@@ -124,6 +133,14 @@ defmodule Ysc.Merch.StripeService do
             {:ok, intent}
 
           {:error, _} ->
+            # Do not leave a confirmable Intent for a row that is no longer
+            # pending (superseded between Stripe create and local attach).
+            _ =
+              CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+                intent.id,
+                "merch_attach_not_pending"
+              )
+
             {:error, Ysc.PaymentUserMessages.payment_setup_failed()}
         end
 

@@ -6,12 +6,19 @@ defmodule YscWeb.ShopCheckoutLive do
   Totals are always recomputed on the server from the catalog and a fresh
   Printful quote taken at payment time; nothing monetary is trusted from the
   browser or from an earlier shipping step.
+
+  The first HTML is a skeleton. Billing address and cart queries run after the
+  WebSocket connects so the HTTP response is never blocked on those loads, and
+  they run once instead of on both the disconnected and connected mounts.
   """
   use YscWeb, :live_view
 
   on_mount {YscWeb.ShopAccess, :ensure_member}
 
+  require Ysc.Logging
+
   import Ysc.MoneyHelper, only: [format_price: 1]
+  import YscWeb.Live.AsyncHelpers
   import YscWeb.ShopComponents
 
   alias Ysc.Merch.{
@@ -27,51 +34,81 @@ defmodule YscWeb.ShopCheckoutLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    user = Repo.preload(socket.assigns.current_user, :billing_address)
-    lines = user |> Cart.list() |> Cart.available_lines()
+    socket =
+      socket
+      |> assign(:page_title, "Checkout")
+      |> assign(:async_data_loaded, false)
+      |> assign(:lines, [])
+      |> assign(:subtotal, Money.new(0, :USD))
+      |> assign(:cart_count, 0)
+      |> assign(:step, :address)
+      |> assign(:form, nil)
+      |> assign(:address, nil)
+      |> assign(:shipping_options, [])
+      |> assign(:selected_option, nil)
+      |> assign(:quoting?, false)
+      |> assign(:preparing_payment?, false)
+      |> assign(:address_error, nil)
+      |> assign(:shipping_error, nil)
+      |> assign(:payment_error, nil)
+      |> assign(:order, nil)
+      |> assign(:payment_intent, nil)
+      |> assign(:stripe_payment_element_ready, false)
+      |> assign(:stripe_billing_details, "{}")
 
-    if lines == [] do
-      {:ok,
-       socket
-       |> YscWeb.Flash.put_toast(:info, "Your cart is empty.", title: "Shop")
-       |> push_navigate(to: ~p"/shop/cart")}
+    {:ok, maybe_load_checkout(socket)}
+  end
+
+  defp maybe_load_checkout(socket) do
+    if connected?(socket) do
+      user = socket.assigns.current_user
+
+      start_async(socket, :load_checkout, fn ->
+        allow_sandbox_access()
+        user = Repo.preload(user, :billing_address)
+        lines = user |> Cart.list() |> Cart.available_lines()
+        %{user: user, lines: lines}
+      end)
     else
-      {:ok,
-       socket
-       |> assign(:page_title, "Checkout")
-       |> assign(:current_user, user)
-       |> assign(:lines, lines)
-       |> assign(:subtotal, Cart.subtotal(lines))
-       |> assign(:cart_count, Cart.item_count(lines))
-       |> assign(:step, :address)
-       |> assign(
-         :form,
-         to_form(
-           ShippingAddress.changeset(ShippingAddress.from_user(user), %{}),
-           as: :address
-         )
-       )
-       |> assign(:address, nil)
-       |> assign(:shipping_options, [])
-       |> assign(:selected_option, nil)
-       |> assign(:quoting?, false)
-       |> assign(:preparing_payment?, false)
-       |> assign(:address_error, nil)
-       |> assign(:shipping_error, nil)
-       |> assign(:payment_error, nil)
-       |> assign(:order, nil)
-       |> assign(:payment_intent, nil)
-       |> assign(:stripe_payment_element_ready, false)
-       |> assign(
-         :stripe_billing_details,
-         Ysc.Customers.payment_element_default_values_json(user)
-       )}
+      socket
     end
+  end
+
+  defp assign_loaded_checkout(socket, user, lines) do
+    socket
+    |> assign(:async_data_loaded, true)
+    |> assign(:current_user, user)
+    |> assign_cart(lines)
+    |> assign(
+      :form,
+      to_form(
+        ShippingAddress.changeset(ShippingAddress.from_user(user), %{}),
+        as: :address
+      )
+    )
+    |> assign(
+      :stripe_billing_details,
+      Ysc.Customers.payment_element_default_values_json(user)
+    )
+  end
+
+  defp redirect_empty_cart(socket) do
+    socket
+    |> YscWeb.Flash.put_toast(:info, "Your cart is empty.", title: "Shop")
+    |> push_navigate(to: ~p"/shop/cart")
   end
 
   ## Address
 
   @impl true
+  def handle_event(
+        _event,
+        _params,
+        %{assigns: %{async_data_loaded: false}} = socket
+      ) do
+    {:noreply, socket}
+  end
+
   def handle_event("validate_address", %{"address" => params}, socket) do
     form =
       %ShippingAddress{}
@@ -206,6 +243,22 @@ defmodule YscWeb.ShopCheckoutLive do
   ## Async results
 
   @impl true
+  def handle_async(:load_checkout, {:ok, %{lines: []}}, socket) do
+    {:noreply, redirect_empty_cart(socket)}
+  end
+
+  def handle_async(:load_checkout, {:ok, %{user: user, lines: lines}}, socket) do
+    {:noreply, assign_loaded_checkout(socket, user, lines)}
+  end
+
+  def handle_async(:load_checkout, {:exit, reason}, socket) do
+    Ysc.Logging.error("ShopCheckoutLive: failed to load checkout",
+      error: reason
+    )
+
+    {:noreply, redirect_empty_cart(socket)}
+  end
+
   def handle_async(:quote_shipping, {:ok, {:ok, options}}, socket) do
     {:noreply,
      socket
@@ -333,6 +386,19 @@ defmodule YscWeb.ShopCheckoutLive do
   ## Render
 
   @impl true
+  def render(%{async_data_loaded: false} = assigns) do
+    ~H"""
+    <.shop_frame
+      id="shop-checkout-page"
+      title="Checkout"
+      active={:cart}
+      cart_count={@cart_count}
+    >
+      <.shop_page_loading id="shop-checkout-loading" />
+    </.shop_frame>
+    """
+  end
+
   def render(assigns) do
     ~H"""
     <.shop_frame
