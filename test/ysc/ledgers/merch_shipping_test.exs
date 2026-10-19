@@ -11,8 +11,6 @@ defmodule Ysc.Ledgers.MerchShippingTest do
   alias Ysc.Ledgers.LedgerEntry
   alias Ysc.Quickbooks.ClientMock
 
-  setup :set_mox_global
-
   setup do
     original = Application.get_env(:ysc, :quickbooks_client)
     Application.put_env(:ysc, :quickbooks_client, ClientMock)
