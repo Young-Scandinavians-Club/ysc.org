@@ -37,7 +37,7 @@ cleanup() {
 trap cleanup EXIT
 printf '%s' "$LIST_JSON" >"$tmp"
 
-if ! python3 - "$MIN_STARTED" "$APP" "$tmp" <<'PY'
+if ! python3 - "$MIN_STARTED" "$APP" "$tmp" <<'PY'; then
 import json, sys
 
 min_started = int(sys.argv[1])
@@ -67,6 +67,5 @@ if n < min_started:
 
 print(f"OK: Fly app '{app}' has {n} started machine(s) (minimum {min_started}).")
 PY
-then
   exit 1
 fi
