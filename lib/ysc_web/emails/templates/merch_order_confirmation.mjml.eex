@@ -34,29 +34,27 @@
     <mj-spacer height="16px"></mj-spacer>
     <mj-table css-class="table" padding="12px 0">
       <tr style="border-bottom:1px solid #e0e0e0;">
-        <td style="padding: 12px 16px; font-weight:bold; font-size:16px;">Item</td>
-        <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:center;">Qty</td>
-        <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Price</td>
-        <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Total</td>
+        <td style="padding: 12px 8px 12px 0; font-weight:bold; font-size:16px;">Item</td>
+        <td style="padding: 12px 0 12px 8px; font-weight:bold; font-size:16px; text-align:right;">Total</td>
       </tr>
       <%= YscWeb.Emails.MerchItems.priced_rows(@items) %>
       <%= if @comp do %>
       <tr style="border-top:2px solid #000; background-color:#f8f9fa;">
-        <td colspan="3" style="padding: 12px 16px; font-weight:bold; font-size:18px;">Paid by the club</td>
-        <td style="padding: 12px 16px; font-weight:bold; font-size:18px; text-align:right; color: #059669;">$0.00</td>
+        <td style="padding: 12px 8px 12px 0; font-weight:bold; font-size:18px;">Paid by the club</td>
+        <td style="padding: 12px 0 12px 8px; font-weight:bold; font-size:18px; text-align:right; color: #059669; white-space:nowrap;">$0.00</td>
       </tr>
       <% else %>
       <tr style="border-top:1px solid #e0e0e0;">
-        <td colspan="3" style="padding: 12px 16px; font-size:16px;">Subtotal</td>
-        <td style="padding: 12px 16px; font-size:16px; text-align:right;"><%= @subtotal %></td>
+        <td style="padding: 12px 8px 12px 0; font-size:16px;">Subtotal</td>
+        <td style="padding: 12px 0 12px 8px; font-size:16px; text-align:right; white-space:nowrap;"><%= @subtotal %></td>
       </tr>
       <tr>
-        <td colspan="3" style="padding: 12px 16px; font-size:16px;">Shipping</td>
-        <td style="padding: 12px 16px; font-size:16px; text-align:right;"><%= @shipping %></td>
+        <td style="padding: 12px 8px 12px 0; font-size:16px;">Shipping</td>
+        <td style="padding: 12px 0 12px 8px; font-size:16px; text-align:right; white-space:nowrap;"><%= @shipping %></td>
       </tr>
       <tr style="border-top:2px solid #000; background-color:#f8f9fa;">
-        <td colspan="3" style="padding: 12px 16px; font-weight:bold; font-size:18px;">Total</td>
-        <td style="padding: 12px 16px; font-weight:bold; font-size:18px; text-align:right;"><%= @total %></td>
+        <td style="padding: 12px 8px 12px 0; font-weight:bold; font-size:18px;">Total</td>
+        <td style="padding: 12px 0 12px 8px; font-weight:bold; font-size:18px; text-align:right; white-space:nowrap;"><%= @total %></td>
       </tr>
       <% end %>
     </mj-table>

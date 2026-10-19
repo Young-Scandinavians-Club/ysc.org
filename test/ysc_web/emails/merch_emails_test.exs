@@ -79,6 +79,22 @@ defmodule YscWeb.Emails.MerchEmailsTest do
       assert html =~ "$50.00"
     end
 
+    test "the confirmation's item table has two columns, so it fits a phone", %{
+      order: order
+    } do
+      html =
+        order
+        |> MerchOrderConfirmation.prepare_email_data()
+        |> MerchOrderConfirmation.render()
+
+      # Quantity and unit price sit under the item name, not in their own
+      # columns (which shrank to a few characters wide on mobile).
+      assert html =~ "2 &times; $25.00"
+      refute html =~ ">Qty<"
+      refute html =~ ">Price<"
+      assert html =~ ">Total<"
+    end
+
     test "shipped", %{order: order} do
       order
       |> MerchOrderShipped.prepare_email_data(shipment())

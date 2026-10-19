@@ -142,6 +142,93 @@ defmodule Ysc.Merch.CatalogSyncTest do
     assert Repo.get!(Ysc.Merch.ProductImage, white_photo.id).position == moved
   end
 
+  describe "photos for variants that have no mockup of their own" do
+    # Printful makes one mockup per variant, but not always for every size
+    # (the 4" and 5.5" stickers had none). Their fallback used to be the
+    # generic catalog photo of the blank item, a banner saying "Stickers".
+    defp without_preview(id, attrs \\ %{}) do
+      sync_variant(
+        id,
+        Map.merge(
+          %{
+            "files" => [],
+            "product" => %{"image" => "https://catalog/blank-#{id}.jpg"}
+          },
+          attrs
+        )
+      )
+    end
+
+    defp variant_image_url(sync_id),
+      do:
+        Repo.get_by!(Variant, printful_sync_variant_id: sync_id).source_image_url
+
+    test "use another size's mockup in the same color", %{admin: admin} do
+      expect(ClientMock, :list_sync_products, fn -> {:ok, [listed(1)]} end)
+
+      expect(ClientMock, :get_sync_product, fn 1 ->
+        detail(listed(1), [sync_variant(10), without_preview(11)])
+      end)
+
+      assert {:ok, %{failed: 0}} = Merch.sync_catalog(admin)
+
+      assert variant_image_url(11) == "https://img/v10.png"
+    end
+
+    test "else the product's own thumbnail, never the catalog blank", %{
+      admin: admin
+    } do
+      expect(ClientMock, :list_sync_products, fn -> {:ok, [listed(1)]} end)
+
+      expect(ClientMock, :get_sync_product, fn 1 ->
+        detail(listed(1), [
+          sync_variant(10),
+          without_preview(11, %{"color" => "White"})
+        ])
+      end)
+
+      assert {:ok, %{failed: 0}} = Merch.sync_catalog(admin)
+
+      assert variant_image_url(11) == "https://img/1.png"
+    end
+
+    test "the catalog photo is the last resort", %{admin: admin} do
+      expect(ClientMock, :list_sync_products, fn ->
+        {:ok, [%{"id" => 1, "name" => "Bare", "thumbnail_url" => nil}]}
+      end)
+
+      expect(ClientMock, :get_sync_product, fn 1 ->
+        detail(%{"id" => 1, "name" => "Bare", "thumbnail_url" => nil}, [
+          without_preview(11)
+        ])
+      end)
+
+      assert {:ok, %{failed: 0}} = Merch.sync_catalog(admin)
+
+      assert variant_image_url(11) == "https://catalog/blank-11.jpg"
+    end
+
+    test "a re-sync replaces a catalog photo stored before this fix", %{
+      admin: admin
+    } do
+      expect(ClientMock, :list_sync_products, 2, fn -> {:ok, [listed(1)]} end)
+
+      expect(ClientMock, :get_sync_product, 2, fn 1 ->
+        detail(listed(1), [sync_variant(10), without_preview(11)])
+      end)
+
+      assert {:ok, _} = Merch.sync_catalog(admin)
+
+      # As the old code stored it.
+      Repo.get_by!(Variant, printful_sync_variant_id: 11)
+      |> Ecto.Changeset.change(source_image_url: "https://catalog/blank-11.jpg")
+      |> Repo.update!()
+
+      assert {:ok, _} = Merch.sync_catalog(admin)
+      assert variant_image_url(11) == "https://img/v10.png"
+    end
+  end
+
   describe "color dots" do
     test "stores the real color from Printful's catalog", %{admin: admin} do
       expect(ClientMock, :list_sync_products, fn -> {:ok, [listed(1)]} end)

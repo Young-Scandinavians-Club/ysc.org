@@ -107,7 +107,7 @@ defmodule Ysc.Merch.CatalogSync do
       Enum.map_reduce(usable, cache, fn sync_variant, cache ->
         {image, cache} =
           resolve_image(
-            variant_image_url(sync_variant),
+            variant_image_url(sync_variant, usable, sync_product),
             variant_image_title(sync_product, sync_variant),
             Map.get(existing_variants, sync_variant["id"]),
             uploader,
@@ -445,15 +445,33 @@ defmodule Ysc.Merch.CatalogSync do
       )
   end
 
-  defp variant_image_url(sync_variant) do
+  # A variant's own mockup, else another variant's of the same color, else the
+  # product's thumbnail. Printful's generic catalog photo of the blank item
+  # (`product.image`, which for stickers is a banner that just says "Stickers")
+  # is only a last resort: it is never what the member ordered.
+  defp variant_image_url(sync_variant, all_variants, sync_product) do
+    own = preview_url(sync_variant)
+
+    same_color =
+      Enum.find_value(all_variants, fn other ->
+        if other["color"] == sync_variant["color"], do: preview_url(other)
+      end)
+
+    own || same_color || present(sync_product["thumbnail_url"]) ||
+      get_in(sync_variant, ["product", "image"])
+  end
+
+  defp preview_url(sync_variant) do
     preview =
       sync_variant
       |> Map.get("files", [])
       |> Enum.find(&(&1["type"] == "preview"))
 
-    (preview && (preview["preview_url"] || preview["thumbnail_url"])) ||
-      get_in(sync_variant, ["product", "image"])
+    preview && present(preview["preview_url"] || preview["thumbnail_url"])
   end
+
+  defp present(value) when value in [nil, ""], do: nil
+  defp present(value), do: value
 
   defp variant_image_title(sync_product, sync_variant) do
     case sync_variant["color"] do

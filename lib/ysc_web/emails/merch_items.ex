@@ -62,31 +62,40 @@ defmodule YscWeb.Emails.MerchItems do
   end
 
   @doc """
-  Table rows with quantity, unit price and line total, for the order
-  confirmation. Four columns: item, quantity, price, total.
+  Table rows with the line total, for the order confirmation. Two columns,
+  item and total: the quantity and unit price sit under the name. Separate
+  quantity and price columns got a few characters wide on a phone.
   """
   def priced_rows(items) do
     items
     |> Enum.map(fn item ->
       """
       <tr style="border-bottom:1px solid #f0f0f0;">
-        <td style="padding: 12px 16px;">#{item_cell(item)}</td>
-        <td style="padding: 12px 16px; font-size:16px; text-align:center; vertical-align:middle;">#{esc(item.quantity)}</td>
-        <td style="padding: 12px 16px; font-size:16px; text-align:right; vertical-align:middle;">#{esc(item.unit_price)}</td>
-        <td style="padding: 12px 16px; font-size:16px; text-align:right; vertical-align:middle;">#{esc(item.line_total)}</td>
+        <td style="padding: 12px 8px 12px 0; width:100%;">#{item_cell(item, price_line(item))}</td>
+        <td style="padding: 12px 0 12px 8px; font-size:16px; text-align:right; vertical-align:middle; white-space:nowrap;">#{esc(item.line_total)}</td>
       </tr>
       """
     end)
     |> raw()
   end
 
+  defp price_line(%{quantity: 1, unit_price: _}), do: nil
+
+  defp price_line(item),
+    do: "#{esc(item.quantity)} &times; #{esc(item.unit_price)}"
+
   # A thumbnail beside the name and variant. Nested table: the only layout
-  # every email client agrees on.
-  defp item_cell(item) do
+  # every email client agrees on. `extra` is a further muted line under them.
+  defp item_cell(item, extra \\ nil) do
     """
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>#{thumbnail_cell(item)}<td style="font-size:16px; line-height:1.4; vertical-align:middle;"><strong>#{esc(item.name)}</strong>#{variant_line(item)}</td></tr></table>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>#{thumbnail_cell(item)}<td style="font-size:16px; line-height:1.4; vertical-align:middle;"><strong>#{esc(item.name)}</strong>#{variant_line(item)}#{extra_line(extra)}</td></tr></table>
     """
   end
+
+  defp extra_line(nil), do: ""
+
+  defp extra_line(text),
+    do: ~s(<br /><span style="color:#71717a;">#{text}</span>)
 
   # No photo: an empty box the same size, so every row lines up.
   defp thumbnail_cell(%{thumbnail: nil}),
