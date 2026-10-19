@@ -24,6 +24,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     EventNotification,
     EventUpdateNotification,
     ExpenseReportConfirmation,
+    ExpenseReportRejected,
     FamilyInviteCancelled,
     FamilyMemberRemoved,
     MembershipEnded,
@@ -1093,12 +1094,47 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       text = html_text(html)
 
+      treasurer_email = Ysc.EmailConfig.treasurer_email()
+
       assert text =~ "Amount we will reimburse"
       assert text =~ "See your expense report"
       assert text =~ "We'll email you when the money is on the way"
+      assert text =~ "contact the Treasurer at #{treasurer_email}"
+      assert html =~ "mailto:#{treasurer_email}"
       refute text =~ "Net Total"
       refute text =~ "View Expense Report"
       refute text =~ "reimbursement has been processed"
+    end
+
+    test "tells members how to email the Treasurer, not just to contact them" do
+      treasurer_email = Ysc.EmailConfig.treasurer_email()
+
+      html =
+        ExpenseReportConfirmation.render(%{
+          first_name: "Jane",
+          expense_report_url: "https://example.com/expensereport/preview",
+          treasurer_email: treasurer_email,
+          expense_report: %{
+            id: "er-preview",
+            purpose: "Cabin supplies",
+            submitted_date: "September 1, 2026",
+            reimbursement_method: "Bank Transfer",
+            event: nil,
+            bank_account: nil,
+            expense_items: [],
+            income_items: [],
+            expense_total: "$40.00",
+            income_total: "$0.00",
+            net_total: "$40.00"
+          }
+        })
+
+      text = html_text(html)
+
+      assert text =~ "contact the Treasurer at #{treasurer_email}"
+      assert html =~ ~s(href="mailto:#{treasurer_email}")
+      refute text =~ "contact the Treasurer."
+      refute html =~ "info@ysc.org"
     end
 
     test "labels offsets as money already received instead of income" do
@@ -1144,6 +1180,31 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Guest ticket cash"
       refute text =~ "Income Items"
       refute text =~ "Total Income"
+    end
+  end
+
+  describe "expense report rejected" do
+    test "points questions about the Treasurer's note to the Treasurer, not info@" do
+      treasurer_email = Ysc.EmailConfig.treasurer_email()
+
+      html =
+        ExpenseReportRejected.render(%{
+          first_name: "Jane",
+          treasurer_email: treasurer_email,
+          expense_report: %{
+            id: "er-preview",
+            purpose: "Cabin supplies"
+          },
+          rejection_note: "The hotel receipt is missing.",
+          new_expense_report_url: "https://example.com/expensereport"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "contact the Treasurer at #{treasurer_email}"
+      assert html =~ ~s(href="mailto:#{treasurer_email}")
+      refute html =~ "info@ysc.org"
+      refute text =~ "contact us at"
     end
   end
 
