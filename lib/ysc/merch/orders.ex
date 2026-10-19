@@ -28,6 +28,10 @@ defmodule Ysc.Merch.Orders do
     succeeded
   )
 
+  # Two-arg advisory lock namespace so merch checkout serialization cannot
+  # collide with expense-draft / Stripe-customer locks elsewhere.
+  @checkout_advisory_lock_namespace 8_233_202
+
   @user_order_fields [:id, :reference_id, :status, :total_amount, :inserted_at]
   @user_order_item_fields [:id, :order_id, :name, :quantity, :variant_id]
   @user_order_variant_fields [:id, :image_id]
@@ -106,6 +110,11 @@ defmodule Ysc.Merch.Orders do
   checkout is refused with `:payment_in_progress` instead — canceling those
   would orphan a settling charge.
 
+  Concurrent identical checkouts (two tabs both on the shipping step clicking
+  continue together) are serialized with a per-user advisory lock so both
+  callers cannot pass `find_reusable_pending` before either inserts — that
+  race minted two payable orders and two PaymentIntents.
+
   Errors: `:empty_cart`, `:unavailable_items` (a line is no longer sellable),
   `:payment_in_progress`, or an `Ecto.Changeset`.
   """
@@ -136,17 +145,44 @@ defmodule Ysc.Merch.Orders do
 
       true ->
         attrs = purchase_attrs(user, lines, address, option)
-
-        case find_reusable_pending(user, lines, attrs) do
-          %Order{} = order ->
-            {:ok, order}
-
-          nil ->
-            with :ok <- supersede_other_pending_purchases(user) do
-              insert_purchase(user, lines, attrs)
-            end
-        end
+        create_pending_purchase_locked(user, lines, attrs)
     end
+  end
+
+  # Serialize find → supersede → insert per user. Without this, two LiveView
+  # processes that both finished Printful's shipping requote can each see no
+  # reusable pending and both insert — two confirmable PaymentIntents.
+  defp create_pending_purchase_locked(user, lines, attrs) do
+    case Repo.transaction(fn ->
+           lock_user_merch_checkout!(user.id)
+
+           case find_reusable_pending(user, lines, attrs) do
+             %Order{} = order ->
+               order
+
+             nil ->
+               case supersede_other_pending_purchases(user) do
+                 :ok ->
+                   case insert_purchase(user, lines, attrs) do
+                     {:ok, order} -> order
+                     {:error, reason} -> Repo.rollback(reason)
+                   end
+
+                 {:error, reason} ->
+                   Repo.rollback(reason)
+               end
+           end
+         end) do
+      {:ok, order} -> {:ok, order}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp lock_user_merch_checkout!(user_id) do
+    Repo.query!("SELECT pg_advisory_xact_lock($1, $2)", [
+      @checkout_advisory_lock_namespace,
+      :erlang.phash2(user_id, 2_147_483_647)
+    ])
   end
 
   defp purchase_attrs(user, lines, address, option) do
