@@ -588,6 +588,79 @@ defmodule Ysc.Merch.PrintfulEventsTest do
       assert_email_sent(subject: ~r/on its way/, to: {"", member.email})
     end
 
+    # As Printful returned a freshly placed order (live API): shipments are
+    # listed right away, each "pending" with no tracking number.
+    defp pending_shipment(attrs \\ %{}) do
+      Map.merge(
+        %{
+          "id" => System.unique_integer([:positive]) + 9_000,
+          "carrier" => nil,
+          "service" => nil,
+          "status" => "pending",
+          "ship_date" => nil,
+          "shipped_at" => nil,
+          "tracking_number" => nil,
+          "tracking_url" => "https://myorders.co/tracking/1/",
+          "reshipment" => false
+        },
+        attrs
+      )
+    end
+
+    test "shipments Printful lists but has not shipped do not ship the order",
+         %{
+           order: order
+         } do
+      printful_order = %{
+        "id" => order.printful_order_id,
+        "external_id" => order.reference_id,
+        "status" => "pending",
+        "shipments" => [pending_shipment(), pending_shipment()]
+      }
+
+      assert :ok = PrintfulEvents.sync_order(order, printful_order)
+
+      assert status(order) == :submitted
+      assert shipments(order) == []
+      refute_email_sent()
+      assert sms_messages() == []
+    end
+
+    test "only the shipments that left are recorded and announced", %{
+      order: order
+    } do
+      shipped =
+        printful_shipment(%{"status" => "shipped", "carrier" => "USPS"})
+
+      printful_order = %{
+        "id" => order.printful_order_id,
+        "external_id" => order.reference_id,
+        "status" => "partial",
+        "shipments" => [shipped, pending_shipment()]
+      }
+
+      assert :ok = PrintfulEvents.sync_order(order, printful_order)
+
+      assert [recorded] = shipments(order)
+      assert recorded.printful_shipment_id == shipped["id"]
+      assert status(order) == :shipped
+      assert_email_sent(subject: ~r/on its way/)
+    end
+
+    test "a shipment with no status but a ship date counts as shipped", %{
+      order: order
+    } do
+      shipment = printful_shipment() |> Map.delete("status")
+
+      PrintfulEvents.sync_order(order, %{
+        "id" => order.printful_order_id,
+        "status" => "fulfilled",
+        "shipments" => [shipment]
+      })
+
+      assert length(shipments(order)) == 1
+    end
+
     test "polling after a webhook does not notify again", %{order: order} do
       shipment = printful_shipment()
       handle("package_shipped", order, %{"shipment" => shipment})
