@@ -6,6 +6,7 @@ defmodule YscWeb.ShopOrdersTest do
   import Ysc.MerchFixtures
   import YscWeb.ShopLiveHelpers
 
+  alias Ysc.Ledgers.Payment
   alias Ysc.Merch.{Order, Orders}
   alias Ysc.Printful.{ClientMock, Error}
   alias Ysc.Repo
@@ -363,6 +364,32 @@ defmodule YscWeb.ShopOrdersTest do
              )
 
       assert Orders.get_order!(order.id).status == :pending
+    end
+
+    test "an amount mismatch leaves the confirmation page waiting, without recording payment",
+         %{
+           conn: conn,
+           member: member
+         } do
+      order = order_for(member, :pending, "pi_mismatch")
+
+      expect(StripeMock, :retrieve_payment_intent, fn "pi_mismatch", _ ->
+        {:ok, %{succeeded(order) | amount: 100}}
+      end)
+
+      {:ok, view, _html} =
+        live_shop_page(conn, ~p"/shop/orders/#{order.id}/confirmation")
+
+      render(view)
+
+      assert has_element?(
+               view,
+               "#order-banner-pending",
+               "still waiting"
+             )
+
+      assert Orders.get_order!(order.id).status == :pending
+      assert Repo.aggregate(Payment, :count) == 0
     end
 
     test "an order paid via the webhook first just shows as confirmed", %{

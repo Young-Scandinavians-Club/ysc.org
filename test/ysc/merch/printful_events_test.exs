@@ -661,6 +661,32 @@ defmodule Ysc.Merch.PrintfulEventsTest do
       assert status(order) == :submitted
     end
 
+    test "a pending shipment with an estimated ship date still does not ship the order",
+         %{
+           order: order
+         } do
+      # Printful often puts an estimated date on a still-pending parcel as soon
+      # as the order is placed. Status is authoritative when present.
+      printful_order = %{
+        "id" => order.printful_order_id,
+        "external_id" => order.reference_id,
+        "status" => "pending",
+        "shipments" => [
+          pending_shipment(%{
+            "ship_date" => "2026-10-21",
+            "shipped_at" => System.os_time(:second)
+          })
+        ]
+      }
+
+      assert :ok = PrintfulEvents.sync_order(order, printful_order)
+
+      assert status(order) == :submitted
+      assert shipments(order) == []
+      refute_email_sent()
+      assert sms_messages() == []
+    end
+
     test "a shipment with no status but a ship date counts as shipped", %{
       order: order
     } do
