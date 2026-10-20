@@ -79,7 +79,7 @@ defmodule QueryConsole.DnsClusterUpgradeTest do
       assert lock =~ ~s|"dns_cluster": {:hex, :dns_cluster, "0.3.1"|
       refute lock =~ ~s|"dns_cluster": {:hex, :dns_cluster, "0.3.0"|
       assert lock =~ ~s|"finch": {:hex, :finch, "0.23.0"|
-      assert lock =~ ~s|"telemetry_metrics": {:hex, :telemetry_metrics, "1.1.0"|
+      assert lock =~ ~s|"telemetry_metrics": {:hex, :telemetry_metrics, "1.2.0"|
     end
 
     test "start_link/1 and Resolver still load" do
