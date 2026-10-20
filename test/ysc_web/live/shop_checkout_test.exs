@@ -640,7 +640,7 @@ defmodule YscWeb.ShopCheckoutTest do
          }}
       end)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/checkout")
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
       render_async(view)
