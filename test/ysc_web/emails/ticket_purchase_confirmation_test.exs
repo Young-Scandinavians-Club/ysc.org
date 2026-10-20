@@ -124,7 +124,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       assert data.event_date_time =~ ~r/\d{4}/
     end
 
-    test "describes payment as default Stripe card when payment_method is absent",
+    test "describes payment as online payment when payment_method is absent",
          %{
            ticket_order: ticket_order
          } do
@@ -133,7 +133,8 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
 
       data = TicketPurchaseConfirmation.prepare_email_data(ticket_order)
 
-      assert data.payment_method == "Credit or debit card"
+      assert data.payment_method == "Online payment"
+      refute data.payment_method =~ "card"
     end
 
     test "describes card with brand and last four when present", %{

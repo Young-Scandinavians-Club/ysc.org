@@ -98,7 +98,7 @@ defmodule YscWeb.PaymentMethodFormatter do
   defp extract_link_details_from_charge_pmd(_), do: {nil, nil, nil}
 
   @fallback_stripe_summary %{
-    description: "Credit or debit card",
+    description: "Online payment",
     logo_path: nil
   }
 

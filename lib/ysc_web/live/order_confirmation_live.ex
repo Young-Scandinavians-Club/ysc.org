@@ -878,7 +878,7 @@ defmodule YscWeb.OrderConfirmationLive do
       ticket_order.payment ->
         description ||
           if(async_data_loaded? && ticket_order.payment.external_payment_id,
-            do: "Credit or debit card",
+            do: "Online payment",
             else: "Loading payment details…"
           )
 
@@ -886,7 +886,7 @@ defmodule YscWeb.OrderConfirmationLive do
         "Free"
 
       async_data_loaded? && ticket_order.payment_intent_id ->
-        "Credit or debit card"
+        "Online payment"
 
       true ->
         "Loading payment details…"

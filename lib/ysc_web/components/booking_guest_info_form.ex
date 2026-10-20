@@ -298,7 +298,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
             {render_slot(@actions)}
             <.button
               type="submit"
-              phx-disable-with="Processing..."
+              phx-disable-with="Continuing..."
               class="w-full sm:w-auto py-3"
               disabled={
                 !BookingGuestForm.all_guests_valid?(@guest_info_form, @booking)
