@@ -87,6 +87,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 91 (MEDIUM)   Printful webhook secret lives in the URL path (`/webhooks/printful/:token`) but `Ysc.SentryScrubber` only redacted FlowRoute's path token, so Sentry request URLs leaked `PRINTFUL_WEBHOOK_SECRET`
   Finding 92 (MEDIUM)   Merch checkout quoted Printful shipping from mount-time cart lines, then created the pending order and Stripe PaymentIntent from a freshly loaded cart plus the stale `option.rate`, so a member could underpay shipping by adding items in another tab
   Finding 93 (HIGH)     Account-setup / update_user_phone_and_sms reused User.registration_changeset with validate_email: false, so a client could mass-assign email (keeping email_verified_at), name, and DOB while saving a phone number — planting an account under a victim's unused address without the email-change reauth flow
+  Finding 94 (MEDIUM)   Volunteer→member demotion did not disconnect LiveViews. Finding 87 only force-closed sockets when the previous role was `:admin`, so an already-open volunteer scanner / event editor / check-in / posts LiveView kept frozen `admin_role` and `current_user.role` and continued handling staff events after revocation.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -6072,6 +6073,104 @@ defmodule YscWeb.SecurityAuditTest do
         event: "disconnect",
         topic: ^live_socket_id
       }
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 94 (MEDIUM): Volunteer demotion must disconnect LiveViews
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 94: volunteer demotion disconnects LiveViews" do
+    test "demoting a volunteer via update_user broadcasts LiveView disconnect" do
+      volunteer = user_fixture(%{role: "volunteer"})
+      actor = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(volunteer)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, updated} =
+               Accounts.update_user(volunteer, %{"role" => "member"}, actor)
+
+      assert updated.role == :member
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      # Demotion keeps the session token so they can keep browsing as a member.
+      assert Accounts.get_user_by_session_token(token).id == volunteer.id
+    end
+
+    test "demoting a volunteer via update_user_with_address broadcasts LiveView disconnect" do
+      volunteer = user_fixture(%{role: "volunteer"})
+      actor = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(volunteer)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address(
+                 volunteer,
+                 profile_save_params(volunteer, %{"role" => "member"}),
+                 actor
+               )
+
+      assert updated.role == :member
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      assert Accounts.get_user_by_session_token(token).id == volunteer.id
+    end
+
+    test "demoting a volunteer via rejection-override save broadcasts LiveView disconnect" do
+      volunteer = user_fixture(%{role: "volunteer"})
+      actor = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(volunteer)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address_and_rejection_override_note(
+                 volunteer,
+                 profile_save_params(volunteer, %{"role" => "member"}),
+                 "Override note for volunteer demotion coverage",
+                 actor
+               )
+
+      assert updated.role == :member
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      assert Accounts.get_user_by_session_token(token).id == volunteer.id
+    end
+
+    test "saving a volunteer profile without demotion does not broadcast disconnect" do
+      volunteer =
+        user_fixture(%{role: "volunteer", first_name: "StillVolunteer"})
+
+      actor = user_fixture(%{role: "admin"})
+      token = Accounts.generate_user_session_token(volunteer)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address(
+                 volunteer,
+                 profile_save_params(volunteer, %{
+                   "first_name" => "StillVolunteer"
+                 }),
+                 actor
+               )
+
+      assert updated.role == :volunteer
+      refute_received %Phoenix.Socket.Broadcast{event: "disconnect"}
     end
   end
 

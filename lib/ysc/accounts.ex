@@ -2007,11 +2007,17 @@ defmodule Ysc.Accounts do
   # Demotion does not delete session tokens (the account can keep browsing as a
   # member), but Finding 87's remount-only guard is not enough: an already-open
   # impersonating LiveView keeps `current_user` as the victim until disconnect.
+  #
+  # Finding 94: volunteer→member was missed. `on_mount :ensure_admin` freezes
+  # `admin_role` and `current_user.role` at mount; scanner, event editor,
+  # check-in, posts, and newsletters then authorize from those assigns. Any
+  # staff role change (`:admin` / `:volunteer`) must disconnect so the socket
+  # remounts with the new privileges.
   defp disconnect_live_views_if_admin_privilege_lost(
-         %User{role: :admin},
-         %User{role: role} = user
+         %User{role: previous_role},
+         %User{role: new_role} = user
        )
-       when role != :admin do
+       when previous_role in [:admin, :volunteer] and previous_role != new_role do
     disconnect_user_live_views(user)
   end
 
