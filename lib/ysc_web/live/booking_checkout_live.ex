@@ -724,7 +724,7 @@ defmodule YscWeb.BookingCheckoutLive do
           <.button
             type="submit"
             form="guest-info-form"
-            phx-disable-with="Continuing..."
+            phx-disable-with="Processing..."
             class="flex-1"
             disabled={
               !BookingGuestForm.all_guests_valid?(@guest_info_form, @booking)

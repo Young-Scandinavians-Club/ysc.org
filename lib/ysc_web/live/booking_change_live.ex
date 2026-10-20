@@ -1711,7 +1711,7 @@ defmodule YscWeb.BookingChangeLive do
 
   defp modification_error_message(:property_buyout_active),
     do:
-      "The Entire cabin is already booked for those dates. Please choose different dates."
+      "The whole cabin is already booked for those dates. Please choose different dates."
 
   defp modification_error_message(:rooms_already_booked),
     do: "Rooms are already booked for the selected dates."

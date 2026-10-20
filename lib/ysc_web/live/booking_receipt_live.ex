@@ -2377,8 +2377,7 @@ defmodule YscWeb.BookingReceiptLive do
         nil,
         "Credit Card (Stripe)",
         "Credit Card",
-        "Credit or debit card",
-        "Online payment"
+        "Credit or debit card"
       ] ->
         summary
 

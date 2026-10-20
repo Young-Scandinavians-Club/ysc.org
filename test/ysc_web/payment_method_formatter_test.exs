@@ -802,7 +802,7 @@ defmodule YscWeb.PaymentMethodFormatterTest do
 
     test "returns the shared fallback for a nil id" do
       assert PaymentMethodFormatter.stripe_summary(nil) == %{
-               description: "Online payment",
+               description: "Credit or debit card",
                logo_path: nil
              }
     end
@@ -838,7 +838,7 @@ defmodule YscWeb.PaymentMethodFormatterTest do
     test "returns the fallback when Stripe lookup fails" do
       assert PaymentMethodFormatter.stripe_summary("pi_error", @summary_opts) ==
                %{
-                 description: "Online payment",
+                 description: "Credit or debit card",
                  logo_path: nil
                }
     end
@@ -846,7 +846,7 @@ defmodule YscWeb.PaymentMethodFormatterTest do
     test "returns the fallback when the intent has no payment method details" do
       assert PaymentMethodFormatter.stripe_summary("pi_empty", @summary_opts) ==
                %{
-                 description: "Online payment",
+                 description: "Credit or debit card",
                  logo_path: nil
                }
     end

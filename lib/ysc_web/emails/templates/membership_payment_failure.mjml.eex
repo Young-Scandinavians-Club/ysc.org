@@ -65,7 +65,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#6b7280">
       <%= if @invoice_id do %>
-        If you contact us, mention the email on your account: <%= @email %>. You can also share this billing reference: <%= @invoice_id %>
+        If you contact us, mention the email on your account: <%= @email %>. You can also share this payment ID: <%= @invoice_id %>
       <% else %>
         If you contact us, mention the email on your account: <%= @email %>
       <% end %>

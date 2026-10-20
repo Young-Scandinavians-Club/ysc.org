@@ -198,8 +198,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~
                "Click Update your card or bank account above to add a new one first"
 
-      assert text =~ "billing reference: in_123"
-      refute text =~ "payment ID"
+      assert text =~ "payment ID: in_123"
       assert text =~ "jane@example.com"
       refute text =~ "successfully processed"
       refute text =~ "complete the payment process"
