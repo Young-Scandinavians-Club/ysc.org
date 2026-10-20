@@ -162,10 +162,70 @@ defmodule YscWeb.AdminMerchLive do
   end
 
   def handle_info(
+        {YscWeb.MediaPickerComponent, :merch_add_photo, image_ids},
+        socket
+      )
+      when is_list(image_ids) do
+    results =
+      case socket.assigns.editing_product do
+        nil ->
+          []
+
+        product ->
+          Enum.map(image_ids, &Merch.add_product_photo(product, &1))
+      end
+
+    socket = refresh_editing(socket)
+
+    if results == [] do
+      {:noreply, socket}
+    else
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         if(Enum.any?(results, &failed_photo?/1), do: :error, else: :info),
+         add_photos_summary(results)
+       )}
+    end
+  end
+
+  def handle_info(
         {YscWeb.MediaPickerComponent, :merch_add_photo, :cleared},
         socket
       ),
       do: {:noreply, socket}
+
+  defp failed_photo?({:error, %Ecto.Changeset{} = changeset}),
+    do: not duplicate_photo?(changeset)
+
+  defp failed_photo?(_result), do: false
+
+  defp duplicate_photo?(%Ecto.Changeset{errors: errors}) do
+    Enum.any?(errors, fn {_field, {_message, opts}} ->
+      opts[:constraint] == :unique
+    end)
+  end
+
+  defp add_photos_summary(results) do
+    added = Enum.count(results, &match?({:ok, _}, &1))
+
+    duplicates =
+      Enum.count(results, fn
+        {:error, %Ecto.Changeset{} = changeset} -> duplicate_photo?(changeset)
+        _ -> false
+      end)
+
+    failed = length(results) - added - duplicates
+
+    [
+      "Added #{added} #{if added == 1, do: "photo", else: "photos"}",
+      if(duplicates > 0, do: "#{duplicates} already on this product"),
+      if(failed > 0, do: "#{failed} could not be added")
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("; ")
+    |> Kernel.<>(".")
+  end
 
   # The photo list is part of the product being edited; reload it after a change.
   defp refresh_editing(socket) do
@@ -617,7 +677,7 @@ defmodule YscWeb.AdminMerchLive do
             <h3 class="type-subhead text-lg text-zinc-900">Photos</h3>
             <p class="text-sm text-zinc-500">
               Photos tied to a color show only while that color is selected. Printful's own photos
-              refresh with each sync; add more of your own from the media library.
+              refresh with each sync; upload several at once or pick from the media library.
             </p>
           </div>
 
@@ -706,6 +766,7 @@ defmodule YscWeb.AdminMerchLive do
               id={:merch_add_photo}
               user_id={@current_user.id}
               image_id={nil}
+              multiple
             />
           </div>
         </section>

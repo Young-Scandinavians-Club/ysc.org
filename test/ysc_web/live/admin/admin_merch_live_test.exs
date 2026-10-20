@@ -20,6 +20,21 @@ defmodule YscWeb.AdminMerchLiveTest do
 
   setup :verify_on_exit!
 
+  # A valid 1x1 PNG of one colour, so each upload hashes differently.
+  defp solid_png(r, g, b) do
+    chunk = fn type, data ->
+      body = type <> data
+
+      <<byte_size(data)::32, body::binary, :erlang.crc32(body)::32>>
+    end
+
+    ihdr = <<1::32, 1::32, 8, 2, 0, 0, 0>>
+    idat = :zlib.compress(<<0, r, g, b>>)
+
+    <<137, 80, 78, 71, 13, 10, 26, 10>> <>
+      chunk.("IHDR", ihdr) <> chunk.("IDAT", idat) <> chunk.("IEND", "")
+  end
+
   defp product!(attrs \\ %{}) do
     n = System.unique_integer([:positive])
 
@@ -276,6 +291,113 @@ defmodule YscWeb.AdminMerchLiveTest do
       send(view.pid, {YscWeb.MediaPickerComponent, :merch_add_photo, image.id})
       render(view)
 
+      assert Repo.aggregate(Ysc.Merch.ProductImage, :count) == 1
+    end
+
+    test "the photo drop zone accepts several files at once", %{
+      conn: conn,
+      product: product
+    } do
+      {:ok, view, _html} = live(conn, edit_path(product))
+
+      assert has_element?(view, "#merch-add-photo input[type=file][multiple]")
+    end
+
+    test "several uploaded photos are added in one go, in order", %{
+      conn: conn,
+      product: product
+    } do
+      first = image_fixture(%{title: "Front print"})
+      second = image_fixture(%{title: "Back print"})
+      {:ok, view, _html} = live(conn, edit_path(product))
+
+      send(
+        view.pid,
+        {YscWeb.MediaPickerComponent, :merch_add_photo, [first.id, second.id]}
+      )
+
+      html = render(view)
+
+      assert html =~ "Front print"
+      assert html =~ "Back print"
+
+      assert [first.id, second.id] ==
+               Ysc.Merch.ProductImage
+               |> Repo.all()
+               |> Enum.sort_by(& &1.position)
+               |> Enum.map(& &1.image_id)
+    end
+
+    test "duplicates in a batch are skipped without losing the rest", %{
+      conn: conn,
+      product: product
+    } do
+      existing = image_fixture()
+      fresh = image_fixture()
+      {:ok, view, _html} = live(conn, edit_path(product))
+
+      send(
+        view.pid,
+        {YscWeb.MediaPickerComponent, :merch_add_photo, existing.id}
+      )
+
+      send(
+        view.pid,
+        {YscWeb.MediaPickerComponent, :merch_add_photo, [existing.id, fresh.id]}
+      )
+
+      render(view)
+
+      assert Repo.aggregate(Ysc.Merch.ProductImage, :count) == 2
+    end
+
+    test "files uploaded together land in selection order, titled by filename",
+         %{conn: conn, product: product} do
+      {:ok, view, _html} = live(conn, edit_path(product))
+
+      upload =
+        file_input(view, "#merch_add_photo-upload-form", :media_picker_file, [
+          %{
+            name: "front.png",
+            content: solid_png(10, 20, 30),
+            type: "image/png"
+          },
+          %{
+            name: "back.png",
+            content: solid_png(200, 100, 50),
+            type: "image/png"
+          }
+        ])
+
+      render_upload(upload, "front.png")
+      render_upload(upload, "back.png")
+
+      view |> form("#merch_add_photo-upload-form") |> render_submit()
+      render(view)
+
+      assert ["front", "back"] ==
+               Ysc.Merch.ProductImage
+               |> Repo.all()
+               |> Repo.preload(:image)
+               |> Enum.sort_by(& &1.position)
+               |> Enum.map(& &1.image.title)
+    end
+
+    test "an image that no longer exists is reported as a failure, not a duplicate",
+         %{conn: conn, product: product} do
+      fresh = image_fixture()
+      {:ok, view, _html} = live(conn, edit_path(product))
+
+      send(
+        view.pid,
+        {YscWeb.MediaPickerComponent, :merch_add_photo,
+         [fresh.id, Ecto.ULID.generate()]}
+      )
+
+      html = render(view)
+
+      assert html =~ "Added 1 photo; 1 could not be added."
+      refute html =~ "already on this product"
       assert Repo.aggregate(Ysc.Merch.ProductImage, :count) == 1
     end
 
