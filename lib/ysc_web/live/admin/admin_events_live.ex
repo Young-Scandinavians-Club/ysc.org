@@ -17,16 +17,13 @@ defmodule YscWeb.AdminEventsLive do
       user={@current_user}
       role={@admin_role}
     >
-      <div class="flex justify-between py-6">
-        <.admin_page_title
-          help_topic="events/create"
-          help_label="How to create an event"
-          help_role={@admin_role}
-        >
-          Events
-        </.admin_page_title>
-
-        <div class="flex items-center gap-3">
+      <.admin_page_header
+        help_topic="events/create"
+        help_label="How to create an event"
+        help_role={@admin_role}
+      >
+        Events
+        <:actions>
           <.button navigate={~p"/admin/scanner"}>
             <.icon name="hero-qr-code" class="w-5 h-5" /> Check-in &amp; Scan
           </.button>
@@ -34,8 +31,8 @@ defmodule YscWeb.AdminEventsLive do
           <.button navigate={~p"/admin/events/new"}>
             <.icon name="hero-calendar" class="w-5 h-5" /> New Event
           </.button>
-        </div>
-      </div>
+        </:actions>
+      </.admin_page_header>
 
       <div class="w-full pt-4">
         <%!-- Tab navigation --%>

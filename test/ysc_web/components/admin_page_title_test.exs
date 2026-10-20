@@ -130,4 +130,75 @@ defmodule YscWeb.AdminPageTitleTest do
       assert html =~ ~s(<p class="text-sm text-zinc-500 mt-1">)
     end
   end
+
+  describe "admin_page_header/1" do
+    test "renders the title inside the index header layout" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_page_header>Settings</.admin_page_header>
+        """)
+
+      assert html =~ "<header"
+      assert html =~ "flex flex-wrap items-start justify-between gap-4 py-6"
+      assert html =~ ~s(<h1 class="text-2xl text-zinc-800 type-display")
+      assert html =~ "Settings"
+      refute html =~ "flex items-center gap-3 shrink-0"
+    end
+
+    test "renders actions beside the title" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_page_header>
+          Posts
+          <:actions>
+            <a id="admin-posts-new-post" href="/admin/posts/new">New Post</a>
+          </:actions>
+        </.admin_page_header>
+        """)
+
+      assert html =~ "Posts"
+      assert html =~ ~s(id="admin-posts-new-post")
+      assert html =~ "flex items-center gap-3 shrink-0"
+    end
+
+    test "forwards subtitle and help link to admin_page_title" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_page_header
+          id="admin-events-header"
+          help_topic="events/create"
+          help_label="How to create an event"
+          help_role={:admin}
+          subtitle="Upcoming, drafts, and past events."
+        >
+          Events
+        </.admin_page_header>
+        """)
+
+      assert html =~ ~s(id="admin-events-header")
+      assert html =~ "Events"
+      assert html =~ "Upcoming, drafts, and past events."
+      assert html =~ ~s(id="admin-help-link-events-create")
+      assert html =~ ~s(href="/admin/help/events%2Fcreate")
+      assert html =~ "How to create an event"
+    end
+
+    test "merges extra classes onto the header" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_page_header class="mb-2">Users</.admin_page_header>
+        """)
+
+      assert html =~ "mb-2"
+      assert html =~ "py-6"
+    end
+  end
 end

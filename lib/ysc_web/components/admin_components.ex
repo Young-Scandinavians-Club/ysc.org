@@ -175,6 +175,87 @@ defmodule YscWeb.AdminComponents do
     do: "text-2xl text-zinc-800 type-display"
 
   # ---------------------------------------------------------------------------
+  # admin_page_header
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Index-page header: `admin_page_title` on the left, optional actions on the right.
+
+  Use this on admin list/index pages instead of wrapping the title in a
+  `flex justify-between py-6` div. Modal and nested headings still use
+  `admin_page_title` directly.
+
+  Title options (`subtitle`, `help_topic`, …) are forwarded to `admin_page_title/1`.
+
+  ## Examples
+
+      <.admin_page_header
+        help_topic="posts/publish"
+        help_label="How to publish a post"
+        help_role={@admin_role}
+      >
+        Posts
+        <:actions>
+          <.button navigate={~p"/admin/posts/new"}>New Post</.button>
+        </:actions>
+      </.admin_page_header>
+  """
+  attr :id, :string, default: nil
+  attr :level, :integer, default: 1, values: [1, 2]
+  attr :variant, :atom, default: :default, values: [:default, :emphasis]
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged with the default header layout"
+
+  attr :subtitle, :string,
+    default: nil,
+    doc: "Optional muted description rendered below the title"
+
+  attr :help_topic, :string,
+    default: nil,
+    doc: "Guide slug passed to `<.admin_help_link>` when present"
+
+  attr :help_label, :string,
+    default: "Open the guide for this page",
+    doc: "Accessible label and tooltip for the help link"
+
+  attr :help_role, :atom,
+    default: nil,
+    doc: "Admin role used to hide the help link when the guide is inaccessible"
+
+  slot :inner_block, required: true
+  slot :actions
+
+  def admin_page_header(assigns) do
+    ~H"""
+    <header
+      id={@id}
+      class={[
+        "flex flex-wrap items-start justify-between gap-4 py-6",
+        @class
+      ]}
+    >
+      <div class="min-w-0">
+        <.admin_page_title
+          level={@level}
+          variant={@variant}
+          subtitle={@subtitle}
+          help_topic={@help_topic}
+          help_label={@help_label}
+          help_role={@help_role}
+        >
+          {render_slot(@inner_block)}
+        </.admin_page_title>
+      </div>
+      <div :if={@actions != []} class="flex items-center gap-3 shrink-0">
+        {render_slot(@actions)}
+      </div>
+    </header>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_kbd
   # ---------------------------------------------------------------------------
 
