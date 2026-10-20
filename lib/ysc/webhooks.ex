@@ -267,7 +267,7 @@ defmodule Ysc.Webhooks do
          end_date,
          limit,
          offset,
-         state \\ nil
+         state
        ) do
     from(w in WebhookEvent,
       where: w.provider == :stripe,
@@ -323,6 +323,6 @@ defmodule Ysc.Webhooks do
   @doc false
   def ci_query_explain_list_webhook_events_for_admin_query do
     now = Ysc.Ci.QueryExplain.Fixtures.now()
-    list_webhook_events_for_admin_query(now, now, 20, 0)
+    list_webhook_events_for_admin_query(now, now, 20, 0, nil)
   end
 end
