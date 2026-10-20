@@ -425,6 +425,40 @@ defmodule YscWeb.ShopCheckoutTest do
       refute has_element?(view, "#checkout-payment")
     end
 
+    test "a newly created Intent is Stripe-canceled when the order is canceled before attach",
+         %{
+           conn: conn
+         } do
+      expect(StripeMock, :create_payment_intent, fn params, _ ->
+        order = Repo.get_by!(Order, status: :pending)
+        :ok = Orders.cancel_pending(order, "Superseded by new checkout")
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_orphan",
+           status: "requires_payment_method",
+           amount: params.amount,
+           client_secret: "pi_orphan_secret"
+         }}
+      end)
+
+      expect(StripeMock, :cancel_payment_intent, fn "pi_orphan", _ ->
+        {:ok, %Stripe.PaymentIntent{id: "pi_orphan", status: "canceled"}}
+      end)
+
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
+      to_shipping(view)
+      view |> element("#continue-to-payment") |> render_click()
+      render_async(view)
+
+      assert has_element?(view, "#shipping-error", "couldn't set up payment")
+      refute has_element?(view, "#checkout-payment")
+
+      canceled = Repo.one!(Order)
+      assert canceled.status == :canceled
+      assert canceled.payment_intent_id == nil
+    end
+
     test "a processing Intent waits on confirmation instead of opening payment",
          %{
            conn: conn,
