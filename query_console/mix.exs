@@ -72,7 +72,12 @@ defmodule QueryConsole.MixProject do
        app: false,
        compile: false,
        depth: 1},
-      {:telemetry_metrics, "~> 1.0"},
+      # 1.2.0: tags may be a 1-arity function (supersedes tag_values in docs).
+      # tag_values is still supported and emits no deprecation warning. We keep
+      # list tags ([:route], [:event]) because QueryConsoleWeb.Telemetry is
+      # Phoenix-generated LiveDashboard-style metrics. We do not pass
+      # tag_values or a tags function. ConsoleReporter is commented out.
+      {:telemetry_metrics, "~> 1.2"},
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
