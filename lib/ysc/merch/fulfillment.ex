@@ -161,23 +161,28 @@ defmodule Ysc.Merch.Fulfillment do
           ]
         )
 
-      if count == 1, do: {:ok, :claimed}, else: {:error, :already_processed}
+      # Losing the claim is not a failure: another process (the webhook or the
+      # member's return from checkout) settled the order first. Failing the
+      # Multi here would roll back a caller's transaction, e.g. the webhook's.
+      if count == 1, do: {:ok, :claimed}, else: {:ok, :already_processed}
     end)
-    |> Notifier.schedule_email_multi(:confirmation_email, fn _ ->
-      # `order` is the slim email/fulfillment load from `order_for/1`.
-      # Printful submit still reloads fat `get_order/1` in MerchSubmitOrder.
-      confirmation_email_attrs(order)
+    |> Multi.merge(fn
+      %{claim: :claimed} ->
+        Multi.new()
+        |> Notifier.schedule_email_multi(:confirmation_email, fn _ ->
+          # `order` is the slim email/fulfillment load from `order_for/1`.
+          # Printful submit still reloads fat `get_order/1` in MerchSubmitOrder.
+          confirmation_email_attrs(order)
+        end)
+        |> Oban.insert(:submit_job, MerchSubmitOrder.new(%{order_id: order.id}))
+
+      _already_processed ->
+        Multi.new()
     end)
-    |> Oban.insert(:submit_job, MerchSubmitOrder.new(%{order_id: order.id}))
     |> Repo.transaction()
     |> case do
       {:ok, _} ->
         remove_ordered_variants_from_cart(order)
-        {:ok, Orders.get_order!(order.id)}
-
-      {:error, :claim, :already_processed, _} ->
-        # Another process already claimed it. The claim, confirmation email and
-        # submission job commit together, so there is nothing left to do.
         {:ok, Orders.get_order!(order.id)}
 
       {:error, step, reason, _} ->

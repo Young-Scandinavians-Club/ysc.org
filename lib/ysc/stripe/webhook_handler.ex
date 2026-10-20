@@ -76,7 +76,15 @@ defmodule Ysc.Stripe.WebhookHandler do
     Application.get_env(:ysc, :webhooks_context, Ysc.Webhooks)
   end
 
-  def handle_event(event) do
+  @doc """
+  Handles a Stripe event.
+
+  Live deliveries are rejected when older than #{@webhook_max_age_seconds}
+  seconds (replay protection). Pass `replay: true` for an event we already
+  stored and verified, as `YscWeb.Workers.WebhookRetryWorker` does; the age check
+  is skipped, since a retry is by definition older than that.
+  """
+  def handle_event(event, opts \\ []) do
     require Ysc.Logging
 
     if wordpress_originated_event?(event) do
@@ -106,7 +114,7 @@ defmodule Ysc.Stripe.WebhookHandler do
 
       # Check for replay attacks - reject webhooks older than 5 minutes
       result =
-        case check_webhook_age(event) do
+        case check_webhook_age(event, Keyword.get(opts, :replay, false)) do
           :ok ->
             process_webhook(event)
 
@@ -181,7 +189,9 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   # Check if webhook is within acceptable age
-  defp check_webhook_age(event) do
+  defp check_webhook_age(_event, true), do: :ok
+
+  defp check_webhook_age(event, false) do
     event_timestamp = DateTime.from_unix!(event.created)
     current_time = DateTime.utc_now()
     age_seconds = DateTime.diff(current_time, event_timestamp)

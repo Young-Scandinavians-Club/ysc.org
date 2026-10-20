@@ -212,6 +212,33 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert payment == nil
     end
 
+    test "processes an old stored event when replaying (webhook retry)" do
+      user = user_with_stripe_id()
+      subscription = create_subscription(user)
+
+      old_timestamp =
+        DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.to_unix()
+
+      invoice_data = %{
+        "id" => "in_replay_#{System.unique_integer()}",
+        "customer" => user.stripe_id,
+        "subscription" => subscription.stripe_id,
+        "amount_paid" => 4500,
+        "description" => "Replayed Invoice",
+        "number" => "INV-002",
+        "charge" => nil,
+        "metadata" => %{}
+      }
+
+      event =
+        build_stripe_event("invoice.payment_succeeded", invoice_data,
+          created: old_timestamp
+        )
+
+      assert :ok = WebhookHandler.handle_event(event, replay: true)
+      assert Ledgers.get_payment_by_external_id(invoice_data["id"]) != nil
+    end
+
     test "rejects very old webhooks (hours old)" do
       user = user_with_stripe_id()
 
