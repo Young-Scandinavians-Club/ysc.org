@@ -164,6 +164,11 @@ defmodule Ysc.Tickets do
   # Serialize prepare → atomic_booking per user/event. Without this, two
   # LiveView processes that both pass prepare_new_checkout_session (no pending
   # yet) both insert — two confirmable PaymentIntents for the same event.
+  #
+  # When prepare fulfills a succeeded abandoned PI, it returns
+  # `:checkout_payment_in_progress`. That path must *commit* the transaction
+  # (so the fulfill sticks) rather than `Repo.rollback/1`, which would undo
+  # the completion and leave a captured charge on a pending cart.
   defp create_ticket_order_locked(
          user_id,
          event_id,
@@ -181,15 +186,16 @@ defmodule Ysc.Tickets do
                       ticket_selections,
                       booking_opts
                     ) do
-                 {:ok, ticket_order} -> ticket_order
+                 {:ok, ticket_order} -> {:created, ticket_order}
                  {:error, reason} -> Repo.rollback(reason)
                end
 
-             {:error, reason} ->
-               Repo.rollback(reason)
+             {:error, :checkout_payment_in_progress} ->
+               {:blocked, :checkout_payment_in_progress}
            end
          end) do
-      {:ok, ticket_order} -> {:ok, ticket_order}
+      {:ok, {:created, ticket_order}} -> {:ok, ticket_order}
+      {:ok, {:blocked, reason}} -> {:error, reason}
       {:error, reason} -> {:error, reason}
     end
   end
