@@ -132,6 +132,52 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert Repo.reload!(booking).payment_intent_id == "pi_test_123"
     end
 
+    test "cancels the orphan PaymentIntent when the hold is released during Stripe create",
+         %{
+           conn: conn,
+           booking: booking
+         } do
+      pi_id = "pi_after_release_#{System.unique_integer([:positive])}"
+      test_pid = self()
+
+      expect(StripeMock, :create_payment_intent, fn params, _opts ->
+        booking
+        |> Ecto.Changeset.change(%{status: :canceled})
+        |> Repo.update!()
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: pi_id,
+           client_secret: "#{pi_id}_secret",
+           status: "requires_payment_method",
+           amount: params.amount
+         }}
+      end)
+
+      expect(StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+        send(test_pid, {:canceled_orphan_payment_intent, pi_id})
+        {:ok, %Stripe.PaymentIntent{id: pi_id, status: "canceled"}}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+      render(view)
+
+      assert_received {:canceled_orphan_payment_intent, ^pi_id}
+
+      reloaded = Repo.reload!(booking)
+      assert reloaded.status == :canceled
+      assert is_nil(reloaded.payment_intent_id)
+
+      assert has_element?(
+               view,
+               "#checkout-payment-error",
+               YscWeb.BookingUserMessages.checkout_payment_setup_failed()
+             )
+
+      refute has_element?(view, "#stripe-payment-container")
+      Mox.verify!(StripeMock)
+    end
+
     test "renders Clear Lake property title", %{conn: conn, user: user} do
       booking =
         booking_fixture(%{

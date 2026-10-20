@@ -190,6 +190,8 @@ defmodule Ysc.Tickets do
                  {:error, reason} -> Repo.rollback(reason)
                end
 
+             # Fulfill-during-cleanup must commit: rollback would un-complete
+             # the tickets and leave a captured charge on a pending cart.
              {:error, :checkout_payment_in_progress} ->
                {:blocked, :checkout_payment_in_progress}
            end

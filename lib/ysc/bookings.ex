@@ -1139,8 +1139,6 @@ defmodule Ysc.Bookings do
   """
   def attach_payment_intent(%Booking{} = booking, payment_intent_id)
       when is_binary(payment_intent_id) do
-    require Ysc.Logging
-
     previous_id = booking.payment_intent_id
 
     case reconcile_previous_hold_payment_intent(
@@ -1152,9 +1150,7 @@ defmodule Ysc.Bookings do
         now = DateTime.utc_now() |> DateTime.truncate(:second)
 
         {count, _} =
-          from(b in Booking,
-            where: b.id == ^booking.id and b.status == :hold
-          )
+          attach_hold_payment_intent_query(booking.id)
           |> Repo.update_all(
             set: [payment_intent_id: payment_intent_id, updated_at: now]
           )
@@ -1166,8 +1162,7 @@ defmodule Ysc.Bookings do
           Ysc.Logging.warning(
             "Refusing to attach PaymentIntent to non-hold booking",
             booking_id: booking.id,
-            payment_intent_id: payment_intent_id,
-            status: booking.status
+            payment_intent_id: payment_intent_id
           )
 
           {:error, :booking_not_on_hold}
@@ -1176,6 +1171,10 @@ defmodule Ysc.Bookings do
       {:error, _} = error ->
         error
     end
+  end
+
+  defp attach_hold_payment_intent_query(booking_id) do
+    from(b in Booking, where: b.id == ^booking_id and b.status == :hold)
   end
 
   # Same Stripe-first replace as `attach_modification_payment_intent/2`. Blind
@@ -6964,5 +6963,10 @@ defmodule Ysc.Bookings do
       order_by: [desc: b.inserted_at],
       limit: 50
     )
+  end
+
+  @doc false
+  def ci_query_explain_attach_payment_intent_query do
+    attach_hold_payment_intent_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end

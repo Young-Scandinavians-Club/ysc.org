@@ -9,6 +9,7 @@ defmodule Ysc.Tickets.ConcurrentCheckoutTest do
   use Ysc.DataCase, async: false
 
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
 
   alias Ysc.Tickets
   alias Ysc.Tickets.TicketOrder
@@ -25,27 +26,8 @@ defmodule Ysc.Tickets.ConcurrentCheckoutTest do
       |> Ysc.Repo.update!()
 
     organizer = user_fixture()
-
-    {:ok, event} =
-      Ysc.Events.create_event(%{
-        title: "Concurrent Checkout Event",
-        description: "Dual-tab race",
-        state: :published,
-        organizer_id: organizer.id,
-        start_date:
-          DateTime.add(DateTime.truncate(DateTime.utc_now(), :second), 30, :day),
-        max_attendees: 100,
-        published_at: DateTime.truncate(DateTime.utc_now(), :second)
-      })
-
-    {:ok, tier} =
-      Ysc.Events.create_ticket_tier(%{
-        name: "GA",
-        type: :paid,
-        price: Money.new(50, :USD),
-        quantity: 50,
-        event_id: event.id
-      })
+    event = event_fixture(%{organizer_id: organizer.id})
+    tier = ticket_tier_fixture(%{event_id: event.id, name: "GA", quantity: 50})
 
     %{user: user, event: event, tier: tier}
   end
