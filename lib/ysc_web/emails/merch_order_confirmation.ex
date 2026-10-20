@@ -25,7 +25,8 @@ defmodule YscWeb.Emails.MerchOrderConfirmation do
   end
 
   @doc """
-  Template data for an order with `items` and `user` loaded.
+  Template data for an order with `items` and slim `user` loaded
+  (`Ysc.Merch.Orders.get_order_for_email/1`).
   """
   def prepare_email_data(%Order{} = order) do
     comp? = order.kind == :admin_comp

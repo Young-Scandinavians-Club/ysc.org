@@ -2,6 +2,7 @@ defmodule Ysc.Merch.OrdersTest do
   use Ysc.DataCase, async: true
 
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
   import Ysc.MerchFixtures
 
   alias Ysc.Merch.{Order, Orders}
@@ -238,6 +239,117 @@ defmodule Ysc.Merch.OrdersTest do
     assert [%{id: shipment_id, carrier: "USPS"}] = shown.shipments
     assert shipment_id == shipment.id
     assert is_nil(hd(shown.shipments).printful_shipment_id)
+    assert fat_cols == 0
+  end
+
+  test "get_order_for_email loads email fields and omits Printful ids and users.*",
+       %{user: user, lines: lines, tee: tee} do
+    image =
+      image_fixture(%{
+        upload_data: %{"original" => "fat-json"},
+        content_hash: "abc123"
+      })
+
+    tee |> Ecto.Changeset.change(image_id: image.id) |> Repo.update!()
+
+    {:ok, order} = create(user, lines)
+
+    order
+    |> Ecto.Changeset.change(%{
+      status: :shipped,
+      payment_intent_id: "pi_email",
+      printful_order_id: 90_002
+    })
+    |> Repo.update!()
+
+    shipment =
+      %Ysc.Merch.Shipment{}
+      |> Ysc.Merch.Shipment.changeset(%{
+        order_id: order.id,
+        printful_shipment_id: 91_002,
+        carrier: "USPS",
+        tracking_number: "9400111899223197428490",
+        tracking_url: "https://tools.usps.com/track?x=1",
+        shipped_at: ~U[2026-10-10 12:00:00Z]
+      })
+      |> Repo.insert!()
+
+    {shown, fat_cols} =
+      Ysc.QueryCounter.with_query_counter(
+        fn -> Orders.get_order_for_email(order.id) end,
+        pattern:
+          ~r/printful_order_id|printful_shipment_id|printful_sync_variant_id|upload_data|content_hash|hashed_password|board_bio|raw_details/i,
+        caller_pids: [self()]
+      )
+
+    assert shown.id == order.id
+    assert shown.address1 == "1 Market St"
+    assert shown.email == user.email
+    assert shown.payment_intent_id == "pi_email"
+    assert shown.user.id == user.id
+    assert shown.user.email == user.email
+    assert shown.user.first_name == user.first_name
+    assert is_nil(shown.user.hashed_password)
+    assert is_nil(shown.printful_order_id)
+    item = Enum.find(shown.items, &(&1.variant_id == tee.id))
+    assert Money.equal?(item.unit_price, Money.new(:USD, "25"))
+    assert item.variant.image.id == image.id
+    assert is_nil(item.variant.image.upload_data)
+    assert is_nil(item.variant.printful_sync_variant_id)
+    assert Ecto.assoc_loaded?(item.variant.product)
+    assert [%{id: shipment_id, carrier: "USPS"}] = shown.shipments
+    assert shipment_id == shipment.id
+    assert is_nil(hd(shown.shipments).printful_shipment_id)
+    assert fat_cols == 0
+
+    assert Orders.get_order_for_email(Ecto.ULID.generate()) == nil
+    assert Orders.get_order_for_email("garbage") == nil
+
+    assert Orders.get_order_for_email_by_payment_intent("pi_email").id ==
+             order.id
+
+    assert Orders.get_order_for_email_by_payment_intent("pi_missing") == nil
+  end
+
+  test "get_order_for_email slims granted_by and event for club-paid orders" do
+    admin =
+      user_fixture(%{
+        role: "admin",
+        first_name: "Lars",
+        last_name: "Nilsson",
+        board_bio: "fat bio"
+      })
+
+    member = user_fixture(%{first_name: "Astrid", last_name: "Berg"})
+    event = event_fixture()
+
+    order =
+      admin_order_fixture(admin, %{
+        user_id: member.id,
+        event_id: event.id,
+        purpose: "Happy hour giveaway",
+        estimated_cost: Money.new(:USD, "118.40")
+      })
+
+    {shown, fat_cols} =
+      Ysc.QueryCounter.with_query_counter(
+        fn -> Orders.get_order_for_email!(order.id) end,
+        pattern: ~r/hashed_password|board_bio|raw_details|printful_order_id/i,
+        caller_pids: [self()]
+      )
+
+    assert shown.kind == :admin_comp
+    assert shown.purpose == "Happy hour giveaway"
+    assert Money.equal?(shown.estimated_cost, Money.new(:USD, "118.40"))
+    assert shown.granted_by.id == admin.id
+    assert shown.granted_by.email == admin.email
+    assert shown.granted_by.last_name == "Nilsson"
+    assert is_nil(shown.granted_by.hashed_password)
+    assert is_nil(shown.granted_by.board_bio)
+    assert shown.user.id == member.id
+    assert shown.event.id == event.id
+    assert shown.event.title == event.title
+    assert is_nil(shown.event.raw_details)
     assert fat_cols == 0
   end
 

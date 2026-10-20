@@ -67,8 +67,8 @@ defmodule Ysc.Merch.Fulfillment do
     order =
       case Map.get(metadata, "merch_order_id") ||
              Map.get(metadata, :merch_order_id) do
-        id when is_binary(id) -> Orders.get_order(id)
-        _ -> Orders.get_order_by_payment_intent(payment_intent.id)
+        id when is_binary(id) -> Orders.get_order_for_email(id)
+        _ -> Orders.get_order_for_email_by_payment_intent(payment_intent.id)
       end
 
     case order do
@@ -164,7 +164,9 @@ defmodule Ysc.Merch.Fulfillment do
       if count == 1, do: {:ok, :claimed}, else: {:error, :already_processed}
     end)
     |> Notifier.schedule_email_multi(:confirmation_email, fn _ ->
-      confirmation_email_attrs(Orders.get_order!(order.id))
+      # `order` is the slim email/fulfillment load from `order_for/1`.
+      # Printful submit still reloads fat `get_order/1` in MerchSubmitOrder.
+      confirmation_email_attrs(order)
     end)
     |> Oban.insert(:submit_job, MerchSubmitOrder.new(%{order_id: order.id}))
     |> Repo.transaction()

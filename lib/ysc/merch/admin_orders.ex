@@ -397,9 +397,12 @@ defmodule Ysc.Merch.AdminOrders do
     |> Multi.run(:items, fn repo, %{order: order} ->
       insert_items(repo, order, lines)
     end)
+    |> Multi.run(:email_order, fn _repo, %{order: order} ->
+      {:ok, Orders.get_order_for_email!(order.id)}
+    end)
     |> put_confirmation_email()
-    |> Notifier.schedule_email_multi(:board_email, fn %{order: order} ->
-      board_email_attrs(Orders.get_order!(order.id))
+    |> Notifier.schedule_email_multi(:board_email, fn %{email_order: order} ->
+      board_email_attrs(order)
     end)
     |> Oban.insert(:submit_job, fn %{order: order} ->
       MerchSubmitOrder.new(%{order_id: order.id})
@@ -446,8 +449,7 @@ defmodule Ysc.Merch.AdminOrders do
 
   # The recipient is told about the order when we have somewhere to send it.
   defp put_confirmation_email(multi) do
-    Multi.merge(multi, fn %{order: order} ->
-      order = Orders.get_order!(order.id)
+    Multi.merge(multi, fn %{email_order: order} ->
       attrs = Fulfillment.confirmation_email_attrs(order)
 
       if attrs.recipient in [nil, ""] do

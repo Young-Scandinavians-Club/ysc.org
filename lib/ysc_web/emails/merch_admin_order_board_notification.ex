@@ -25,8 +25,8 @@ defmodule YscWeb.Emails.MerchAdminOrderBoardNotification do
     do: "A club-paid merch order was placed (#{reference_id})"
 
   @doc """
-  Template data for an order with `granted_by`, `items`, `event` and `user`
-  loaded.
+  Template data for an order with slim `granted_by`, `items`, `event` and
+  `user` loaded (`Ysc.Merch.Orders.get_order_for_email/1`).
   """
   def prepare_email_data(%Order{} = order) do
     %{
