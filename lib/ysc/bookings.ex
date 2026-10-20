@@ -1129,9 +1129,18 @@ defmodule Ysc.Bookings do
 
   Used later to cancel that intent by id when the hold is released, instead of
   listing recent PaymentIntents and scanning metadata.
+
+  Only `:hold` bookings are updated. Deferred checkout can create a Stripe
+  PaymentIntent after HoldExpiry / Cancel has already released the hold.
+  Attaching anyway leaves a confirmable Intent on a `:canceled` row that
+  HoldExpiry will never reconcile (`status != :hold`); cabin
+  `payment_intent.succeeded` webhooks are a no-op, so a closed tab orphans
+  the captured charge.
   """
   def attach_payment_intent(%Booking{} = booking, payment_intent_id)
       when is_binary(payment_intent_id) do
+    require Ysc.Logging
+
     previous_id = booking.payment_intent_id
 
     case reconcile_previous_hold_payment_intent(
@@ -1140,9 +1149,29 @@ defmodule Ysc.Bookings do
            booking.id
          ) do
       :ok ->
-        booking
-        |> Booking.payment_changeset(%{payment_intent_id: payment_intent_id})
-        |> Repo.update()
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+        {count, _} =
+          from(b in Booking,
+            where: b.id == ^booking.id and b.status == :hold
+          )
+          |> Repo.update_all(
+            set: [payment_intent_id: payment_intent_id, updated_at: now]
+          )
+
+        if count == 1 do
+          {:ok,
+           %{booking | payment_intent_id: payment_intent_id, updated_at: now}}
+        else
+          Ysc.Logging.warning(
+            "Refusing to attach PaymentIntent to non-hold booking",
+            booking_id: booking.id,
+            payment_intent_id: payment_intent_id,
+            status: booking.status
+          )
+
+          {:error, :booking_not_on_hold}
+        end
 
       {:error, _} = error ->
         error

@@ -7303,6 +7303,15 @@ defmodule Ysc.BookingsTest do
       assert Repo.reload!(booking).payment_intent_id == "pi_attach_test"
     end
 
+    test "refuses to attach a PaymentIntent when the hold was already released" do
+      booking = booking_fixture(%{status: :canceled})
+
+      assert {:error, :booking_not_on_hold} =
+               Bookings.attach_payment_intent(booking, "pi_after_release")
+
+      assert is_nil(Repo.reload!(booking).payment_intent_id)
+    end
+
     test "cancels the previous PaymentIntent when checkout creates a new one" do
       booking = booking_fixture(%{status: :hold})
 

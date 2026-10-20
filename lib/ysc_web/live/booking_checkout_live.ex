@@ -305,7 +305,7 @@ defmodule YscWeb.BookingCheckoutLive do
   defp create_and_persist_checkout_payment_intent(booking, total_price, user) do
     case create_payment_intent(booking, total_price, user) do
       {:ok, payment_intent} ->
-        {:ok, persist_checkout_payment_intent(booking, payment_intent)}
+        persist_checkout_payment_intent(booking, payment_intent)
 
       {:error, message} ->
         {:error, message}
@@ -1924,20 +1924,29 @@ defmodule YscWeb.BookingCheckoutLive do
     end
   end
 
+  # Fail-closed like modification `create_delta_payment_intent/3`: never hand
+  # the member a confirmable client_secret for an Intent that is not on a
+  # live `:hold`. Swallowing attach errors left Elements paying a PI that
+  # HoldExpiry cannot reconcile after the hold was released.
   defp persist_checkout_payment_intent(booking, payment_intent) do
     case Bookings.attach_payment_intent(booking, payment_intent.id) do
       {:ok, updated} ->
-        {updated, payment_intent}
+        {:ok, {updated, payment_intent}}
 
       {:error, reason} ->
         Ysc.Logging.error(
-          "Failed to persist booking payment_intent_id",
+          "Failed to persist booking payment_intent_id; cancelling orphan PaymentIntent",
           booking_id: booking.id,
           payment_intent_id: payment_intent.id,
           error: inspect(reason)
         )
 
-        {booking, payment_intent}
+        CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+          payment_intent.id,
+          "booking_checkout_attach_failed"
+        )
+
+        {:error, BookingUserMessages.checkout_payment_setup_failed()}
     end
   end
 

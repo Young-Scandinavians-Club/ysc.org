@@ -40,6 +40,10 @@ defmodule Ysc.Tickets do
 
   @payment_timeout_minutes 5
 
+  # Two-arg advisory lock namespace so ticket checkout serialization cannot
+  # collide with merch (`8_233_202`) or unrelated app locks.
+  @checkout_advisory_lock_namespace 8_233_203
+
   ## Ticket Order Management
 
   @doc """
@@ -51,6 +55,10 @@ defmodule Ysc.Tickets do
   - Uses atomic booking to prevent overbooking
   - Creates tickets with pending status
   - Schedules timeout cleanup
+
+  Concurrent checkouts for the same user/event (two tabs both clicking
+  proceed-to-checkout before either insert) are serialized with a per-user/
+  event advisory lock so both cannot mint payable pending orders.
 
   ## Parameters:
   - `user_id`: The user purchasing tickets
@@ -104,9 +112,8 @@ defmodule Ysc.Tickets do
                  ticket_selections,
                  opts
                ),
-             :ok <- prepare_new_checkout_session(user_id, event_id),
              {:ok, ticket_order} <-
-               BookingLocker.atomic_booking(
+               create_ticket_order_locked(
                  user_id,
                  event_id,
                  ticket_selections,
@@ -152,6 +159,46 @@ defmodule Ysc.Tickets do
 
         error
     end
+  end
+
+  # Serialize prepare → atomic_booking per user/event. Without this, two
+  # LiveView processes that both pass prepare_new_checkout_session (no pending
+  # yet) both insert — two confirmable PaymentIntents for the same event.
+  defp create_ticket_order_locked(
+         user_id,
+         event_id,
+         ticket_selections,
+         booking_opts
+       ) do
+    case Repo.transaction(fn ->
+           lock_user_event_ticket_checkout!(user_id, event_id)
+
+           case prepare_new_checkout_session(user_id, event_id) do
+             :ok ->
+               case BookingLocker.atomic_booking(
+                      user_id,
+                      event_id,
+                      ticket_selections,
+                      booking_opts
+                    ) do
+                 {:ok, ticket_order} -> ticket_order
+                 {:error, reason} -> Repo.rollback(reason)
+               end
+
+             {:error, reason} ->
+               Repo.rollback(reason)
+           end
+         end) do
+      {:ok, ticket_order} -> {:ok, ticket_order}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp lock_user_event_ticket_checkout!(user_id, event_id) do
+    Repo.query!("SELECT pg_advisory_xact_lock($1, $2)", [
+      @checkout_advisory_lock_namespace,
+      :erlang.phash2({user_id, event_id}, 2_147_483_647)
+    ])
   end
 
   @doc """
