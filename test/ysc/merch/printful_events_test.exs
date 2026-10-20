@@ -51,7 +51,7 @@ defmodule Ysc.Merch.PrintfulEventsTest do
       assert recorded.notified_at
 
       assert_email_sent(
-        subject: "Your merch is on its way (#{order.reference_id})",
+        subject: "Your order is on its way (#{order.reference_id})",
         to: {"", member.email}
       )
 
@@ -261,7 +261,7 @@ defmodule Ysc.Merch.PrintfulEventsTest do
 
       handle("package_delivered", order, %{"shipment" => b})
       assert status(order) == :delivered
-      assert_email_sent(subject: ~r/Your merch was delivered/)
+      assert_email_sent(subject: ~r/Your order was delivered/)
     end
 
     test "a late shipped event does not undo a delivery", %{order: order} do

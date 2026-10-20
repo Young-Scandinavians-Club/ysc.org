@@ -806,9 +806,9 @@
     },
     "merch_order_update" => %{
       first_name: "Astrid",
-      headline: "Your merch was delivered",
+      headline: "Your order was delivered",
       paragraphs: [
-        "The carrier shows your order as delivered. We hope you love it!",
+        "Tracking shows your order as delivered. We hope you love it!",
         "If anything isn't right, just reply to this email or write to info@ysc.org and we'll sort it out."
       ],
       order: %{reference_id: "MRC-PREVIEW-123"},

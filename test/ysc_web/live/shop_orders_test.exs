@@ -104,6 +104,9 @@ defmodule YscWeb.ShopOrdersTest do
                "#order-progress #progress-shipped .bg-green-600"
              )
 
+      assert has_element?(view, "#progress-in_production", "Being made")
+      refute has_element?(view, "#order-progress", "In production")
+
       refute has_element?(
                view,
                "#order-progress #progress-delivered .bg-green-600"
@@ -131,7 +134,13 @@ defmodule YscWeb.ShopOrdersTest do
       order = order_for(member, :failed)
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
 
-      assert has_element?(view, "#order-banner-failed")
+      assert has_element?(
+               view,
+               "#order-banner-failed",
+               "start making your order"
+             )
+
+      refute has_element?(view, "#order-banner-failed", "printer")
       refute has_element?(view, "#order-progress")
     end
 
@@ -292,6 +301,9 @@ defmodule YscWeb.ShopOrdersTest do
                "#shipment-#{shipment.id}",
                "Returned to sender"
              )
+
+      assert has_element?(view, "#shipment-#{shipment.id}", "Shipping company")
+      refute has_element?(view, "#shipment-#{shipment.id}", "Carrier")
     end
   end
 

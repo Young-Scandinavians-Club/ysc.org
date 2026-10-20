@@ -129,6 +129,15 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
 
       assert has_element?(view, "#checkout-address")
+      assert has_element?(view, "#address-form", "Phone number")
+
+      assert has_element?(
+               view,
+               "#checkout-phone-help",
+               "shipping company may call"
+             )
+
+      refute has_element?(view, "#checkout-address", "carrier")
       assert has_element?(view, "#summary-subtotal", "$64.00")
       assert has_element?(view, "#summary-shipping", "Calculated next")
       refute has_element?(view, "#summary-total")
