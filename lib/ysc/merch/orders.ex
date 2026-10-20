@@ -13,8 +13,19 @@ defmodule Ysc.Merch.Orders do
 
   alias Ecto.Multi
   alias Ysc.Accounts.User
+  alias Ysc.Events.Event
   alias Ysc.Media.Image
-  alias Ysc.Merch.{Cart, Order, OrderItem, Shipment, ShippingAddress, Variant}
+
+  alias Ysc.Merch.{
+    Cart,
+    Order,
+    OrderItem,
+    Product,
+    Shipment,
+    ShippingAddress,
+    Variant
+  }
+
   alias Ysc.Repo
   alias Ysc.Tickets.CheckoutCancel
 
@@ -81,6 +92,41 @@ defmodule Ysc.Merch.Orders do
     :shipped_at,
     :delivered_at
   ]
+
+  # Confirmation / board / payment-fulfillment graph. Skip Printful ids,
+  # hashed_password, event body HTML, and image upload JSON. Printful
+  # submission still uses fat `get_order/1`.
+  @email_order_fields [
+    :id,
+    :user_id,
+    :granted_by_id,
+    :event_id,
+    :email,
+    :reference_id,
+    :kind,
+    :status,
+    :purpose,
+    :inserted_at,
+    :recipient_name,
+    :address1,
+    :address2,
+    :city,
+    :state_code,
+    :zip,
+    :country_code,
+    :subtotal,
+    :shipping_amount,
+    :total_amount,
+    :estimated_cost,
+    :payment_id,
+    :payment_intent_id,
+    :delivery_estimate_min,
+    :delivery_estimate_max
+  ]
+  @email_user_fields [:id, :email, :first_name, :last_name]
+  @email_event_fields [:id, :title]
+  @email_variant_fields [:id, :image_id, :product_id]
+  @email_product_fields [:id, :image_id]
 
   @detail_preloads [
     items: [variant: [:image, product: :image]],
@@ -412,6 +458,81 @@ defmodule Ysc.Merch.Orders do
   def get_order!(id), do: Order |> Repo.get!(id) |> preload_detail()
 
   @doc """
+  Loads an order for merch emails and payment fulfillment.
+
+  Address, totals, delivery estimate, slim member/admin/event identity, item
+  thumbs (variant photo, else product photo), and tracking parcels. Omits
+  Printful ids, purchaser secrets, event body HTML, and image upload JSON.
+
+  Printful submission still uses fat `get_order/1`.
+  """
+  def get_order_for_email(id) do
+    from(o in order_for_email_query(), where: o.id == ^id)
+    |> Repo.one()
+  rescue
+    Ecto.Query.CastError -> nil
+  end
+
+  def get_order_for_email!(id) do
+    from(o in order_for_email_query(), where: o.id == ^id)
+    |> Repo.one!()
+  end
+
+  @doc false
+  def get_order_for_email_by_payment_intent(payment_intent_id)
+      when is_binary(payment_intent_id) do
+    from(o in order_for_email_query(),
+      where: o.payment_intent_id == ^payment_intent_id
+    )
+    |> Repo.one()
+  end
+
+  defp order_for_email_query do
+    from(o in Order,
+      select: struct(o, ^@email_order_fields),
+      preload: [
+        items: ^email_item_query(),
+        shipments: ^user_order_shipment_query(),
+        user: ^email_user_query(),
+        granted_by: ^email_user_query(),
+        event: ^email_event_query()
+      ]
+    )
+  end
+
+  defp email_item_query do
+    from(i in OrderItem,
+      select: struct(i, ^@user_order_detail_item_fields),
+      preload: [variant: ^email_variant_query()]
+    )
+  end
+
+  defp email_variant_query do
+    from(v in Variant,
+      select: struct(v, ^@email_variant_fields),
+      preload: [
+        image: ^user_order_image_query(),
+        product: ^email_product_query()
+      ]
+    )
+  end
+
+  defp email_product_query do
+    from(p in Product,
+      select: struct(p, ^@email_product_fields),
+      preload: [image: ^user_order_image_query()]
+    )
+  end
+
+  defp email_user_query do
+    from(u in User, select: struct(u, ^@email_user_fields))
+  end
+
+  defp email_event_query do
+    from(e in Event, select: struct(e, ^@email_event_fields))
+  end
+
+  @doc """
   The member's own order for the receipt page, or `nil` (also for other
   members' orders).
 
@@ -572,6 +693,13 @@ defmodule Ysc.Merch.Orders do
     alias Ysc.Ci.QueryExplain.Fixtures
 
     user_order_query(Fixtures.ulid(), Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_order_for_email_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    from(o in order_for_email_query(), where: o.id == ^Fixtures.ulid())
   end
 
   @doc false

@@ -211,7 +211,7 @@ defmodule YscWeb.Emails.MerchEmailsTest do
       order =
         admin
         |> admin_order_fixture(%{items: [{variant, 20}]})
-        |> then(&Orders.get_order!(&1.id))
+        |> then(&Orders.get_order_for_email!(&1.id))
 
       for html <- [
             order
@@ -328,7 +328,7 @@ defmodule YscWeb.Emails.MerchEmailsTest do
           estimated_cost: Money.new(:USD, "118.40"),
           items: [{variant_fixture(nil, %{name: "Club Tee / Black / M"}), 5}]
         })
-        |> then(&Orders.get_order!(&1.id))
+        |> then(&Orders.get_order_for_email!(&1.id))
 
       %{admin: admin, event: event, club_order: order}
     end

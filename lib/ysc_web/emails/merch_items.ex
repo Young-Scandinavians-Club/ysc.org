@@ -5,7 +5,8 @@ defmodule YscWeb.Emails.MerchItems do
   so an order's items look the same wherever they appear.
 
   An order needs `items: [variant: [:image, product: :image]]` loaded (as
-  `Ysc.Merch.Orders` does). Anything not loaded just means no thumbnail.
+  `Ysc.Merch.Orders.get_order_for_email/1` and fat `get_order/1` do). Anything
+  not loaded just means no thumbnail.
   """
   alias Ysc.Media.Image
   alias Ysc.Merch.{Order, OrderItem}
