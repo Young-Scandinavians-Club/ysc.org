@@ -577,11 +577,9 @@ defmodule YscWeb.AdminMerchOrderNewLive do
       user={@current_user}
       role={@admin_role}
     >
-      <div class="py-6">
-        <.admin_page_title subtitle="The club pays. Printful bills the club's card; nobody is charged.">
-          New club-paid order
-        </.admin_page_title>
-      </div>
+      <.admin_page_header subtitle="The club pays. Printful bills the club's card; nobody is charged.">
+        New club-paid order
+      </.admin_page_header>
 
       <div class="w-full max-w-3xl pb-16 pt-4">
         <.details_step

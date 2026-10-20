@@ -18,19 +18,18 @@ defmodule YscWeb.AdminPostsLive do
       user={@current_user}
       role={@admin_role}
     >
-      <div class="flex justify-between py-6">
-        <.admin_page_title
-          help_topic="posts/publish"
-          help_label="How to publish a post"
-          help_role={@admin_role}
-        >
-          Posts
-        </.admin_page_title>
-
-        <.button id="admin-posts-new-post" navigate={~p"/admin/posts/new"}>
-          <.icon name="hero-document-plus" class="w-5 h-5" /> New Post
-        </.button>
-      </div>
+      <.admin_page_header
+        help_topic="posts/publish"
+        help_label="How to publish a post"
+        help_role={@admin_role}
+      >
+        Posts
+        <:actions>
+          <.button id="admin-posts-new-post" navigate={~p"/admin/posts/new"}>
+            <.icon name="hero-document-plus" class="w-5 h-5" /> New Post
+          </.button>
+        </:actions>
+      </.admin_page_header>
 
       <div class="w-full pt-4">
         <div>

@@ -391,9 +391,9 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
   defp events_list(assigns) do
     ~H"""
     <.ghost_admin_shell active_page={:events}>
-      <div class="flex justify-between py-6">
-        <.admin_page_title>Events</.admin_page_title>
-        <div class="flex items-center gap-3">
+      <.admin_page_header>
+        Events
+        <:actions>
           <.button>
             <.icon name="hero-qr-code" class="w-5 h-5 -mt-0.5" />
             <span class="ms-1">Check-in &amp; Scan</span>
@@ -402,8 +402,8 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
             <.icon name="hero-calendar" class="w-5 h-5 -mt-0.5" />
             <span class="ms-1">New Event</span>
           </.button>
-        </div>
-      </div>
+        </:actions>
+      </.admin_page_header>
 
       <div class="w-full pt-4">
         <div class="flex gap-6 border-b border-zinc-200 text-sm">

@@ -189,19 +189,14 @@ defmodule YscWeb.AdminMerchOrdersLive do
       user={@current_user}
       role={@admin_role}
     >
-      <div class="flex flex-wrap items-start justify-between gap-4 py-6">
-        <div>
-          <.admin_page_title subtitle="Everything members bought and everything the club paid for.">
-            Merch
-          </.admin_page_title>
-        </div>
-
-        <div class="flex items-center gap-3">
+      <.admin_page_header subtitle="Everything members bought and everything the club paid for.">
+        Merch
+        <:actions>
           <.button id="new-club-order" navigate={~p"/admin/merch/orders/new"}>
             <.icon name="hero-plus" class="w-5 h-5" /> New club-paid order
           </.button>
-        </div>
-      </div>
+        </:actions>
+      </.admin_page_header>
 
       <div class="w-full pt-4">
         <.wip_banner />

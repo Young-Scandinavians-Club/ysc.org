@@ -26,9 +26,9 @@ defmodule YscWeb.AdminSettingsLive do
       user={@current_user}
       role={@admin_role}
     >
-      <div class="flex justify-between py-6">
-        <.admin_page_title>Settings</.admin_page_title>
-      </div>
+      <.admin_page_header>
+        Settings
+      </.admin_page_header>
 
       <div class="w-full">
         <div

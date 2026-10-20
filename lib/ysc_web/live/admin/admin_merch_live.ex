@@ -437,14 +437,9 @@ defmodule YscWeb.AdminMerchLive do
       user={@current_user}
       role={@admin_role}
     >
-      <div class="flex flex-wrap items-start justify-between gap-4 py-6">
-        <div>
-          <.admin_page_title subtitle="Products and prices are managed in Printful. Sync to pull in changes.">
-            Merch
-          </.admin_page_title>
-        </div>
-
-        <div class="flex items-center gap-3">
+      <.admin_page_header subtitle="Products and prices are managed in Printful. Sync to pull in changes.">
+        Merch
+        <:actions>
           <.button
             id="register-merch-webhooks"
             phx-click="register_webhooks"
@@ -464,8 +459,8 @@ defmodule YscWeb.AdminMerchLive do
             />
             {if @syncing?, do: "Syncing…", else: "Sync from Printful"}
           </.button>
-        </div>
-      </div>
+        </:actions>
+      </.admin_page_header>
 
       <div class="w-full pb-16 pt-4">
         <.wip_banner />

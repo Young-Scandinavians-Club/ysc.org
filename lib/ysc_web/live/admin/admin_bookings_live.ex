@@ -1879,18 +1879,18 @@ defmodule YscWeb.AdminBookingsLive do
         </.simple_form>
       </.modal>
 
-      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-6 gap-3">
-        <.admin_page_title>
-          {titleize(@selected_property)} Bookings
-        </.admin_page_title>
-        <.button
-          id="admin-bookings-booking-entitlements"
-          navigate={~p"/admin/bookings/entitlements"}
-          class="shrink-0"
-        >
-          <.icon name="hero-gift" class="w-5 h-5" /> Booking Entitlements
-        </.button>
-      </div>
+      <.admin_page_header>
+        {titleize(@selected_property)} Bookings
+        <:actions>
+          <.button
+            id="admin-bookings-booking-entitlements"
+            navigate={~p"/admin/bookings/entitlements"}
+            class="shrink-0"
+          >
+            <.icon name="hero-gift" class="w-5 h-5" /> Booking Entitlements
+          </.button>
+        </:actions>
+      </.admin_page_header>
       <!-- Property Tabs -->
       <.admin_tabs
         id="bookings-property-tabs"

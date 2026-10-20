@@ -240,101 +240,102 @@ defmodule YscWeb.AdminUsersLive do
         </div>
       </.modal>
 
-      <div class="flex justify-between py-6">
-        <.admin_page_title>Users</.admin_page_title>
-
-        <.dropdown
-          id="export-users-button"
-          right={true}
-          class="bg-blue-700 hover:bg-blue-800 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
-        >
-          <:button_block>
-            <.tooltip tooltip_text="Export to CSV">
-              <.icon name="hero-document-arrow-down" class="w-5 h-5 -mt-0.5" />
-              <span class="ms-1">Export</span>
-            </.tooltip>
-          </:button_block>
-          <div class="w-full px-4 py-3">
-            <h3 class="text-zinc-800 mb-2 type-subhead">
-              Include Fields
-            </h3>
-            <form
-              id="csv-export-form"
-              phx-submit="export-csv"
-              class="flex flex-col gap-y-2 justify-between"
-            >
-              <%= for attr <- ~w(id email first_name last_name phone_number state address)a do %>
-                <.input
-                  field={@form[attr]}
-                  label={export_field_to_label(attr)}
-                  type="checkbox"
-                  checked={true}
-                />
-              <% end %>
-
-              <div class="border-t border-zinc-100 py-2">
-                <.input
-                  field={@form[:only_subscribers]}
-                  label="Only users with active memberships"
-                  type="checkbox"
-                  checked={false}
-                />
-              </div>
-              <.button
-                type="submit"
-                phx-disable-with="Exporting..."
-                disabled={
-                  !(@export_status == :not_exporting || @export_status == :failed)
-                }
+      <.admin_page_header>
+        Users
+        <:actions>
+          <.dropdown
+            id="export-users-button"
+            right={true}
+            class="bg-blue-700 hover:bg-blue-800 text-sm font-semibold leading-6 text-zinc-100 active:text-zinc-100/80"
+          >
+            <:button_block>
+              <.tooltip tooltip_text="Export to CSV">
+                <.icon name="hero-document-arrow-down" class="w-5 h-5 -mt-0.5" />
+                <span class="ms-1">Export</span>
+              </.tooltip>
+            </:button_block>
+            <div class="w-full px-4 py-3">
+              <h3 class="text-zinc-800 mb-2 type-subhead">
+                Include Fields
+              </h3>
+              <form
+                id="csv-export-form"
+                phx-submit="export-csv"
+                class="flex flex-col gap-y-2 justify-between"
               >
-                <span :if={
-                  @export_status == :not_exporting || @export_status == :failed
-                }>
-                  Export CSV
-                </span>
-                <.spinner
+                <%= for attr <- ~w(id email first_name last_name phone_number state address)a do %>
+                  <.input
+                    field={@form[attr]}
+                    label={export_field_to_label(attr)}
+                    type="checkbox"
+                    checked={true}
+                  />
+                <% end %>
+
+                <div class="border-t border-zinc-100 py-2">
+                  <.input
+                    field={@form[:only_subscribers]}
+                    label="Only users with active memberships"
+                    type="checkbox"
+                    checked={false}
+                  />
+                </div>
+                <.button
+                  type="submit"
+                  phx-disable-with="Exporting..."
+                  disabled={
+                    !(@export_status == :not_exporting || @export_status == :failed)
+                  }
+                >
+                  <span :if={
+                    @export_status == :not_exporting || @export_status == :failed
+                  }>
+                    Export CSV
+                  </span>
+                  <.spinner
+                    :if={@export_status == :in_progress}
+                    class="w-6 h-6 mx-auto"
+                  />
+                  <.icon
+                    :if={@export_status == :complete}
+                    name="hero-check-circle"
+                    class="w-6 h-6 flex-none fill-blue-600 text-zinc-200 mx-auto"
+                  />
+                </.button>
+
+                <.progress_bar
                   :if={@export_status == :in_progress}
-                  class="w-6 h-6 mx-auto"
+                  progress={@export_progress}
                 />
-                <.icon
+
+                <p
+                  :if={@export_status == :failed}
+                  class="flex gap-1 mt-1 text-sm leading-6 text-rose-600"
+                >
+                  <.icon
+                    name="hero-exclamation-circle-mini"
+                    class="mt-0.5 w-5 h-5 flex-none"
+                  />
+                  {@export_error}
+                </p>
+
+                <button
                   :if={@export_status == :complete}
-                  name="hero-check-circle"
-                  class="w-6 h-6 flex-none fill-blue-600 text-zinc-200 mx-auto"
-                />
-              </.button>
-
-              <.progress_bar
-                :if={@export_status == :in_progress}
-                progress={@export_progress}
-              />
-
-              <p
-                :if={@export_status == :failed}
-                class="flex gap-1 mt-1 text-sm leading-6 text-rose-600"
-              >
-                <.icon
-                  name="hero-exclamation-circle-mini"
-                  class="mt-0.5 w-5 h-5 flex-none"
-                />
-                {@export_error}
-              </p>
-
-              <button
-                :if={@export_status == :complete}
-                id="download-user-export-button"
-                type="button"
-                phx-click="download-export-csv"
-                class="flex gap-1 mt-1 text-sm leading-6 text-blue-800 hover:underline"
-              >
-                <.icon
-                  name="hero-document-check"
-                  class="mt-0.5 w-5 h-5 flex-none text-green-600"
-                /> Download file
-              </button>
-            </form>
-          </div>
-        </.dropdown>
-      </div>
+                  id="download-user-export-button"
+                  type="button"
+                  phx-click="download-export-csv"
+                  class="flex gap-1 mt-1 text-sm leading-6 text-blue-800 hover:underline"
+                >
+                  <.icon
+                    name="hero-document-check"
+                    class="mt-0.5 w-5 h-5 flex-none text-green-600"
+                  /> Download file
+                </button>
+              </form>
+            </div>
+          </.dropdown>
+        </:actions>
+      </.admin_page_header>
 
       <div class="w-full pt-4">
         <div>
