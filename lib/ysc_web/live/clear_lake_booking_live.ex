@@ -2205,6 +2205,30 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <p class="text-sm text-amber-800 leading-relaxed">
                           {winter_beds_setup_copy()}
                         </p>
+                        <div
+                          id="winter-sleeping-photos"
+                          class="grid grid-cols-2 gap-3"
+                        >
+                          <a
+                            :for={
+                              {image, index} <-
+                                Enum.with_index(winter_sleeping_images())
+                            }
+                            id={"winter-sleeping-photo-#{index}"}
+                            href={image.src}
+                            target="_blank"
+                            rel="noopener"
+                            class="block overflow-hidden rounded-lg border border-amber-200 bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                          >
+                            <img
+                              src={image.src}
+                              alt={image.alt}
+                              loading="lazy"
+                              decoding="async"
+                              class="aspect-[4/3] w-full object-cover transition-transform duration-300 hover:scale-105"
+                            />
+                          </a>
+                        </div>
                         <p class="text-sm text-amber-800 leading-relaxed">
                           Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help in the Social Hall.
                         </p>
@@ -4217,6 +4241,30 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp winter_beds_setup_copy do
     "Two rooms have one queen bed each. The third has a queen and two full-size beds. Each room has bedside tables, lamps, heaters, storage, rugs, and coat racks."
+  end
+
+  defp winter_sleeping_images do
+    [
+      %{
+        src: "https://assets.ysc.org/01M58BDBP7T49QNSSQZ530Y8WE_optimized.webp",
+        alt:
+          "Winter bedroom with a queen bed, bedside lamps, and a window onto the lake"
+      },
+      %{
+        src: "https://assets.ysc.org/01M58BDBMM2CJ549P6F9Y4ZKDP_optimized.webp",
+        alt:
+          "Winter bedroom with a queen bed and a window looking out over the lawn to the lake"
+      },
+      %{
+        src: "https://assets.ysc.org/01M58BDBNRWWABP8YNQYNMMTRT_optimized.webp",
+        alt: "Winter bedroom with a queen bed and two full-size beds"
+      },
+      %{
+        src: "https://assets.ysc.org/01M58BDBN9EDFX4C40RXRDQQA8_optimized.webp",
+        alt:
+          "Winter bedroom with full-size beds, mirrors, and open shelving for storage"
+      }
+    ]
   end
 
   defp assign_sleeping_copy(socket) do
