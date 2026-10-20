@@ -248,7 +248,8 @@ defmodule YscWeb.MediaPickerComponent do
         {:noreply, socket}
 
       {image_ids, true} ->
-        send(self(), {__MODULE__, id, image_ids})
+        # LiveView hands consumed entries back in reverse selection order.
+        send(self(), {__MODULE__, id, Enum.reverse(image_ids)})
         {:noreply, socket}
 
       {[image_id], false} ->
