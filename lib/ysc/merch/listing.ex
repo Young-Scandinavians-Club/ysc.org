@@ -19,7 +19,6 @@ defmodule Ysc.Merch.Listing do
 
   # Swatches shown on a tile; the rest collapse into a "+N" link.
   @max_swatches 5
-  @new_for_days 30
 
   @type color :: %{
           name: String.t(),
@@ -35,8 +34,7 @@ defmodule Ysc.Merch.Listing do
           colors: [color()],
           hidden_colors: non_neg_integer(),
           active: color() | nil,
-          sizes: String.t() | nil,
-          new?: boolean()
+          sizes: String.t() | nil
         }
 
   @doc "Sort options as `{value, label}`, in menu order."
@@ -119,8 +117,7 @@ defmodule Ysc.Merch.Listing do
       colors: if(colors == [], do: [color(product, nil)], else: shown),
       hidden_colors: hidden,
       active: active || color(product, nil),
-      sizes: size_range(product),
-      new?: new?(product)
+      sizes: size_range(product)
     }
   end
 
@@ -151,11 +148,6 @@ defmodule Ysc.Merch.Listing do
       sizes -> "#{List.first(sizes)}–#{List.last(sizes)}"
     end
   end
-
-  defp new?(%Product{inserted_at: %DateTime{} = at}),
-    do: DateTime.diff(DateTime.utc_now(), at, :day) < @new_for_days
-
-  defp new?(_), do: false
 
   @doc "The color's URL-safe id, used in DOM ids."
   @spec slug(String.t()) :: String.t()

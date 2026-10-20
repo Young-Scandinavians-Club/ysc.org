@@ -3898,6 +3898,29 @@ body.overflow-hidden {
   pointer-events: auto;
 }
 
+/* On pages with their own cart link, the pill waits until that link has
+   scrolled out of view (CartDockReveal sets data-revealed). */
+.cart-dock[data-reveal-after]:not([data-revealed]) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(1rem);
+}
+
+.cart-dock[data-reveal-after] {
+  transition:
+    opacity 200ms ease,
+    transform 320ms var(--ease-spring-settle),
+    visibility 0s linear 0s;
+}
+
+.cart-dock[data-reveal-after]:not([data-revealed]) {
+  transition:
+    opacity 160ms ease,
+    transform 240ms ease,
+    visibility 0s linear 240ms;
+}
+
 @keyframes cart-dock-in {
   from {
     transform: translateY(calc(100% + 2rem));
