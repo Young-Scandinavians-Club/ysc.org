@@ -463,5 +463,30 @@ defmodule Ysc.WebhooksTest do
       assert loaded.event_type == "payment_intent.succeeded"
       assert loaded.payload == nil
     end
+
+    test "filters by state" do
+      now = DateTime.utc_now()
+
+      for {state, suffix} <- [failed: "f", processed: "p"] do
+        Webhooks.create_webhook_event!(%{
+          provider: :stripe,
+          event_id: "evt_admin_state_#{suffix}",
+          event_type: "payment_intent.succeeded",
+          payload: %{},
+          state: state
+        })
+      end
+
+      states =
+        Webhooks.list_webhook_events_for_admin(
+          DateTime.add(now, -1, :day),
+          DateTime.add(now, 1, :day),
+          state: :failed
+        )
+        |> Enum.map(& &1.state)
+        |> Enum.uniq()
+
+      assert states == [:failed]
+    end
   end
 end

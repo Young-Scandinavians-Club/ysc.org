@@ -594,6 +594,46 @@ defmodule YscWeb.AdminMoneyLiveTest do
              )
     end
 
+    test "webhooks tab filters by state", %{conn: conn} do
+      create = fn state ->
+        Webhooks.create_webhook_event!(%{
+          provider: :stripe,
+          event_id: "evt_filter_#{state}_#{System.unique_integer([:positive])}",
+          event_type: "payment_intent.succeeded",
+          payload: %{},
+          state: state
+        })
+      end
+
+      failed = create.(:failed)
+      processed = create.(:processed)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money?tab=webhooks")
+
+      assert has_element?(view, "#webhook-row-#{failed.id}")
+      assert has_element?(view, "#webhook-row-#{processed.id}")
+
+      view
+      |> form("#webhook-filter-form", webhook_filter: %{state: "failed"})
+      |> render_change()
+
+      assert_patch(view)
+      assert has_element?(view, "#webhook-row-#{failed.id}")
+      refute has_element?(view, "#webhook-row-#{processed.id}")
+
+      view
+      |> form("#webhook-filter-form", webhook_filter: %{state: ""})
+      |> render_change()
+
+      assert has_element?(view, "#webhook-row-#{processed.id}")
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money?tab=webhooks&webhook_state=processed")
+
+      assert has_element?(view, "#webhook-row-#{processed.id}")
+      refute has_element?(view, "#webhook-row-#{failed.id}")
+    end
+
     test "webhooks tab lists slim rows and the modal still loads payload JSON",
          %{conn: conn} do
       event_id =
