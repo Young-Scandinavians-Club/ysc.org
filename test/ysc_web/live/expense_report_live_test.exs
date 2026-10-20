@@ -140,6 +140,43 @@ defmodule YscWeb.ExpenseReportLiveTest do
     assert html =~ "Expense Report"
   end
 
+  describe "ghost loaders" do
+    test "list shows a skeleton on the static render, not the empty state", %{
+      conn: conn
+    } do
+      html = conn |> get(~p"/expensereports") |> html_response(200)
+
+      assert html =~ "expense-reports-loading"
+      refute html =~ "expense-reports-empty"
+    end
+
+    test "list swaps the skeleton for the empty state once connected", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/expensereports")
+
+      refute has_element?(view, "#expense-reports-loading")
+      assert has_element?(view, "#expense-reports-empty")
+    end
+
+    test "success page shows a skeleton on the static render", %{
+      conn: conn,
+      user: user
+    } do
+      report = insert_member_report!(user, %{purpose: "Cabin groceries"})
+
+      html =
+        conn
+        |> get(~p"/expensereport/#{report.id}/success")
+        |> html_response(200)
+
+      assert html =~ "expense-report-success-loading"
+
+      {:ok, view, _html} = live(conn, ~p"/expensereport/#{report.id}/success")
+      refute has_element?(view, "#expense-report-success-loading")
+    end
+  end
+
   describe "rejected report member view" do
     test "success page shows the treasurer rejection note and a new-report link",
          %{
