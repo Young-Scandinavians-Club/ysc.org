@@ -87,8 +87,9 @@ defmodule YscWeb.Components.BookingGuestInfoFormTest do
       assert html =~ ~s|id="guest-number-1"|
       assert html =~ ~s|id="guest-number-2"|
       assert html =~ "Continue to payment"
-      assert html =~ ~s|phx-disable-with="Continuing..."|
-      refute html =~ ~s|phx-disable-with="Processing..."|
+      # <.button> turns phx-disable-with into structured loading label text
+      assert html =~ "Continuing..."
+      refute html =~ "Processing..."
       assert html =~ ~s|name="guests[1][first_name]"|
       assert html =~ ~s|type="hidden" name="guests[0][first_name]"|
     end
