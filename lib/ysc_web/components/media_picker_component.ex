@@ -16,8 +16,13 @@ defmodule YscWeb.MediaPickerComponent do
         image_id={@image_id}
       />
 
+  Pass `multiple` (and optionally `max_entries`) to let the drop zone take
+  several files at once. The library browser still picks one image at a time.
+
   The component sends messages to the parent LiveView:
   - `{YscWeb.MediaPickerComponent, id, image_id}` when an image is selected/uploaded
+  - `{YscWeb.MediaPickerComponent, id, [image_id, ...]}` when several images are
+    uploaded at once (only with `multiple`)
   - `{YscWeb.MediaPickerComponent, id, :cleared}` when the image is cleared
   """
   use YscWeb, :live_component
@@ -28,6 +33,7 @@ defmodule YscWeb.MediaPickerComponent do
   alias YscWeb.MediaGalleryCursor
 
   @per_page 30
+  @default_max_entries 20
 
   @impl true
   def mount(socket) do
@@ -40,16 +46,35 @@ defmodule YscWeb.MediaPickerComponent do
      |> assign(:end_of_timeline?, false)
      |> assign(:last_image_date, nil)
      |> assign(:last_image_id, nil)
-     |> allow_upload(:media_picker_file,
-       accept: ~w(.jpg .jpeg .png .gif .webp),
-       max_entries: 1,
-       auto_upload: true
-     )}
+     |> assign(:upload_configured?, false)}
   end
 
   @impl true
   def update(assigns, socket) do
-    {:ok, socket |> assign(assigns)}
+    {:ok,
+     socket
+     |> assign(assigns)
+     |> assign_new(:multiple, fn -> false end)
+     |> assign_new(:max_entries, fn -> @default_max_entries end)
+     |> configure_upload()}
+  end
+
+  # `multiple` and `max_entries` arrive as assigns, so the upload is configured
+  # on the first update rather than in mount/1, and only once.
+  defp configure_upload(%{assigns: %{upload_configured?: true}} = socket),
+    do: socket
+
+  defp configure_upload(socket) do
+    max_entries =
+      if socket.assigns.multiple, do: socket.assigns.max_entries, else: 1
+
+    socket
+    |> allow_upload(:media_picker_file,
+      accept: ~w(.jpg .jpeg .png .gif .webp),
+      max_entries: max_entries,
+      auto_upload: true
+    )
+    |> assign(:upload_configured?, true)
   end
 
   @impl true
@@ -119,7 +144,13 @@ defmodule YscWeb.MediaPickerComponent do
                         </div>
                         <.live_img_preview
                           entry={entry}
-                          class="group-hover:blur-sm h-60 w-full rounded-lg"
+                          class={[
+                            "group-hover:blur-sm rounded-lg",
+                            if(@multiple,
+                              do: "size-28 object-cover",
+                              else: "h-60 w-full"
+                            )
+                          ]}
                         />
                       </button>
                     </figure>
@@ -138,7 +169,11 @@ defmodule YscWeb.MediaPickerComponent do
               <div :if={length(@uploads.media_picker_file.entries) == 0}>
                 <.upload_dropzone_empty_state
                   size={:compact}
-                  formats="PNG, JPG, JPEG, GIF or WebP"
+                  formats={
+                    if @multiple,
+                      do: "PNG, JPG, JPEG, GIF or WebP · select several at once",
+                      else: "PNG, JPG, JPEG, GIF or WebP"
+                  }
                 />
               </div>
             </label>
@@ -148,7 +183,7 @@ defmodule YscWeb.MediaPickerComponent do
               class="flex justify-end mt-3"
             >
               <.button type="submit" phx-disable-with="Uploading...">
-                Upload
+                {upload_button_label(length(@uploads.media_picker_file.entries))}
               </.button>
             </div>
           </form>
@@ -206,12 +241,18 @@ defmodule YscWeb.MediaPickerComponent do
 
   @impl true
   def handle_event("save-upload", _params, socket) do
-    case YscWeb.Uploads.consume_entries(socket, :media_picker_file) do
-      [] ->
+    %{id: id, multiple: multiple?} = socket.assigns
+
+    case {YscWeb.Uploads.consume_entries(socket, :media_picker_file), multiple?} do
+      {[], _} ->
         {:noreply, socket}
 
-      [image_id] ->
-        send(self(), {__MODULE__, socket.assigns.id, image_id})
+      {image_ids, true} ->
+        send(self(), {__MODULE__, id, image_ids})
+        {:noreply, socket}
+
+      {[image_id], false} ->
+        send(self(), {__MODULE__, id, image_id})
         {:noreply, socket}
     end
   end
@@ -325,6 +366,9 @@ defmodule YscWeb.MediaPickerComponent do
   end
 
   # --- Helpers ---
+
+  defp upload_button_label(count) when count > 1, do: "Upload #{count} photos"
+  defp upload_button_label(_count), do: "Upload"
 
   defp has_image?(id) when is_binary(id) and id != "", do: true
   defp has_image?(_), do: false

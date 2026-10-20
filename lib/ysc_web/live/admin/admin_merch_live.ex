@@ -162,6 +162,47 @@ defmodule YscWeb.AdminMerchLive do
   end
 
   def handle_info(
+        {YscWeb.MediaPickerComponent, :merch_add_photo, image_ids},
+        socket
+      )
+      when is_list(image_ids) do
+    results =
+      case socket.assigns.editing_product do
+        nil ->
+          []
+
+        product ->
+          Enum.map(image_ids, &Merch.add_product_photo(product, &1))
+      end
+
+    added = Enum.count(results, &match?({:ok, _}, &1))
+    skipped = length(results) - added
+
+    socket = refresh_editing(socket)
+
+    cond do
+      results == [] ->
+        {:noreply, socket}
+
+      skipped == 0 ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :info,
+           "Added #{added} #{if added == 1, do: "photo", else: "photos"}."
+         )}
+
+      true ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :info,
+           "Added #{added}; #{skipped} already on this product."
+         )}
+    end
+  end
+
+  def handle_info(
         {YscWeb.MediaPickerComponent, :merch_add_photo, :cleared},
         socket
       ),
@@ -617,7 +658,7 @@ defmodule YscWeb.AdminMerchLive do
             <h3 class="type-subhead text-lg text-zinc-900">Photos</h3>
             <p class="text-sm text-zinc-500">
               Photos tied to a color show only while that color is selected. Printful's own photos
-              refresh with each sync; add more of your own from the media library.
+              refresh with each sync; upload several at once or pick from the media library.
             </p>
           </div>
 
@@ -706,6 +747,7 @@ defmodule YscWeb.AdminMerchLive do
               id={:merch_add_photo}
               user_id={@current_user.id}
               image_id={nil}
+              multiple
             />
           </div>
         </section>

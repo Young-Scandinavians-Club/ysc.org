@@ -96,4 +96,15 @@ defmodule YscWeb.UploadsConsumeEntryTest do
       assert id == existing.id
     end
   end
+
+  describe "consume_entry/3 — title" do
+    test "a new image is titled after the uploaded filename", %{user: user} do
+      entry = %{client_name: "Back print final.v2.png"}
+
+      assert {:ok, id} =
+               Uploads.consume_entry(%{path: @tiny_png_path}, entry, user)
+
+      assert Repo.get!(Image, id).title == "Back print final.v2"
+    end
+  end
 end

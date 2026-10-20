@@ -137,7 +137,7 @@ defmodule YscWeb.Uploads do
   end
 
   @doc false
-  def consume_entry(%{path: path} = _details, _params, current_user) do
+  def consume_entry(%{path: path} = _details, entry, current_user) do
     # Validate file MIME type before processing
     case FileValidator.validate_image(path, [
            ".jpg",
@@ -157,13 +157,13 @@ defmodule YscWeb.Uploads do
 
     case Media.find_image_by_content_hash(hash) do
       %Media.Image{processing_state: :failed} ->
-        consume_insert_new_image_after_hash(path, hash, current_user)
+        consume_insert_new_image_after_hash(path, hash, current_user, entry)
 
       %Media.Image{} = existing ->
         {:ok, existing.id}
 
       nil ->
-        consume_insert_new_image_after_hash(path, hash, current_user)
+        consume_insert_new_image_after_hash(path, hash, current_user, entry)
     end
   end
 
@@ -172,13 +172,25 @@ defmodule YscWeb.Uploads do
     {:ok, meta}
   end
 
-  defp consume_insert_new_image_after_hash(path, hash, current_user) do
+  # Default the title to the original filename (without extension) so images
+  # aren't all "Untitled" in the library and pickers. Admins can still rename.
+  defp title_from_entry(%{client_name: name}) when is_binary(name) do
+    case name |> Path.rootname() |> String.trim() |> String.slice(0, 255) do
+      "" -> nil
+      title -> title
+    end
+  end
+
+  defp title_from_entry(_entry), do: nil
+
+  defp consume_insert_new_image_after_hash(path, hash, current_user, entry) do
     upload_result = Media.upload_file_to_s3(path)
 
     case Media.add_new_image(
            %{
              raw_image_path: upload_result[:body][:location],
-             content_hash: hash
+             content_hash: hash,
+             title: title_from_entry(entry)
            },
            current_user
          ) do
