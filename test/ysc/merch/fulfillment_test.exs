@@ -127,7 +127,7 @@ defmodule Ysc.Merch.FulfillmentTest do
       assert payment.external_payment_id == "pi_#{order.reference_id}"
 
       assert_email_sent(
-        subject: "We've got your merch order (#{order.reference_id})",
+        subject: "We've got your order (#{order.reference_id})",
         to: {nil, user.email}
       )
 

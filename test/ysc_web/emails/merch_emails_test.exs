@@ -71,6 +71,10 @@ defmodule YscWeb.Emails.MerchEmailsTest do
         |> MerchOrderConfirmation.prepare_email_data()
         |> MerchOrderConfirmation.render()
 
+      assert html =~ "We've got your order"
+      assert html =~ "we're making your items now"
+      refute html =~ "merch"
+      refute html =~ "printer"
       assert html =~ "Club Tee"
       assert html =~ "Black · M"
       assert html =~ ~s(src="https://media.example.test/tee.jpg")
@@ -105,6 +109,11 @@ defmodule YscWeb.Emails.MerchEmailsTest do
 
       assert html =~ "<strong>Order number:</strong>"
       assert html =~ "<strong>Ordered:</strong>"
+    end
+
+    test "the confirmation subject names the order, not merch", %{order: order} do
+      assert MerchOrderConfirmation.get_subject(order) ==
+               "We've got your order (#{order.reference_id})"
     end
 
     test "shipped", %{order: order} do
@@ -413,7 +422,10 @@ defmodule YscWeb.Emails.MerchEmailsTest do
         |> MerchOrderShipped.prepare_email_data(shipment())
         |> MerchOrderShipped.render()
 
-      assert html =~ "Your merch is on its way"
+      assert html =~ "Your order is on its way"
+      refute html =~ "merch"
+      assert html =~ "Shipped by:"
+      refute html =~ "Carrier:"
       assert html =~ order.reference_id
       assert html =~ "USPS"
       assert html =~ "9400111899223197428490"
@@ -435,7 +447,8 @@ defmodule YscWeb.Emails.MerchEmailsTest do
         )
         |> MerchOrderShipped.render()
 
-      assert html =~ "hasn't shared a tracking number yet"
+      assert html =~ "A tracking number isn't available yet"
+      refute html =~ "hasn't shared a tracking number yet"
       refute html =~ "Track your package"
     end
 
@@ -462,7 +475,7 @@ defmodule YscWeb.Emails.MerchEmailsTest do
 
     test "subject and template name", %{order: order} do
       assert MerchOrderShipped.get_subject(order) ==
-               "Your merch is on its way (#{order.reference_id})"
+               "Your order is on its way (#{order.reference_id})"
 
       assert MerchOrderShipped.get_template_name() == "merch_order_shipped"
     end
@@ -586,6 +599,8 @@ defmodule YscWeb.Emails.MerchEmailsTest do
         |> MerchOrderConfirmation.prepare_email_data()
         |> MerchOrderConfirmation.render()
 
+      assert html =~ "We've got your order"
+      refute html =~ "merch"
       assert html =~ "the club is covering it"
       assert html =~ "Happy hour giveaway"
       assert html =~ "Paid by the club"

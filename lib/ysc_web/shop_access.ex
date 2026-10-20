@@ -21,7 +21,7 @@ defmodule YscWeb.ShopAccess do
         socket
         |> YscWeb.Flash.put_toast(
           :info,
-          "The merch shop is for active YSC members. Renew your membership to shop.",
+          "The shop is for active YSC members. Renew your membership to shop.",
           title: "Members only"
         )
         |> Phoenix.LiveView.redirect(to: ~p"/users/membership")

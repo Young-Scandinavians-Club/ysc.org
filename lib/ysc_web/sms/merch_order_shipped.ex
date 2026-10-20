@@ -27,7 +27,7 @@ defmodule YscWeb.Sms.MerchOrderShipped do
     eta =
       if estimate in [nil, ""], do: "", else: " Est. delivery #{estimate}."
 
-    "Your YSC merch order #{reference_id} has shipped#{via}.#{eta}#{track}"
+    "Your YSC order #{reference_id} has shipped#{via}.#{eta}#{track}"
     |> Template.greeting(first_name)
     |> Template.format()
   end

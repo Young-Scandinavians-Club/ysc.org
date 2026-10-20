@@ -79,7 +79,7 @@ defmodule YscWeb.AdminMerchOrdersLiveTest do
       assert has_element?(
                view,
                "#admin_merch_orders_list-row-#{comp.id} span.bg-sky-100",
-               "Sending to printer"
+               "Getting ready"
              )
     end
 

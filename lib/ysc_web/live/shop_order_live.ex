@@ -147,7 +147,7 @@ defmodule YscWeb.ShopOrderLive do
   # Steps shown to the member, with how far along the order is.
   @steps [
     {:paid, "Order placed", "hero-check"},
-    {:in_production, "In production", "hero-printer"},
+    {:in_production, "Being made", "hero-printer"},
     {:shipped, "Shipped", "hero-truck"},
     {:delivered, "Delivered", "hero-home"}
   ]
@@ -282,7 +282,7 @@ defmodule YscWeb.ShopOrderLive do
                 >
                   <div class="min-w-0">
                     <p class="text-lg text-zinc-900">
-                      {shipment.carrier || "Carrier"}
+                      {shipment.carrier || "Shipping company"}
                       <span :if={shipment.service} class="text-zinc-500">· {shipment.service}</span>
                     </p>
                     <p class="text-zinc-500">
@@ -381,7 +381,7 @@ defmodule YscWeb.ShopOrderLive do
         There's a problem with your order
       </h2>
       <p class="mt-2 text-red-800">
-        Your payment went through, but we couldn't send your order to our printer. The club has been
+        Your payment went through, but we couldn't start making your order. The club has been
         alerted and will be in touch; you can also email <a
           class="underline"
           href="mailto:info@ysc.org"

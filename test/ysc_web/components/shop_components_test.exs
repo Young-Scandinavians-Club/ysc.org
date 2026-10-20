@@ -51,4 +51,12 @@ defmodule YscWeb.ShopComponentsTest do
       assert html =~ "San Francisco, CA 94105"
     end
   end
+
+  describe "status_display/1" do
+    test "uses everyday words instead of printer or factory jargon" do
+      assert status_display(:submitting) == {"Getting ready", "sky"}
+      assert status_display(:submitted) == {"Being prepared", "sky"}
+      assert status_display(:in_production) == {"Being made", "sky"}
+    end
+  end
 end

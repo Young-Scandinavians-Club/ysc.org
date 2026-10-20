@@ -151,8 +151,8 @@ defmodule YscWeb.ShopLive do
   # Answers are plain text; `contact` is where members write with problems.
   defp faq_items do
     [
-      {"does-the-club-make-money", "Does the club make money on the merch?",
-       "No. The club does not make money on merch. The shop is just for fun, and a way to show your support for the club when you are out and about."},
+      {"does-the-club-make-money", "Does the club make money on club gear?",
+       "No. The club does not make money on these items. The shop is just for fun, and a way to show your support for the club when you are out and about."},
       {"delivery-time", "Why might delivery take longer than usual?",
        "Everything is printed to order. Nothing sits in a warehouse waiting for you: your item is made after you order and then shipped, so it can take a bit longer to arrive than a typical online order. We email you as soon as it ships, with a tracking link."},
       {"shipping", "Where do you ship, and what does it cost?",

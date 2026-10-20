@@ -21,7 +21,7 @@ defmodule YscWeb.Emails.MerchOrderConfirmation do
   def get_template_name, do: "merch_order_confirmation"
 
   def get_subject(%Order{reference_id: reference_id}) do
-    "We've got your merch order (#{reference_id})"
+    "We've got your order (#{reference_id})"
   end
 
   @doc """

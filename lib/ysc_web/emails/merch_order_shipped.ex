@@ -14,7 +14,7 @@ defmodule YscWeb.Emails.MerchOrderShipped do
   def get_template_name, do: "merch_order_shipped"
 
   def get_subject(%Order{reference_id: reference_id}),
-    do: "Your merch is on its way (#{reference_id})"
+    do: "Your order is on its way (#{reference_id})"
 
   @doc """
   Template data for an order (with `user` loaded when it has one) and the

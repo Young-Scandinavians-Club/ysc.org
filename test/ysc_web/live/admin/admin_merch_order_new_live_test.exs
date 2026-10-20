@@ -377,9 +377,7 @@ defmodule YscWeb.AdminMerchOrderNewLiveTest do
 
       assert order.printful_order_id == 4242
 
-      assert_email_sent(
-        subject: "We've got your merch order (#{order.reference_id})"
-      )
+      assert_email_sent(subject: "We've got your order (#{order.reference_id})")
 
       assert_email_sent(
         subject:

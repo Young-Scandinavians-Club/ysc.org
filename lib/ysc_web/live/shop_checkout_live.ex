@@ -525,12 +525,17 @@ defmodule YscWeb.ShopCheckoutLive do
             autocomplete="postal-code"
           />
         </div>
-        <.input
-          field={@form[:phone]}
-          type="tel"
-          label="Phone (for the carrier)"
-          autocomplete="tel"
-        />
+        <div>
+          <.input
+            field={@form[:phone]}
+            type="tel"
+            label="Phone number"
+            autocomplete="tel"
+          />
+          <p id="checkout-phone-help" class="mt-1 text-sm text-zinc-500">
+            The shipping company may call if they need help delivering your package.
+          </p>
+        </div>
         <input type="hidden" name="address[country_code]" value="US" />
         <input type="hidden" name="address[email]" value={@form[:email].value} />
 

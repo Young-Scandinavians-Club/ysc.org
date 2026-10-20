@@ -503,9 +503,9 @@ defmodule YscWeb.ShopComponents do
   @doc false
   def status_display(:pending), do: {"Awaiting payment", "yellow"}
   def status_display(:paid), do: {"Paid", "sky"}
-  def status_display(:submitting), do: {"Sending to printer", "sky"}
+  def status_display(:submitting), do: {"Getting ready", "sky"}
   def status_display(:submitted), do: {"Being prepared", "sky"}
-  def status_display(:in_production), do: {"In production", "sky"}
+  def status_display(:in_production), do: {"Being made", "sky"}
   def status_display(:shipped), do: {"Shipped", "green"}
   def status_display(:delivered), do: {"Delivered", "green"}
   def status_display(:failed), do: {"Problem with order", "red"}

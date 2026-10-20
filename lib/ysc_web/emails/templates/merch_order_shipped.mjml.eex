@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Your merch is on its way</strong>
+      <strong>Your order is on its way</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -24,8 +24,8 @@
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Tracking</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <%= if @shipment.carrier do %><strong>Carrier:</strong> <%= @shipment.carrier %><%= if @shipment.service do %> (<%= @shipment.service %>)<% end %><br /><% end %>
-      <%= if @shipment.tracking_number do %><strong>Tracking number:</strong> <%= @shipment.tracking_number %><% else %>The carrier hasn't shared a tracking number yet.<% end %>
+      <%= if @shipment.carrier do %><strong>Shipped by:</strong> <%= @shipment.carrier %><%= if @shipment.service do %> (<%= @shipment.service %>)<% end %><br /><% end %>
+      <%= if @shipment.tracking_number do %><strong>Tracking number:</strong> <%= @shipment.tracking_number %><% else %>A tracking number isn't available yet.<% end %>
     </mj-text>
     <%= if @shipment.tracking_url do %>
     <mj-spacer height="24px"></mj-spacer>

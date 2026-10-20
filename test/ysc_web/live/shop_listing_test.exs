@@ -278,9 +278,17 @@ defmodule YscWeb.ShopListingTest do
 
       assert has_element?(
                view,
-               "#shop-faq-does-the-club-make-money",
-               "does not"
+               "#shop-faq-does-the-club-make-money summary",
+               "club gear"
              )
+
+      assert has_element?(
+               view,
+               "#shop-faq-does-the-club-make-money",
+               "does not make money on these items"
+             )
+
+      refute has_element?(view, "#shop-faq-does-the-club-make-money", "merch")
 
       assert has_element?(view, "#shop-faq-delivery-time", "printed to order")
       assert has_element?(view, "#shop-faq-contact[href='mailto:info@ysc.org']")

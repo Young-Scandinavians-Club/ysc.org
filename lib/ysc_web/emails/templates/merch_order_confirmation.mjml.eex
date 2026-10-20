@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>We've got your merch order</strong>
+      <strong>We've got your order</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -12,13 +12,13 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <%= if @comp do %>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The club has placed a merch order for you. There's nothing to pay: the club is covering it.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The club has placed an order for you. There's nothing to pay: the club is covering it.</mj-text>
     <%= if @purpose do %>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>For:</strong> <%= @purpose %></mj-text>
     <% end %>
     <% else %>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thanks for your order! Your payment went through and we've sent your items to our printer.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Thanks for your order! Your payment went through and we're making your items now.</mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Order details</mj-text>

@@ -498,7 +498,7 @@ defmodule Ysc.Merch.AdminOrdersTest do
         AdminOrders.create_comp_order(admin, params(%{event_id: event.id}))
 
       assert_email_sent(
-        subject: "We've got your merch order (#{order.reference_id})",
+        subject: "We've got your order (#{order.reference_id})",
         to: {nil, "ada@example.com"}
       )
 
