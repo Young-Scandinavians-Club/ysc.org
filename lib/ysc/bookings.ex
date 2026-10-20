@@ -1129,6 +1129,13 @@ defmodule Ysc.Bookings do
 
   Used later to cancel that intent by id when the hold is released, instead of
   listing recent PaymentIntents and scanning metadata.
+
+  Only `:hold` bookings are updated. Deferred checkout can create a Stripe
+  PaymentIntent after HoldExpiry / Cancel has already released the hold.
+  Attaching anyway leaves a confirmable Intent on a `:canceled` row that
+  HoldExpiry will never reconcile (`status != :hold`); cabin
+  `payment_intent.succeeded` webhooks are a no-op, so a closed tab orphans
+  the captured charge.
   """
   def attach_payment_intent(%Booking{} = booking, payment_intent_id)
       when is_binary(payment_intent_id) do
@@ -1140,13 +1147,34 @@ defmodule Ysc.Bookings do
            booking.id
          ) do
       :ok ->
-        booking
-        |> Booking.payment_changeset(%{payment_intent_id: payment_intent_id})
-        |> Repo.update()
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+        {count, _} =
+          attach_hold_payment_intent_query(booking.id)
+          |> Repo.update_all(
+            set: [payment_intent_id: payment_intent_id, updated_at: now]
+          )
+
+        if count == 1 do
+          {:ok,
+           %{booking | payment_intent_id: payment_intent_id, updated_at: now}}
+        else
+          Ysc.Logging.warning(
+            "Refusing to attach PaymentIntent to non-hold booking",
+            booking_id: booking.id,
+            payment_intent_id: payment_intent_id
+          )
+
+          {:error, :booking_not_on_hold}
+        end
 
       {:error, _} = error ->
         error
     end
+  end
+
+  defp attach_hold_payment_intent_query(booking_id) do
+    from(b in Booking, where: b.id == ^booking_id and b.status == :hold)
   end
 
   # Same Stripe-first replace as `attach_modification_payment_intent/2`. Blind
@@ -6935,5 +6963,10 @@ defmodule Ysc.Bookings do
       order_by: [desc: b.inserted_at],
       limit: 50
     )
+  end
+
+  @doc false
+  def ci_query_explain_attach_payment_intent_query do
+    attach_hold_payment_intent_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end
