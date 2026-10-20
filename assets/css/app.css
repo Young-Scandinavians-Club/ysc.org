@@ -132,13 +132,6 @@ html {
   }
 }
 
-/* A single over-wide element must never make the page pan sideways: on phones
-   that also drags fixed bars (the event ticket CTA) out of place. `clip` hides
-   the overflow without making body a scroll container, so sticky still works. */
-body {
-  overflow-x: clip;
-}
-
 /* Ensure the scroll stops below sticky navbar for history page sections */
 
 #key-events {
@@ -986,6 +979,13 @@ body.overflow-hidden {
     page-break-inside: avoid;
     break-inside: avoid;
   }
+}
+
+/* Authored content often contains bare URLs. Left unbroken, one long link makes
+   the whole page wider than the screen on phones, which also stretches the
+   fixed bars (the event ticket CTA) past the edge. */
+.post-render {
+  overflow-wrap: anywhere;
 }
 
 /* Trix-authored content rendering — used on public post/event pages and in the admin editor preview */
