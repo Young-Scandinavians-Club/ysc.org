@@ -208,7 +208,9 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
 
       {:ok, stripe_event} ->
         # Attempt to process the webhook using the handler
-        case WebhookHandler.handle_event(stripe_event) do
+        # The event was stored and verified when first received, so it is
+        # older than the live replay window by design.
+        case WebhookHandler.handle_event(stripe_event, replay: true) do
           :ok ->
             Ysc.Logging.info("Successfully retried webhook",
               webhook_id: webhook_event.id,
@@ -217,22 +219,6 @@ defmodule YscWeb.Workers.WebhookRetryWorker do
             )
 
             {:ok, :success}
-
-          {:error, :webhook_too_old} ->
-            # Webhook is too old, mark as failed
-            Ysc.Logging.warning("Webhook too old to retry, marking as failed",
-              webhook_id: webhook_event.id,
-              event_id: webhook_event.event_id,
-              age_days:
-                DateTime.diff(
-                  DateTime.utc_now(),
-                  webhook_event.inserted_at,
-                  :day
-                )
-            )
-
-            Ysc.Webhooks.update_webhook_state(webhook_event, :failed)
-            {:ok, :skipped}
 
           {:error, reason} = error ->
             Ysc.Logging.warning("Failed to retry webhook",

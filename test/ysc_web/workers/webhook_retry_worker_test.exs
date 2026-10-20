@@ -296,7 +296,7 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
       assert updated.state == :failed
     end
 
-    test "marks webhook failed and skips when Stripe event is too old to process" do
+    test "retries a stored event older than the live replay window" do
       old_created =
         DateTime.to_unix(DateTime.add(DateTime.utc_now(), -600, :second))
 
@@ -310,9 +310,9 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
           }
         })
 
-      assert {:ok, :skipped} = WebhookRetryWorker.retry_webhook(webhook)
+      assert {:ok, :success} = WebhookRetryWorker.retry_webhook(webhook)
       updated = Repo.get!(WebhookEvent, webhook.id)
-      assert updated.state == :failed
+      assert updated.state == :processed
     end
 
     test "returns error for unsupported provider" do
@@ -666,7 +666,7 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
       assert Repo.get!(WebhookEvent, webhook.id).state == :processed
     end
 
-    test "telemetry counts skipped when webhook is too old for handler" do
+    test "telemetry counts success for webhooks older than the live replay window" do
       old_time = DateTime.add(DateTime.utc_now(), -10, :minute)
 
       old_created =
@@ -687,10 +687,10 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
 
       ref =
         :telemetry.attach(
-          "webhook-retry-skipped-telemetry",
+          "webhook-retry-old-event-telemetry",
           [:ysc, :workers, :webhook_retry_completed],
           fn _event, measurements, _meta, _ ->
-            send(parent, {:telemetry_skipped, measurements})
+            send(parent, {:telemetry_old_event, measurements})
           end,
           nil
         )
@@ -699,8 +699,9 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
 
       assert :ok = perform_job(WebhookRetryWorker, %{})
 
-      assert_receive {:telemetry_skipped, measurements}
-      assert measurements.skipped >= 1
+      assert_receive {:telemetry_old_event, measurements}
+      assert measurements.success >= 1
+      assert measurements.skipped == 0
     end
   end
 

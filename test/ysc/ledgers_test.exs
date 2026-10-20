@@ -316,6 +316,35 @@ defmodule Ysc.LedgersTest do
       assert payment2.external_payment_id == external_id
     end
 
+    test "create_payment/2 in a savepoint leaves the surrounding transaction usable on a duplicate",
+         %{user: user} do
+      external_id = "pi_savepoint_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        amount: Money.new(5000, :USD),
+        external_provider: :stripe,
+        external_payment_id: external_id,
+        status: :completed,
+        payment_date: DateTime.utc_now()
+      }
+
+      assert {:ok, _payment} = Ledgers.create_payment(attrs)
+
+      result =
+        Repo.transaction(fn ->
+          assert {:error, changeset} =
+                   Ledgers.create_payment(attrs, mode: :savepoint)
+
+          assert Keyword.has_key?(changeset.errors, :external_payment_id)
+
+          # Without the savepoint this raises: the transaction was aborted.
+          Ledgers.get_payment_by_external_id(external_id)
+        end)
+
+      assert {:ok, %Payment{external_payment_id: ^external_id}} = result
+    end
+
     @tag :capture_log
     test "process_payment/1 handles concurrent duplicate external_payment_id (race condition)",
          %{user: user, sandbox_owner: owner} do

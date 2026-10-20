@@ -618,8 +618,13 @@ defmodule Ysc.Ledgers do
       create_entries: create_entries
     } = opts
 
+    # The insert runs in a savepoint: when this is nested in a caller's
+    # transaction (e.g. the webhook handler's), a lost race on the unique
+    # external_payment_id must not abort that outer transaction. For the same
+    # reason the duplicate is returned as a value instead of via Repo.rollback/1,
+    # which would mark the whole outer transaction as rolled back.
     case Repo.transaction(fn ->
-           case create_payment(payment_attrs) do
+           case create_payment(payment_attrs, mode: :savepoint) do
              {:ok, payment} ->
                {:ok, transaction} =
                  create_transaction(%{
@@ -634,17 +639,17 @@ defmodule Ysc.Ledgers do
 
              {:error, %Ecto.Changeset{} = changeset} ->
                if duplicate_external_payment_id_error?(changeset) do
-                 Repo.rollback(:duplicate_external_payment_id)
+                 :duplicate_external_payment_id
                else
                  Repo.rollback(changeset)
                end
            end
          end) do
+      {:ok, :duplicate_external_payment_id} ->
+        return_existing_completed_payment(external_payment_id)
+
       {:ok, result} ->
         {:ok, result}
-
-      {:error, :duplicate_external_payment_id} ->
-        return_existing_completed_payment(external_payment_id)
 
       {:error, reason} ->
         {:error, reason}
@@ -734,10 +739,10 @@ defmodule Ysc.Ledgers do
   @doc """
   Creates a payment record.
   """
-  def create_payment(attrs \\ %{}) do
+  def create_payment(attrs \\ %{}, opts \\ []) do
     %Payment{}
     |> Payment.changeset(attrs)
-    |> Repo.insert()
+    |> Repo.insert(opts)
   end
 
   @doc """
