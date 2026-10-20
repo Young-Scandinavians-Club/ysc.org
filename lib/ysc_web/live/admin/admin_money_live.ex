@@ -98,6 +98,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:ledger_entries_end?, true)
       |> assign(:webhook_events, [])
       |> assign(:webhooks_end?, true)
+      |> assign(:webhook_state, nil)
       |> assign(:expense_reports, [])
       |> assign(:expense_reports_end?, true)
       |> assign(:expense_reports_inbox, [])
@@ -132,8 +133,12 @@ defmodule YscWeb.AdminMoneyLive do
 
     {socket, dates_changed?} = assign_dates_from_params(socket, params)
 
+    webhook_state = parse_webhook_state(params["webhook_state"])
+    webhook_state_changed? = webhook_state != socket.assigns.webhook_state
+
     socket =
       socket
+      |> assign(:webhook_state, webhook_state)
       |> assign(:active_tab, active_tab)
       |> assign(:live_action, socket.assigns.live_action || :index)
 
@@ -142,6 +147,7 @@ defmodule YscWeb.AdminMoneyLive do
         socket
         |> apply_action(socket.assigns.live_action, params)
         |> maybe_refresh_for_date_change(dates_changed?)
+        |> maybe_refresh_webhooks(webhook_state_changed? and not dates_changed?)
         |> ensure_tab_loaded(active_tab)
       else
         socket
@@ -327,6 +333,12 @@ defmodule YscWeb.AdminMoneyLive do
         base
       end
 
+    base =
+      case assigns[:webhook_state] do
+        nil -> base
+        state -> Map.put(base, "webhook_state", to_string(state))
+      end
+
     Map.merge(base, stringify_query_overrides(overrides))
   end
 
@@ -337,6 +349,13 @@ defmodule YscWeb.AdminMoneyLive do
   defp money_index_path(socket_or_assigns, overrides) do
     ~p"/admin/money?#{money_query_params(socket_or_assigns, overrides)}"
   end
+
+  @webhook_state_filters ~w(pending processing processed failed)
+
+  defp parse_webhook_state(state) when state in @webhook_state_filters,
+    do: String.to_existing_atom(state)
+
+  defp parse_webhook_state(_), do: nil
 
   defp parse_tab("expenses"), do: :expenses
   defp parse_tab("ledger"), do: :ledger
@@ -378,6 +397,18 @@ defmodule YscWeb.AdminMoneyLive do
       )
     )
   end
+
+  defp maybe_refresh_webhooks(socket, true) do
+    if socket.assigns.tabs_loaded.webhooks do
+      socket
+      |> assign(:webhooks_page, 1)
+      |> paginate_webhooks(1)
+    else
+      socket
+    end
+  end
+
+  defp maybe_refresh_webhooks(socket, false), do: socket
 
   defp maybe_refresh_for_date_change(socket, false), do: socket
 
@@ -592,6 +623,23 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   @impl true
+  def handle_event("filter_webhooks", params, socket) do
+    state = get_in(params, ["webhook_filter", "state"])
+
+    query =
+      socket
+      |> money_query_params(%{"tab" => "webhooks"})
+      |> Map.delete("webhook_state")
+
+    query =
+      case parse_webhook_state(state) do
+        nil -> query
+        parsed -> Map.put(query, "webhook_state", to_string(parsed))
+      end
+
+    {:noreply, push_patch(socket, to: ~p"/admin/money?#{query}")}
+  end
+
   def handle_event("show_webhook_modal", %{"webhook_id" => webhook_id}, socket) do
     webhook = Webhooks.get_webhook_event(webhook_id)
 
@@ -1245,7 +1293,8 @@ defmodule YscWeb.AdminMoneyLive do
     webhook_events =
       Webhooks.list_webhook_events_for_admin(start_date, end_date,
         limit: per_page,
-        offset: offset
+        offset: offset,
+        state: socket.assigns.webhook_state
       )
 
     socket
@@ -2005,6 +2054,20 @@ defmodule YscWeb.AdminMoneyLive do
       </div>
 
       <div :if={@active_tab == :webhooks} id="money-webhooks-tab">
+        <.form
+          for={webhook_filter_form(@webhook_state)}
+          id="webhook-filter-form"
+          phx-change="filter_webhooks"
+          class="mb-4 max-w-xs"
+        >
+          <.input
+            field={webhook_filter_form(@webhook_state)[:state]}
+            id="webhook-state-filter"
+            type="select"
+            label="State"
+            options={webhook_state_filter_options()}
+          />
+        </.form>
         <.admin_table_card title="Stripe Webhook Events">
           <table class="min-w-full divide-y divide-zinc-200">
             <thead class="bg-zinc-50">
@@ -2074,7 +2137,7 @@ defmodule YscWeb.AdminMoneyLive do
                   colspan="5"
                   class="px-6 py-4 text-center text-sm text-zinc-500"
                 >
-                  No webhook events found for the selected date range.
+                  No webhook events found for the selected date range and filter.
                 </td>
               </tr>
             </tbody>
@@ -5048,6 +5111,22 @@ defmodule YscWeb.AdminMoneyLive do
             )
         end
     end
+  end
+
+  defp webhook_filter_form(state) do
+    to_form(%{"state" => if(state, do: to_string(state), else: "")},
+      as: :webhook_filter
+    )
+  end
+
+  defp webhook_state_filter_options do
+    [
+      {"All states", ""},
+      {"Processed", "processed"},
+      {"Failed", "failed"},
+      {"Processing", "processing"},
+      {"Pending", "pending"}
+    ]
   end
 
   defp get_webhook_state_color(state) do

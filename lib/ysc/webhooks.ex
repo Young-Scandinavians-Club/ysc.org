@@ -248,17 +248,27 @@ defmodule Ysc.Webhooks do
   Paginated Stripe webhook rows for the treasurer Money webhooks tab.
 
   Skips `payload` JSON. Click-through uses `get_webhook_event/1`.
+
+  Options: `:limit`, `:offset`, and `:state` (a webhook state atom such as
+  `:failed`; `nil` returns every state).
   """
   def list_webhook_events_for_admin(start_date, end_date, opts \\ []) do
     limit = Keyword.get(opts, :limit, 20)
     offset = Keyword.get(opts, :offset, 0)
+    state = Keyword.get(opts, :state)
 
     start_date
-    |> list_webhook_events_for_admin_query(end_date, limit, offset)
+    |> list_webhook_events_for_admin_query(end_date, limit, offset, state)
     |> Repo.all()
   end
 
-  defp list_webhook_events_for_admin_query(start_date, end_date, limit, offset) do
+  defp list_webhook_events_for_admin_query(
+         start_date,
+         end_date,
+         limit,
+         offset,
+         state
+       ) do
     from(w in WebhookEvent,
       where: w.provider == :stripe,
       where: w.inserted_at >= ^start_date,
@@ -268,6 +278,7 @@ defmodule Ysc.Webhooks do
       limit: ^limit,
       offset: ^offset
     )
+    |> maybe_filter_by_state(state)
   end
 
   defp maybe_filter_by_provider(query, nil), do: query
@@ -312,6 +323,6 @@ defmodule Ysc.Webhooks do
   @doc false
   def ci_query_explain_list_webhook_events_for_admin_query do
     now = Ysc.Ci.QueryExplain.Fixtures.now()
-    list_webhook_events_for_admin_query(now, now, 20, 0)
+    list_webhook_events_for_admin_query(now, now, 20, 0, nil)
   end
 end
