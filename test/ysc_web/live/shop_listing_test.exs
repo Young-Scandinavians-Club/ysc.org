@@ -78,7 +78,8 @@ defmodule YscWeb.ShopListingTest do
   test "tiles show a swatch per color and details", %{
     conn: conn,
     tee: tee,
-    sticker: sticker
+    sticker: sticker,
+    hoodie: hoodie
   } do
     {:ok, view, _html} = live_shop(conn)
 
@@ -89,6 +90,31 @@ defmodule YscWeb.ShopListingTest do
 
     # No colors, no swatches.
     refute has_element?(view, "#shop-swatches-#{sticker.id}")
+
+    # One color is no choice: the color is named in the details line only.
+    refute has_element?(view, "#shop-swatches-#{hoodie.id}")
+    assert has_element?(view, "#shop-details-#{hoodie.id}", "Navy")
+  end
+
+  test "tiles have one link for assistive tech and no New badge", %{
+    conn: conn,
+    tee: tee
+  } do
+    {:ok, view, _html} = live_shop(conn)
+
+    assert has_element?(
+             view,
+             "#shop-product-link-#{tee.id}[aria-hidden=true][tabindex='-1']"
+           )
+
+    refute has_element?(view, "#shop-product-new-#{tee.id}")
+  end
+
+  test "the color filter button reports whether its panel is open", %{
+    conn: conn
+  } do
+    {:ok, view, _html} = live_shop(conn)
+    assert has_element?(view, "#shop-filter-toggle[aria-expanded=false]")
   end
 
   test "photos show a server-rendered blur preview until they load", %{

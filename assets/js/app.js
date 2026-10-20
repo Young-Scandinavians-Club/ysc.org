@@ -43,6 +43,7 @@ import GLightboxHook from "./glightbox_hook";
 import ProductLightbox from "./product_lightbox";
 import ShopTile from "./shop_tile";
 import CartPeekHover from "./cart_peek_hover";
+import CartDockReveal from "./cart_dock_reveal";
 import LocalTime from "./local_time";
 import ResendTimer from "./resend_timer";
 import BackToTop from "./back_to_top";
@@ -100,6 +101,7 @@ let Hooks = {
     ProductLightbox,
     ShopTile,
     CartPeekHover,
+    CartDockReveal,
     LocalTime,
     ResendTimer,
     BackToTop,

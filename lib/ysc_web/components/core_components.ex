@@ -4197,6 +4197,11 @@ defmodule YscWeb.CoreComponents do
 
   attr :class, :any, default: nil
 
+  attr :margin_class, :string,
+    default: nil,
+    doc:
+      "Replaces the size's default bottom margin (for pages that sit closer to their content)"
+
   slot :inner_block,
     doc:
       "Optional content rendered below the title and subtitle inside the bordered masthead"
@@ -4206,7 +4211,7 @@ defmodule YscWeb.CoreComponents do
     <div
       id={@id}
       class={[
-        page_masthead_frame_class(@size),
+        @margin_class || page_masthead_frame_class(@size),
         @class
       ]}
     >

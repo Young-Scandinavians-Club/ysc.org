@@ -182,18 +182,5 @@ defmodule Ysc.Merch.ListingTest do
       assert navy_color.image.id == navy.image_id
       assert navy_color.hover_image == nil
     end
-
-    test "flags products added in the last 30 days as new", %{tee: tee} do
-      tile = loaded() |> Enum.find(&(&1.id == tee.id)) |> Listing.tile()
-      assert tile.new?
-
-      old = %{
-        (loaded()
-         |> Enum.find(&(&1.id == tee.id)))
-        | inserted_at: DateTime.add(DateTime.utc_now(), -45, :day)
-      }
-
-      refute Listing.tile(old).new?
-    end
   end
 end

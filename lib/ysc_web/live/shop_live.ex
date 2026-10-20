@@ -171,6 +171,11 @@ defmodule YscWeb.ShopLive do
   defp answer_after(answer, phrase),
     do: answer |> String.split(phrase, parts: 2) |> List.last()
 
+  defp hide_filter_panel do
+    JS.hide(to: "#shop-filter-panel")
+    |> JS.set_attribute({"aria-expanded", "false"}, to: "#shop-filter-toggle")
+  end
+
   defp count_label(1), do: "1 item"
   defp count_label(count), do: "#{count} items"
 
@@ -232,7 +237,14 @@ defmodule YscWeb.ShopLive do
                 type="button"
                 id="shop-filter-toggle"
                 aria-controls="shop-filter-panel"
-                phx-click={JS.toggle(to: "#shop-filter-panel")}
+                aria-expanded="false"
+                phx-click={
+                  JS.toggle(to: "#shop-filter-panel")
+                  |> JS.toggle_attribute(
+                    {"aria-expanded", "true", "false"},
+                    to: "#shop-filter-toggle"
+                  )
+                }
                 class="inline-flex items-center gap-2 rounded-xl bg-zinc-100 px-3 py-2.5 md:px-4 text-base font-medium text-zinc-900 transition hover:bg-zinc-200 motion-safe:active:scale-[0.97]"
               >
                 <.icon name="hero-adjustments-horizontal" class="size-5" /> Color
@@ -247,9 +259,9 @@ defmodule YscWeb.ShopLive do
 
               <div
                 id="shop-filter-panel"
-                phx-click-away={JS.hide(to: "#shop-filter-panel")}
+                phx-click-away={hide_filter_panel()}
                 phx-key="escape"
-                phx-window-keydown={JS.hide(to: "#shop-filter-panel")}
+                phx-window-keydown={hide_filter_panel()}
                 class="absolute right-0 z-20 mt-2 hidden w-72 rounded-2xl bg-white p-3 shadow-xl ring-1 ring-zinc-900/5"
               >
                 <ul class="flex flex-col">
@@ -423,7 +435,7 @@ defmodule YscWeb.ShopLive do
         </div>
       </section>
 
-      <.cart_dock summary={@cart_summary} />
+      <.cart_dock summary={@cart_summary} reveal_after="shop-nav" />
     </.shop_frame>
     """
   end

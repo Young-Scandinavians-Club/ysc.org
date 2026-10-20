@@ -51,7 +51,7 @@ defmodule YscWeb.ShopComponents do
           id={"#{@id}-masthead"}
           eyebrow={@eyebrow}
           title={@title}
-          class="mb-6! md:mb-8!"
+          margin_class="mb-6 md:mb-8"
         />
       </div>
 
@@ -256,7 +256,8 @@ defmodule YscWeb.ShopComponents do
         navigate={product_path(@product, @tile.active)}
         id={"shop-product-link-#{@product.id}"}
         data-tile-link
-        aria-label={@product.name}
+        tabindex="-1"
+        aria-hidden="true"
         class="block transition-transform motion-safe:active:scale-[0.98]"
       >
         <div class="shop-tile-photo relative aspect-square overflow-hidden rounded-2xl bg-zinc-100">
@@ -279,18 +280,11 @@ defmodule YscWeb.ShopComponents do
               />
             </div>
           </div>
-          <span
-            :if={@tile.new?}
-            id={"shop-product-new-#{@product.id}"}
-            class="type-eyebrow absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-xs text-zinc-900"
-          >
-            New
-          </span>
         </div>
       </.link>
 
       <div
-        :if={@tile.active.name}
+        :if={length(@tile.colors) > 1}
         class="mt-2 flex flex-wrap items-center gap-x-0.5"
         id={"shop-swatches-#{@product.id}"}
       >
@@ -323,7 +317,10 @@ defmodule YscWeb.ShopComponents do
       <.link
         navigate={product_path(@product, @tile.active)}
         data-tile-link
-        class={["group block", if(@tile.active.name, do: "mt-1", else: "mt-11")]}
+        class={[
+          "group block",
+          if(length(@tile.colors) > 1, do: "mt-1", else: "mt-11")
+        ]}
       >
         <h2 class="type-subhead text-lg text-zinc-900 transition-colors group-hover:text-blue-700 md:text-xl">
           {@product.name}
@@ -587,9 +584,20 @@ defmodule YscWeb.ShopComponents do
 
   attr :open?, :boolean, default: false
 
+  attr :reveal_after, :string,
+    default: nil,
+    doc:
+      "DOM id of an element (the page's own cart link) that the pill stays hidden behind until it scrolls out of view"
+
   def cart_dock(assigns) do
     ~H"""
-    <div :if={@summary.count > 0} id="cart-dock" class="cart-dock print:hidden">
+    <div
+      :if={@summary.count > 0}
+      id="cart-dock"
+      class="cart-dock print:hidden"
+      phx-hook={@reveal_after && "CartDockReveal"}
+      data-reveal-after={@reveal_after}
+    >
       <%!-- Announced to assistive tech when something is added. --%>
       <p id="cart-dock-status" class="sr-only" role="status" aria-live="polite">
         <%= if @open? && @peek do %>
