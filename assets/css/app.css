@@ -3943,7 +3943,6 @@ body.overflow-hidden {
 /* The count lands with a small pulse each time it changes (the element is
    re-created per count, so the animation replays). */
 .cart-count-pop {
-  display: inline-block;
   animation: cart-count-pop 420ms var(--ease-spring-settle);
 }
 
