@@ -578,6 +578,38 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       refute has_element?(view, "#order-confirmation-payment-method", "Free")
     end
 
+    test "falls back to Online payment when method details are unavailable",
+         %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+
+      order =
+        create_ticket_order(user, event, %{
+          total_amount: Money.new(5000, :USD),
+          payment_intent_id: "pi_missing_#{System.unique_integer([:positive])}"
+        })
+
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      render_async(view)
+
+      assert has_element?(
+               view,
+               "#order-confirmation-payment-method",
+               "Online payment"
+             )
+
+      refute has_element?(
+               view,
+               "#order-confirmation-payment-method",
+               "Credit or debit card"
+             )
+    end
+
     test "shows payment summary heading", %{conn: conn} do
       user = create_user_with_membership()
       event = create_event(%{})
