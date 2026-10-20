@@ -2334,6 +2334,11 @@ defmodule YscWeb.CoreComponents do
     doc:
       "Truncate the name/subtitle with an ellipsis instead of letting them set the card's width; the caller must give the card a bounded width (e.g. `flex-1 min-w-0`)"
 
+  attr :avatar_only_on_mobile, :boolean,
+    default: false,
+    doc:
+      "Show only the avatar below the `sm` breakpoint, for tight spots like the mobile navbar"
+
   def user_card(assigns) do
     assigns = derive_user_card_assigns(assigns)
 
@@ -2391,7 +2396,8 @@ defmodule YscWeb.CoreComponents do
       <div class={[
         @right && "order-1 pe-3",
         !@right && "ps-3",
-        @truncate && "min-w-0"
+        @truncate && "min-w-0",
+        @avatar_only_on_mobile && "hidden sm:block"
       ]}>
         <div class={[
           "text-sm font-semibold text-zinc-800 text-left",
@@ -2453,7 +2459,8 @@ defmodule YscWeb.CoreComponents do
         data-dropdown-toggle="avatar-menu"
         id="avatar-menuLink"
         aria-expanded="false"
-        class="flex flex-row items-center h-10 rounded-sm hover:bg-zinc-100 pl-3"
+        aria-label="Account menu"
+        class="flex flex-row items-center h-10 rounded-sm hover:bg-zinc-100 sm:pl-3"
         phx-click={toggle_dropdown("#avatar-menu")}
       >
         <.user_card
@@ -2466,6 +2473,7 @@ defmodule YscWeb.CoreComponents do
           avatar_url={@avatar_url}
           right={true}
           show_subtitle={false}
+          avatar_only_on_mobile
         />
       </button>
       <!-- Dropdown menu -->

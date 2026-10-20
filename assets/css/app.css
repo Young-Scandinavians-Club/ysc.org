@@ -132,6 +132,13 @@ html {
   }
 }
 
+/* A single over-wide element must never make the page pan sideways: on phones
+   that also drags fixed bars (the event ticket CTA) out of place. `clip` hides
+   the overflow without making body a scroll container, so sticky still works. */
+body {
+  overflow-x: clip;
+}
+
 /* Ensure the scroll stops below sticky navbar for history page sections */
 
 #key-events {
