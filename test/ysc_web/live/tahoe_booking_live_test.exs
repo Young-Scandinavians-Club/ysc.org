@@ -2168,9 +2168,23 @@ defmodule YscWeb.TahoeBookingLiveTest do
       render_click(view, "room-changed", %{"room-id" => first.id})
       render_click(view, "room-changed", %{"room-id" => second.id})
 
-      refute has_element?(view, "#room-#{third.id}")
+      assert has_element?(
+               view,
+               ~s(#room-card-#{third.id} input[value="#{third.id}"][disabled])
+             )
+
+      assert has_element?(
+               view,
+               "#room-card-#{third.id}",
+               "maximum of 2 rooms"
+             )
+
+      assert has_element?(
+               view,
+               ~s(#room-card-#{third.id} input[aria-describedby="room-#{third.id}-reason"])
+             )
+
       assert has_element?(view, "#room-#{first.id}[checked]")
-      assert render(view) =~ "maximum of 2 rooms"
     end
   end
 

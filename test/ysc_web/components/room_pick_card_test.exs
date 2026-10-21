@@ -81,7 +81,9 @@ defmodule YscWeb.Components.RoomPickCardTest do
 
     assert html =~ "disabled"
     assert html =~ "Already booked for these dates"
-    # The reason sits under the photo; nothing is drawn over it.
+    # The reason is exposed to assistive tech and sits under the photo.
+    assert html =~ ~s(aria-describedby="room-room-1-reason")
+    assert html =~ ~s(id="room-room-1-reason")
     refute html =~ "bg-zinc-900/80"
     refute html =~ ~s(id="room-room-1")
     refute html =~ "phx-click"
