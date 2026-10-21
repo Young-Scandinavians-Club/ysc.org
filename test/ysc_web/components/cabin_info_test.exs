@@ -42,6 +42,11 @@ defmodule YscWeb.Components.CabinInfoTest do
       assert html =~ "Arrival & House Manual"
       assert html =~ "Booking & Cancellation Policies"
       refute html =~ "info-tab-rooms"
+      # Underlines must not overhang the scroll container, or the bar scrolls
+      # vertically; the scrollbar itself is hidden on narrow screens.
+      refute html =~ "-mb-px"
+      assert html =~ "overflow-y-hidden"
+      assert html =~ "scrollbar-width:none"
       assert html =~ ~s(aria-selected="true")
       assert html =~ "border-blue-600"
     end

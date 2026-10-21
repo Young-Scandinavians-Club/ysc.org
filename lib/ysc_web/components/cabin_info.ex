@@ -30,7 +30,10 @@ defmodule YscWeb.Components.CabinInfo do
   def info_tabs(assigns) do
     ~H"""
     <div class="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-zinc-200 mb-8 -mx-4 px-4">
-      <nav class="flex gap-6 overflow-x-auto" role="tablist">
+      <nav
+        class="flex gap-6 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        role="tablist"
+      >
         <.info_tab
           id="info-tab-general"
           tab="general"
@@ -80,7 +83,7 @@ defmodule YscWeb.Components.CabinInfo do
       phx-click="switch-info-tab"
       phx-value-tab={@tab}
       class={[
-        "inline-flex items-center gap-2 min-h-11 -mb-px border-b-2 text-sm whitespace-nowrap transition-colors",
+        "inline-flex items-center gap-2 min-h-11 border-b-2 text-sm whitespace-nowrap transition-colors",
         if(@active,
           do: ["font-semibold text-zinc-900", tab_underline(@accent)],
           else: "font-medium border-transparent text-zinc-500 hover:text-zinc-900"
