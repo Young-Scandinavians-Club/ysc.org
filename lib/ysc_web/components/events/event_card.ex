@@ -41,7 +41,7 @@ defmodule YscWeb.Components.Events.EventCard do
 
     ~H"""
     <div class={[
-      "group flex flex-col rounded-xl border transition duration-300 relative hover:ring-2 hover:ring-blue-500 p-2",
+      "group flex flex-col rounded-xl border transition duration-300 relative hover:ring-2 hover:ring-blue-500 motion-safe:active:scale-[0.98] p-2",
       if(@variant == "dark",
         do: "bg-zinc-800 border-zinc-700",
         else: "bg-white border-zinc-100"
@@ -104,7 +104,10 @@ defmodule YscWeb.Components.Events.EventCard do
             {DateTimeFormatter.format_time(@event.start_time)}
           </span>
         </div>
-        <.link navigate={~p"/events/#{@event.id}"} class="block">
+        <.link
+          navigate={~p"/events/#{@event.id}"}
+          class="block after:absolute after:inset-0 after:content-['']"
+        >
           <h3 class={[
             "text-2xl mb-3 group-hover:text-blue-600 group-hover:underline transition-colors line-clamp-2 min-h-16 type-subhead",
             if(@variant == "dark", do: "text-white", else: "text-zinc-900")

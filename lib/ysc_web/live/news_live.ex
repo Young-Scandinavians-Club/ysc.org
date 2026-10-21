@@ -191,7 +191,7 @@ defmodule YscWeb.NewsLive do
           <div
             :for={{dom_id, post} <- @streams.posts}
             id={dom_id}
-            class="group flex flex-col bg-white rounded-xl p-2 border border-zinc-100 transition duration-300 hover:ring-2 hover:ring-blue-500"
+            class="group relative flex flex-col bg-white rounded-xl p-2 border border-zinc-100 transition duration-300 hover:ring-2 hover:ring-blue-500 motion-safe:active:scale-[0.98]"
           >
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
               <div class="relative aspect-video sm:aspect-16/10 overflow-hidden rounded-lg">
@@ -225,7 +225,7 @@ defmodule YscWeb.NewsLive do
 
               <.link
                 navigate={~p"/posts/#{post.url_name}"}
-                class="text-2xl text-zinc-900 mb-3 group-hover:text-blue-600 group-hover:underline transition-colors type-subhead"
+                class="text-2xl text-zinc-900 mb-3 group-hover:text-blue-600 group-hover:underline transition-colors type-subhead after:absolute after:inset-0 after:content-['']"
               >
                 {post.title}
               </.link>
