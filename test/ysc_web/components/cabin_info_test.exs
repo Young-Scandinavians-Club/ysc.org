@@ -245,15 +245,21 @@ defmodule YscWeb.Components.CabinInfoTest do
       html =
         rendered_to_string(~H"""
         <.essentials_strip id="essentials" accent={:teal}>
-          <:item id="sleeping" icon="hero-moon">Bring your own linens</:item>
-          <:item icon="hero-no-symbol">No pets or smoking</:item>
+          <:item id="sleeping" icon="hero-moon" title="Sleeping">
+            Bring your own linens
+          </:item>
+          <:item icon="hero-no-symbol" title="House rules">
+            No pets or smoking
+          </:item>
         </.essentials_strip>
         """)
 
       assert html =~ ~s(id="essentials")
       assert html =~ ~s(id="sleeping")
       assert html =~ "hero-moon"
-      assert html =~ "text-teal-600"
+      assert html =~ "bg-teal-50"
+      assert html =~ "Sleeping"
+      assert html =~ "House rules"
       assert html =~ "No pets or smoking"
     end
   end

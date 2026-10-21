@@ -387,7 +387,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       assert html =~ "Bring your own bed linens"
       assert html =~ "No pets or smoking"
-      assert html =~ "Winter: carry chains or use 4WD with snow tires"
+      assert html =~ "Carry chains or use 4WD with snow tires"
       assert html =~ "please help with chores before you leave"
       refute html =~ "BRING YOUR OWN LINENS"
       refute html =~ "NOT A HOTEL"
