@@ -1275,10 +1275,7 @@ defmodule YscWeb.HomeLive do
               <div
                 :if={@async_data_loaded && !Enum.empty?(@upcoming_tickets)}
                 id="home-tickets-list"
-                class={[
-                  "grid grid-cols-1 md:grid-cols-2 gap-4",
-                  !Enum.empty?(@future_bookings) && "mt-4"
-                ]}
+                class={["space-y-3", !Enum.empty?(@future_bookings) && "mt-3"]}
               >
                 <%= for {event, grouped_tiers} <- group_tickets_by_event_and_tier(@upcoming_tickets) do %>
                   <% order_ids =
@@ -1305,71 +1302,71 @@ defmodule YscWeb.HomeLive do
                       </span>
                       <.icon name="hero-ticket" class="w-4 h-4 mt-3 text-blue-200" />
                     </div>
-                    <div class="flex-1 min-w-0 p-5">
-                      <span class={[
-                        "inline-block px-2 py-1 mb-2 text-xs font-bold rounded-sm",
-                        case days_until_this_event do
-                          0 -> "bg-amber-50 text-amber-700"
-                          _ -> "bg-blue-50 text-blue-700"
-                        end
-                      ]}>
-                        {DateDisplay.relative_days_phrase(days_until_this_event)}
-                      </span>
-                      <.link navigate={~p"/events/#{event.id}"} class="block group">
-                        <h3 class="text-zinc-900 mb-2 group-hover:text-blue-600 transition-colors type-subhead">
-                          {event.title}
-                        </h3>
-                      </.link>
-                      <p class="text-xs text-zinc-500 flex items-center gap-1 mb-1">
-                        <.icon name="hero-calendar" class="w-3 h-3" />
-                        {DateDisplay.format_datetime_display(event.start_date)}
-                      </p>
-                      <div
-                        :if={event.location_name}
-                        class="text-xs text-zinc-500 flex items-center gap-1"
-                      >
-                        <.icon name="hero-map-pin" class="w-3 h-3" />
-                        <span class="truncate">{event.location_name}</span>
-                      </div>
-                      <div class="mt-4 pt-4 border-t border-zinc-100 space-y-3">
-                        <div class="flex flex-wrap gap-1.5">
+                    <div class="flex-1 min-w-0 p-5 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                      <div class="flex-1 min-w-0">
+                        <span class={[
+                          "inline-block px-2 py-1 mb-2 text-xs font-bold rounded-sm",
+                          case days_until_this_event do
+                            0 -> "bg-amber-50 text-amber-700"
+                            _ -> "bg-blue-50 text-blue-700"
+                          end
+                        ]}>
+                          {DateDisplay.relative_days_phrase(days_until_this_event)}
+                        </span>
+                        <.link
+                          navigate={~p"/events/#{event.id}"}
+                          class="block group"
+                        >
+                          <h3 class="text-zinc-900 mb-1 group-hover:text-blue-600 transition-colors type-subhead">
+                            {event.title}
+                          </h3>
+                        </.link>
+                        <p class="text-xs text-zinc-500 flex items-center gap-1">
+                          <.icon name="hero-calendar" class="w-3 h-3 shrink-0" />
+                          {DateDisplay.format_datetime_display(event.start_date)}
+                        </p>
+                        <p
+                          :if={event.location_name}
+                          class="mt-1 text-xs text-zinc-500 flex items-center gap-1"
+                        >
+                          <.icon name="hero-map-pin" class="w-3 h-3 shrink-0" />
+                          <span class="truncate">{event.location_name}</span>
+                        </p>
+                        <div class="mt-3 flex flex-wrap gap-1.5">
                           <%= for {tier_name, tickets} <- grouped_tiers do %>
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-full">
                               <span class="text-blue-500">{length(tickets)}×</span>{tier_name}
                             </span>
                           <% end %>
                         </div>
-                        <div class="flex flex-wrap items-center gap-3">
-                          <.button
+                      </div>
+                      <div class="flex flex-col items-start md:items-end gap-1 shrink-0 md:pl-6 md:border-l md:border-zinc-100">
+                        <.button
+                          navigate={~p"/events/#{event.id}/tickets/qr?return_to=/"}
+                          color="blue"
+                          class="py-1.5! whitespace-nowrap"
+                        >
+                          <.icon name="hero-qr-code" class="w-4 h-4" /> Show tickets
+                        </.button>
+                        <%= if length(order_ids) == 1 do %>
+                          <.link
                             navigate={
-                              ~p"/events/#{event.id}/tickets/qr?return_to=/"
+                              ~p"/orders/#{List.first(order_ids)}/confirmation"
                             }
-                            color="blue"
-                            class="py-1.5! whitespace-nowrap"
+                            class="inline-flex items-center min-h-8 text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors duration-150 whitespace-nowrap"
                           >
-                            <.icon name="hero-qr-code" class="w-4 h-4" />
-                            Show tickets for check-in
-                          </.button>
-                          <%= if length(order_ids) == 1 do %>
+                            View order & receipt
+                          </.link>
+                        <% else %>
+                          <%= if length(order_ids) > 1 do %>
                             <.link
-                              navigate={
-                                ~p"/orders/#{List.first(order_ids)}/confirmation"
-                              }
-                              class="inline-flex items-center min-h-11 -my-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
+                              navigate={~p"/users/tickets"}
+                              class="inline-flex items-center min-h-8 text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors duration-150 whitespace-nowrap"
                             >
-                              View order & receipt
+                              View all tickets
                             </.link>
-                          <% else %>
-                            <%= if length(order_ids) > 1 do %>
-                              <.link
-                                navigate={~p"/users/tickets"}
-                                class="inline-flex items-center min-h-11 -my-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
-                              >
-                                View all tickets
-                              </.link>
-                            <% end %>
                           <% end %>
-                        </div>
+                        <% end %>
                       </div>
                     </div>
                   </div>
