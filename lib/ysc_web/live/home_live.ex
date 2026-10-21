@@ -1119,7 +1119,7 @@ defmodule YscWeb.HomeLive do
                   id="home-quick-action-expenses"
                   navigate={~p"/expensereports"}
                   icon="hero-receipt-refund"
-                  tone={:blue}
+                  tone={:yellow}
                   title="Expenses"
                   subtitle="View reports"
                 />

@@ -4881,7 +4881,7 @@ defmodule YscWeb.CoreComponents do
 
   attr :tone, :atom,
     default: :blue,
-    values: [:blue, :emerald, :violet, :zinc],
+    values: [:blue, :emerald, :violet, :yellow, :zinc],
     doc: "Icon colour"
 
   def quick_action_card(assigns) do
@@ -4913,6 +4913,7 @@ defmodule YscWeb.CoreComponents do
   defp quick_action_card_icon_class(:blue), do: "text-blue-600"
   defp quick_action_card_icon_class(:emerald), do: "text-emerald-600"
   defp quick_action_card_icon_class(:violet), do: "text-violet-600"
+  defp quick_action_card_icon_class(:yellow), do: "text-yellow-600"
   defp quick_action_card_icon_class(:zinc), do: "text-zinc-500"
 
   @doc """
