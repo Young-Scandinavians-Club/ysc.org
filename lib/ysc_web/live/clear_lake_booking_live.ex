@@ -1474,20 +1474,6 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Change dates or guests
                     </.button>
                   </div>
-                  <.refund_summary
-                    id="clear-lake-refund-summary"
-                    columns={[
-                      %{
-                        label: BookingModeDisplay.stay_type_label(:day),
-                        rules: RefundPolicyDisplay.policy_rules(@day_refund_policy)
-                      },
-                      %{
-                        label: BookingModeDisplay.stay_type_label(:buyout),
-                        rules:
-                          RefundPolicyDisplay.policy_rules(@buyout_refund_policy)
-                      }
-                    ]}
-                  />
                 </div>
               </div>
             </aside>
