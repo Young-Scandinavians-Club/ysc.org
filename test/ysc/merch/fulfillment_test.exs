@@ -391,6 +391,51 @@ defmodule Ysc.Merch.FulfillmentTest do
 
       assert Repo.aggregate(Payment, :count) == 0
     end
+
+    test "losing the pending-to-paid claim does not fail a surrounding transaction",
+         %{order: order} do
+      printful_accepts()
+      pi = payment_intent(order)
+      handler_id = "merch-lost-claim-#{inspect(self())}"
+
+      :telemetry.attach(
+        handler_id,
+        [:ysc, :ledgers, :payment_recorded],
+        fn _event, _measurements, metadata, _config ->
+          now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+          {1, _} =
+            from(o in Order,
+              where: o.id == ^order.id and o.status == :pending
+            )
+            |> Repo.update_all(
+              set: [
+                status: :paid,
+                payment_id: metadata.payment_id,
+                payment_intent_id: pi.id,
+                updated_at: now
+              ]
+            )
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      # Checkout-return vs webhook: both see :pending, both record the ledger
+      # payment, then the other process wins the status claim. Failing that
+      # Multi used to Repo.rollback and abort the webhook's outer transaction.
+      result =
+        Repo.transaction(fn ->
+          assert {:ok, %Order{}} = Fulfillment.process_successful_payment(pi)
+          Repo.get!(Order, order.id)
+        end)
+
+      assert {:ok, %Order{status: :paid, id: id}} = result
+      assert id == order.id
+      assert Repo.aggregate(Payment, :count) == 1
+      refute_received {:printful_payload, _}
+    end
   end
 
   describe "submit_to_printful/1" do
