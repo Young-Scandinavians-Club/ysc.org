@@ -279,12 +279,26 @@ defmodule Ysc.PublicContentCacheTest do
       assert PublicContentCache.fetch_post_page("remote", load) == 1
       assert PublicContentCache.fetch_post_page("remote", load) == 1
 
-      # What Ysc.DistributedCache.Sync does when another node bumps the version.
+      version_key = "public_content:version:post_pages"
+      {:ok, stale_version} = Cachex.get(:ysc_cache, version_key)
+
+      # Bump through the real publisher and capture what it broadcasts.
+      Phoenix.PubSub.subscribe(Ysc.PubSub, Ysc.DistributedCache.topic())
+      PublicContentCache.invalidate_post_pages()
+      this_node = node()
+
+      assert_receive {:distributed_cache_put, ^this_node, :ysc_cache,
+                      ^version_key, version, opts}
+
+      # Rewind to what a node that hasn't received the broadcast yet sees.
+      Cachex.put(:ysc_cache, version_key, stale_version)
+      assert PublicContentCache.fetch_post_page("remote", load) == 1
+
+      # Replay the broadcast as another node's write (Sync skips its own node).
       send(
         Process.whereis(Ysc.DistributedCache.Sync),
-        {:distributed_cache_put, :other@node, :ysc_cache,
-         "public_content:version:post_pages", System.system_time(:microsecond),
-         []}
+        {:distributed_cache_put, :other@node, :ysc_cache, version_key, version,
+         opts}
       )
 
       :sys.get_state(Ysc.DistributedCache.Sync)

@@ -788,7 +788,7 @@ defmodule Ysc.Posts do
   post uses `image_id`, e.g. after the image is edited or finishes processing.
   """
   def invalidate_caches_for_image(image_id) when is_binary(image_id) do
-    if Repo.exists?(from p in Post, where: p.image_id == ^image_id) do
+    if Repo.exists?(post_using_image_query(image_id)) do
       Ysc.PublicContentCache.invalidate_posts()
     end
 
@@ -800,10 +800,18 @@ defmodule Ysc.Posts do
   # Callers (the admin editor autosave) pass `%Post{id: id}` stubs, so the
   # struct's `state` can't tell whether the post was live before the update.
   defp published_in_db?(%Post{id: id}) when is_binary(id) do
-    Repo.exists?(from p in Post, where: p.id == ^id and p.state == :published)
+    Repo.exists?(published_post_by_id_query(id))
   end
 
   defp published_in_db?(_), do: false
+
+  defp post_using_image_query(image_id) do
+    from(p in Post, where: p.image_id == ^image_id)
+  end
+
+  defp published_post_by_id_query(id) do
+    from(p in Post, where: p.id == ^id and p.state == :published)
+  end
 
   defp maybe_invalidate_public_post_cache(result, was_public? \\ false)
 
@@ -865,5 +873,15 @@ defmodule Ysc.Posts do
       select: struct(p, ^@public_feed_post_fields),
       preload: [author: ^public_post_author_name_query()]
     )
+  end
+
+  @doc false
+  def ci_query_explain_post_using_image_query do
+    post_using_image_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_published_post_by_id_query do
+    published_post_by_id_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end
