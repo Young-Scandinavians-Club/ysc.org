@@ -29,6 +29,20 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert result =~ "<em>friends</em>"
     end
 
+    test "gives headings explicit inline styles smaller than the edition title" do
+      result =
+        NewsletterEdition.email_safe_html(
+          ~s(<h1 class="x" style="font-size:99px">Winter is coming</h1><h3>Sub</h3>)
+        )
+
+      assert result =~ "Winter is coming"
+      assert result =~ "font-size:20px"
+      assert result =~ "font-size:17px"
+      assert result =~ "font-weight:bold"
+      refute result =~ "99px"
+      refute result =~ "class="
+    end
+
     test "strips class attributes" do
       html = "<p class=\"text-bold\">Text</p>"
       result = NewsletterEdition.email_safe_html(html)
@@ -476,6 +490,24 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       result = NewsletterEdition.email_safe_html(html)
       assert result =~ "report.pdf"
       refute result =~ "KB"
+    end
+  end
+
+  describe "heading hierarchy in render/1" do
+    test "edition title is larger than intro headings" do
+      assigns =
+        NewsletterEdition.build_preview_assigns(
+          "Tahoe is open",
+          "<div>Hi</div><h1>Winter is coming</h1>",
+          nil,
+          [],
+          []
+        )
+
+      html = NewsletterEdition.render(assigns)
+
+      assert html =~ ~r/font-size:28px;[^>]*>\s*Tahoe is open/
+      assert html =~ ~r/<h1 style="[^"]*font-size:20px[^"]*">Winter is coming/
     end
   end
 
