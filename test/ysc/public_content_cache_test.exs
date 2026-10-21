@@ -270,6 +270,28 @@ defmodule Ysc.PublicContentCacheTest do
     end
   end
 
+  describe "invalidate_caches_for_image/1" do
+    test "ignores images no post uses and non-ids" do
+      image = Ysc.MerchFixtures.image_fixture()
+
+      {:ok, before_version} =
+        Cachex.get(:ysc_cache, "public_content:version:posts")
+
+      assert :ok = Posts.invalidate_caches_for_image(image.id)
+      assert :ok = Posts.invalidate_caches_for_image(nil)
+
+      assert {:ok, ^before_version} =
+               Cachex.get(:ysc_cache, "public_content:version:posts")
+    end
+  end
+
+  describe "ci_query_explain targets" do
+    test "build queries" do
+      assert %Ecto.Query{} = Posts.ci_query_explain_post_using_image_query()
+      assert %Ecto.Query{} = Posts.ci_query_explain_published_post_by_id_query()
+    end
+  end
+
   describe "cross-node invalidation" do
     test "a version replicated from another node drops cached post pages" do
       {:ok, counter} = Agent.start_link(fn -> 0 end)

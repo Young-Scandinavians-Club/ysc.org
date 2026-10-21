@@ -799,11 +799,9 @@ defmodule Ysc.Posts do
 
   # Callers (the admin editor autosave) pass `%Post{id: id}` stubs, so the
   # struct's `state` can't tell whether the post was live before the update.
-  defp published_in_db?(%Post{id: id}) when is_binary(id) do
-    Repo.exists?(published_post_by_id_query(id))
+  defp published_in_db?(%Post{id: id}) do
+    is_binary(id) and Repo.exists?(published_post_by_id_query(id))
   end
-
-  defp published_in_db?(_), do: false
 
   defp post_using_image_query(image_id) do
     from(p in Post, where: p.image_id == ^image_id)
