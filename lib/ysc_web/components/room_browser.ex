@@ -111,17 +111,7 @@ defmodule YscWeb.Components.RoomBrowser do
         <p :if={@room.description} class="text-sm text-zinc-600 leading-relaxed">
           {@room.description}
         </p>
-        <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
-          <span>{capacity_label(@room.capacity_max)}</span>
-          <span
-            :for={{type, count, label} <- bed_summary(@room)}
-            class="inline-flex items-center gap-1.5"
-          >
-            <span aria-hidden="true">·</span>
-            <.bed_icon type={type} />
-            <span>{count} {label}</span>
-          </span>
-        </p>
+        <.room_meta room={@room} />
         <p
           :if={@room.min_billable_occupancy > 1}
           class="text-xs text-amber-700"
@@ -146,6 +136,28 @@ defmodule YscWeb.Components.RoomBrowser do
         </div>
       </div>
     </article>
+    """
+  end
+
+  @doc """
+  One quiet metadata line for a room: capacity, then each bed type with its icon
+  (`Up to 2 guests · 1 queen`). Shared by the browse and booking-flow cards.
+  """
+  attr :room, :map, required: true
+
+  def room_meta(assigns) do
+    ~H"""
+    <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+      <span>{capacity_label(@room.capacity_max)}</span>
+      <span
+        :for={{type, count, label} <- bed_summary(@room)}
+        class="inline-flex items-center gap-1.5"
+      >
+        <span aria-hidden="true">·</span>
+        <.bed_icon type={type} />
+        <span>{count} {label}</span>
+      </span>
+    </p>
     """
   end
 
