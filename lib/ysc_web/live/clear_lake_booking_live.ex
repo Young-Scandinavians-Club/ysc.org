@@ -659,7 +659,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       role="radiogroup"
                     >
                       <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition has-focus-visible:ring-2 has-focus-visible:ring-offset-2 has-focus-visible:ring-teal-600",
                         if(
                           @selected_booking_mode == :day ||
                             @selected_booking_mode == nil,
@@ -719,7 +719,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </p>
                       </label>
                       <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition has-focus-visible:ring-2 has-focus-visible:ring-offset-2 has-focus-visible:ring-teal-600",
                         if(@selected_booking_mode == :buyout,
                           do: "border-teal-600 bg-teal-50 shadow-xs",
                           else:

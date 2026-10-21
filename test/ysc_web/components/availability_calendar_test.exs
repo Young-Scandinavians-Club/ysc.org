@@ -311,12 +311,18 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
     test "renders clear availability legend labels" do
       html = render_clear_lake_calendar()
 
-      assert html =~ "Already booked"
-      assert html =~ "Closed (maintenance or club event)"
-      assert html =~ "Valid check-in day"
-      assert html =~ "Valid check-out day"
-      refute html =~ "Not available for booking"
-      refute html =~ ">Unavailable<"
+      legend =
+        html
+        |> calendar_document()
+        |> Floki.find(~s|[aria-label="Calendar legend"]|)
+        |> Floki.raw_html()
+
+      assert legend =~ "Already booked"
+      assert legend =~ "Closed (maintenance or club event)"
+      assert legend =~ "Valid check-in day"
+      assert legend =~ "Valid check-out day"
+      refute legend =~ "Not available for booking"
+      refute legend =~ ">Unavailable<"
     end
 
     test "does not render old dot indicators" do
@@ -786,6 +792,8 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       # The blackout day is a "check-in day" (morning available, afternoon blacked out),
       # so it renders a green-to-red-800 gradient rather than a fully blocked bg-red-800 cell.
       assert day_html =~ "to-red-800"
+      # Not selectable as a check-in, so it must not advertise itself as OK.
+      refute day_html =~ "text-green-800"
     end
 
     test "shows X icon on fully unavailable blackout cells" do

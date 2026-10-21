@@ -1299,7 +1299,7 @@ defmodule YscWeb.TahoeBookingLive do
                       role="radiogroup"
                     >
                       <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition has-focus-visible:ring-2 has-focus-visible:ring-offset-2 has-focus-visible:ring-blue-600",
                         if(
                           @selected_booking_mode == :room ||
                             @selected_booking_mode == nil,
@@ -1354,7 +1354,7 @@ defmodule YscWeb.TahoeBookingLive do
                         </p>
                       </label>
                       <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition has-focus-visible:ring-2 has-focus-visible:ring-offset-2 has-focus-visible:ring-blue-600",
                         if(@selected_booking_mode == :buyout,
                           do: "border-blue-600 bg-blue-50 shadow-xs",
                           else:
