@@ -188,6 +188,50 @@ defmodule Ysc.Merch.WebhookHandlerTest do
       assert %Order{status: :submitted} = Orders.get_order!(order.id)
     end
 
+    test "a lost pending-to-paid claim still marks the webhook processed", %{
+      order: order
+    } do
+      intent = succeeded_intent(order)
+      handler_id = "merch-webhook-lost-claim-#{inspect(self())}"
+
+      expect(StripeMock, :retrieve_payment_intent, fn _, _ ->
+        {:ok, intent}
+      end)
+
+      :telemetry.attach(
+        handler_id,
+        [:ysc, :ledgers, :payment_recorded],
+        fn _event, _measurements, metadata, _config ->
+          now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+          {1, _} =
+            from(o in Order,
+              where: o.id == ^order.id and o.status == :pending
+            )
+            |> Repo.update_all(
+              set: [
+                status: :paid,
+                payment_id: metadata.payment_id,
+                payment_intent_id: intent.id,
+                updated_at: now
+              ]
+            )
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      event = stripe_event("payment_intent.succeeded", intent)
+      assert :ok = Ysc.Stripe.WebhookHandler.handle_event(event)
+
+      webhook =
+        Repo.get_by!(Ysc.Webhooks.WebhookEvent, event_id: event.id)
+
+      assert webhook.state == :processed
+      assert %Order{status: :paid} = Orders.get_order!(order.id)
+    end
+
     test "canceled events with a merch_order_id reach the merch handler", %{
       order: order
     } do
