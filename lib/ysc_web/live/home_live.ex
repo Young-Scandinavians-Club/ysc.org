@@ -1079,11 +1079,11 @@ defmodule YscWeb.HomeLive do
       </div>
 
       <%!-- Compact header with the quick-action bar on the right --%>
-      <div class="bg-white border-b border-zinc-200">
+      <div class="bg-linear-to-b from-blue-50 to-white border-b border-blue-100">
         <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 py-8">
           <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div class="space-y-1 min-w-0">
-              <p class="text-zinc-500 text-xs type-eyebrow">
+              <p class="text-blue-600 text-xs type-eyebrow">
                 Member Dashboard
               </p>
               <h1 class="text-2xl sm:text-3xl lg:text-4xl text-zinc-900 wrap-break-word type-display">
@@ -1096,12 +1096,13 @@ defmodule YscWeb.HomeLive do
             <%!-- Unified quick-action bar: 1px gaps over a zinc backdrop draw the dividers --%>
             <div
               id="home-quick-actions"
-              class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-zinc-200 border border-zinc-200 rounded-xl overflow-hidden lg:min-w-xl"
+              class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-blue-100 border border-blue-100 rounded-xl overflow-hidden shadow-xs lg:min-w-xl"
             >
               <.quick_action_card
                 id="home-quick-action-tahoe"
                 navigate={~p"/bookings/tahoe"}
                 icon="hero-home"
+                tone={:blue}
                 title="Lake Tahoe"
                 subtitle="Book a stay"
               />
@@ -1109,6 +1110,7 @@ defmodule YscWeb.HomeLive do
                 id="home-quick-action-clear-lake"
                 navigate={~p"/bookings/clear-lake"}
                 icon="hero-sun"
+                tone={:emerald}
                 title="Clear Lake"
                 subtitle="Book a stay"
               />
@@ -1117,6 +1119,7 @@ defmodule YscWeb.HomeLive do
                   id="home-quick-action-expenses"
                   navigate={~p"/expensereports"}
                   icon="hero-receipt-refund"
+                  tone={:violet}
                   title="Expenses"
                   subtitle="View reports"
                 />
@@ -1125,6 +1128,7 @@ defmodule YscWeb.HomeLive do
                   id="home-quick-action-events"
                   navigate={~p"/events"}
                   icon="hero-calendar-days"
+                  tone={:violet}
                   title="Events"
                   subtitle="See what's on"
                 />
@@ -1133,6 +1137,7 @@ defmodule YscWeb.HomeLive do
                 id="home-quick-action-settings"
                 navigate={~p"/users/settings"}
                 icon="hero-cog-6-tooth"
+                tone={:zinc}
                 title="Account"
                 subtitle="Membership & billing"
               />
@@ -1148,7 +1153,7 @@ defmodule YscWeb.HomeLive do
             <%!-- Reservations: cabin stays and event tickets in one place --%>
             <section id="home-reservations">
               <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg text-zinc-900 type-subhead">
+                <h2 class="text-lg text-zinc-900 border-l-4 border-blue-600 pl-3 type-subhead">
                   Your Reservations
                 </h2>
                 <.section_link navigate={~p"/users/payments"}>
@@ -1170,7 +1175,7 @@ defmodule YscWeb.HomeLive do
                     Enum.empty?(@upcoming_tickets)
                 }
                 id="home-reservations-empty"
-                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 px-5 bg-white border border-zinc-200 rounded-lg"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 px-5 bg-blue-50/50 border border-blue-100 rounded-lg"
               >
                 <p class="text-sm text-zinc-600">
                   No upcoming cabin stays or event tickets.
@@ -1286,18 +1291,20 @@ defmodule YscWeb.HomeLive do
                     |> Enum.filter(& &1)
                     |> Enum.uniq() %>
                   <% days_until_this_event = days_until_event(event) %>
-                  <div class="bg-white border border-zinc-200 rounded-xl p-5">
+                  <div class="bg-white border border-zinc-200 border-t-4 border-t-violet-400 rounded-xl p-5">
                     <div class="flex justify-between items-start mb-3">
                       <span class={[
                         "px-2 py-1 text-xs font-bold rounded-sm",
                         case days_until_this_event do
                           0 -> "bg-amber-50 text-amber-700"
-                          _ -> "bg-zinc-100 text-zinc-700"
+                          1 -> "bg-blue-50 text-blue-700"
+                          days when days <= 7 -> "bg-emerald-50 text-emerald-700"
+                          _ -> "bg-violet-50 text-violet-700"
                         end
                       ]}>
                         {DateDisplay.relative_days_phrase(days_until_this_event)}
                       </span>
-                      <.icon name="hero-ticket" class="w-5 h-5 text-zinc-400" />
+                      <.icon name="hero-ticket" class="w-5 h-5 text-violet-400" />
                     </div>
                     <.link navigate={~p"/events/#{event.id}"} class="block group">
                       <h3 class="text-zinc-900 mb-2 group-hover:text-blue-600 transition-colors type-subhead">
@@ -1361,7 +1368,7 @@ defmodule YscWeb.HomeLive do
             <%!-- Upcoming Events --%>
             <section id="home-upcoming-events">
               <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg text-zinc-900 type-subhead">
+                <h2 class="text-lg text-zinc-900 border-l-4 border-blue-600 pl-3 type-subhead">
                   Upcoming Events
                 </h2>
                 <.section_link navigate={~p"/events"}>
@@ -1389,7 +1396,7 @@ defmodule YscWeb.HomeLive do
               <div
                 :if={@async_data_loaded && Enum.empty?(@upcoming_events)}
                 id="home-upcoming-events-empty"
-                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 px-5 bg-white border border-zinc-200 rounded-lg"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 px-5 bg-blue-50/50 border border-blue-100 rounded-lg"
               >
                 <p class="text-sm text-zinc-600">
                   No upcoming events. Check back later for new community events.
@@ -1419,8 +1426,21 @@ defmodule YscWeb.HomeLive do
             <%!-- Member pass --%>
             <div
               id="home-member-pass"
-              class="bg-white border border-zinc-200 rounded-xl p-5 space-y-4"
+              class="relative bg-white border border-zinc-200 rounded-xl p-5 pt-6 space-y-4 overflow-hidden shadow-xs"
             >
+              <%!-- Nordic-flag nod: a blue bar with a short amber tail --%>
+              <div class="absolute inset-x-0 top-0 h-1.5 flex" aria-hidden="true">
+                <div class={[
+                  "flex-1",
+                  cond do
+                    @active_membership? -> "bg-blue-700"
+                    @current_user.state == :pending_approval -> "bg-sky-500"
+                    true -> "bg-amber-500"
+                  end
+                ]}>
+                </div>
+                <div class="w-1/5 bg-amber-300"></div>
+              </div>
               <div class="flex items-center justify-between gap-3">
                 <div class="inline-flex items-center gap-2 min-w-0">
                   <span
@@ -1484,7 +1504,7 @@ defmodule YscWeb.HomeLive do
                 :if={@active_membership?}
                 id="home-membership-qr-button"
                 type="button"
-                color="zinc"
+                color="blue"
                 phx-click="show_membership_qr"
                 loading_text="Opening..."
                 class="flex w-full"
@@ -1497,7 +1517,7 @@ defmodule YscWeb.HomeLive do
                 :if={@current_user.state == :pending_approval}
                 navigate={~p"/pending-review"}
                 id="home-pending-review-status"
-                class="flex w-full items-center justify-center rounded-md px-4 py-2.5 text-sm font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+                class="flex w-full items-center justify-center rounded-md px-4 py-2.5 text-sm font-semibold bg-sky-700 text-white hover:bg-sky-800 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-sky-700 focus-visible:ring-offset-2"
               >
                 <.icon name="hero-clock" class="w-4 h-4 mr-2 shrink-0" />
                 View application status
@@ -1589,7 +1609,7 @@ defmodule YscWeb.HomeLive do
                       />
                     </div>
                     <div class="min-w-0">
-                      <p class="text-xs text-zinc-500 mb-1">
+                      <p class="text-xs font-bold text-blue-600 mb-1">
                         {DateDisplay.format_date_short_in_zone(
                           post.published_on,
                           @timezone

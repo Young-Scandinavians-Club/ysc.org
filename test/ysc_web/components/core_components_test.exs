@@ -363,7 +363,7 @@ defmodule YscWeb.CoreComponentsTest do
   end
 
   describe "quick_action_card/1" do
-    test "renders a Tahoe booking shortcut with a neutral icon" do
+    test "renders a Tahoe booking shortcut with a tinted icon and no well" do
       assigns = %{}
 
       html =
@@ -382,12 +382,12 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "Lake Tahoe"
       assert html =~ "Book a stay"
       assert html =~ "hero-home"
-      assert html =~ "text-zinc-500"
-      refute html =~ "bg-blue-50"
+      assert html =~ "text-blue-600"
+      refute html =~ ~s(bg-blue-50 )
       refute html =~ "snap-center"
     end
 
-    test "renders several shortcuts without per-tone colour" do
+    test "colours the icon by tone" do
       assigns = %{}
 
       html =
@@ -395,7 +395,8 @@ defmodule YscWeb.CoreComponentsTest do
         <.quick_action_card
           id="home-quick-action-clear-lake"
           navigate="/bookings/clear-lake"
-          icon="hero-home"
+          icon="hero-sun"
+          tone={:emerald}
           title="Clear Lake"
           subtitle="Book a stay"
         />
@@ -403,6 +404,7 @@ defmodule YscWeb.CoreComponentsTest do
           id="home-quick-action-expenses"
           navigate="/expensereports"
           icon="hero-receipt-refund"
+          tone={:violet}
           title="Expenses"
           subtitle="View reports"
         />
@@ -420,6 +422,8 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ ~s(id="home-quick-action-settings")
       assert html =~ "hero-receipt-refund"
       assert html =~ "hero-cog-6-tooth"
+      assert html =~ "text-emerald-600"
+      assert html =~ "text-violet-600"
       refute html =~ "bg-emerald-50"
       refute html =~ "bg-orange-50"
     end

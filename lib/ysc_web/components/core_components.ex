@@ -4834,8 +4834,9 @@ defmodule YscWeb.CoreComponents do
   @doc """
   Compact dashboard shortcut cell used in the signed-in homepage quick-action bar.
 
-  Renders a neutral icon beside a two-line label; the parent supplies the
-  dividers and border so several cells read as one unified bar.
+  Renders an icon beside a two-line label; the parent supplies the dividers and
+  border so several cells read as one unified bar. The icon carries the only
+  colour (`tone`) and there is no tinted well behind it.
 
   ## Examples
 
@@ -4853,16 +4854,24 @@ defmodule YscWeb.CoreComponents do
   attr :title, :string, required: true
   attr :subtitle, :string, required: true
 
+  attr :tone, :atom,
+    default: :blue,
+    values: [:blue, :emerald, :violet, :zinc],
+    doc: "Icon colour"
+
   def quick_action_card(assigns) do
     ~H"""
     <.link
       id={@id}
       navigate={@navigate}
-      class="group flex items-center gap-3 px-4 py-3 min-h-14 bg-white hover:bg-zinc-50 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-900"
+      class="group flex items-center gap-3 px-4 py-3 min-h-14 bg-white hover:bg-blue-50/60 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-900"
     >
       <.icon
         name={@icon}
-        class="w-5 h-5 shrink-0 text-zinc-500 group-hover:text-zinc-900 transition-colors duration-150"
+        class={[
+          "w-5 h-5 shrink-0 transition-transform duration-150 group-hover:scale-110",
+          quick_action_card_icon_class(@tone)
+        ]}
       />
       <span class="min-w-0">
         <span class="block text-sm font-semibold text-zinc-900 leading-tight">
@@ -4875,6 +4884,11 @@ defmodule YscWeb.CoreComponents do
     </.link>
     """
   end
+
+  defp quick_action_card_icon_class(:blue), do: "text-blue-600"
+  defp quick_action_card_icon_class(:emerald), do: "text-emerald-600"
+  defp quick_action_card_icon_class(:violet), do: "text-violet-600"
+  defp quick_action_card_icon_class(:zinc), do: "text-zinc-500"
 
   @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.
