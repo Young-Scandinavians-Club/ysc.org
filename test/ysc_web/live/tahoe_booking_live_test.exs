@@ -2144,6 +2144,50 @@ defmodule YscWeb.TahoeBookingLiveTest do
     end)
   end
 
+  describe "room limit" do
+    test "rooms that can no longer be picked say why", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      rooms = for i <- 1..3, do: create_tahoe_room!(suffix: "limit-#{i}")
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "room",
+        "guests_count" => "3"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 2_000)
+
+      [first, second, third] = rooms
+      render_click(view, "room-changed", %{"room-id" => first.id})
+      render_click(view, "room-changed", %{"room-id" => second.id})
+
+      assert has_element?(
+               view,
+               ~s(#room-card-#{third.id} input[value="#{third.id}"][disabled])
+             )
+
+      assert has_element?(
+               view,
+               "#room-card-#{third.id}",
+               "maximum of 2 rooms"
+             )
+
+      assert has_element?(
+               view,
+               ~s(#room-card-#{third.id} input[aria-describedby="room-#{third.id}-reason"])
+             )
+
+      assert has_element?(view, "#room-#{first.id}[checked]")
+    end
+  end
+
   describe "rooms info tab" do
     setup %{conn: conn} do
       user = user_with_membership(:lifetime)

@@ -33,10 +33,13 @@ defmodule YscWeb.Components.RoomPickCard do
 
   def room_pick_card(assigns) do
     ~H"""
-    <div class={[
-      "relative flex flex-col h-full overflow-hidden rounded-xl border bg-white transition-colors has-focus-visible:ring-2 has-focus-visible:ring-blue-600 has-focus-visible:ring-offset-2",
-      card_state(@disabled, @selected)
-    ]}>
+    <div
+      id={"room-card-#{@room.id}"}
+      class={[
+        "relative flex flex-col h-full overflow-hidden rounded-xl border bg-white transition-colors has-focus-visible:ring-2 has-focus-visible:ring-blue-600 has-focus-visible:ring-offset-2",
+        card_state(@disabled, @selected)
+      ]}
+    >
       <label class={[
         "flex flex-col h-full",
         if(@disabled, do: "cursor-not-allowed", else: "cursor-pointer")
@@ -49,6 +52,7 @@ defmodule YscWeb.Components.RoomPickCard do
           checked={@selected}
           disabled={@disabled}
           aria-label={"Select #{@room.name}"}
+          aria-describedby={if(@disabled && @reason, do: "room-#{@room.id}-reason")}
           phx-click={if(!@disabled, do: "room-changed")}
           phx-value-room-id={if(!@disabled, do: @room.id)}
           class="sr-only"
@@ -101,6 +105,7 @@ defmodule YscWeb.Components.RoomPickCard do
           <.room_meta room={@room} />
           <p
             :if={@disabled && @reason}
+            id={"room-#{@room.id}-reason"}
             class="flex items-start gap-1.5 text-xs text-zinc-700 leading-relaxed"
           >
             <.icon
