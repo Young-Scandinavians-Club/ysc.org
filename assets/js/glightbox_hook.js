@@ -71,9 +71,14 @@ const GLightboxHook = {
 
             // First pass only: restructure DOM and clean href (idempotent via glightboxReady).
             // On re-init after destroy, still re-add ready links to the new gallery.
+            // Links marked data-glightbox-plain keep their markup (e.g. photos laid out in
+            // a grid) and take their caption from data-glightbox-caption.
+            const plain = link.hasAttribute("data-glightbox-plain");
             if (!link.dataset.glightboxReady) {
-                const caption = extractCaption(link, img);
-                restructureImageLink(link, img, caption);
+                const caption = plain
+                    ? (link.dataset.glightboxCaption || "").trim()
+                    : extractCaption(link, img);
+                if (!plain) restructureImageLink(link, img, caption);
 
                 const cleanHref = safeLightboxHref(href);
                 if (!cleanHref) return;
