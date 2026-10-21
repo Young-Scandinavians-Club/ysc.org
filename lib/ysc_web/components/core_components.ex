@@ -2981,6 +2981,31 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Reservation card for an upcoming or in-progress cabin stay (date stub plus
+  details). See `YscWeb.Components.Bookings.BookingCard`.
+
+  ## Examples
+
+      <.booking_card id="booking-1" booking={@booking} />
+
+      <.booking_card
+        id="booking-1"
+        booking={@booking}
+        accent={:teal}
+        detail="2 Guests • Day Pass"
+      />
+  """
+  attr :id, :string, required: true
+  attr :booking, :map, required: true
+  attr :accent, :atom, default: nil, values: [nil, :blue, :emerald, :teal]
+  attr :detail, :string, default: nil
+  attr :class, :any, default: nil
+
+  def booking_card(assigns) do
+    YscWeb.Components.Bookings.BookingCard.booking_card(assigns)
+  end
+
+  @doc """
   Add-to-calendar web component for an event.
 
   Used on event details and ticket QR. Callers still gate visibility

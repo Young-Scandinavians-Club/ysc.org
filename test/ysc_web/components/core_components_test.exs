@@ -362,6 +362,75 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "booking_card/1" do
+    defp booking_fixture_map(attrs) do
+      today = Date.utc_today()
+
+      Map.merge(
+        %{
+          id: "bk-1",
+          reference_id: "BK-REF-1",
+          property: :tahoe,
+          booking_mode: :room,
+          checkin_date: Date.add(today, 10),
+          checkout_date: Date.add(today, 12)
+        },
+        attrs
+      )
+    end
+
+    test "upcoming stay gets a soft-tinted stub and links to the receipt" do
+      assigns = %{booking: booking_fixture_map(%{})}
+
+      html =
+        rendered_to_string(~H"""
+        <.booking_card id="bc-1" booking={@booking} detail="2 Guests • Room 1" />
+        """)
+
+      assert html =~ ~s(id="bc-1")
+      assert html =~ ~s(href="/bookings/bk-1/receipt")
+      assert html =~ "Lake Tahoe"
+      assert html =~ "BK-REF-1"
+      assert html =~ "2 Guests • Room 1"
+      assert html =~ "bg-blue-50"
+      refute html =~ "bg-blue-700"
+    end
+
+    test "stay in progress turns the stub solid and uses the accent" do
+      today = Date.utc_today()
+
+      assigns = %{
+        booking:
+          booking_fixture_map(%{
+            property: :clear_lake,
+            checkin_date: Date.add(today, -2),
+            checkout_date: Date.add(today, 2)
+          })
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.booking_card id="bc-2" booking={@booking} accent={:teal} />
+        """)
+
+      assert html =~ "Clear Lake"
+      assert html =~ "Currently staying"
+      assert html =~ "bg-teal-700"
+      refute html =~ "bg-teal-50"
+    end
+
+    test "buyout bookings are badged" do
+      assigns = %{booking: booking_fixture_map(%{booking_mode: :buyout})}
+
+      html =
+        rendered_to_string(~H"""
+        <.booking_card id="bc-3" booking={@booking} />
+        """)
+
+      assert html =~ "Entire cabin"
+    end
+  end
+
   describe "quick_action_card/1" do
     test "renders a Tahoe booking shortcut with a tinted icon and no well" do
       assigns = %{}

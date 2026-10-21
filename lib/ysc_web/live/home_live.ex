@@ -15,7 +15,7 @@ defmodule YscWeb.HomeLive do
   alias Ysc.Events.EventHelpers
 
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
-  alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay, Season}
+  alias Ysc.Bookings.Season
   alias Ysc.Posts.ReadingTime
   alias Ysc.GoogleWallet
   alias Ysc.Tickets.Display, as: TicketDisplay
@@ -1200,82 +1200,11 @@ defmodule YscWeb.HomeLive do
                 id="home-itinerary-list"
                 class="space-y-3"
               >
-                <%= for booking <- @future_bookings do %>
-                  <% days_until_this_booking = days_until_booking(booking) %>
-                  <.link
-                    id={"home-itinerary-booking-#{booking.id}"}
-                    navigate={~p"/bookings/#{booking.id}/receipt"}
-                    class="flex bg-white rounded-xl overflow-hidden transition-colors duration-150 group border border-zinc-200 hover:border-zinc-300"
-                  >
-                    <%!-- Stub: soft tint by property; solid only while the stay is active --%>
-                    <div class={[
-                      "flex flex-col items-center justify-center w-18 shrink-0 border-r-2 border-dashed px-2 py-4",
-                      stub_class(
-                        booking.property,
-                        booking_active?(days_until_this_booking)
-                      )
-                    ]}>
-                      <span class="text-xs type-eyebrow opacity-80">
-                        {Calendar.strftime(booking.checkin_date, "%b")}
-                      </span>
-                      <span class="text-3xl type-display leading-none">
-                        {Calendar.strftime(booking.checkin_date, "%-d")}
-                      </span>
-                      <.icon name="hero-home" class="w-4 h-4 mt-3 opacity-70" />
-                    </div>
-                    <div class="flex-1 min-w-0 p-5 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-                      <div class="flex-1 min-w-0">
-                        <div class="flex flex-wrap items-center gap-1.5 mb-2">
-                          <span class={[
-                            "inline-flex items-center px-2 py-1 text-xs font-bold rounded-sm",
-                            case days_until_this_booking do
-                              :started -> "bg-green-50 text-green-700"
-                              0 -> "bg-amber-50 text-amber-700"
-                              _ -> "bg-zinc-100 text-zinc-700"
-                            end
-                          ]}>
-                            {case days_until_this_booking do
-                              :started -> "Currently staying"
-                              0 -> "Checking in today"
-                              1 -> "Tomorrow"
-                              days -> "In #{days} days"
-                            end}
-                          </span>
-                          <span
-                            :if={booking.booking_mode == :buyout}
-                            class="inline-flex items-center px-2 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-sm"
-                          >
-                            {BookingModeDisplay.stay_type_label(:buyout)}
-                          </span>
-                        </div>
-                        <p class="text-zinc-900 type-subhead">
-                          {PropertyDisplay.medium_name(booking.property)}
-                        </p>
-                        <p class="mt-1 text-xs text-zinc-500 flex items-center gap-1">
-                          <.icon name="hero-calendar" class="w-3 h-3 shrink-0" />
-                          {format_booking_date(booking.checkin_date)} — {format_booking_date(
-                            booking.checkout_date
-                          )}
-                        </p>
-                        <p class="mt-1 text-xs font-mono text-zinc-500">
-                          {booking.reference_id}
-                        </p>
-                      </div>
-                      <div class="shrink-0 md:pl-6 md:border-l md:border-zinc-100">
-                        <span class={[
-                          "inline-flex items-center gap-1 text-sm font-semibold transition-colors duration-150",
-                          if(booking_active?(days_until_this_booking),
-                            do: stub_link_class(booking.property),
-                            else: "text-zinc-600 group-hover:text-zinc-900"
-                          )
-                        ]}>
-                          View details
-                          <.icon name="hero-arrow-right" class="w-4 h-4" />
-                        </span>
-                      </div>
-                    </div>
-                  </.link>
-                <% end %>
+                <.booking_card
+                  :for={booking <- @future_bookings}
+                  id={"home-itinerary-booking-#{booking.id}"}
+                  booking={booking}
+                />
               </div>
 
               <div
@@ -1301,7 +1230,7 @@ defmodule YscWeb.HomeLive do
                     <%!-- Ticket stub: soft tint; solid only on the day of the event --%>
                     <div class={[
                       "flex flex-col items-center justify-center w-18 shrink-0 border-r-2 border-dashed px-2 py-4",
-                      stub_class(:tahoe, days_until_this_event == 0)
+                      ticket_stub_class(days_until_this_event == 0)
                     ]}>
                       <span class="text-xs type-eyebrow opacity-80">
                         {ticket_stub_month(event)}
@@ -1869,29 +1798,9 @@ defmodule YscWeb.HomeLive do
     )
   end
 
-  defp days_until_booking(booking) do
-    DateDisplay.days_until_cabin_checkin(booking)
-  end
-
   # Date stubs stay soft-tinted so colour is reserved for what is happening now.
-  defp booking_active?(:started), do: true
-  defp booking_active?(0), do: true
-  defp booking_active?(_), do: false
-
-  defp stub_class(property, true) do
-    if property == :tahoe,
-      do: "bg-blue-700 border-blue-300/60 text-white",
-      else: "bg-emerald-700 border-emerald-300/60 text-white"
-  end
-
-  defp stub_class(property, false) do
-    if property == :tahoe,
-      do: "bg-blue-50 border-blue-200 text-blue-700",
-      else: "bg-emerald-50 border-emerald-200 text-emerald-700"
-  end
-
-  defp stub_link_class(:tahoe), do: "text-blue-700 group-hover:text-blue-800"
-  defp stub_link_class(_), do: "text-emerald-700 group-hover:text-emerald-800"
+  defp ticket_stub_class(true), do: "bg-blue-700 border-blue-300/60 text-white"
+  defp ticket_stub_class(false), do: "bg-blue-50 border-blue-200 text-blue-700"
 
   defp ticket_stub_month(event) do
     case DateDisplay.event_start_datetime(event) do
@@ -2047,10 +1956,6 @@ defmodule YscWeb.HomeLive do
       %Money{} = rate -> Ysc.MoneyHelper.format_money!(rate)
       _ -> nil
     end
-  end
-
-  defp format_booking_date(%Date{} = date) do
-    Calendar.strftime(date, "%b %d")
   end
 
   defp days_since_inserted(%DateTime{} = inserted_at) do
