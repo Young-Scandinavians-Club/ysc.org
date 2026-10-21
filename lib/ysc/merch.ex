@@ -266,12 +266,44 @@ defmodule Ysc.Merch do
   """
   @spec add_product_photo(Product.t(), String.t(), String.t() | nil) ::
           {:ok, ProductImage.t()} | {:error, Ecto.Changeset.t()}
-  def add_product_photo(%Product{id: product_id}, image_id, color \\ nil) do
+  def add_product_photo(%Product{} = product, image_id, color \\ nil) do
+    case add_product_photos(product, [image_id], color) do
+      [result] -> result
+      [] -> {:error, ProductImage.changeset(%ProductImage{}, %{})}
+    end
+  end
+
+  @doc """
+  Adds many media-library photos to a product's gallery in selection order.
+
+  One round-trip reads the current gallery, one checks that the images exist,
+  and one `INSERT` writes every new row. Duplicates (already in the gallery or
+  repeated in `image_ids`) and missing images are returned as changeset errors
+  in the same order as `image_ids`, matching `add_product_photo/3`.
+  """
+  @spec add_product_photos(Product.t(), [String.t()], String.t() | nil) :: [
+          {:ok, ProductImage.t()} | {:error, Ecto.Changeset.t()}
+        ]
+  def add_product_photos(%Product{} = product, image_ids, color \\ nil)
+      when is_list(image_ids) do
+    image_ids = Enum.reject(image_ids, &is_nil/1)
+
+    case image_ids do
+      [] ->
+        []
+
+      [image_id] ->
+        [insert_product_photo(product.id, image_id, color)]
+
+      image_ids ->
+        insert_product_photos(product.id, image_ids, color)
+    end
+  end
+
+  defp insert_product_photo(product_id, image_id, color) do
     position =
-      from(g in ProductImage,
-        where: g.product_id == ^product_id,
-        select: max(g.position)
-      )
+      product_id
+      |> max_product_gallery_position_query()
       |> Repo.one()
       |> then(&((&1 || -1) + 1))
 
@@ -284,6 +316,127 @@ defmodule Ysc.Merch do
       source: :admin
     })
     |> Repo.insert()
+  end
+
+  defp insert_product_photos(product_id, image_ids, color) do
+    gallery = Repo.all(product_gallery_photos_query(product_id))
+
+    max_position =
+      gallery
+      |> Enum.map(& &1.position)
+      |> Enum.max(fn -> -1 end)
+
+    existing_gallery_ids = MapSet.new(gallery, & &1.image_id)
+
+    present_image_ids =
+      MapSet.new(Repo.all(existing_image_ids_query(image_ids)))
+
+    {entries, rows, _next_position, _seen} =
+      Enum.reduce(
+        image_ids,
+        {[], [], max_position + 1, existing_gallery_ids},
+        fn image_id, {entries, rows, position, seen} ->
+          cond do
+            MapSet.member?(seen, image_id) ->
+              {[duplicate_photo_error(product_id, image_id) | entries], rows,
+               position, seen}
+
+            not MapSet.member?(present_image_ids, image_id) ->
+              {[missing_photo_error(product_id, image_id) | entries], rows,
+               position, seen}
+
+            true ->
+              row =
+                product_photo_insert_row(product_id, image_id, color, position)
+
+              {[{:insert, image_id} | entries], [row | rows], position + 1,
+               MapSet.put(seen, image_id)}
+          end
+        end
+      )
+
+    inserted_by_image_id = insert_product_photo_rows(Enum.reverse(rows))
+
+    entries
+    |> Enum.reverse()
+    |> Enum.map(fn
+      {:error, changeset} -> {:error, changeset}
+      {:insert, image_id} -> {:ok, Map.fetch!(inserted_by_image_id, image_id)}
+    end)
+  end
+
+  defp insert_product_photo_rows([]), do: %{}
+
+  defp insert_product_photo_rows(rows) do
+    {_count, inserted} = Repo.insert_all(ProductImage, rows, returning: true)
+    Map.new(inserted, &{&1.image_id, &1})
+  end
+
+  defp product_photo_insert_row(product_id, image_id, color, position) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    photo =
+      %ProductImage{}
+      |> ProductImage.changeset(%{
+        product_id: product_id,
+        image_id: image_id,
+        color: color,
+        position: position,
+        source: :admin
+      })
+      |> Ecto.Changeset.apply_changes()
+
+    %{
+      id: Ecto.ULID.generate(),
+      product_id: photo.product_id,
+      image_id: photo.image_id,
+      color: photo.color,
+      position: photo.position,
+      source: photo.source,
+      source_image_url: photo.source_image_url,
+      inserted_at: now,
+      updated_at: now
+    }
+  end
+
+  defp duplicate_photo_error(product_id, image_id) do
+    {:error,
+     %ProductImage{}
+     |> ProductImage.changeset(%{product_id: product_id, image_id: image_id})
+     |> Ecto.Changeset.add_error(
+       :product_id,
+       "is already in this gallery",
+       constraint: :unique,
+       constraint_name: :merch_product_images_product_id_image_id_index
+     )}
+  end
+
+  defp missing_photo_error(product_id, image_id) do
+    {:error,
+     %ProductImage{}
+     |> ProductImage.changeset(%{product_id: product_id, image_id: image_id})
+     |> Ecto.Changeset.add_error(:image_id, "does not exist",
+       constraint: :foreign,
+       constraint_name: :merch_product_images_image_id_fkey
+     )}
+  end
+
+  defp product_gallery_photos_query(product_id) do
+    from(g in ProductImage,
+      where: g.product_id == ^product_id,
+      select: %{image_id: g.image_id, position: g.position}
+    )
+  end
+
+  defp max_product_gallery_position_query(product_id) do
+    from(g in ProductImage,
+      where: g.product_id == ^product_id,
+      select: max(g.position)
+    )
+  end
+
+  defp existing_image_ids_query(image_ids) do
+    from(i in Image, where: i.id in ^image_ids, select: i.id)
   end
 
   @doc """
@@ -480,5 +633,20 @@ defmodule Ysc.Merch do
       select: struct(p, ^@orderable_product_fields),
       preload: [variants: ^orderable_variants_query()]
     )
+  end
+
+  @doc false
+  def ci_query_explain_product_gallery_photos_query do
+    product_gallery_photos_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_max_product_gallery_position_query do
+    max_product_gallery_position_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_existing_image_ids_query do
+    existing_image_ids_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
   end
 end
