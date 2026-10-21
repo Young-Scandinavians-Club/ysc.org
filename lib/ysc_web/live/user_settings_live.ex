@@ -2113,7 +2113,7 @@ defmodule YscWeb.UserSettingsLive do
                     id="payments-intro"
                     class="text-sm text-zinc-600 mt-1 max-w-2xl"
                   >
-                    View payments for cabin bookings, events, donations, merch, and membership below. Unpaid cabin bookings won't appear here until checkout is complete — use the link in your email or return to the cabin page to finish. To see or use your event tickets, open Your event tickets.
+                    View payments for cabin bookings, events, donations, club gear, and membership below. Unpaid cabin bookings won't appear here until checkout is complete — use the link in your email or return to the cabin page to finish. To see or use your event tickets, open Your event tickets.
                   </p>
                 </div>
                 <.link
@@ -2288,7 +2288,7 @@ defmodule YscWeb.UserSettingsLive do
                           else: "text-rose-600"
                         )
                       ]}
-                    />Merch
+                    />Club Gear
                   </button>
                 </div>
                 <!-- Desktop Table View -->
@@ -2365,7 +2365,7 @@ defmodule YscWeb.UserSettingsLive do
                   class="text-center py-12"
                 >
                   <p class="text-zinc-600 text-sm">
-                    No payments yet. Cabin bookings, events, donations, merch, and membership payments will show up here.
+                    No payments yet. Cabin bookings, events, donations, club gear, and membership payments will show up here.
                   </p>
                 </div>
 
@@ -5826,7 +5826,7 @@ defmodule YscWeb.UserSettingsLive do
     do: "View ticket confirmation"
 
   defp payment_row_navigate_aria_label(%{type: :merch}, %JS{}),
-    do: "View merch order"
+    do: "View Club Gear order"
 
   defp payment_row_navigate_aria_label(_, _), do: nil
 
@@ -6156,7 +6156,7 @@ defmodule YscWeb.UserSettingsLive do
     end)
   end
 
-  defp merch_items_summary(_), do: "Merch order"
+  defp merch_items_summary(_), do: "Club Gear Order"
 
   defp payment_status_for_badge(%{payment: nil}), do: :completed
   defp payment_status_for_badge(%{payment: payment}), do: payment.status
