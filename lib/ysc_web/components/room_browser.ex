@@ -45,11 +45,11 @@ defmodule YscWeb.Components.RoomBrowser do
   def room_browser(assigns) do
     ~H"""
     <section id={@id} class="space-y-8">
-      <div class="prose prose-zinc max-w-none">
-        <h2 class="text-3xl font-black tracking-tight text-zinc-900 mb-3">
+      <div class="max-w-2xl">
+        <h2 class="type-subhead text-lg text-zinc-900">
           Rooms at the {@property_name}
         </h2>
-        <p class="text-lg text-zinc-600 leading-relaxed">
+        <p class="mt-1.5 text-sm text-zinc-500 leading-relaxed">
           <%= if @intro do %>
             {@intro}
           <% else %>
@@ -100,20 +100,20 @@ defmodule YscWeb.Components.RoomBrowser do
       </div>
       <div class="p-5 flex-1 flex flex-col gap-3">
         <div>
-          <h3 class="font-bold text-zinc-900 text-lg">{@room.name}</h3>
+          <h3 class="type-subhead text-lg text-zinc-900">{@room.name}</h3>
           <p
             :if={@room.room_category}
-            class="text-xs font-semibold uppercase tracking-wider text-zinc-500"
+            class="mt-0.5 text-xs text-zinc-500 type-eyebrow"
           >
             {@room.room_category.name}
           </p>
         </div>
-        <p :if={@room.description} class="text-sm text-zinc-600">
+        <p :if={@room.description} class="text-sm text-zinc-600 leading-relaxed">
           {@room.description}
         </p>
         <div class="flex items-center gap-2 flex-wrap">
           <span class={[
-            "px-2 py-1 text-xs font-bold rounded-sm border",
+            "px-2 py-1 text-xs font-semibold rounded-sm border",
             capacity_badge(@accent)
           ]}>
             Max {@room.capacity_max} {if @room.capacity_max == 1,
@@ -122,7 +122,7 @@ defmodule YscWeb.Components.RoomBrowser do
           </span>
           <span
             :if={@room.min_billable_occupancy > 1}
-            class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-sm border border-amber-200"
+            class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-sm border border-amber-200"
           >
             {YscWeb.BookingUserMessages.room_min_charge_badge(
               @room.min_billable_occupancy
@@ -150,7 +150,7 @@ defmodule YscWeb.Components.RoomBrowser do
             phx-click={@pick_event}
             phx-value-room-id={@room.id}
             class={[
-              "w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold rounded-md transition-colors",
+              "w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-md transition-colors",
               pick_button(@accent)
             ]}
           >
