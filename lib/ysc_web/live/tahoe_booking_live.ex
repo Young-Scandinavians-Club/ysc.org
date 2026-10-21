@@ -45,6 +45,7 @@ defmodule YscWeb.TahoeBookingLive do
   alias YscWeb.DateDisplay
   alias YscWeb.BookingDisplay
   import YscWeb.Components.CabinInfo
+  import YscWeb.Components.RoomPickCard
   require Ysc.Logging
   import Ecto.Query
 
@@ -1943,398 +1944,43 @@ defmodule YscWeb.TahoeBookingLive do
                         (is_unavailable && !room_already_selected) ||
                           (max_rooms_reached && !room_already_selected) ||
                           cannot_add_second_room %>
-                      <div class={[
-                        "border-2 rounded-lg overflow-hidden flex flex-col h-full transition",
-                        if(is_disabled,
-                          do:
-                            "border-zinc-200 bg-zinc-50 cursor-not-allowed opacity-60",
-                          else:
-                            if(
-                              (can_select_multiple_rooms?(assigns) &&
-                                 room.id in @selected_room_ids) ||
-                                (!can_select_multiple_rooms?(assigns) &&
-                                   @selected_room_id == room.id),
-                              do: "border-blue-500 bg-blue-50 shadow-xs",
-                              else:
-                                "border-zinc-300 hover:border-blue-400 cursor-pointer"
-                            )
-                        )
-                      ]}>
-                        <label
-                          :if={!is_disabled}
-                          class="block cursor-pointer flex flex-col h-full"
-                        >
-                          <input
-                            type={
-                              if can_select_multiple_rooms?(assigns),
-                                do: "checkbox",
-                                else: "radio"
-                            }
-                            id={"room-#{room.id}"}
-                            name={
-                              if can_select_multiple_rooms?(assigns),
-                                do: "room_ids",
-                                else: "room_id"
-                            }
-                            value={room.id}
-                            checked={
-                              if can_select_multiple_rooms?(assigns) do
-                                room.id in @selected_room_ids
-                              else
-                                @selected_room_id == room.id
-                              end
-                            }
-                            aria-label={"Select #{room.name}"}
-                            phx-click="room-changed"
-                            phx-value-room-id={room.id}
-                            class="sr-only"
-                          />
-                          <!-- Room Image with Alert Overlay -->
-                          <div class="w-full h-32 bg-zinc-200 relative overflow-hidden">
-                            <!-- Availability Badge -->
-                            <div
-                              :if={!is_unavailable}
-                              class="absolute top-2 right-2 z-10 px-2 py-1 bg-green-500 text-white text-xs font-bold rounded-sm shadow-lg"
-                            >
-                              Available
-                            </div>
-                            <!-- Alert Overlay on Image -->
-                            <div
-                              :if={is_unavailable && reason}
-                              class="absolute top-0 left-0 right-0 bg-linear-to-r from-amber-50 to-amber-100 border-b border-amber-200 p-2 z-10"
-                            >
-                              <div class="flex items-start gap-2">
-                                <.icon
-                                  name="hero-exclamation-triangle-solid"
-                                  class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"
-                                />
-                                <div class="flex-1">
-                                  <p class="text-xs font-semibold text-amber-900 mb-1">
-                                    Not Available
-                                  </p>
-                                  <p class="text-xs text-amber-800">
-                                    {reason}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            <%= if room.image && room.image.id do %>
-                              <.live_component
-                                id={"room-image-#{room.id}"}
-                                module={YscWeb.Components.Image}
-                                image={room.image}
-                                aspect_class="h-full"
-                                preferred_type={:thumbnail}
-                                rounded_class=""
-                              />
-                            <% else %>
-                              <!-- Placeholder when no image -->
-                              <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="text-zinc-500 text-sm flex flex-col items-center justify-center">
-                                  <.icon
-                                    name="hero-photo"
-                                    class="w-20 h-20 mx-auto mb-2"
-                                  />Room Image
-                                </div>
-                              </div>
-                            <% end %>
-                          </div>
-                          <!-- Room Content -->
-                          <div class="p-4 flex-1 flex flex-col">
-                            <div class="flex items-start justify-between mb-2">
-                              <div class="flex-1">
-                                <div class="mb-1 text-lg text-zinc-900 type-subhead">
-                                  {room.name}
-                                </div>
-                                <div class="text-xs text-zinc-600 line-clamp-2">
-                                  {room.description}
-                                </div>
-                              </div>
-                              <div class="ml-3 shrink-0">
-                                <div class={
-                                  if (can_select_multiple_rooms?(assigns) &&
-                                        room.id in @selected_room_ids) or
-                                       (!can_select_multiple_rooms?(assigns) &&
-                                          @selected_room_id == room.id) do
-                                    "w-6 h-6 rounded-full border-2 flex items-center justify-center bg-blue-600 border-blue-600 shadow-md"
-                                  else
-                                    "w-6 h-6 rounded-full border-2 flex items-center justify-center border-zinc-300 bg-white"
-                                  end
-                                }>
-                                  <svg
-                                    :if={
-                                      (can_select_multiple_rooms?(assigns) &&
-                                         room.id in @selected_room_ids) or
-                                        (!can_select_multiple_rooms?(assigns) &&
-                                           @selected_room_id == room.id)
-                                    }
-                                    class="w-4 h-4 text-white"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path
-                                      fill-rule="evenodd"
-                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                      clip-rule="evenodd"
-                                    />
-                                  </svg>
-                                </div>
-                              </div>
-                            </div>
-                            <div class="flex items-center gap-2 mb-2 flex-wrap">
-                              <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-sm border border-blue-200">
-                                Max {room.capacity_max} Guests
-                              </span>
-                              <span
-                                :if={room.min_billable_occupancy > 1}
-                                id={"room-#{room.id}-min-charge-badge"}
-                                class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-sm border border-amber-200"
-                              >
-                                {YscWeb.BookingUserMessages.room_min_charge_badge(
-                                  room.min_billable_occupancy
-                                )}
-                              </span>
-                            </div>
-                            <!-- Room Features: Compact Badges -->
-                            <div
-                              :if={
-                                room.single_beds > 0 || room.queen_beds > 0 ||
-                                  room.king_beds > 0
-                              }
-                              class="mb-2 flex items-center gap-2 flex-wrap"
-                            >
-                              <span
-                                :if={room.single_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="Twin beds"
-                              >
-                                {raw(bed_icon_svg(:single, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.single_beds}</span>
-                              </span>
-                              <span
-                                :if={room.queen_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="Queen beds"
-                              >
-                                {raw(bed_icon_svg(:queen, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.queen_beds}</span>
-                              </span>
-                              <span
-                                :if={room.king_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="King beds"
-                              >
-                                {raw(bed_icon_svg(:king, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.king_beds}</span>
-                              </span>
-                            </div>
-                            <div class="border-t border-zinc-200 pt-2 mt-auto">
-                              <% season =
-                                Season.find_season_for_date(
-                                  @seasons,
-                                  @checkin_date
-                                ) %>
-                              <% season_id = if season, do: season.id, else: nil %>
-                              <div class="text-sm text-zinc-900 font-bold">
-                                <div :if={room.minimum_price}>
-                                  {MoneyHelper.format_money!(room.minimum_price)} min
-                                  <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    {YscWeb.BookingUserMessages.room_minimum_price_caption(
-                                      room.min_billable_occupancy
-                                    )}
-                                  </span>
-                                </div>
-                                <div :if={!room.minimum_price}>
-                                  <% fallback_adult_price =
-                                    get_default_adult_price(@property, season_id) %>
-                                  {MoneyHelper.format_money!(
-                                    room.adult_price_per_night ||
-                                      fallback_adult_price
-                                  )}/adult
-                                </div>
-                              </div>
-                              <div class="text-xs text-zinc-500">
-                                <% fallback_children_price =
-                                  get_default_children_price(@property, season_id) %>
-                                {MoneyHelper.format_money!(
-                                  room.children_price_per_night ||
-                                    fallback_children_price
-                                )}/child
-                              </div>
-                            </div>
-                          </div>
-                        </label>
-                        <div
-                          :if={is_disabled}
-                          class="block cursor-not-allowed flex flex-col h-full relative"
-                        >
-                          <input
-                            type={
-                              if can_select_multiple_rooms?(assigns),
-                                do: "checkbox",
-                                else: "radio"
-                            }
-                            name={
-                              if can_select_multiple_rooms?(assigns),
-                                do: "room_ids",
-                                else: "room_id"
-                            }
-                            value={room.id}
-                            checked={false}
-                            disabled={true}
-                            class="sr-only"
-                            readonly
-                          />
-                          <!-- Room Image with Alert Overlay -->
-                          <div class="w-full h-32 bg-zinc-200 relative overflow-hidden">
-                            <!-- Availability Badge -->
-                            <div
-                              :if={!is_unavailable}
-                              class="absolute top-2 right-2 z-10 px-2 py-1 bg-green-500 text-white text-xs font-bold rounded-sm shadow-lg"
-                            >
-                              Available
-                            </div>
-                            <!-- Alert Overlay on Image -->
-                            <div
-                              :if={is_unavailable && reason}
-                              class="absolute top-0 left-0 right-0 bg-linear-to-r from-amber-50 to-amber-100 border-b border-amber-200 p-2 z-10"
-                            >
-                              <div class="flex items-start gap-2">
-                                <.icon
-                                  name="hero-exclamation-triangle-solid"
-                                  class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"
-                                />
-                                <div class="flex-1">
-                                  <p class="text-xs font-semibold text-amber-900 mb-1">
-                                    Not Available
-                                  </p>
-                                  <p class="text-xs text-amber-800">
-                                    {reason}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            <%= if room.image && room.image.id do %>
-                              <.live_component
-                                id={"room-image-disabled-#{room.id}"}
-                                module={YscWeb.Components.Image}
-                                image={room.image}
-                                aspect_class="h-full"
-                                preferred_type={:thumbnail}
-                                rounded_class=""
-                              />
-                            <% else %>
-                              <!-- Placeholder when no image -->
-                              <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="text-zinc-500 text-sm flex flex-col items-center justify-center">
-                                  <.icon
-                                    name="hero-photo"
-                                    class="w-20 h-20 mx-auto mb-2"
-                                  />Room Image
-                                </div>
-                              </div>
-                            <% end %>
-                          </div>
-                          <!-- Room Content (Disabled) -->
-                          <div class="p-4 flex-1 flex flex-col opacity-60">
-                            <div class="flex items-start justify-between mb-2">
-                              <div class="flex-1">
-                                <div class="mb-1 text-lg text-zinc-900 type-subhead">
-                                  {room.name}
-                                </div>
-                                <div class="text-xs text-zinc-600 line-clamp-2">
-                                  {room.description}
-                                </div>
-                              </div>
-                              <div class="ml-3 shrink-0">
-                                <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center border-zinc-300 bg-white">
-                                </div>
-                              </div>
-                            </div>
-                            <div class="flex items-center gap-2 mb-2 flex-wrap">
-                              <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-sm border border-blue-200">
-                                Max {room.capacity_max} Guests
-                              </span>
-                              <span
-                                :if={room.min_billable_occupancy > 1}
-                                id={"room-#{room.id}-min-charge-badge"}
-                                class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-sm border border-amber-200"
-                              >
-                                {YscWeb.BookingUserMessages.room_min_charge_badge(
-                                  room.min_billable_occupancy
-                                )}
-                              </span>
-                            </div>
-                            <!-- Room Features: Compact Badges -->
-                            <div
-                              :if={
-                                room.single_beds > 0 || room.queen_beds > 0 ||
-                                  room.king_beds > 0
-                              }
-                              class="mb-2 flex items-center gap-2 flex-wrap"
-                            >
-                              <span
-                                :if={room.single_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="Twin beds"
-                              >
-                                {raw(bed_icon_svg(:single, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.single_beds}</span>
-                              </span>
-                              <span
-                                :if={room.queen_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="Queen beds"
-                              >
-                                {raw(bed_icon_svg(:queen, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.queen_beds}</span>
-                              </span>
-                              <span
-                                :if={room.king_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="King beds"
-                              >
-                                {raw(bed_icon_svg(:king, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.king_beds}</span>
-                              </span>
-                            </div>
-                            <div class="border-t border-zinc-200 pt-2 mt-auto">
-                              <% season =
-                                Season.find_season_for_date(
-                                  @seasons,
-                                  @checkin_date
-                                ) %>
-                              <% season_id = if season, do: season.id, else: nil %>
-                              <div class="text-sm text-zinc-900 font-bold">
-                                <div :if={room.minimum_price}>
-                                  {MoneyHelper.format_money!(room.minimum_price)} min
-                                  <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    {YscWeb.BookingUserMessages.room_minimum_price_caption(
-                                      room.min_billable_occupancy
-                                    )}
-                                  </span>
-                                </div>
-                                <div :if={!room.minimum_price}>
-                                  <% fallback_adult_price =
-                                    get_default_adult_price(@property, season_id) %>
-                                  {MoneyHelper.format_money!(
-                                    room.adult_price_per_night ||
-                                      fallback_adult_price
-                                  )}/adult
-                                </div>
-                              </div>
-                              <div class="text-xs text-zinc-500">
-                                <% fallback_children_price =
-                                  get_default_children_price(@property, season_id) %>
-                                {MoneyHelper.format_money!(
-                                  room.children_price_per_night ||
-                                    fallback_children_price
-                                )}/child
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <% price_season =
+                        Season.find_season_for_date(@seasons, @checkin_date) %>
+                      <% price_season_id = if price_season, do: price_season.id %>
+                      <.room_pick_card
+                        room={room}
+                        selected={room_already_selected}
+                        disabled={is_disabled}
+                        reason={reason}
+                        multiple={can_select_multiple_rooms?(assigns)}
+                        prices={
+                          %{
+                            adult:
+                              MoneyHelper.format_money!(
+                                room.adult_price_per_night ||
+                                  get_default_adult_price(
+                                    @property,
+                                    price_season_id
+                                  )
+                              ),
+                            child:
+                              MoneyHelper.format_money!(
+                                room.children_price_per_night ||
+                                  get_default_children_price(
+                                    @property,
+                                    price_season_id
+                                  )
+                              ),
+                            minimum:
+                              room.minimum_price &&
+                                MoneyHelper.format_money!(room.minimum_price),
+                            minimum_caption:
+                              YscWeb.BookingUserMessages.room_minimum_price_caption(
+                                room.min_billable_occupancy
+                              )
+                          }
+                        }
+                      />
                     <% end %>
                   </div>
                 </fieldset>
@@ -6678,43 +6324,6 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   # Bed icon SVG helpers
-  defp bed_icon_svg(bed_type, class)
-
-  defp bed_icon_svg(:single, class) do
-    """
-    <svg class="#{class}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="twinBedTitle">
-      <path d="M6 9h12" />
-      <rect x="6" y="9" width="12" height="8" rx="2" />
-      <path d="M8 17v2m8-2v2" />
-      <rect x="9.75" y="10.25" width="4.5" height="2.5" rx="1" />
-    </svg>
-    """
-  end
-
-  defp bed_icon_svg(:queen, class) do
-    """
-    <svg class="#{class}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="queenBedTitle">
-      <path d="M4 9h16" />
-      <rect x="4" y="9" width="16" height="8" rx="2" />
-      <path d="M7 17v2m10-2v2" />
-      <rect x="7.5" y="10.25" width="5" height="2.5" rx="1" />
-      <rect x="11.5" y="10.25" width="5" height="2.5" rx="1" />
-    </svg>
-    """
-  end
-
-  defp bed_icon_svg(:king, class) do
-    """
-    <svg class="#{class}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="kingBedTitle">
-      <path d="M3 9h18" />
-      <rect x="3" y="9" width="18" height="8" rx="2" />
-      <path d="M6 17v2m12-2v2" />
-      <rect x="6.25" y="10.25" width="6" height="2.5" rx="1" />
-      <rect x="11.75" y="10.25" width="6" height="2.5" rx="1" />
-    </svg>
-    """
-  end
-
   # Helper to get default adult price from pricing rules (property-level fallback)
   defp get_default_adult_price(property, season_id) do
     pricing_rule =
