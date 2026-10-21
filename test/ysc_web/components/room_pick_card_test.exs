@@ -72,7 +72,7 @@ defmodule YscWeb.Components.RoomPickCardTest do
     assert html =~ "hero-check-mini"
   end
 
-  test "a disabled card cannot be picked and explains why" do
+  test "a disabled card cannot be picked, looks disabled and explains why" do
     html =
       render_card(%{
         disabled: true,
@@ -80,13 +80,35 @@ defmodule YscWeb.Components.RoomPickCardTest do
       })
 
     assert html =~ "disabled"
-    assert html =~ "Already booked for these dates"
-    # The reason is exposed to assistive tech and sits under the photo.
-    assert html =~ ~s(aria-describedby="room-room-1-reason")
-    assert html =~ ~s(id="room-room-1-reason")
-    refute html =~ "bg-zinc-900/80"
     refute html =~ ~s(id="room-room-1")
     refute html =~ "phx-click"
+
+    # Obvious at a glance: dashed card, greyed photo, "Not available" badge.
+    assert html =~ "border-dashed"
+    assert html =~ "grayscale"
+    assert html =~ "Not available"
+
+    # The reason is a highlighted notice, exposed to assistive tech.
+    assert html =~ "Already booked for these dates"
+    assert html =~ "bg-amber-50"
+    assert html =~ ~s(id="room-room-1-reason")
+    assert html =~ ~s(aria-describedby="room-room-1-reason")
+  end
+
+  test "a disabled card without a specific reason still shows a notice" do
+    html = render_card(%{disabled: true})
+
+    assert html =~ "Not available for your selection."
+    assert html =~ ~s(id="room-room-1-reason")
+  end
+
+  test "an enabled card has no badge or notice" do
+    html = render_card(%{})
+
+    refute html =~ "Not available"
+    refute html =~ "grayscale"
+    refute html =~ "bg-amber-50"
+    refute html =~ "border-dashed"
   end
 
   test "shows the minimum price and charge note for min-occupancy rooms" do

@@ -4,8 +4,8 @@ defmodule YscWeb.Components.RoomPickCard do
 
   Shares its look with the browse-only cards in `YscWeb.Components.RoomBrowser`
   (title, one metadata line, quiet price footer) and adds the selection state:
-  a visually hidden radio or checkbox, a check indicator, and a short note that
-  explains why a room can't be picked. The photo is never covered.
+  a visually hidden radio or checkbox, a check indicator, and a clear "Not available" badge and
+  a highlighted notice that explains why a room can't be picked. The photo is never covered.
   """
   use Phoenix.Component
 
@@ -52,26 +52,35 @@ defmodule YscWeb.Components.RoomPickCard do
           checked={@selected}
           disabled={@disabled}
           aria-label={"Select #{@room.name}"}
-          aria-describedby={if(@disabled && @reason, do: "room-#{@room.id}-reason")}
+          aria-describedby={if(@disabled, do: "room-#{@room.id}-reason")}
           phx-click={if(!@disabled, do: "room-changed")}
           phx-value-room-id={if(!@disabled, do: @room.id)}
           class="sr-only"
         />
         <div class="relative h-36 w-full shrink-0 overflow-hidden bg-zinc-200">
-          <%= if @room.image && @room.image.id do %>
-            <.live_component
-              id={"room-image-#{if(@disabled, do: "disabled-")}#{@room.id}"}
-              module={YscWeb.Components.Image}
-              image={@room.image}
-              aspect_class="h-full"
-              preferred_type={:thumbnail}
-              rounded_class=""
-            />
-          <% else %>
-            <div class="absolute inset-0 flex items-center justify-center text-zinc-500">
-              <.icon name="hero-photo" class="w-12 h-12" />
-            </div>
-          <% end %>
+          <div class={["h-full w-full", @disabled && "grayscale opacity-50"]}>
+            <%= if @room.image && @room.image.id do %>
+              <.live_component
+                id={"room-image-#{if(@disabled, do: "disabled-")}#{@room.id}"}
+                module={YscWeb.Components.Image}
+                image={@room.image}
+                aspect_class="h-full"
+                preferred_type={:thumbnail}
+                rounded_class=""
+              />
+            <% else %>
+              <div class="absolute inset-0 flex items-center justify-center text-zinc-500">
+                <.icon name="hero-photo" class="w-12 h-12" />
+              </div>
+            <% end %>
+          </div>
+          <span
+            :if={@disabled}
+            class="absolute left-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-white shadow-xs"
+            aria-hidden="true"
+          >
+            <.icon name="hero-no-symbol" class="size-3.5" /> Not available
+          </span>
         </div>
         <div class="flex flex-1 flex-col gap-3 p-4">
           <div class="flex items-start justify-between gap-3">
@@ -84,7 +93,10 @@ defmodule YscWeb.Components.RoomPickCard do
               </h3>
               <p
                 :if={@room.description}
-                class="mt-1 text-sm text-zinc-600 leading-relaxed line-clamp-2"
+                class={[
+                  "mt-1 text-sm leading-relaxed line-clamp-2",
+                  if(@disabled, do: "text-zinc-500", else: "text-zinc-600")
+                ]}
               >
                 {@room.description}
               </p>
@@ -102,18 +114,18 @@ defmodule YscWeb.Components.RoomPickCard do
               <.icon :if={@selected} name="hero-check-mini" class="size-3.5" />
             </span>
           </div>
-          <.room_meta room={@room} />
           <p
-            :if={@disabled && @reason}
+            :if={@disabled}
             id={"room-#{@room.id}-reason"}
-            class="flex items-start gap-1.5 text-xs text-zinc-700 leading-relaxed"
+            class="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900 leading-snug"
           >
             <.icon
-              name="hero-no-symbol"
-              class="mt-0.5 w-4 h-4 shrink-0 text-zinc-500"
+              name="hero-exclamation-triangle-mini"
+              class="mt-0.5 size-4 shrink-0 text-amber-600"
             />
-            <span>{@reason}</span>
+            <span>{@reason || "Not available for your selection."}</span>
           </p>
+          <.room_meta room={@room} />
           <p
             :if={@room.min_billable_occupancy > 1}
             id={"room-#{@room.id}-min-charge-badge"}
@@ -125,14 +137,14 @@ defmodule YscWeb.Components.RoomPickCard do
           </p>
           <div class="mt-auto border-t border-zinc-100 pt-3">
             <%= if @prices[:minimum] do %>
-              <p class="text-sm font-semibold text-zinc-900">
+              <p class={["text-sm font-semibold", price_tone(@disabled)]}>
                 {@prices.minimum} min
                 <span class="text-xs font-normal text-zinc-500">
                   {@prices[:minimum_caption]}
                 </span>
               </p>
             <% else %>
-              <p class="text-sm font-semibold text-zinc-900">
+              <p class={["text-sm font-semibold", price_tone(@disabled)]}>
                 {@prices.adult}/adult
               </p>
             <% end %>
@@ -144,7 +156,12 @@ defmodule YscWeb.Components.RoomPickCard do
     """
   end
 
-  defp card_state(true, _selected), do: "border-zinc-200 bg-zinc-50"
+  defp card_state(true, _selected),
+    do: "border-dashed border-zinc-300 bg-zinc-50"
+
   defp card_state(false, true), do: "border-blue-600 ring-1 ring-blue-600"
   defp card_state(false, false), do: "border-zinc-200 hover:border-zinc-400"
+
+  defp price_tone(true), do: "text-zinc-500"
+  defp price_tone(false), do: "text-zinc-900"
 end
