@@ -7389,21 +7389,35 @@ defmodule Ysc.BookingsTest do
   end
 
   describe "attach_modification_payment_intent/2" do
-    test "stores the PaymentIntent id on modification hold attrs" do
-      booking = booking_fixture(%{status: :complete})
+    defp put_active_modification_hold(booking, attrs_extra \\ %{}) do
+      expires_at =
+        DateTime.utc_now()
+        |> DateTime.add(30, :minute)
+        |> DateTime.truncate(:second)
 
-      booking =
-        booking
-        |> Ecto.Changeset.change(%{
-          modification_hold_attrs: %{
+      attrs =
+        Map.merge(
+          %{
             "checkin_date" => Date.to_iso8601(booking.checkin_date),
             "checkout_date" =>
               Date.to_iso8601(Date.add(booking.checkout_date, 1)),
             "guests_count" => booking.guests_count,
             "children_count" => booking.children_count || 0
-          }
-        })
-        |> Repo.update!()
+          },
+          attrs_extra
+        )
+
+      booking
+      |> Ecto.Changeset.change(%{
+        modification_hold_attrs: attrs,
+        modification_hold_expires_at: expires_at
+      })
+      |> Repo.update!()
+    end
+
+    test "stores the PaymentIntent id on modification hold attrs" do
+      booking = booking_fixture(%{status: :complete})
+      booking = put_active_modification_hold(booking)
 
       assert {:ok, updated} =
                Bookings.attach_modification_payment_intent(
@@ -7426,18 +7440,9 @@ defmodule Ysc.BookingsTest do
       booking = booking_fixture(%{status: :complete})
 
       booking =
-        booking
-        |> Ecto.Changeset.change(%{
-          modification_hold_attrs: %{
-            "checkin_date" => Date.to_iso8601(booking.checkin_date),
-            "checkout_date" =>
-              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
-            "guests_count" => booking.guests_count,
-            "children_count" => booking.children_count || 0,
-            "payment_intent_id" => "pi_mod_old"
-          }
+        put_active_modification_hold(booking, %{
+          "payment_intent_id" => "pi_mod_old"
         })
-        |> Repo.update!()
 
       test_pid = self()
       previous_client = Application.get_env(:ysc, :stripe_client)
@@ -7468,18 +7473,9 @@ defmodule Ysc.BookingsTest do
       booking = booking_fixture(%{status: :complete})
 
       booking =
-        booking
-        |> Ecto.Changeset.change(%{
-          modification_hold_attrs: %{
-            "checkin_date" => Date.to_iso8601(booking.checkin_date),
-            "checkout_date" =>
-              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
-            "guests_count" => booking.guests_count,
-            "children_count" => booking.children_count || 0,
-            "payment_intent_id" => "pi_mod_paid"
-          }
+        put_active_modification_hold(booking, %{
+          "payment_intent_id" => "pi_mod_paid"
         })
-        |> Repo.update!()
 
       previous_client = Application.get_env(:ysc, :stripe_client)
       Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
@@ -7522,18 +7518,9 @@ defmodule Ysc.BookingsTest do
       booking = booking_fixture(%{status: :complete})
 
       booking =
-        booking
-        |> Ecto.Changeset.change(%{
-          modification_hold_attrs: %{
-            "checkin_date" => Date.to_iso8601(booking.checkin_date),
-            "checkout_date" =>
-              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
-            "guests_count" => booking.guests_count,
-            "children_count" => booking.children_count || 0,
-            "payment_intent_id" => "pi_mod_processing"
-          }
+        put_active_modification_hold(booking, %{
+          "payment_intent_id" => "pi_mod_processing"
         })
-        |> Repo.update!()
 
       previous_client = Application.get_env(:ysc, :stripe_client)
       Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
@@ -7576,18 +7563,9 @@ defmodule Ysc.BookingsTest do
       booking = booking_fixture(%{status: :complete})
 
       booking =
-        booking
-        |> Ecto.Changeset.change(%{
-          modification_hold_attrs: %{
-            "checkin_date" => Date.to_iso8601(booking.checkin_date),
-            "checkout_date" =>
-              Date.to_iso8601(Date.add(booking.checkout_date, 1)),
-            "guests_count" => booking.guests_count,
-            "children_count" => booking.children_count || 0,
-            "payment_intent_id" => "pi_mod_timeout"
-          }
+        put_active_modification_hold(booking, %{
+          "payment_intent_id" => "pi_mod_timeout"
         })
-        |> Repo.update!()
 
       previous_client = Application.get_env(:ysc, :stripe_client)
       Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
@@ -7622,11 +7600,75 @@ defmodule Ysc.BookingsTest do
                  "pi_mod_missing_hold"
                )
     end
+
+    test "refuses to attach after the modification hold was released" do
+      booking = booking_fixture(%{status: :complete})
+      booking = put_active_modification_hold(booking)
+
+      # Stale in-memory struct still has attrs; DB hold was cleared (abandon /
+      # ModHoldExpiry / complete-cancel). Must not rewrite phantom attrs.
+      {:ok, _released} = Bookings.release_modification_hold(booking.id)
+
+      assert {:error, :no_modification_hold} =
+               Bookings.attach_modification_payment_intent(
+                 booking,
+                 "pi_mod_after_release"
+               )
+
+      reloaded = Repo.reload!(booking)
+      assert is_nil(reloaded.modification_hold_attrs)
+      assert is_nil(reloaded.modification_hold_expires_at)
+    end
+
+    test "refuses to attach when attrs remain but expires_at was cleared" do
+      booking = booking_fixture(%{status: :complete})
+      booking = put_active_modification_hold(booking)
+
+      # The leftover of a stale changeset attach after release: attrs written
+      # back, expires_at left nil. ModHoldExpiry never selects those rows.
+      booking
+      |> Ecto.Changeset.change(%{modification_hold_expires_at: nil})
+      |> Repo.update!()
+
+      assert {:error, :no_modification_hold} =
+               Bookings.attach_modification_payment_intent(
+                 booking.id,
+                 "pi_mod_phantom_attrs"
+               )
+
+      reloaded = Repo.reload!(booking)
+      assert reloaded.modification_hold_attrs
+      assert is_nil(Bookings.modification_hold_payment_intent_id(reloaded))
+      assert is_nil(reloaded.modification_hold_expires_at)
+    end
+
+    test "refuses to attach when the booking is no longer complete" do
+      booking = booking_fixture(%{status: :complete})
+      booking = put_active_modification_hold(booking)
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{status: :canceled})
+        |> Repo.update!()
+
+      assert {:error, :no_modification_hold} =
+               Bookings.attach_modification_payment_intent(
+                 booking,
+                 "pi_mod_canceled_booking"
+               )
+
+      reloaded = Repo.reload!(booking)
+
+      assert is_nil(Bookings.modification_hold_payment_intent_id(reloaded))
+    end
   end
 
   describe "ci_query_explain_* query builders" do
     test "each helper builds a runnable Ecto query" do
       assert %Ecto.Query{} = Bookings.ci_query_explain_query()
+
+      assert %Ecto.Query{} =
+               Bookings.ci_query_explain_attach_modification_payment_intent_query()
 
       assert %Ecto.Query{} =
                Bookings.ci_query_explain_conflicting_bookings_query()

@@ -1210,7 +1210,7 @@ defmodule YscWeb.SecurityAuditTest do
     } do
       user = unpaid_active_user_with_payment_method()
 
-      expect(Stripe.SubscriptionMock, :create, 0, fn _params ->
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params, _opts ->
         flunk("unauthenticated mount should not create a Stripe subscription")
       end)
 
@@ -1232,7 +1232,7 @@ defmodule YscWeb.SecurityAuditTest do
          } do
       user = unpaid_active_user_with_payment_method()
 
-      expect(Stripe.SubscriptionMock, :create, 0, fn _params ->
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params, _opts ->
         flunk("unauthenticated mount should not create a Stripe subscription")
       end)
 
