@@ -13,7 +13,9 @@ defmodule Ysc.Merch.PrintfulEvents do
       never back, and closed orders (failed, canceled, refunded, delivered) are
       left alone;
     * a shipment is keyed by Printful's shipment id, and its notification is
-      claimed in the same transaction that queues it, so it is sent once;
+      claimed in the same transaction that queues it, so it is sent once, and
+      only once the parcel has really shipped and has a tracking number (or
+      has waited long enough for one);
     * a failure or cancellation notifies once, when the status actually changes.
 
   Events for orders that aren't ours (no matching reference) are ignored.
@@ -23,13 +25,18 @@ defmodule Ysc.Merch.PrintfulEvents do
   require Ysc.Logging
 
   alias Ecto.Multi
-  alias Ysc.Merch.{Notifications, Order, Orders, Shipment}
+  alias Ysc.Merch.{Notifications, Order, OrderItem, Orders, Shipment, Variant}
   alias Ysc.Printful.Amount
   alias Ysc.Repo
 
   # Statuses an event may still change. Shipped orders can still be marked
   # delivered or returned, but can no longer fail or be canceled.
   @before_shipment [:paid, :submitting, :submitted, :in_production]
+  # A shipped parcel is announced once it has a tracking number. If Printful
+  # still has none this long after the parcel left, announce it without one
+  # rather than never telling the member.
+  @tracking_grace_seconds 6 * 3600
+
   @rank %{
     paid: 0,
     submitting: 0,
@@ -78,23 +85,31 @@ defmodule Ysc.Merch.PrintfulEvents do
 
   def handle_event(_type, _data), do: :ok
 
-  defp dispatch("package_shipped", order, data, _po) do
-    case record_shipment(order, data["shipment"], :shipped) do
-      {:ok, shipment} -> shipped(order, shipment)
-      :ignore -> :ok
+  defp dispatch("package_shipped", order, data, po) do
+    raw = data["shipment"]
+
+    # The event says the parcel shipped, but a shipment Printful itself still
+    # calls something else (pending) has not left the building.
+    if left_the_building?(raw) do
+      case record_shipment(order, raw, :shipped, po) do
+        {:ok, shipment} -> shipped(order, shipment)
+        :ignore -> :ok
+      end
+    else
+      :ok
     end
   end
 
-  defp dispatch(type, order, data, _po)
+  defp dispatch(type, order, data, po)
        when type in ["package_delivered", "shipment_delivered"] do
-    case record_shipment(order, data["shipment"], :delivered) do
+    case record_shipment(order, data["shipment"], :delivered, po) do
       {:ok, shipment} -> delivered(order, shipment)
       :ignore -> :ok
     end
   end
 
-  defp dispatch("package_returned", order, data, _po) do
-    case record_shipment(order, data["shipment"], :returned) do
+  defp dispatch("package_returned", order, data, po) do
+    case record_shipment(order, data["shipment"], :returned, po) do
       {:ok, shipment} -> returned(order, shipment)
       :ignore -> :ok
     end
@@ -163,7 +178,10 @@ defmodule Ysc.Merch.PrintfulEvents do
       |> Enum.filter(&shipped?/1)
 
     Enum.each(shipments, fn raw ->
-      case record_shipment(order, raw, :shipped) do
+      # A parcel Printful already reports as delivered or returned is recorded
+      # as such, so a missed webhook never turns into a "shipped" email sent
+      # after the fact.
+      case record_shipment(order, raw, shipment_status(raw), printful_order) do
         {:ok, shipment} -> shipped(order, shipment)
         :ignore -> :ok
       end
@@ -219,6 +237,17 @@ defmodule Ysc.Merch.PrintfulEvents do
     do: is_integer(shipment["shipped_at"]) or is_binary(shipment["ship_date"])
 
   defp shipped?(_), do: false
+
+  # For a webhook that announces a shipment: only an explicit status other than
+  # shipped/delivered/returned (i.e. pending) rules it out.
+  defp left_the_building?(%{"status" => status}) when is_binary(status),
+    do: status in ~w(shipped delivered returned)
+
+  defp left_the_building?(_), do: true
+
+  defp shipment_status(%{"status" => "delivered"}), do: :delivered
+  defp shipment_status(%{"status" => "returned"}), do: :returned
+  defp shipment_status(_), do: :shipped
 
   ## Finding and stamping
 
@@ -276,18 +305,23 @@ defmodule Ysc.Merch.PrintfulEvents do
 
   ## Shipments
 
-  defp record_shipment(_order, nil, _status), do: :ignore
+  defp record_shipment(_order, nil, _status, _po), do: :ignore
 
-  defp record_shipment(order, %{"id" => id} = raw, status)
+  defp record_shipment(order, %{"id" => id} = raw, status, po)
        when is_integer(id) do
+    tracking_number = text(raw["tracking_number"])
+
     attrs = %{
       order_id: order.id,
       printful_shipment_id: id,
-      carrier: raw["carrier"],
-      service: raw["service"],
-      tracking_number: raw["tracking_number"],
-      tracking_url: raw["tracking_url"],
+      carrier: text(raw["carrier"]),
+      service: text(raw["service"]),
+      tracking_number: tracking_number,
+      # Before the carrier has a label Printful gives a link with no number in
+      # it (".../tracking/<id>/"), which goes nowhere.
+      tracking_url: tracking_number && url(raw["tracking_url"]),
       reshipment: raw["reshipment"] == true,
+      items: shipment_items(order, raw["items"], po),
       shipped_at: shipped_at(raw)
     }
 
@@ -297,7 +331,89 @@ defmodule Ysc.Merch.PrintfulEvents do
     end
   end
 
-  defp record_shipment(_order, _bad, _status), do: :ignore
+  defp record_shipment(_order, _bad, _status, _po), do: :ignore
+
+  # Printful's free text, trimmed and cut to the column; blank is no value.
+  defp text(value) when is_binary(value) do
+    case value |> String.trim() |> String.slice(0, 255) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp text(value) when is_integer(value), do: Integer.to_string(value)
+  defp text(_), do: nil
+
+  # Too long to store means too long to be a real link.
+  defp url(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed when byte_size(trimmed) > 1024 -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp url(_), do: nil
+
+  # Which of our order lines are in this parcel. Printful's shipment names its
+  # items by Printful's own item ids; the order record maps those to the sync
+  # variant we sent, which is how we find our line. Anything we cannot place is
+  # left out, and an empty result means "unknown" (the whole order is shown).
+  defp shipment_items(%{items: order_items}, raw_items, po)
+       when is_list(raw_items) and is_list(order_items) do
+    sync_by_item =
+      po
+      |> Map.get("items")
+      |> List.wrap()
+      |> Enum.flat_map(fn
+        %{"id" => id, "sync_variant_id" => sync} when is_integer(id) ->
+          [{id, sync}]
+
+        _ ->
+          []
+      end)
+      |> Map.new()
+
+    line_by_sync =
+      order_items
+      |> Enum.flat_map(fn
+        %OrderItem{variant: %Variant{printful_sync_variant_id: sync}} = line
+        when is_integer(sync) ->
+          [{sync, line}]
+
+        _ ->
+          []
+      end)
+      |> Map.new()
+
+    raw_items
+    |> Enum.flat_map(fn
+      %{"item_id" => item_id} = raw when is_integer(item_id) ->
+        with sync when is_integer(sync) <- sync_by_item[item_id],
+             %OrderItem{} = line <- line_by_sync[sync] do
+          [{line, parcel_quantity(raw["quantity"], line)}]
+        else
+          _ -> []
+        end
+
+      _ ->
+        []
+    end)
+    |> Enum.group_by(fn {line, _} -> line.id end)
+    |> Enum.map(fn {line_id, [{line, _} | _] = entries} ->
+      total = entries |> Enum.map(&elem(&1, 1)) |> Enum.sum()
+      %{"order_item_id" => line_id, "quantity" => min(total, line.quantity)}
+    end)
+    |> Enum.sort_by(& &1["order_item_id"])
+  end
+
+  defp shipment_items(_order, _raw_items, _po), do: []
+
+  defp parcel_quantity(quantity, _line)
+       when is_integer(quantity) and quantity > 0,
+       do: quantity
+
+  defp parcel_quantity(_quantity, line), do: line.quantity
 
   # A webhook and the status poll can report the same new shipment at once.
   # The insert is a no-op if the other one got there first; either way we
@@ -306,6 +422,7 @@ defmodule Ysc.Merch.PrintfulEvents do
     attrs =
       Map.merge(attrs, %{
         status: status,
+        shipped_at: attrs.shipped_at || now(),
         delivered_at: if(status == :delivered, do: now())
       })
 
@@ -352,8 +469,15 @@ defmodule Ysc.Merch.PrintfulEvents do
 
     changes =
       attrs
-      |> Map.take([:carrier, :service, :tracking_number, :tracking_url])
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.take([
+        :carrier,
+        :service,
+        :tracking_number,
+        :tracking_url,
+        :items,
+        :shipped_at
+      ])
+      |> Enum.reject(fn {_k, v} -> v in [nil, []] end)
       |> Map.new()
       |> Map.put(:status, next_status)
       |> then(fn changes ->
@@ -375,11 +499,11 @@ defmodule Ysc.Merch.PrintfulEvents do
   defp shipped_at(%{"ship_date" => date}) when is_binary(date) do
     case Date.from_iso8601(date) do
       {:ok, date} -> DateTime.new!(date, ~T[12:00:00], "Etc/UTC")
-      _ -> now()
+      _ -> nil
     end
   end
 
-  defp shipped_at(_), do: now()
+  defp shipped_at(_), do: nil
 
   ## Transitions
 
@@ -389,11 +513,20 @@ defmodule Ysc.Merch.PrintfulEvents do
     advance(order, :shipped)
 
     if shipment.status == :shipped and is_nil(shipment.notified_at) and
-         order.status not in [:failed, :canceled, :refunded] do
+         order.status not in [:failed, :canceled, :refunded] and
+         ready_to_announce?(shipment) do
       notify_shipped(order, shipment)
     end
 
     :ok
+  end
+
+  # A parcel is announced once it can be tracked. Until then the next webhook
+  # or poll gets another look; after the grace period it goes out regardless
+  # (some services have no tracking), so the member is never left untold.
+  defp ready_to_announce?(%Shipment{shipped_at: shipped_at} = shipment) do
+    Shipment.trackable?(shipment) or is_nil(shipped_at) or
+      DateTime.diff(now(), shipped_at) >= @tracking_grace_seconds
   end
 
   defp delivered(order, _shipment) do

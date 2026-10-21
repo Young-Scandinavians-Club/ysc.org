@@ -277,7 +277,14 @@ defmodule Ysc.Printful.DemoClient do
           "status" => if(confirm, do: "pending", else: "draft"),
           "shipping" => Map.get(order, :shipping),
           "recipient" => stringify(Map.get(order, :recipient, %{})),
-          "items" => order |> Map.get(:items, []) |> Enum.map(&stringify/1),
+          # Like Printful, each item gets an id of its own; shipments refer to it.
+          "items" =>
+            order
+            |> Map.get(:items, [])
+            |> Enum.with_index(1)
+            |> Enum.map(fn {item, index} ->
+              item |> stringify() |> Map.put("id", id * 100 + index)
+            end),
           "costs" => costs(order),
           "shipments" => []
         }

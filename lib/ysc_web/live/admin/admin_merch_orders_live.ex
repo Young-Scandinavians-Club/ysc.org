@@ -437,6 +437,15 @@ defmodule YscWeb.AdminMerchOrdersLive do
               <span class="text-zinc-900">
                 {shipment.carrier || "Carrier"}
                 <span :if={shipment.service} class="text-zinc-500">· {shipment.service}</span>
+                <span
+                  :for={
+                    {quantity, line} <-
+                      Ysc.Merch.Shipment.contents(shipment, @order.items)
+                  }
+                  class="block text-zinc-500"
+                >
+                  {quantity} × {line.name}
+                </span>
               </span>
               <span class="text-zinc-600">
                 <%= if url = Ysc.Merch.Shipment.safe_tracking_url(shipment.tracking_url) do %>
