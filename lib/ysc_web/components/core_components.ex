@@ -4178,6 +4178,58 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Bordered card for a section on account settings pages (profile, security, family).
+
+  Wraps a type-subhead title and body in the shared `rounded-sm border` chrome
+  used across those pages. Pass `count` to append a muted `({n})` after the title.
+
+  ## Examples
+
+      <.settings_section title="Passkeys">
+        <p class="text-zinc-600 text-sm">A passkey is a passwordless way to sign in.</p>
+      </.settings_section>
+
+      <.settings_section title="Family Members" count={length(@members)}>
+        ...
+      </.settings_section>
+  """
+  attr :id, :string, default: nil
+  attr :title, :string, required: true
+
+  attr :count, :integer,
+    default: nil,
+    doc: "Optional count rendered after the title as muted `({n})`"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the section container"
+
+  slot :inner_block, required: true
+
+  def settings_section(assigns) do
+    ~H"""
+    <section
+      id={@id}
+      class={[
+        "rounded-sm border border-zinc-100 py-4 px-4 space-y-4",
+        @class
+      ]}
+    >
+      <h2 class="text-zinc-900 text-xl type-subhead">
+        {@title}
+        <span
+          :if={@count != nil}
+          class="text-zinc-500 font-normal text-sm ml-2"
+        >
+          ({@count})
+        </span>
+      </h2>
+      {render_slot(@inner_block)}
+    </section>
+    """
+  end
+
+  @doc """
   Page title for public pages: left-aligned eyebrow + title + optional
   subtitle. Public text pages open with this so the site reads as one place.
   (The cabin pages keep their own photo hero.)

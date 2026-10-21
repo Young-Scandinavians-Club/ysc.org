@@ -385,9 +385,7 @@ defmodule YscWeb.UserSettingsLive do
 
         <div class="text-medium px-2 text-zinc-500 rounded-sm w-full min-w-0 md:border-l md:border-zinc-100 md:pl-16">
           <div :if={@live_action == :edit} class="space-y-8">
-            <!-- Profile Picture Section -->
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 text-xl type-subhead">Profile Picture</h2>
+            <.settings_section title="Profile Picture">
               <p class="text-sm text-zinc-500">
                 Adding a profile picture helps other members recognize you at events and makes the community feel more personal.
               </p>
@@ -612,13 +610,8 @@ defmodule YscWeb.UserSettingsLive do
                   </div>
                 </div>
               </div>
-            </div>
-            <!-- Personal Information Section -->
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 text-xl type-subhead">
-                Personal Information
-              </h2>
-
+            </.settings_section>
+            <.settings_section title="Personal Information">
               <.simple_form
                 for={@profile_form}
                 id="profile_form"
@@ -681,11 +674,8 @@ defmodule YscWeb.UserSettingsLive do
                   <.button phx-disable-with="Updating...">Update Profile</.button>
                 </:actions>
               </.simple_form>
-            </div>
-            <!-- Billing Address Section -->
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 text-xl type-subhead">Billing Address</h2>
-
+            </.settings_section>
+            <.settings_section title="Billing Address">
               <.simple_form
                 for={@address_form}
                 id="address_form"
@@ -732,11 +722,8 @@ defmodule YscWeb.UserSettingsLive do
                   <.button phx-disable-with="Updating...">Update Address</.button>
                 </:actions>
               </.simple_form>
-            </div>
-            <!-- Email Change Section -->
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 text-xl type-subhead">Email</h2>
-
+            </.settings_section>
+            <.settings_section title="Email">
               <%= if @pending_email do %>
                 <div class="p-4 bg-amber-50 border border-amber-200 rounded-md">
                   <div class="flex items-start">
@@ -791,7 +778,7 @@ defmodule YscWeb.UserSettingsLive do
                   </.button>
                 </:actions>
               </.simple_form>
-            </div>
+            </.settings_section>
           </div>
 
           <div

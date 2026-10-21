@@ -424,9 +424,7 @@ defmodule YscWeb.UserSecurityLive do
 
         <div class="text-medium px-2 text-zinc-500 rounded-sm w-full md:border-l md:border md:border-zinc-100 md:pl-16">
           <div class="space-y-8">
-            <!-- Passkeys Section -->
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 text-xl type-subhead">Passkeys</h2>
+            <.settings_section title="Passkeys">
               <p class="text-zinc-600 text-sm">
                 A passkey is a passwordless way to sign in using your device’s built-in security (fingerprint, face, or PIN). It’s tied to your device and this site, so it can’t be phished or leaked like a password.
               </p>
@@ -532,15 +530,10 @@ defmodule YscWeb.UserSecurityLive do
                   </div>
                 </div>
               </div>
-            </div>
-            <!-- Password Change Section -->
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 text-xl type-subhead">
-                {if @user_has_password,
-                  do: "Change Password",
-                  else: "Set Password"}
-              </h2>
-
+            </.settings_section>
+            <.settings_section title={
+              if @user_has_password, do: "Change Password", else: "Set Password"
+            }>
               <p :if={!@user_has_password} class="text-sm text-zinc-600">
                 You don't currently have a password set. Setting a password allows you to sign in with email and password in addition to other methods.
               </p>
@@ -586,10 +579,8 @@ defmodule YscWeb.UserSecurityLive do
                   </.button>
                 </:actions>
               </.simple_form>
-            </div>
-            <!-- Recent Activity Section -->
-            <div class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 text-xl type-subhead">Recent Activity</h2>
+            </.settings_section>
+            <.settings_section title="Recent Activity">
               <p class="text-zinc-600 text-sm">
                 Review where and how you signed in. If you see an unfamiliar sign-in, change your password and sign out on your other devices.
               </p>
@@ -716,7 +707,7 @@ defmodule YscWeb.UserSecurityLive do
                   </div>
                 </div>
               <% end %>
-            </div>
+            </.settings_section>
           </div>
         </div>
       </div>
