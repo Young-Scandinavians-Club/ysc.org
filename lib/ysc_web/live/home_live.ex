@@ -15,7 +15,7 @@ defmodule YscWeb.HomeLive do
   alias Ysc.Events.EventHelpers
 
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
-  alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay, Season}
+  alias Ysc.Bookings.Season
   alias Ysc.Posts.ReadingTime
   alias Ysc.GoogleWallet
   alias Ysc.Tickets.Display, as: TicketDisplay
@@ -1006,9 +1006,10 @@ defmodule YscWeb.HomeLive do
     </section>
 
     <%!-- Logged-in User Dashboard --%>
-    <main
+    <div
       :if={@current_user != nil}
-      class="flex-1 w-full bg-zinc-50/50 min-h-screen"
+      id="member-dashboard"
+      class="flex-1 w-full bg-zinc-50/40 min-h-screen pb-24 -mb-8"
     >
       <%!-- Passkey Setup Prompt Banner.
            Hidden until the async user load confirms the prompt should be shown,
@@ -1077,795 +1078,610 @@ defmodule YscWeb.HomeLive do
         </div>
       </div>
 
-      <%!-- Welcome Header with Soft Background --%>
-      <div class="bg-white border-b border-zinc-100 overflow-hidden">
-        <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 py-10 lg:py-16">
-          <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <%!-- Compact header with the quick-action bar on the right --%>
+      <div class="bg-white border-b border-zinc-200">
+        <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 py-8">
+          <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div class="space-y-1 min-w-0">
               <p class="text-blue-600 text-xs type-eyebrow">
                 Member Dashboard
               </p>
-              <h1 class="text-3xl sm:text-4xl lg:text-5xl text-zinc-900 wrap-break-word type-display">
+              <h1 class="text-2xl sm:text-3xl lg:text-4xl text-zinc-900 wrap-break-word type-display">
                 {greeting_for_country(@current_user.most_connected_country)}, {String.capitalize(
                   @current_user.first_name
                 )}
               </h1>
+            </div>
+
+            <%!-- Unified quick-action bar: 1px gaps over a zinc backdrop draw the dividers --%>
+            <div
+              id="home-quick-actions"
+              class="grid grid-cols-2 sm:grid-cols-4 gap-px bg-zinc-200 border border-zinc-200 rounded-xl overflow-hidden lg:min-w-xl"
+            >
+              <.quick_action_card
+                id="home-quick-action-tahoe"
+                navigate={~p"/bookings/tahoe"}
+                icon="hero-home"
+                tone={:blue}
+                title="Lake Tahoe"
+                subtitle="Book a stay"
+              />
+              <.quick_action_card
+                id="home-quick-action-clear-lake"
+                navigate={~p"/bookings/clear-lake"}
+                icon="hero-sun"
+                tone={:emerald}
+                title="Clear Lake"
+                subtitle="Book a stay"
+              />
+              <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
+                <.quick_action_card
+                  id="home-quick-action-expenses"
+                  navigate={~p"/expensereports"}
+                  icon="hero-receipt-refund"
+                  tone={:blue}
+                  title="Expenses"
+                  subtitle="View reports"
+                />
+              <% else %>
+                <.quick_action_card
+                  id="home-quick-action-events"
+                  navigate={~p"/events"}
+                  icon="hero-calendar-days"
+                  tone={:blue}
+                  title="Events"
+                  subtitle="See what's on"
+                />
+              <% end %>
+              <.quick_action_card
+                id="home-quick-action-settings"
+                navigate={~p"/users/settings"}
+                icon="hero-cog-6-tooth"
+                tone={:zinc}
+                title="Account"
+                subtitle="Membership & billing"
+              />
             </div>
           </div>
         </div>
       </div>
 
       <%!-- Dashboard Content --%>
-      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 -mt-8 pb-20">
-        <div class="flex flex-col">
-          <%!-- Quick Actions --%>
-          <div
-            id="home-quick-actions"
-            phx-hook="InteractScrollbar"
-            class="flex overflow-x-auto snap-x scroll-smooth thin-scrollbar lg:grid lg:grid-cols-4 gap-3 lg:gap-4 pb-2 lg:pb-4 -mx-4 px-4 lg:mx-0 lg:px-0 mb-12 mt-4 lg:mt-0"
-          >
-            <.quick_action_card
-              id="home-quick-action-tahoe"
-              navigate={~p"/bookings/tahoe"}
-              icon="hero-home"
-              tone={:blue}
-              title="Lake Tahoe"
-              subtitle="Book a stay"
-            />
-            <.quick_action_card
-              id="home-quick-action-clear-lake"
-              navigate={~p"/bookings/clear-lake"}
-              icon="hero-home"
-              tone={:emerald}
-              title="Clear Lake"
-              subtitle="Book a stay"
-            />
-            <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
-              <.quick_action_card
-                id="home-quick-action-expenses"
-                navigate={~p"/expensereports"}
-                icon="hero-receipt-refund"
-                tone={:orange}
-                title="Expenses"
-                subtitle="View reports"
-              />
-            <% else %>
-              <.quick_action_card
-                id="home-quick-action-events"
-                navigate={~p"/events"}
-                icon="hero-calendar-days"
-                tone={:purple}
-                title="Events"
-                subtitle="See what's on"
-              />
-            <% end %>
-            <.quick_action_card
-              id="home-quick-action-settings"
-              navigate={~p"/users/settings"}
-              icon="hero-cog-6-tooth"
-              tone={:zinc}
-              title="Account"
-              subtitle="Membership & billing"
-            />
-          </div>
+      <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 pt-10">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <div class="lg:col-span-8 space-y-10 min-w-0">
+            <%!-- Reservations: cabin stays and event tickets in one place --%>
+            <section id="home-reservations">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg text-zinc-900 type-subhead">
+                  Your Reservations
+                </h2>
+                <.section_link navigate={~p"/users/payments"}>
+                  All bookings & payments
+                </.section_link>
+              </div>
 
-          <%!-- Main Content Grid --%>
-          <div class="grid lg:grid-cols-3 gap-12">
-            <div class="lg:col-span-2 space-y-12">
-              <%!-- Your Itinerary Section --%>
-              <section>
-                <div class="flex items-center justify-between mb-6">
-                  <h2 class="text-lg text-zinc-900 flex items-center gap-2 type-subhead">
-                    <.icon name="hero-map-pin" class="w-5 h-5 text-blue-600" />Your Upcoming Stays
-                  </h2>
-                  <.section_link navigate={~p"/users/payments"}>
-                    All bookings & payments
+              <%!-- Loading skeleton matches the compact empty bar (avoids CLS) --%>
+              <div
+                :if={!@async_data_loaded}
+                id="home-reservations-loading"
+                class="h-20 bg-white rounded-lg border border-zinc-200 animate-pulse"
+              >
+              </div>
+
+              <div
+                :if={
+                  @async_data_loaded && Enum.empty?(@future_bookings) &&
+                    Enum.empty?(@upcoming_tickets)
+                }
+                id="home-reservations-empty"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 px-5 bg-white border border-zinc-200 rounded-lg"
+              >
+                <p class="text-sm text-zinc-600">
+                  No upcoming cabin stays or event tickets.
+                </p>
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-1">
+                  <.section_link navigate={~p"/bookings/tahoe"}>
+                    Book Lake Tahoe
+                    <.icon name="hero-arrow-right" class="w-3 h-3" />
                   </.section_link>
-                </div>
-
-                <%!-- Loading skeleton sized to match empty-state card (avoids CLS) --%>
-                <div
-                  :if={!@async_data_loaded}
-                  class="bg-white rounded-xl shadow-xs border border-zinc-200 p-12 text-center min-h-70 animate-pulse"
-                >
-                  <div class="w-14 h-14 bg-zinc-200 rounded-full mx-auto mb-4">
-                  </div>
-                  <div class="h-4 bg-zinc-200 rounded-sm w-48 mx-auto mb-2"></div>
-                  <div class="h-3 bg-zinc-200 rounded-sm w-56 mx-auto mb-6"></div>
-                  <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                    <div class="h-10 w-36 bg-zinc-200 rounded-sm mx-auto sm:mx-0">
-                    </div>
-                    <div class="h-10 w-36 bg-zinc-200 rounded-sm mx-auto sm:mx-0">
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  :if={@async_data_loaded && Enum.empty?(@future_bookings)}
-                  class="bg-white rounded-xl shadow-xs border border-zinc-200 p-12 text-center min-h-70"
-                >
-                  <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <.icon name="hero-home" class="w-7 h-7 text-zinc-500" />
-                  </div>
-                  <h3 class="text-base text-zinc-900 mb-2 type-subhead">
-                    No upcoming bookings
-                  </h3>
-                  <p class="text-zinc-500 text-sm mb-6">
-                    Plan your next cabin getaway
-                  </p>
-                  <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                    <.button navigate={~p"/bookings/tahoe"} color="blue">
-                      Book Lake Tahoe
-                    </.button>
-                    <.button navigate={~p"/bookings/clear-lake"} color="green">
-                      Book Clear Lake
-                    </.button>
-                  </div>
-                </div>
-
-                <div
-                  :if={@async_data_loaded && !Enum.empty?(@future_bookings)}
-                  id="home-itinerary-list"
-                  class="space-y-4"
-                >
-                  <%= for booking <- @future_bookings do %>
-                    <% days_until_this_booking = days_until_booking(booking) %>
-                    <% is_active =
-                      days_until_this_booking == :started ||
-                        days_until_this_booking == 0 %>
-                    <.link
-                      id={"home-itinerary-booking-#{booking.id}"}
-                      navigate={~p"/bookings/#{booking.id}/receipt"}
-                      class={[
-                        "relative bg-white rounded-xl overflow-hidden flex flex-col md:flex-row transition-colors duration-200 group border border-zinc-200 hover:border-zinc-300",
-                        if is_active do
-                          if booking.property == :tahoe do
-                            "ring-1 ring-blue-500/10"
-                          else
-                            "ring-1 ring-emerald-500/10"
-                          end
-                        else
-                          ""
-                        end
-                      ]}
-                    >
-                      <div class={[
-                        "md:w-1.5 shrink-0",
-                        if booking.property == :tahoe do
-                          "bg-linear-to-b from-blue-500 to-blue-700"
-                        else
-                          "bg-linear-to-b from-emerald-500 to-emerald-700"
-                        end
-                      ]}>
-                      </div>
-                      <div class="p-8 flex-1 grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
-                        <div class="space-y-1 md:border-r border-zinc-100 pr-6">
-                          <p class="text-xs text-zinc-500 type-eyebrow">
-                            Destination
-                          </p>
-                          <p class="text-2xl text-zinc-900 type-title">
-                            {PropertyDisplay.medium_name(booking.property)}
-                          </p>
-                          <p class="text-xs font-mono text-zinc-500">
-                            {booking.reference_id}
-                          </p>
-                        </div>
-                        <div class="space-y-2">
-                          <p class="text-xs text-zinc-500 type-eyebrow">
-                            Dates
-                          </p>
-                          <p class="font-bold text-zinc-800">
-                            {format_booking_date(booking.checkin_date)} — {format_booking_date(
-                              booking.checkout_date
-                            )}
-                          </p>
-                          <span class={[
-                            "inline-flex items-center px-2.5 py-0.5 text-xs rounded-sm type-eyebrow",
-                            case days_until_this_booking do
-                              :started ->
-                                "bg-green-50 text-green-700 ring-1 ring-green-200/50"
-
-                              0 ->
-                                "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50"
-
-                              1 ->
-                                "bg-blue-50 text-blue-700 ring-1 ring-blue-200/50"
-
-                              days when days <= 7 ->
-                                "bg-violet-50 text-violet-700 ring-1 ring-violet-200/50"
-
-                              _ ->
-                                "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/50"
-                            end
-                          ]}>
-                            {case days_until_this_booking do
-                              :started -> "Currently Staying"
-                              0 -> "Checking in today"
-                              1 -> "Tomorrow"
-                              days -> "In #{days} days"
-                            end}
-                          </span>
-                          <%= if booking.booking_mode == :buyout do %>
-                            <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs rounded-sm type-eyebrow">
-                              {BookingModeDisplay.stay_type_label(:buyout)}
-                            </span>
-                          <% end %>
-                        </div>
-                        <div class="flex justify-end">
-                          <span class="px-5 py-2.5 bg-zinc-900 text-white text-xs font-bold rounded-sm group-hover:bg-blue-600 transition-colors duration-150">
-                            View Details
-                          </span>
-                        </div>
-                      </div>
-                    </.link>
-                  <% end %>
-                </div>
-              </section>
-
-              <%!-- Event Tickets Section --%>
-              <section>
-                <div class="flex items-center justify-between mb-6">
-                  <h2 class="text-lg text-zinc-900 flex items-center gap-2 type-subhead">
-                    <.icon name="hero-ticket" class="w-5 h-5 text-purple-600" />
-                    Event Tickets
-                  </h2>
+                  <.section_link navigate={~p"/bookings/clear-lake"}>
+                    Book Clear Lake
+                    <.icon name="hero-arrow-right" class="w-3 h-3" />
+                  </.section_link>
                   <.section_link navigate={~p"/events"}>
-                    Browse Events
+                    Browse Events <.icon name="hero-arrow-right" class="w-3 h-3" />
                   </.section_link>
                 </div>
+              </div>
 
-                <%!-- Loading skeleton sized to match empty-state card (avoids CLS) --%>
-                <div
-                  :if={!@async_data_loaded}
-                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-xs p-12 text-center min-h-64 animate-pulse"
-                >
-                  <div class="w-14 h-14 bg-zinc-200 rounded-full mx-auto mb-4">
-                  </div>
-                  <div class="h-4 bg-zinc-200 rounded-sm w-56 mx-auto mb-2"></div>
-                  <div class="h-3 bg-zinc-200 rounded-sm w-64 max-w-full mx-auto mb-6">
-                  </div>
-                  <div class="h-10 w-36 bg-zinc-200 rounded-sm mx-auto"></div>
-                </div>
+              <div
+                :if={@async_data_loaded && !Enum.empty?(@future_bookings)}
+                id="home-itinerary-list"
+                class="space-y-3"
+              >
+                <.booking_card
+                  :for={booking <- @future_bookings}
+                  id={"home-itinerary-booking-#{booking.id}"}
+                  booking={booking}
+                />
+              </div>
 
-                <div
-                  :if={@async_data_loaded && Enum.empty?(@upcoming_tickets)}
-                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-xs p-12 text-center min-h-64"
-                >
-                  <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-500" />
-                  </div>
-                  <h3 class="text-base text-zinc-900 mb-2 type-subhead">
-                    No upcoming event tickets
-                  </h3>
-                  <p class="text-zinc-500 text-sm mb-6">
-                    Discover what's happening in our community
-                  </p>
-                  <.button navigate={~p"/events"} color="zinc">
-                    Browse Events
-                  </.button>
-                </div>
-
-                <div
-                  :if={@async_data_loaded && !Enum.empty?(@upcoming_tickets)}
-                  class="grid grid-cols-1 md:grid-cols-2 gap-6"
-                >
-                  <%= for {event, grouped_tiers} <- group_tickets_by_event_and_tier(@upcoming_tickets) do %>
-                    <% order_ids =
-                      grouped_tiers
-                      |> Enum.flat_map(fn {_tier_name, tickets} ->
-                        Enum.map(tickets, fn t ->
-                          t.ticket_order && t.ticket_order.id
-                        end)
+              <div
+                :if={@async_data_loaded && !Enum.empty?(@upcoming_tickets)}
+                id="home-tickets-list"
+                class={["space-y-3", !Enum.empty?(@future_bookings) && "mt-3"]}
+              >
+                <%= for {event, grouped_tiers} <- group_tickets_by_event_and_tier(@upcoming_tickets) do %>
+                  <% order_ids =
+                    grouped_tiers
+                    |> Enum.flat_map(fn {_tier_name, tickets} ->
+                      Enum.map(tickets, fn t ->
+                        t.ticket_order && t.ticket_order.id
                       end)
-                      |> Enum.filter(& &1)
-                      |> Enum.uniq() %>
-                    <% days_until_this_event = days_until_event(event) %>
-                    <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8">
-                      <div class="flex justify-between items-start mb-4">
+                    end)
+                    |> Enum.filter(& &1)
+                    |> Enum.uniq() %>
+                  <% days_until_this_event = days_until_event(event) %>
+                  <div
+                    id={"home-ticket-#{event.id}"}
+                    class="flex bg-white border border-zinc-200 rounded-xl overflow-hidden"
+                  >
+                    <%!-- Ticket stub: soft tint; solid only on the day of the event --%>
+                    <div class={[
+                      "flex flex-col items-center justify-center w-18 shrink-0 border-r-2 border-dashed px-2 py-4",
+                      ticket_stub_class(days_until_this_event == 0)
+                    ]}>
+                      <span class="text-xs type-eyebrow opacity-80">
+                        {ticket_stub_month(event)}
+                      </span>
+                      <span class="text-3xl type-display leading-none">
+                        {ticket_stub_day(event)}
+                      </span>
+                      <.icon name="hero-ticket" class="w-4 h-4 mt-3 opacity-70" />
+                    </div>
+                    <div class="flex-1 min-w-0 p-5 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                      <div class="flex-1 min-w-0">
                         <span class={[
-                          "px-2 py-1 text-xs font-bold rounded-sm",
+                          "inline-block px-2 py-1 mb-2 text-xs font-bold rounded-sm",
                           case days_until_this_event do
                             0 -> "bg-amber-50 text-amber-700"
-                            1 -> "bg-blue-50 text-blue-700"
-                            days when days <= 7 -> "bg-emerald-50 text-emerald-700"
-                            _ -> "bg-purple-50 text-purple-700"
+                            _ -> "bg-zinc-100 text-zinc-700"
                           end
                         ]}>
                           {DateDisplay.relative_days_phrase(days_until_this_event)}
                         </span>
-                        <.icon name="hero-ticket" class="w-8 h-8 text-zinc-300" />
-                      </div>
-                      <.link navigate={~p"/events/#{event.id}"} class="block group">
-                        <h3 class="text-zinc-900 mb-2 group-hover:text-blue-600 transition-colors type-subhead">
-                          {event.title}
-                        </h3>
-                      </.link>
-                      <p class="text-xs text-zinc-500 flex items-center gap-1 mb-4">
-                        <.icon name="hero-calendar" class="w-3 h-3" />
-                        {DateDisplay.format_datetime_display(event.start_date)}
-                      </p>
-                      <div
-                        :if={event.location_name}
-                        class="text-xs text-zinc-500 flex items-center gap-1 mb-4"
-                      >
-                        <.icon name="hero-map-pin" class="w-3 h-3" />
-                        <span class="truncate">{event.location_name}</span>
-                      </div>
-                      <div class="mt-4 pt-4 border-t-2 border-dashed border-zinc-100 space-y-3">
-                        <div class="flex flex-wrap gap-1.5">
+                        <.link
+                          navigate={~p"/events/#{event.id}"}
+                          class="block group"
+                        >
+                          <h3 class="text-zinc-900 mb-1 group-hover:text-blue-600 transition-colors type-subhead">
+                            {event.title}
+                          </h3>
+                        </.link>
+                        <p class="text-xs text-zinc-500 flex items-center gap-1">
+                          <.icon name="hero-calendar" class="w-3 h-3 shrink-0" />
+                          {DateDisplay.format_datetime_display(event.start_date)}
+                        </p>
+                        <p
+                          :if={event.location_name}
+                          class="mt-1 text-xs text-zinc-500 flex items-center gap-1"
+                        >
+                          <.icon name="hero-map-pin" class="w-3 h-3 shrink-0" />
+                          <span class="truncate">{event.location_name}</span>
+                        </p>
+                        <div class="mt-3 flex flex-wrap gap-1.5">
                           <%= for {tier_name, tickets} <- grouped_tiers do %>
                             <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-zinc-100 text-zinc-600 rounded-full">
                               <span class="text-zinc-500">{length(tickets)}×</span>{tier_name}
                             </span>
                           <% end %>
                         </div>
-                        <div class="flex flex-col gap-1.5">
-                          <div class="flex flex-wrap items-center gap-3">
-                            <.button
-                              navigate={
-                                ~p"/events/#{event.id}/tickets/qr?return_to=/"
-                              }
-                              color="zinc"
-                              class="py-1.5! whitespace-nowrap"
+                      </div>
+                      <div class="flex flex-col items-start md:items-end gap-1 shrink-0 md:pl-6 md:border-l md:border-zinc-100">
+                        <.button
+                          navigate={~p"/events/#{event.id}/tickets/qr?return_to=/"}
+                          color="blue"
+                          variant={
+                            if(days_until_this_event == 0,
+                              do: "solid",
+                              else: "outline"
+                            )
+                          }
+                          class="py-1.5! whitespace-nowrap"
+                        >
+                          <.icon name="hero-qr-code" class="w-4 h-4" /> Show tickets
+                        </.button>
+                        <%= if length(order_ids) == 1 do %>
+                          <.link
+                            navigate={
+                              ~p"/orders/#{List.first(order_ids)}/confirmation"
+                            }
+                            class="inline-flex items-center min-h-8 text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors duration-150 whitespace-nowrap"
+                          >
+                            View order & receipt
+                          </.link>
+                        <% else %>
+                          <%= if length(order_ids) > 1 do %>
+                            <.link
+                              navigate={~p"/users/tickets"}
+                              class="inline-flex items-center min-h-8 text-xs font-semibold text-zinc-500 hover:text-zinc-900 transition-colors duration-150 whitespace-nowrap"
                             >
-                              <.icon name="hero-qr-code" class="w-4 h-4" />
-                              Show tickets for check-in
-                            </.button>
-                            <%= if length(order_ids) == 1 do %>
-                              <.link
-                                navigate={
-                                  ~p"/orders/#{List.first(order_ids)}/confirmation"
-                                }
-                                class="inline-flex items-center min-h-11 -my-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
-                              >
-                                View order & receipt
-                              </.link>
-                            <% else %>
-                              <%= if length(order_ids) > 1 do %>
-                                <.link
-                                  navigate={~p"/users/tickets"}
-                                  class="inline-flex items-center min-h-11 -my-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
-                                >
-                                  View all tickets
-                                </.link>
-                              <% end %>
-                            <% end %>
-                          </div>
-                        </div>
+                              View all tickets
+                            </.link>
+                          <% end %>
+                        <% end %>
                       </div>
                     </div>
-                  <% end %>
-                </div>
-              </section>
-
-              <%!-- Upcoming Events --%>
-              <section>
-                <div class="flex items-center justify-between mb-6">
-                  <h2 class="text-lg text-zinc-900 flex items-center gap-2 type-subhead">
-                    <.icon name="hero-calendar-days" class="w-5 h-5 text-blue-600" />
-                    Upcoming Events
-                  </h2>
-                  <.section_link navigate={~p"/events"}>
-                    View All Events
-                  </.section_link>
-                </div>
-
-                <%!-- Loading skeleton: two cards (~one grid row) balances empty vs loaded CLS --%>
-                <div
-                  :if={!@async_data_loaded}
-                  class="grid grid-cols-1 md:grid-cols-2 gap-8 min-h-88"
-                >
-                  <%= for _i <- 1..2 do %>
-                    <div class="bg-white rounded-xl shadow-xs border border-zinc-200 overflow-hidden animate-pulse">
-                      <div class="h-48 bg-zinc-200"></div>
-                      <div class="p-6 space-y-3">
-                        <div class="h-4 bg-zinc-200 rounded-sm w-1/4"></div>
-                        <div class="h-6 bg-zinc-200 rounded-sm w-3/4"></div>
-                        <div class="h-4 bg-zinc-200 rounded-sm w-1/2"></div>
-                      </div>
-                    </div>
-                  <% end %>
-                </div>
-
-                <div
-                  :if={@async_data_loaded && Enum.empty?(@upcoming_events)}
-                  class="bg-white rounded-xl shadow-xs border border-zinc-200 p-12 text-center min-h-88 flex flex-col items-center justify-center"
-                >
-                  <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <.icon name="hero-calendar" class="w-7 h-7 text-zinc-500" />
                   </div>
-                  <h3 class="text-base text-zinc-900 mb-2 type-subhead">
-                    No upcoming events
-                  </h3>
-                  <p class="text-zinc-500 text-sm mb-6">
-                    Check back later for new community events
-                  </p>
-                  <.button navigate={~p"/events"} color="zinc">
-                    Browse Events
-                  </.button>
-                </div>
+                <% end %>
+              </div>
+            </section>
 
-                <div
-                  :if={@async_data_loaded && !Enum.empty?(@upcoming_events)}
-                  class="grid grid-cols-1 md:grid-cols-2 gap-8 min-h-88"
-                >
-                  <%= for event <- @upcoming_events do %>
-                    <.event_card
-                      event={event}
-                      sold_out={EventHelpers.event_sold_out?(event)}
-                      selling_fast={Map.get(event, :selling_fast, false)}
-                    />
-                  <% end %>
+            <%!-- Upcoming Events --%>
+            <section id="home-upcoming-events">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg text-zinc-900 type-subhead">
+                  Upcoming Events
+                </h2>
+                <.section_link navigate={~p"/events"}>
+                  View All Events
+                </.section_link>
+              </div>
+
+              <%!-- Loading skeleton: two cards (~one grid row) balances empty vs loaded CLS --%>
+              <div
+                :if={!@async_data_loaded}
+                class="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-88"
+              >
+                <%= for _i <- 1..2 do %>
+                  <div class="bg-white rounded-xl shadow-xs border border-zinc-200 overflow-hidden animate-pulse">
+                    <div class="h-48 bg-zinc-200"></div>
+                    <div class="p-6 space-y-3">
+                      <div class="h-4 bg-zinc-200 rounded-sm w-1/4"></div>
+                      <div class="h-6 bg-zinc-200 rounded-sm w-3/4"></div>
+                      <div class="h-4 bg-zinc-200 rounded-sm w-1/2"></div>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+
+              <div
+                :if={@async_data_loaded && Enum.empty?(@upcoming_events)}
+                id="home-upcoming-events-empty"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 px-5 bg-white border border-zinc-200 rounded-lg"
+              >
+                <p class="text-sm text-zinc-600">
+                  No upcoming events. Check back later for new community events.
+                </p>
+                <.section_link navigate={~p"/events"}>
+                  Browse Events <.icon name="hero-arrow-right" class="w-3 h-3" />
+                </.section_link>
+              </div>
+
+              <div
+                :if={@async_data_loaded && !Enum.empty?(@upcoming_events)}
+                class="grid grid-cols-1 md:grid-cols-2 gap-6"
+              >
+                <%= for event <- @upcoming_events do %>
+                  <.event_card
+                    event={event}
+                    sold_out={EventHelpers.event_sold_out?(event)}
+                    selling_fast={Map.get(event, :selling_fast, false)}
+                  />
+                <% end %>
+              </div>
+            </section>
+          </div>
+
+          <%!-- Sidebar --%>
+          <aside class="lg:col-span-4 space-y-8 min-w-0">
+            <%!-- Member pass --%>
+            <div
+              id="home-member-pass"
+              class="bg-white border border-zinc-200 rounded-xl p-5 space-y-4"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div class="inline-flex items-center gap-2 min-w-0">
+                  <span
+                    class={[
+                      "w-2 h-2 rounded-full shrink-0",
+                      cond do
+                        @active_membership? -> "bg-emerald-500"
+                        @current_user.state == :pending_approval -> "bg-sky-500"
+                        true -> "bg-amber-500"
+                      end
+                    ]}
+                    aria-hidden="true"
+                  ></span>
+                  <h2 class="text-xs text-zinc-500 type-eyebrow truncate">
+                    <%= cond do %>
+                      <% @current_user.state == :pending_approval -> %>
+                        Application Under Review
+                      <% @active_membership? -> %>
+                        {YscWeb.UserAuth.get_membership_plan_display_name(
+                          @current_membership
+                        )}
+                      <% true -> %>
+                        Membership Required
+                    <% end %>
+                  </h2>
                 </div>
-              </section>
+                <.link
+                  :if={@active_membership?}
+                  id="home-membership-details-link"
+                  navigate={~p"/users/membership"}
+                  class="text-xs font-medium text-zinc-500 hover:text-zinc-900 underline underline-offset-4 transition-colors duration-150 shrink-0"
+                >
+                  Manage membership
+                </.link>
+              </div>
+
+              <p class="text-sm text-zinc-600 leading-relaxed">
+                <%= cond do %>
+                  <% @active_membership? -> %>
+                    {get_membership_description(
+                      @current_membership,
+                      @is_sub_account || false,
+                      @primary_user,
+                      @timezone
+                    )}
+                  <% @current_user.state == :pending_approval -> %>
+                    <span class="block mb-1 font-semibold text-zinc-900">
+                      Pending Approval
+                    </span>
+                    Your membership application has been submitted and is being reviewed by the board. We will email you when there is a decision. Cabin bookings and member-only tickets become available after you are approved and your membership dues are paid.
+                  <% true -> %>
+                    <%= if @current_membership == nil do %>
+                      You need an active membership to access YSC events, cabin bookings, and all membership perks. Get started today!
+                    <% else %>
+                      Your membership has expired. Renew now to continue enjoying all YSC benefits, including cabin stays and exclusive events.
+                    <% end %>
+                <% end %>
+              </p>
+
+              <.button
+                :if={@active_membership?}
+                id="home-membership-qr-button"
+                type="button"
+                color="blue"
+                phx-click="show_membership_qr"
+                loading_text="Opening..."
+                class="flex w-full"
+              >
+                <.icon name="hero-qr-code" class="w-5 h-5 shrink-0" />
+                My Membership QR
+              </.button>
+
+              <.link
+                :if={@current_user.state == :pending_approval}
+                navigate={~p"/pending-review"}
+                id="home-pending-review-status"
+                class="flex w-full items-center justify-center rounded-md px-4 py-2.5 text-sm font-semibold bg-blue-700 text-white hover:bg-blue-800 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
+              >
+                <.icon name="hero-clock" class="w-4 h-4 mr-2 shrink-0" />
+                View application status
+              </.link>
+
+              <.link
+                :if={
+                  !@active_membership? && @current_user.state != :pending_approval
+                }
+                id="home-membership-cta"
+                navigate={~p"/users/membership"}
+                class="flex w-full items-center justify-center rounded-md px-4 py-2.5 text-sm font-semibold bg-blue-700 text-white hover:bg-blue-800 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
+              >
+                <%= if @current_membership == nil do %>
+                  Choose a membership
+                <% else %>
+                  Renew membership
+                <% end %>
+              </.link>
             </div>
 
-            <%!-- Sidebar --%>
-            <aside class="space-y-10">
-              <%!-- Membership Status Card --%>
-              <div class={[
-                "relative overflow-hidden rounded-xl p-5 lg:p-8 shadow-xs",
-                cond do
-                  @active_membership? ->
-                    "bg-linear-to-br from-blue-50 via-white to-blue-50/80 border border-blue-200 text-zinc-900"
+            <.board_pause_notice
+              :if={@active_membership? && @membership_paused_by_board != nil}
+              board_member={@membership_paused_by_board}
+              current_user={@current_user}
+            />
 
-                  @current_user.state == :pending_approval ->
-                    "bg-linear-to-br from-sky-950 via-blue-950 to-indigo-950 text-white"
+            <%!-- Detects platform to show the correct wallet button(s) --%>
+            <div
+              id="wallet-platform-detector"
+              phx-hook="WalletPlatform"
+              class="hidden"
+            >
+            </div>
 
-                  true ->
-                    "bg-linear-to-br from-amber-900 via-orange-900 to-red-900 text-white"
-                end
-              ]}>
-                <div
-                  :if={!@active_membership?}
-                  class="absolute inset-0 z-0 opacity-40"
-                >
-                  <%= cond do %>
-                    <% @current_user.state == :pending_approval -> %>
-                      <div class="absolute top-[-20%] left-[-10%] h-[80%] w-[80%] rounded-full bg-sky-500 blur-[80px]">
-                      </div>
-                      <div class="absolute top-[20%] right-[-10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
-                      </div>
-                      <div class="absolute bottom-[-20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-700 blur-[80px]">
-                      </div>
-                    <% true -> %>
-                      <div class="absolute top-[-20%] left-[-10%] h-[80%] w-[80%] rounded-full bg-amber-500 blur-[80px]">
-                      </div>
-                      <div class="absolute top-[20%] right-[-10%] h-[70%] w-[70%] rounded-full bg-orange-600 blur-[80px]">
-                      </div>
-                      <div class="absolute bottom-[-20%] left-[20%] h-[60%] w-[60%] rounded-full bg-red-800 blur-[80px]">
-                      </div>
-                  <% end %>
+            <.membership_qr_modal
+              :if={@show_membership_qr}
+              id="membership-qr-modal"
+              token={@membership_qr_token}
+              details={@membership_qr_details}
+              timezone={@timezone}
+              apple_wallet_enabled?={@apple_wallet_membership_enabled?}
+              google_wallet_enabled?={@google_wallet_membership_enabled?}
+              google_wallet_url={@google_wallet_membership_url}
+              wallet_platform={@wallet_platform}
+            />
+
+            <%!-- Latest Updates: sits directly beneath the member pass --%>
+            <section
+              :if={!@async_data_loaded || @latest_news != []}
+              id="home-latest-updates"
+            >
+              <h2 class="text-sm text-zinc-500 mb-4 type-eyebrow">
+                Latest Updates
+              </h2>
+
+              <%!-- Loading skeleton for news --%>
+              <div
+                :if={!@async_data_loaded}
+                class="divide-y divide-zinc-200 border-y border-zinc-200"
+              >
+                <%= for _i <- 1..3 do %>
+                  <div class="flex gap-4 py-4 animate-pulse">
+                    <div class="w-20 h-14 rounded-md bg-zinc-200 shrink-0"></div>
+                    <div class="flex-1 space-y-2 pt-1">
+                      <div class="h-3 bg-zinc-200 rounded-sm w-1/4"></div>
+                      <div class="h-4 bg-zinc-200 rounded-sm w-3/4"></div>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+
+              <div
+                :if={@async_data_loaded}
+                class="divide-y divide-zinc-200 border-y border-zinc-200"
+              >
+                <%= for post <- Enum.take(@latest_news, 3) do %>
+                  <.link
+                    navigate={~p"/posts/#{post.url_name}"}
+                    class="flex gap-4 py-4 group"
+                  >
+                    <div class="w-20 h-14 rounded-md bg-zinc-200 overflow-hidden shrink-0">
+                      <.live_component
+                        id={"sidebar-news-image-#{post.id}"}
+                        module={YscWeb.Components.Image}
+                        image={post.featured_image}
+                        aspect_class="h-full"
+                        preferred_type={:thumbnail}
+                      />
+                    </div>
+                    <div class="min-w-0">
+                      <p class="text-xs font-bold text-blue-600 mb-1">
+                        {DateDisplay.format_date_short_in_zone(
+                          post.published_on,
+                          @timezone
+                        )}
+                      </p>
+                      <h3 class="text-sm text-zinc-900 group-hover:text-blue-600 transition-colors type-subhead">
+                        {post.title}
+                      </h3>
+                    </div>
+                  </.link>
+                <% end %>
+              </div>
+            </section>
+
+            <%!-- Your Family Section (family/lifetime members with linked users) --%>
+            <section
+              :if={@async_data_loaded && @other_family_members != []}
+              id="home-family"
+            >
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm text-zinc-500 type-eyebrow">
+                  Your Family
+                </h2>
+                <.section_link navigate={~p"/users/settings/family"}>
+                  Manage Family
+                </.section_link>
+              </div>
+              <div class="flex flex-wrap gap-x-3 gap-y-4">
+                <%= for member <- @other_family_members do %>
+                  <div
+                    id={"home-family-member-#{member.id}"}
+                    class="flex flex-col items-center w-16 text-center"
+                    title={"#{member.first_name} #{member.last_name} · #{FamilyDisplay.relationship_label(member.family_relationship)}"}
+                  >
+                    <.user_avatar_image user={member} class="w-12 h-12" />
+                    <span class="mt-1.5 text-xs font-semibold text-zinc-900 truncate w-full">
+                      {member.first_name}
+                    </span>
+                    <span class="text-[11px] text-zinc-500 truncate w-full">
+                      {FamilyDisplay.relationship_label(member.family_relationship)}
+                    </span>
+                  </div>
+                <% end %>
+              </div>
+            </section>
+
+            <%!-- Notification preferences: quiet settings, kept below the news --%>
+            <section id="home-notifications">
+              <h2 class="text-sm text-zinc-500 mb-4 type-eyebrow">
+                Notifications
+              </h2>
+
+              <div
+                :if={!@async_data_loaded}
+                class="space-y-4 animate-pulse"
+              >
+                <div :for={_i <- 1..2} class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
+                  <div class="space-y-2 flex-1">
+                    <div class="h-3.5 w-28 bg-zinc-200 rounded-sm"></div>
+                    <div class="h-3 w-36 bg-zinc-100 rounded-sm"></div>
+                  </div>
                 </div>
+              </div>
 
-                <div class="relative z-10">
+              <div :if={@async_data_loaded} class="space-y-4">
+                <.newsletter_member_status
+                  id="home-newsletter-member-status"
+                  subscribed={@newsletter_subscribed}
+                  layout={:compact}
+                />
+
+                <div
+                  id="home-event-notifications-status"
+                  class="flex items-center gap-3"
+                >
                   <div class={[
-                    "mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md",
-                    if(@active_membership?,
-                      do: "bg-blue-50",
-                      else: "bg-white/10"
+                    "flex items-center justify-center w-9 h-9 rounded-full shrink-0",
+                    if(@current_user.event_notifications,
+                      do: "bg-emerald-100",
+                      else: "bg-zinc-100"
                     )
                   ]}>
                     <.icon
                       name={
-                        if @current_user.state == :pending_approval,
-                          do: "hero-clock",
-                          else: "hero-identification"
+                        if(@current_user.event_notifications,
+                          do: "hero-bell",
+                          else: "hero-bell-slash"
+                        )
                       }
                       class={[
-                        "w-6 h-6",
-                        cond do
-                          @active_membership? -> "text-blue-600"
-                          @current_user.state == :pending_approval -> "text-sky-300"
-                          true -> "text-amber-300"
-                        end
+                        "w-4 h-4",
+                        if(@current_user.event_notifications,
+                          do: "text-emerald-600",
+                          else: "text-zinc-500"
+                        )
                       ]}
                     />
                   </div>
-
-                  <h2 class="text-xl lg:text-2xl mb-2 type-title">
-                    <%= cond do %>
-                      <% @current_user.state == :pending_approval -> %>
-                        Application Under Review
-                      <% true -> %>
-                        {YscWeb.UserAuth.get_membership_plan_display_name(
-                          @current_membership
-                        )}
-                    <% end %>
-                  </h2>
-                  <p class={[
-                    "text-sm lg:text-base leading-relaxed mb-5 lg:mb-8",
-                    cond do
-                      @active_membership? -> "text-zinc-600"
-                      @current_user.state == :pending_approval -> "text-sky-100"
-                      true -> "text-amber-100 font-semibold"
-                    end
-                  ]}>
-                    <%= cond do %>
-                      <% @active_membership? -> %>
-                        {get_membership_description(
-                          @current_membership,
-                          @is_sub_account || false,
-                          @primary_user,
-                          @timezone
-                        )}
-                      <% @current_user.state == :pending_approval -> %>
-                        <span class="block mb-2 font-bold text-white">
-                          Pending Approval
-                        </span>
-                        Your membership application has been submitted and is being reviewed by the board. We will email you when there is a decision. Cabin bookings and member-only tickets become available after you are approved and your membership dues are paid.
-                      <% true -> %>
-                        <span class="block mb-2 font-bold text-white">
-                          Membership Required
-                        </span>
-                        <%= if @current_membership == nil do %>
-                          You need an active membership to access YSC events, cabin bookings, and all membership perks. Get started today!
-                        <% else %>
-                          Your membership has expired. Renew now to continue enjoying all YSC benefits, including cabin stays and exclusive events.
-                        <% end %>
-                    <% end %>
-                  </p>
-
-                  <%= cond do %>
-                    <% @current_user.state == :pending_approval -> %>
-                      <.link
-                        navigate={~p"/pending-review"}
-                        id="home-pending-review-status"
-                        class="flex w-full items-center justify-center rounded-sm px-6 py-4 text-sm font-semibold leading-6 bg-white text-sky-950 hover:bg-sky-50 shadow-lg transition duration-150 ease-in-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sky-950 active:scale-[0.98] active:transition-none"
-                      >
-                        <.icon name="hero-clock" class="w-4 h-4 mr-2 shrink-0" />
-                        View application status
-                      </.link>
-                    <% true -> %>
-                      <.link
-                        navigate={~p"/users/membership"}
-                        class={[
-                          "flex w-full items-center justify-center rounded-sm px-6 py-4 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none",
-                          if(@active_membership?,
-                            do: "bg-blue-700 text-white hover:bg-blue-800",
-                            else:
-                              "bg-white text-amber-900 hover:bg-amber-50 shadow-lg"
-                          )
-                        ]}
-                      >
-                        <%= if @active_membership? do %>
-                          Manage Membership
-                        <% else %>
-                          <%= if @current_membership == nil do %>
-                            Choose a membership
-                          <% else %>
-                            Renew membership
-                          <% end %>
-                        <% end %>
-                      </.link>
-                  <% end %>
-
-                  <.button
-                    :if={@active_membership?}
-                    id="home-membership-qr-button"
-                    type="button"
-                    variant="outline"
-                    color="blue"
-                    phx-click="show_membership_qr"
-                    loading_text="Opening..."
-                    class="flex w-full mt-3"
-                  >
-                    <.icon name="hero-qr-code" class="w-5 h-5 shrink-0" />
-                    My Membership QR
-                  </.button>
-                </div>
-
-                <div class={[
-                  "absolute right-[-10%] bottom-[-10%] z-0 rotate-12 hidden sm:block",
-                  if(@active_membership?,
-                    do: "opacity-20 text-blue-200",
-                    else: "opacity-10"
-                  )
-                ]}>
-                  <.icon name="hero-identification" class="w-40 h-40" />
-                </div>
-              </div>
-
-              <.board_pause_notice
-                :if={@active_membership? && @membership_paused_by_board != nil}
-                board_member={@membership_paused_by_board}
-                current_user={@current_user}
-              />
-
-              <%!-- Detects platform to show the correct wallet button(s) --%>
-              <div
-                id="wallet-platform-detector"
-                phx-hook="WalletPlatform"
-                class="hidden"
-              >
-              </div>
-
-              <.membership_qr_modal
-                :if={@show_membership_qr}
-                id="membership-qr-modal"
-                token={@membership_qr_token}
-                details={@membership_qr_details}
-                timezone={@timezone}
-                apple_wallet_enabled?={@apple_wallet_membership_enabled?}
-                google_wallet_enabled?={@google_wallet_membership_enabled?}
-                google_wallet_url={@google_wallet_membership_url}
-                wallet_platform={@wallet_platform}
-              />
-
-              <%!-- Notifications --%>
-              <section>
-                <h2 class="text-sm text-zinc-500 mb-6 type-eyebrow">
-                  Notifications
-                </h2>
-
-                <div
-                  :if={!@async_data_loaded}
-                  class="space-y-4 animate-pulse"
-                >
-                  <div :for={_i <- 1..2} class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
-                    <div class="space-y-2 flex-1">
-                      <div class="h-3.5 w-28 bg-zinc-200 rounded-sm"></div>
-                      <div class="h-3 w-36 bg-zinc-100 rounded-sm"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <div :if={@async_data_loaded} class="space-y-4">
-                  <.newsletter_member_status
-                    id="home-newsletter-member-status"
-                    subscribed={@newsletter_subscribed}
-                    layout={:compact}
-                  />
-
-                  <div
-                    id="home-event-notifications-status"
-                    class="flex items-center gap-3"
-                  >
-                    <div class={[
-                      "flex items-center justify-center w-9 h-9 rounded-full shrink-0",
-                      if(@current_user.event_notifications,
-                        do: "bg-emerald-100",
-                        else: "bg-zinc-100"
-                      )
-                    ]}>
-                      <.icon
-                        name={
-                          if(@current_user.event_notifications,
-                            do: "hero-bell",
-                            else: "hero-bell-slash"
-                          )
-                        }
-                        class={[
-                          "w-4 h-4",
-                          if(@current_user.event_notifications,
-                            do: "text-emerald-600",
-                            else: "text-zinc-500"
-                          )
-                        ]}
-                      />
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="font-semibold text-zinc-900 text-sm">
-                        {if @current_user.event_notifications,
-                          do: "Event notifications on",
-                          else: "Event notifications off"}
-                      </p>
-                      <p class="text-xs text-zinc-500 mt-0.5">
-                        {if @current_user.event_notifications,
-                          do: "You'll hear about new events and reminders.",
-                          else: "Turn on to hear about new events and reminders."}
-                      </p>
-                    </div>
-                    <.section_link
-                      phx-click="toggle_event_notifications"
-                      phx-disable-with="Saving..."
-                      class="shrink-0"
-                    >
+                  <div class="min-w-0 flex-1">
+                    <p class="font-semibold text-zinc-900 text-sm">
                       {if @current_user.event_notifications,
-                        do: "Turn off",
-                        else: "Turn on"}
-                    </.section_link>
+                        do: "Event notifications on",
+                        else: "Event notifications off"}
+                    </p>
+                    <p class="text-xs text-zinc-500 mt-0.5">
+                      {if @current_user.event_notifications,
+                        do: "You'll hear about new events and reminders.",
+                        else: "Turn on to hear about new events and reminders."}
+                    </p>
                   </div>
-
-                  <.section_link navigate={~p"/newsletters"}>
-                    Browse newsletter archive
-                    <.icon name="hero-arrow-right" class="w-3 h-3" />
+                  <.section_link
+                    phx-click="toggle_event_notifications"
+                    phx-disable-with="Saving..."
+                    class="shrink-0"
+                  >
+                    {if @current_user.event_notifications,
+                      do: "Turn off",
+                      else: "Turn on"}
                   </.section_link>
                 </div>
-              </section>
 
-              <%!-- Your Family Section (family/lifetime members with linked users) --%>
-              <section
-                :if={@async_data_loaded && @other_family_members != []}
-                id="home-family"
-              >
-                <div class="flex items-center justify-between mb-6">
-                  <h2 class="text-sm text-zinc-500 type-eyebrow">
-                    Your Family
-                  </h2>
-                  <.section_link navigate={~p"/users/settings/family"}>
-                    Manage Family
-                  </.section_link>
-                </div>
-                <div class="flex flex-wrap gap-x-3 gap-y-4">
-                  <%= for member <- @other_family_members do %>
-                    <div
-                      id={"home-family-member-#{member.id}"}
-                      class="flex flex-col items-center w-16 text-center"
-                      title={"#{member.first_name} #{member.last_name} · #{FamilyDisplay.relationship_label(member.family_relationship)}"}
-                    >
-                      <.user_avatar_image user={member} class="w-12 h-12" />
-                      <span class="mt-1.5 text-xs font-semibold text-zinc-900 truncate w-full">
-                        {member.first_name}
-                      </span>
-                      <span class="text-[11px] text-zinc-500 truncate w-full">
-                        {FamilyDisplay.relationship_label(
-                          member.family_relationship
-                        )}
-                      </span>
-                    </div>
-                  <% end %>
-                </div>
-              </section>
-
-              <%!-- Latest Updates Section --%>
-              <section>
-                <h2 class="text-sm text-zinc-500 mb-6 type-eyebrow">
-                  Latest Updates
-                </h2>
-
-                <%!-- Loading skeleton for news --%>
-                <div :if={!@async_data_loaded} class="space-y-6">
-                  <%= for _i <- 1..3 do %>
-                    <div class="flex gap-4 animate-pulse">
-                      <div class="w-16 h-16 rounded-md bg-zinc-200 shrink-0"></div>
-                      <div class="flex-1 space-y-2 pt-1">
-                        <div class="h-3 bg-zinc-200 rounded-sm w-1/4"></div>
-                        <div class="h-4 bg-zinc-200 rounded-sm w-3/4"></div>
-                      </div>
-                    </div>
-                  <% end %>
-                </div>
-
-                <div :if={@async_data_loaded} class="space-y-6">
-                  <%= for post <- Enum.take(@latest_news, 3) do %>
-                    <.link
-                      navigate={~p"/posts/#{post.url_name}"}
-                      class="flex gap-4 group"
-                    >
-                      <div class="w-16 h-16 rounded-md bg-zinc-200 overflow-hidden shrink-0">
-                        <.live_component
-                          id={"sidebar-news-image-#{post.id}"}
-                          module={YscWeb.Components.Image}
-                          image={post.featured_image}
-                          aspect_class="h-full"
-                          preferred_type={:thumbnail}
-                        />
-                      </div>
-                      <div>
-                        <p class="text-xs font-bold text-blue-600 mb-1">
-                          {DateDisplay.format_date_short_in_zone(
-                            post.published_on,
-                            @timezone
-                          )}
-                        </p>
-                        <h3 class="text-sm text-zinc-900 group-hover:text-blue-600 transition-colors type-subhead">
-                          {post.title}
-                        </h3>
-                      </div>
-                    </.link>
-                  <% end %>
-                </div>
-              </section>
-            </aside>
-          </div>
+                <.section_link navigate={~p"/newsletters"}>
+                  Browse newsletter archive
+                  <.icon name="hero-arrow-right" class="w-3 h-3" />
+                </.section_link>
+              </div>
+            </section>
+          </aside>
         </div>
       </div>
-
-      <%!-- Fade from dashboard background to white footer --%>
-      <div class="h-32 bg-linear-to-b from-transparent to-white"></div>
-    </main>
+    </div>
     """
   end
 
@@ -1982,8 +1798,22 @@ defmodule YscWeb.HomeLive do
     )
   end
 
-  defp days_until_booking(booking) do
-    DateDisplay.days_until_cabin_checkin(booking)
+  # Date stubs stay soft-tinted so colour is reserved for what is happening now.
+  defp ticket_stub_class(true), do: "bg-blue-700 border-blue-300/60 text-white"
+  defp ticket_stub_class(false), do: "bg-blue-50 border-blue-200 text-blue-700"
+
+  defp ticket_stub_month(event) do
+    case DateDisplay.event_start_datetime(event) do
+      %DateTime{} = dt -> Calendar.strftime(dt, "%b")
+      _ -> ""
+    end
+  end
+
+  defp ticket_stub_day(event) do
+    case DateDisplay.event_start_datetime(event) do
+      %DateTime{} = dt -> Calendar.strftime(dt, "%-d")
+      _ -> ""
+    end
   end
 
   defp days_until_event(event) do
@@ -2126,10 +1956,6 @@ defmodule YscWeb.HomeLive do
       %Money{} = rate -> Ysc.MoneyHelper.format_money!(rate)
       _ -> nil
     end
-  end
-
-  defp format_booking_date(%Date{} = date) do
-    Calendar.strftime(date, "%b %d")
   end
 
   defp days_since_inserted(%DateTime{} = inserted_at) do

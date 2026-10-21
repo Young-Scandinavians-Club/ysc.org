@@ -362,8 +362,77 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "booking_card/1" do
+    defp booking_fixture_map(attrs) do
+      today = Date.utc_today()
+
+      Map.merge(
+        %{
+          id: "bk-1",
+          reference_id: "BK-REF-1",
+          property: :tahoe,
+          booking_mode: :room,
+          checkin_date: Date.add(today, 10),
+          checkout_date: Date.add(today, 12)
+        },
+        attrs
+      )
+    end
+
+    test "upcoming stay gets a soft-tinted stub and links to the receipt" do
+      assigns = %{booking: booking_fixture_map(%{})}
+
+      html =
+        rendered_to_string(~H"""
+        <.booking_card id="bc-1" booking={@booking} detail="2 Guests • Room 1" />
+        """)
+
+      assert html =~ ~s(id="bc-1")
+      assert html =~ ~s(href="/bookings/bk-1/receipt")
+      assert html =~ "Lake Tahoe"
+      assert html =~ "BK-REF-1"
+      assert html =~ "2 Guests • Room 1"
+      assert html =~ "bg-blue-50"
+      refute html =~ "bg-blue-700"
+    end
+
+    test "stay in progress turns the stub solid and uses the accent" do
+      today = Date.utc_today()
+
+      assigns = %{
+        booking:
+          booking_fixture_map(%{
+            property: :clear_lake,
+            checkin_date: Date.add(today, -2),
+            checkout_date: Date.add(today, 2)
+          })
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.booking_card id="bc-2" booking={@booking} accent={:teal} />
+        """)
+
+      assert html =~ "Clear Lake"
+      assert html =~ "Currently staying"
+      assert html =~ "bg-teal-700"
+      refute html =~ "bg-teal-50"
+    end
+
+    test "buyout bookings are badged" do
+      assigns = %{booking: booking_fixture_map(%{booking_mode: :buyout})}
+
+      html =
+        rendered_to_string(~H"""
+        <.booking_card id="bc-3" booking={@booking} />
+        """)
+
+      assert html =~ "Entire cabin"
+    end
+  end
+
   describe "quick_action_card/1" do
-    test "renders a Tahoe booking shortcut with blue tone" do
+    test "renders a Tahoe booking shortcut with a tinted icon and no well" do
       assigns = %{}
 
       html =
@@ -372,7 +441,6 @@ defmodule YscWeb.CoreComponentsTest do
           id="home-quick-action-tahoe"
           navigate="/bookings/tahoe"
           icon="hero-home"
-          tone={:blue}
           title="Lake Tahoe"
           subtitle="Book a stay"
         />
@@ -383,12 +451,12 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "Lake Tahoe"
       assert html =~ "Book a stay"
       assert html =~ "hero-home"
-      assert html =~ "bg-blue-50"
       assert html =~ "text-blue-600"
-      assert html =~ "snap-center"
+      refute html =~ ~s(bg-blue-50 )
+      refute html =~ "snap-center"
     end
 
-    test "renders emerald, orange, and zinc tones" do
+    test "colours the icon by tone" do
       assigns = %{}
 
       html =
@@ -396,7 +464,7 @@ defmodule YscWeb.CoreComponentsTest do
         <.quick_action_card
           id="home-quick-action-clear-lake"
           navigate="/bookings/clear-lake"
-          icon="hero-home"
+          icon="hero-sun"
           tone={:emerald}
           title="Clear Lake"
           subtitle="Book a stay"
@@ -405,7 +473,7 @@ defmodule YscWeb.CoreComponentsTest do
           id="home-quick-action-expenses"
           navigate="/expensereports"
           icon="hero-receipt-refund"
-          tone={:orange}
+          tone={:violet}
           title="Expenses"
           subtitle="View reports"
         />
@@ -413,7 +481,6 @@ defmodule YscWeb.CoreComponentsTest do
           id="home-quick-action-settings"
           navigate="/users/settings"
           icon="hero-cog-6-tooth"
-          tone={:zinc}
           title="Settings"
           subtitle="Preferences"
         />
@@ -422,14 +489,12 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ ~s(id="home-quick-action-clear-lake")
       assert html =~ ~s(id="home-quick-action-expenses")
       assert html =~ ~s(id="home-quick-action-settings")
-      assert html =~ "bg-emerald-50"
-      assert html =~ "text-emerald-600"
-      assert html =~ "bg-orange-50"
-      assert html =~ "text-orange-600"
-      assert html =~ "bg-zinc-50"
-      assert html =~ "text-zinc-600"
       assert html =~ "hero-receipt-refund"
       assert html =~ "hero-cog-6-tooth"
+      assert html =~ "text-emerald-600"
+      assert html =~ "text-violet-600"
+      refute html =~ "bg-emerald-50"
+      refute html =~ "bg-orange-50"
     end
   end
 

@@ -2981,6 +2981,31 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Reservation card for an upcoming or in-progress cabin stay (date stub plus
+  details). See `YscWeb.Components.Bookings.BookingCard`.
+
+  ## Examples
+
+      <.booking_card id="booking-1" booking={@booking} />
+
+      <.booking_card
+        id="booking-1"
+        booking={@booking}
+        accent={:teal}
+        detail="2 Guests • Day Pass"
+      />
+  """
+  attr :id, :string, required: true
+  attr :booking, :map, required: true
+  attr :accent, :atom, default: nil, values: [nil, :blue, :emerald, :teal]
+  attr :detail, :string, default: nil
+  attr :class, :any, default: nil
+
+  def booking_card(assigns) do
+    YscWeb.Components.Bookings.BookingCard.booking_card(assigns)
+  end
+
+  @doc """
   Add-to-calendar web component for an event.
 
   Used on event details and ticket QR. Callers still gate visibility
@@ -4832,7 +4857,11 @@ defmodule YscWeb.CoreComponents do
   defp cabin_showcase_cta_class(:emerald), do: "hover:bg-emerald-700"
 
   @doc """
-  Compact dashboard shortcut card used on the signed-in homepage.
+  Compact dashboard shortcut cell used in the signed-in homepage quick-action bar.
+
+  Renders an icon beside a two-line label; the parent supplies the dividers and
+  border so several cells read as one unified bar. The icon carries the only
+  colour (`tone`) and there is no tinted well behind it.
 
   ## Examples
 
@@ -4840,7 +4869,6 @@ defmodule YscWeb.CoreComponents do
         id="home-quick-action-tahoe"
         navigate={~p"/bookings/tahoe"}
         icon="hero-home"
-        tone={:blue}
         title="Lake Tahoe"
         subtitle="Book a stay"
       />
@@ -4852,43 +4880,40 @@ defmodule YscWeb.CoreComponents do
   attr :subtitle, :string, required: true
 
   attr :tone, :atom,
-    required: true,
-    values: [:blue, :emerald, :orange, :purple, :zinc],
-    doc: "Icon well background and icon color"
+    default: :blue,
+    values: [:blue, :emerald, :violet, :zinc],
+    doc: "Icon colour"
 
   def quick_action_card(assigns) do
     ~H"""
     <.link
       id={@id}
       navigate={@navigate}
-      class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition duration-150 group"
+      class="group flex items-center gap-3 px-4 py-3 min-h-14 bg-white hover:bg-zinc-50 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-900"
     >
-      <div class={[
-        "w-8 h-8 lg:w-10 lg:h-10 rounded-md flex items-center justify-center mb-2 lg:mb-4",
-        quick_action_card_well_class(@tone)
-      ]}>
-        <.icon
-          name={@icon}
-          class={["w-4 h-4 lg:w-5 lg:h-5", quick_action_card_icon_class(@tone)]}
-        />
-      </div>
-      <p class="font-bold text-sm lg:text-base text-zinc-900">{@title}</p>
-      <p class="text-xs lg:text-sm text-zinc-500">{@subtitle}</p>
+      <.icon
+        name={@icon}
+        class={[
+          "w-5 h-5 shrink-0 transition-transform duration-150 group-hover:scale-110",
+          quick_action_card_icon_class(@tone)
+        ]}
+      />
+      <span class="min-w-0">
+        <span class="block text-sm font-semibold text-zinc-900 leading-tight">
+          {@title}
+        </span>
+        <span class="block text-xs text-zinc-500 leading-snug truncate">
+          {@subtitle}
+        </span>
+      </span>
     </.link>
     """
   end
 
-  defp quick_action_card_well_class(:blue), do: "bg-blue-50"
-  defp quick_action_card_well_class(:emerald), do: "bg-emerald-50"
-  defp quick_action_card_well_class(:orange), do: "bg-orange-50"
-  defp quick_action_card_well_class(:purple), do: "bg-purple-50"
-  defp quick_action_card_well_class(:zinc), do: "bg-zinc-50"
-
   defp quick_action_card_icon_class(:blue), do: "text-blue-600"
   defp quick_action_card_icon_class(:emerald), do: "text-emerald-600"
-  defp quick_action_card_icon_class(:orange), do: "text-orange-600"
-  defp quick_action_card_icon_class(:purple), do: "text-purple-600"
-  defp quick_action_card_icon_class(:zinc), do: "text-zinc-600"
+  defp quick_action_card_icon_class(:violet), do: "text-violet-600"
+  defp quick_action_card_icon_class(:zinc), do: "text-zinc-500"
 
   @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.

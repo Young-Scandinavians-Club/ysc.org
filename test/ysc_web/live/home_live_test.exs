@@ -570,6 +570,7 @@ defmodule YscWeb.HomeLiveTest do
 
       assert has_element?(view, "h3", event_title)
       assert has_element?(view, "span", tier_name)
+      assert has_element?(view, "#home-ticket-#{data.event.id} .border-dashed")
     end
 
     test "hides event tickets for events that already started today", %{
@@ -651,7 +652,7 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       refute html =~ event.title
-      assert html =~ "No upcoming event tickets"
+      assert has_element?(view, "#home-reservations-empty")
     end
 
     test "sorts and renders event tickets when an event has no start_date", %{
@@ -674,7 +675,7 @@ defmodule YscWeb.HomeLiveTest do
       render_async(view, 5_000)
       html = render(view)
 
-      assert html =~ "Event Tickets"
+      assert has_element?(view, "#home-reservations")
       assert html =~ data.event.title
     end
 
@@ -716,7 +717,7 @@ defmodule YscWeb.HomeLiveTest do
       %{conn: log_in_user(conn, user), user: user}
     end
 
-    test "shows empty event tickets card when member has no upcoming tickets",
+    test "shows a compact empty reservations bar when member has no upcoming tickets",
          %{
            conn: conn
          } do
@@ -726,9 +727,10 @@ defmodule YscWeb.HomeLiveTest do
       {:ok, view, _html} = live(conn, ~p"/")
 
       render_async(view, 5_000)
-      html = render(view)
 
-      assert html =~ "No upcoming event tickets"
+      assert has_element?(view, "#home-reservations-empty")
+      assert has_element?(view, "#home-reservations-empty a[href='/events']")
+      refute has_element?(view, "#home-reservations-loading")
     end
 
     test "opens and closes membership QR modal", %{conn: conn} do

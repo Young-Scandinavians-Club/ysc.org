@@ -426,6 +426,13 @@ defmodule YscWeb.ClearLakeBookingLive do
     end
   end
 
+  defp booking_card_detail(booking) do
+    guests =
+      "#{booking.guests_count} #{if booking.guests_count == 1, do: "Guest", else: "Guests"}"
+
+    "#{guests} • #{BookingModeDisplay.stay_type_label(booking.booking_mode)}"
+  end
+
   defp dates_changed?(checkin_date, checkout_date, socket) do
     date_assign_changed?(checkin_date, socket.assigns.checkin_date) or
       date_assign_changed?(checkout_date, socket.assigns.checkout_date)
@@ -598,43 +605,13 @@ defmodule YscWeb.ClearLakeBookingLive do
               Your bookings
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <%= for booking <- @active_bookings do %>
-                <div class="bg-white border-2 border-teal-100 rounded-xl p-5 shadow-xs">
-                  <div class="flex justify-between items-start mb-3">
-                    <span class="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-sm">
-                      {booking.reference_id}
-                    </span>
-                    <%= if Date.compare(booking.checkout_date, @today) == :eq do %>
-                      <span class="text-xs font-bold text-amber-600 italic">
-                        Today!
-                      </span>
-                    <% else %>
-                      <span class="text-xs font-bold text-teal-600 italic">
-                        Active
-                      </span>
-                    <% end %>
-                  </div>
-                  <p class="text-lg text-zinc-900 type-subhead">
-                    {Calendar.strftime(booking.checkin_date, "%b %d")} — {Calendar.strftime(
-                      booking.checkout_date,
-                      "%b %d"
-                    )}
-                  </p>
-                  <p class="text-sm text-zinc-500 mt-1">
-                    {booking.guests_count} {if booking.guests_count == 1,
-                      do: "Guest",
-                      else: "Guests"} • {BookingModeDisplay.stay_type_label(
-                      booking.booking_mode
-                    )}
-                  </p>
-                  <.link
-                    navigate={~p"/bookings/#{booking.id}/receipt"}
-                    class="inline-block mt-4 text-sm font-semibold text-teal-600 hover:underline"
-                  >
-                    View Booking →
-                  </.link>
-                </div>
-              <% end %>
+              <.booking_card
+                :for={booking <- @active_bookings}
+                id={"clear-lake-active-booking-#{booking.id}"}
+                booking={booking}
+                accent={:teal}
+                detail={booking_card_detail(booking)}
+              />
             </div>
           </div>
           <!-- Booking Form -->

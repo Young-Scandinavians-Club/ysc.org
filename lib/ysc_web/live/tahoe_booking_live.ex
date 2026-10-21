@@ -1230,56 +1230,13 @@ defmodule YscWeb.TahoeBookingLive do
               id="tahoe-active-bookings-list"
               class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             >
-              <%= for booking <- @active_bookings do %>
-                <div
-                  id={"tahoe-active-booking-#{booking.id}"}
-                  class="bg-white border-2 border-blue-100 rounded-xl p-5 shadow-xs"
-                >
-                  <div class="flex justify-between items-start mb-3">
-                    <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-sm">
-                      {booking.reference_id}
-                    </span>
-                    <%= if Date.compare(booking.checkout_date, @today) == :eq do %>
-                      <span class="text-xs font-bold text-amber-600 italic">
-                        Today!
-                      </span>
-                    <% else %>
-                      <span class="text-xs font-bold text-blue-600 italic">
-                        Active
-                      </span>
-                    <% end %>
-                  </div>
-                  <p class="text-lg text-zinc-900 type-subhead">
-                    {Calendar.strftime(booking.checkin_date, "%b %d")} — {Calendar.strftime(
-                      booking.checkout_date,
-                      "%b %d"
-                    )}
-                  </p>
-                  <p class="text-sm text-zinc-500 mt-1">
-                    {booking.guests_count} {if booking.guests_count == 1,
-                      do: "Guest",
-                      else: "Guests"} • {if booking.booking_mode == :buyout do
-                      BookingModeDisplay.stay_type_label(:buyout)
-                    else
-                      if Ecto.assoc_loaded?(booking.rooms) &&
-                           length(booking.rooms) > 0 do
-                        Enum.map_join(booking.rooms, ", ", fn room -> room.name end)
-                      else
-                        "Rooms"
-                      end
-                    end}
-                  </p>
-                  <.link
-                    navigate={~p"/bookings/#{booking.id}/receipt"}
-                    class="inline-block mt-4 text-sm font-semibold text-blue-600 hover:underline"
-                  >
-                    View Booking<.icon
-                      name="hero-arrow-right-solid"
-                      class="w-4 h-4 ms-1"
-                    />
-                  </.link>
-                </div>
-              <% end %>
+              <.booking_card
+                :for={booking <- @active_bookings}
+                id={"tahoe-active-booking-#{booking.id}"}
+                booking={booking}
+                accent={:blue}
+                detail={booking_card_detail(booking)}
+              />
             </div>
           </div>
           <!-- Booking Form -->
@@ -4626,6 +4583,25 @@ defmodule YscWeb.TahoeBookingLive do
 
   defp check_single_room_capacity(room, total_people) do
     if total_people > 0, do: room.capacity_max >= total_people, else: true
+  end
+
+  defp booking_card_detail(booking) do
+    guests =
+      "#{booking.guests_count} #{if booking.guests_count == 1, do: "Guest", else: "Guests"}"
+
+    stay =
+      cond do
+        booking.booking_mode == :buyout ->
+          BookingModeDisplay.stay_type_label(:buyout)
+
+        Ecto.assoc_loaded?(booking.rooms) && booking.rooms != [] ->
+          Enum.map_join(booking.rooms, ", ", & &1.name)
+
+        true ->
+          "Rooms"
+      end
+
+    "#{guests} • #{stay}"
   end
 
   defp check_has_existing_booking(socket) do
