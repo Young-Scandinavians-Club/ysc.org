@@ -2743,13 +2743,13 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         assert has_element?(
                  view,
                  "#cancellation-policy",
-                 "21 or more days before check-in"
+                 "15–21 days before check-in"
                )
 
         assert has_element?(
                  view,
                  "#cancellation-policy",
-                 "14 or more days before check-in"
+                 "14 days or fewer before check-in"
                )
       end)
     end

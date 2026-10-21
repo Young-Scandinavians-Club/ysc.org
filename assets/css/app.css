@@ -4272,6 +4272,15 @@ cropper-canvas {
   );
 }
 
+/* Hero pages give <main> its own stacking context (relative z-1) so content can
+   slide under the transparent navbar. A modal inside <main> is trapped in that
+   context and ends up beneath the navbar (z-100), so lift <main> above it only
+   while a modal is open. Toasts live outside <main> and stay on top. */
+
+main:has([data-modal-open]) {
+  z-index: 200;
+}
+
 /* One-shot attention ring for a badge that has just become relevant (e.g. an
    event happening today). Plays once on appearance; never loops. */
 
