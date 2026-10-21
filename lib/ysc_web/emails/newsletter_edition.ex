@@ -29,6 +29,9 @@ defmodule YscWeb.Emails.NewsletterEdition do
       plus an optional styled caption `<p>`.
     - All `data-trix-*` attributes stripped.
     - All `class` attributes stripped (Trix CSS is not present in email clients).
+    - Headings (`h1`–`h6`) given explicit inline styles. Email clients fall back to their
+      own defaults (an unstyled `<h1>` is 32px, larger than the edition title), so intro
+      headings are pinned to a size below the edition title.
     - Standard formatting tags (`em`, `strong`, `a`, `br`, `ul`, `ol`, `li`, etc.) kept as-is.
   """
   def email_safe_html(nil), do: ""
@@ -51,6 +54,19 @@ defmodule YscWeb.Emails.NewsletterEdition do
     script style iframe object embed form svg link meta base
     video audio applet
   )
+
+  @heading_font "Ubuntu,Helvetica,Arial,sans-serif"
+
+  # Intro headings sit below the edition title (28px) and the "Club Updates" /
+  # "Upcoming events" section headers (22px) in the visual hierarchy.
+  @heading_sizes %{
+    "h1" => "20px",
+    "h2" => "20px",
+    "h3" => "17px",
+    "h4" => "17px",
+    "h5" => "17px",
+    "h6" => "17px"
+  }
 
   defp transform_nodes_for_email(nodes) do
     Enum.flat_map(nodes, &transform_node_for_email/1)
@@ -163,6 +179,17 @@ defmodule YscWeb.Emails.NewsletterEdition do
       # All other div blocks → <p>
       _ -> [{"p", [], inner}]
     end
+  end
+
+  # Headings: drop author attributes and apply fixed, email-safe inline styles.
+  defp transform_node_for_email({tag, _attrs, children})
+       when tag in ["h1", "h2", "h3", "h4", "h5", "h6"] do
+    style =
+      "margin:24px 0 8px 0;font-family:#{@heading_font};" <>
+        "font-size:#{Map.fetch!(@heading_sizes, tag)};font-weight:bold;" <>
+        "line-height:1.3;color:#000000;"
+
+    [{tag, [{"style", style}], transform_nodes_for_email(children)}]
   end
 
   # Strip dangerous tags entirely. Remaining tags keep safe attrs only.

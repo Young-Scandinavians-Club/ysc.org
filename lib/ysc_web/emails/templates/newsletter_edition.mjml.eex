@@ -14,7 +14,7 @@
     <mj-spacer height="8px"></mj-spacer>
     <% end %>
     <%= if @edition_title do %>
-    <mj-text align="left" color="#000000" font-size="26px" line-height="1.25" padding="0 48px" font-weight="bold">
+    <mj-text align="left" color="#000000" font-size="28px" line-height="1.2" padding="0 48px" font-weight="bold">
       <%= @edition_title %>
     </mj-text>
     <mj-spacer height="16px"></mj-spacer>
@@ -39,7 +39,7 @@
           <td style="width:32px;padding-right:12px;vertical-align:middle;">
             <div style="width:32px;height:1px;background-color:#e4e4e7;font-size:1px;line-height:1px;">&nbsp;</div>
           </td>
-          <td style="vertical-align:middle;font-size:24px;font-weight:900;color:#18181b;letter-spacing:-0.025em;line-height:1.25;font-family:Arial,Helvetica,sans-serif;">
+          <td style="vertical-align:middle;font-size:22px;font-weight:bold;color:#18181b;line-height:1.25;font-family:Ubuntu,Helvetica,Arial,sans-serif;">
             Club Updates
           </td>
         </tr>
@@ -82,7 +82,7 @@
           <td style="width:32px;padding-right:12px;vertical-align:middle;">
             <div style="width:32px;height:1px;background-color:#e4e4e7;font-size:1px;line-height:1px;">&nbsp;</div>
           </td>
-          <td style="vertical-align:middle;font-size:24px;font-weight:900;color:#18181b;letter-spacing:-0.025em;line-height:1.25;font-family:Arial,Helvetica,sans-serif;">
+          <td style="vertical-align:middle;font-size:22px;font-weight:bold;color:#18181b;line-height:1.25;font-family:Ubuntu,Helvetica,Arial,sans-serif;">
             Upcoming events
           </td>
         </tr>
