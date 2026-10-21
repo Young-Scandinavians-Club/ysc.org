@@ -4281,6 +4281,16 @@ main:has([data-modal-open]) {
   z-index: 200;
 }
 
+/* Running copy on the cabin information tabs and modals: inline emphasis is one
+   weight and colour everywhere, rather than each <strong> being styled by hand. */
+
+@utility cabin-copy {
+  & strong {
+    font-weight: 600;
+    color: var(--color-zinc-900);
+  }
+}
+
 /* One-shot attention ring for a badge that has just become relevant (e.g. an
    event happening today). Plays once on appearance; never loops. */
 

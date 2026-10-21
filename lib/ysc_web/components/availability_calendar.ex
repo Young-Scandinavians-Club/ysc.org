@@ -26,7 +26,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           today={@today}
           target={@myself}
           class="mb-4"
-          month_label_class="font-semibold text-lg"
+          month_label_class="text-lg type-subhead"
         />
 
         <div

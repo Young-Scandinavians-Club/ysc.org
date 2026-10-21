@@ -267,7 +267,7 @@ defmodule YscWeb.Components.CabinInfo do
             <.icon name="hero-x-mark" class="w-5 h-5" />
           </button>
         </header>
-        <div class="flex-1 overflow-y-auto overscroll-contain px-6">
+        <div class="flex-1 overflow-y-auto overscroll-contain px-6 cabin-copy">
           {render_slot(@inner_block)}
         </div>
         <footer class={[
@@ -545,7 +545,7 @@ defmodule YscWeb.Components.CabinInfo do
           ]}
         />
         <span>
-          <strong :if={Map.get(item, :title)} class="font-semibold text-zinc-900">
+          <strong :if={Map.get(item, :title)}>
             {item.title}
           </strong>
           {render_slot(item)}
@@ -575,7 +575,7 @@ defmodule YscWeb.Components.CabinInfo do
         <span class={["w-2 h-2 rounded-full", dot_class(@dot)]}></span>
         <h3 class="type-subhead text-sm text-zinc-900">{@title}</h3>
       </div>
-      <ol class="space-y-3 text-sm text-zinc-700 leading-relaxed">
+      <ol class="space-y-3 text-sm text-zinc-600 leading-relaxed">
         <li :for={{step, index} <- Enum.with_index(@step, 1)} class="flex gap-3">
           <span class="font-mono text-xs font-bold text-zinc-400 mt-0.5">
             {String.pad_leading(Integer.to_string(index), 2, "0")}
@@ -724,7 +724,7 @@ defmodule YscWeb.Components.CabinInfo do
             </th>
             <td :for={percentage <- band.percentages} class="px-4 py-3 tabular-nums">
               <span class={
-                if(percentage == 0, do: "text-zinc-400", else: "font-medium")
+                if(percentage == 0, do: "text-zinc-500", else: "font-medium")
               }>
                 {percentage}%
               </span>

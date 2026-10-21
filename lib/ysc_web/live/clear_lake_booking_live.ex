@@ -589,7 +589,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           </.essentials_strip>
           <!-- Active Bookings -->
           <div :if={length(@active_bookings) > 0} class="space-y-4">
-            <h2 class="text-sm text-zinc-400 type-eyebrow">
+            <h2 class="text-sm text-zinc-500 type-eyebrow">
               Your bookings
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -609,7 +609,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </span>
                     <% end %>
                   </div>
-                  <p class="font-bold text-zinc-900 text-lg leading-none">
+                  <p class="text-lg text-zinc-900 type-subhead">
                     {Calendar.strftime(booking.checkin_date, "%b %d")} — {Calendar.strftime(
                       booking.checkout_date,
                       "%b %d"
@@ -1363,7 +1363,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <hr class="border-zinc-200" />
 
                       <div class="flex justify-between items-end">
-                        <span class="text-lg font-bold text-zinc-900">Total</span>
+                        <span class="text-lg text-zinc-900 type-subhead">Total</span>
                         <div class="text-right">
                           <span
                             :if={!@availability_error}
@@ -1540,7 +1540,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           <%!-- Information Sections (Tab System) --%>
           <div
             id="information-section"
-            class="mt-12 max-w-(--breakpoint-xl) mx-auto"
+            class="mt-12 max-w-(--breakpoint-xl) mx-auto cabin-copy"
           >
             <% browse_rooms =
               YscWeb.Components.RoomBrowser.browsable_rooms(:clear_lake) %>
@@ -1549,9 +1549,9 @@ defmodule YscWeb.ClearLakeBookingLive do
             <%!-- The Cabin & Rooms: what you are deciding to book --%>
             <div :if={info_tab == :general} id="cabin-overview">
               <header class="max-w-3xl">
-                <h1 class="text-3xl text-zinc-900 mb-4 type-display">
+                <h2 class="mb-4 text-2xl sm:text-3xl text-zinc-900 type-title">
                   Welcome to the YSC Clear Lake Cabin
-                </h1>
+                </h2>
                 <p class="text-lg text-zinc-600 leading-relaxed">
                   Your year-round gateway to North America's oldest natural lake —
                   <strong>2.5 million years</strong>
@@ -1566,7 +1566,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 class="mt-8"
               >
                 <p>
-                  <strong class="font-semibold text-zinc-900">Remember:</strong>
+                  <strong>Remember:</strong>
                   the Clear Lake Cabin is your cabin — not a hotel. To keep rates reasonable for everyone, please follow the guidelines below.
                 </p>
               </.info_callout>
@@ -1628,7 +1628,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <p class="type-eyebrow text-xs text-zinc-500">
                           Winter ({@winter_season_window})
                         </p>
-                        <p class="text-base font-semibold text-zinc-900">
+                        <p class="text-base text-zinc-900 type-subhead">
                           Indoor beds are set up in three separate rooms.
                         </p>
                         <p class="text-sm text-zinc-600 leading-relaxed">
@@ -1667,17 +1667,17 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </div>
                     <% @sleeping_mode == :mixed -> %>
                       <div class="space-y-4">
-                        <p class="text-base font-semibold text-zinc-900">
+                        <p class="text-base text-zinc-900 type-subhead">
                           Your stay covers both seasons.
                         </p>
                         <p class="text-sm text-zinc-600 leading-relaxed">
-                          <strong class="font-medium text-zinc-900">
+                          <strong>
                             Summer ({@summer_season_window}):
                           </strong>
                           Beds are not set up. Lawn camp or use the cabin with your own sleeping setup. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
                         </p>
                         <p class="text-sm text-zinc-600 leading-relaxed">
-                          <strong class="font-medium text-zinc-900">
+                          <strong>
                             Winter ({@winter_season_window}):
                           </strong>
                           Indoor beds are set up in three separate rooms. {winter_beds_setup_copy()} Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels.
@@ -1688,7 +1688,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <p class="type-eyebrow text-xs text-zinc-500">
                           Summer ({@summer_season_window})
                         </p>
-                        <p class="text-base font-semibold text-zinc-900">
+                        <p class="text-base text-zinc-900 type-subhead">
                           Beds are not set up in the cabin.
                         </p>
                         <p class="text-sm text-zinc-600 leading-relaxed">
@@ -1814,7 +1814,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         accent={:amber}
                       >
                         <p>
-                          <strong class="font-semibold text-zinc-900">Note:</strong>
+                          <strong>Note:</strong>
                           if you reach Konocti Harbor Inn, you've gone too far — turn around.
                         </p>
                       </.info_callout>
@@ -1855,7 +1855,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </.numbered_steps>
                   <p class="text-sm text-zinc-600 leading-relaxed">
                     Cancellation and refunds are on the
-                    <strong class="font-semibold text-zinc-900">Cabin & Booking Rules</strong>
+                    <strong>Cabin & Booking Rules</strong>
                     tab under Cancellation Policy.
                   </p>
                 </.info_section>
@@ -1898,21 +1898,21 @@ defmodule YscWeb.ClearLakeBookingLive do
                       navigate={
                         ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
                       }
-                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors"
+                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
                     >
                       Sign In to Book
                     </.link>
                     <.link
                       :if={@booking_error_title == "Application under review"}
                       navigate={~p"/pending-review"}
-                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors"
+                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
                     >
                       View application status
                     </.link>
                     <.link
                       :if={@booking_error_title == "Membership Required"}
                       navigate={~p"/users/membership"}
-                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors"
+                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
                     >
                       Pay or renew membership
                     </.link>
@@ -2064,7 +2064,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </p>
                   <.info_callout icon="hero-exclamation-triangle" accent={:red}>
                     <p>
-                      <strong class="font-semibold text-zinc-900">
+                      <strong>
                         Quagga mussel warning:
                       </strong>
                       mandatory boat inspection required. Violations result in a $1,000 fine from Lake County.
