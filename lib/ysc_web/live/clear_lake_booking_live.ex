@@ -1607,6 +1607,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <div
                         id="winter-sleeping-photos"
                         class="grid grid-cols-2 gap-3"
+                        phx-hook="GLightboxHook"
                       >
                         <a
                           :for={
@@ -1617,7 +1618,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                           href={image.src}
                           target="_blank"
                           rel="noopener"
-                          class="block overflow-hidden rounded-lg bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+                          data-glightbox-plain
+                          data-glightbox-caption={image.alt}
+                          class="block cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
                         >
                           <img
                             src={image.src}
