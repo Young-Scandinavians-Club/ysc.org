@@ -4864,7 +4864,7 @@ defmodule YscWeb.CoreComponents do
     <.link
       id={@id}
       navigate={@navigate}
-      class="group flex items-center gap-3 px-4 py-3 min-h-14 bg-white hover:bg-blue-50/60 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-900"
+      class="group flex items-center gap-3 px-4 py-3 min-h-14 bg-white hover:bg-zinc-50 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-900"
     >
       <.icon
         name={@icon}
