@@ -2360,9 +2360,11 @@ defmodule YscWeb.TahoeBookingLive do
             </div>
             <!-- Right Column: Sticky Reservation Summary (1 column on large screens) -->
             <aside class="lg:sticky lg:top-24 lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto">
-              <div class="bg-white rounded-xl border-2 border-blue-600 overflow-hidden">
-                <div class="bg-blue-600 p-4 text-white text-center">
-                  <h3 class="text-lg type-subhead">Booking Summary</h3>
+              <div class="bg-white rounded-xl border border-zinc-200 shadow-xs overflow-hidden">
+                <div class="px-6 py-4 border-b border-zinc-100 bg-zinc-50/50">
+                  <h3 class="text-base text-zinc-900 type-subhead">
+                    Booking Summary
+                  </h3>
                 </div>
 
                 <div class="p-6 space-y-4">
@@ -2788,13 +2790,15 @@ defmodule YscWeb.TahoeBookingLive do
                       phx-click="show-confirm-modal"
                       phx-disable-with="Loading..."
                       disabled={!can_submit_booking?(assigns)}
-                      class={
-                        if can_submit_booking?(assigns) do
-                          "w-full text-lg py-4"
-                        else
-                          "w-full bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed py-4"
-                        end
+                      variant={
+                        if can_submit_booking?(assigns),
+                          do: "solid",
+                          else: "outline"
                       }
+                      color={
+                        if can_submit_booking?(assigns), do: "blue", else: "zinc"
+                      }
+                      class="w-full text-lg py-4"
                     >
                       <span class="flex items-center justify-center gap-2">
                         <.icon name="hero-check-circle-solid" class="w-5 h-5" />{YscWeb.BookingUserMessages.tahoe_review_booking_button()}
@@ -3133,34 +3137,12 @@ defmodule YscWeb.TahoeBookingLive do
             <.info_tabs active={info_tab} accent={:blue} />
             <%!-- The Cabin & Rooms: what you are deciding to book --%>
             <div :if={info_tab == :general} id="cabin-overview">
-              <header class="max-w-3xl">
-                <h2 class="mb-4 text-2xl sm:text-3xl text-zinc-900 type-title">
-                  Welcome to the YSC Tahoe Cabin
-                </h2>
-                <p class="text-lg text-zinc-600 leading-relaxed">
-                  Your year-round retreat in the heart of Lake Tahoe. Since <strong>1993</strong>, the YSC has proudly owned this beautiful cabin, located just minutes from Tahoe City, on the
-                  <strong>west shore</strong>
-                  of <strong>Lake Tahoe</strong>.
-                </p>
-              </header>
-              <.info_callout
-                id="tahoe-not-a-hotel"
-                icon="hero-home"
-                accent={:blue}
-                class="mt-8"
-              >
-                <p>
-                  <strong>Remember:</strong>
-                  the Tahoe Cabin is your cabin — not a hotel. To keep rates reasonable for everyone, please follow the guidelines below.
-                </p>
-              </.info_callout>
-
-              <.info_sections class="mt-10">
+              <.info_sections>
                 <.info_section
                   id="general-info"
                   heading_id="tahoe-about-heading"
                   title="About the Cabin"
-                  description="The Lake Tahoe region offers endless outdoor opportunities."
+                  description="Since 1993 the YSC has proudly owned this cabin, just minutes from Tahoe City on the west shore of Lake Tahoe. The region offers endless outdoor opportunities, year-round."
                 >
                   <.stat_strip id="tahoe-at-a-glance" columns={4}>
                     <:stat label="Capacity" value="17 guests" detail="7 bedrooms" />
@@ -3212,15 +3194,14 @@ defmodule YscWeb.TahoeBookingLive do
                   />
                 </.info_section>
 
-                <div :if={browse_rooms != []} class="py-10">
-                  <YscWeb.Components.RoomBrowser.room_browser
-                    id="property-room-browser"
-                    rooms={browse_rooms}
-                    property_name="YSC Tahoe Cabin"
-                    accent={:blue}
-                    pick_event={if @can_book, do: "browse-room-pick"}
-                  />
-                </div>
+                <YscWeb.Components.RoomBrowser.room_browser
+                  :if={browse_rooms != []}
+                  id="property-room-browser"
+                  rooms={browse_rooms}
+                  property_name="YSC Tahoe Cabin"
+                  accent={:blue}
+                  pick_event={if @can_book, do: "browse-room-pick"}
+                />
 
                 <.info_section
                   heading_id="tahoe-nearby-heading"
@@ -3246,6 +3227,15 @@ defmodule YscWeb.TahoeBookingLive do
                     <p class="mt-1 text-lg font-medium text-zinc-900">
                       2685 Cedar Lane<br />Homewood, CA 96141
                     </p>
+                    <a
+                      href="https://www.google.com/maps/dir/?api=1&destination=39.12591794747629,-120.16648676079016"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900"
+                    >
+                      Open in Google Maps
+                      <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
+                    </a>
                   </div>
                   <.numbered_steps
                     id="tahoe-directions"
@@ -3269,49 +3259,14 @@ defmodule YscWeb.TahoeBookingLive do
                       — the cabin is on your left.
                     </:step>
                   </.numbered_steps>
-                  <div class="space-y-4">
-                    <div class="rounded-lg overflow-hidden border border-zinc-200 h-72">
-                      <.live_component
-                        id="tahoe-cabin-map"
-                        module={YscWeb.Components.MapComponent}
-                        latitude={39.12591794747629}
-                        longitude={-120.16648676079016}
-                        locked={true}
-                        class="w-full h-full"
-                      />
-                    </div>
-                    <YscWeb.Components.MapNavigationButtons.map_navigation_buttons
-                      latitude={39.12591794747629}
-                      longitude={-120.16648676079016}
-                      class="w-full"
-                    />
-                  </div>
-                </.info_section>
-
-                <.info_section
-                  heading_id="tahoe-how-to-book-heading"
-                  title="How to Book"
-                  description="Everything happens on this website."
-                >
-                  <.numbered_steps id="tahoe-booking-steps">
-                    <:step>
-                      Choose whether you want individual rooms or the entire cabin.
-                    </:step>
-                    <:step>
-                      Select your check-in and check-out dates, number of adults and children using the <strong>booking form above</strong>.
-                    </:step>
-                    <:step>
-                      After selecting your dates, available rooms will appear. Browse and select the rooms that best fit your group size and needs.
-                    </:step>
-                    <:step>
-                      Review your booking summary, then complete your booking and payment <strong>through this website</strong>. You'll receive a confirmation email with your booking details.
-                    </:step>
-                  </.numbered_steps>
-                  <p class="text-sm text-zinc-600 leading-relaxed">
-                    Afterwards you can view and manage your booking from the link in your confirmation email. Refunds and cancellations are covered under
-                    <strong>Cancellation Policy</strong>
-                    on the Cabin & Booking Rules tab.
-                  </p>
+                  <.live_component
+                    id="tahoe-cabin-map"
+                    module={YscWeb.Components.MapComponent}
+                    latitude={39.12591794747629}
+                    longitude={-120.16648676079016}
+                    locked={true}
+                    class="w-full"
+                  />
                 </.info_section>
               </.info_sections>
             </div>
@@ -3718,13 +3673,11 @@ defmodule YscWeb.TahoeBookingLive do
                 id="tahoe-review-booking-mobile"
                 phx-click="show-confirm-modal"
                 disabled={!can_submit_booking?(assigns)}
-                class={
-                  if can_submit_booking?(assigns) do
-                    "px-6 py-3 shrink-0"
-                  else
-                    "px-6 py-3 shrink-0 bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed"
-                  end
+                variant={
+                  if can_submit_booking?(assigns), do: "solid", else: "outline"
                 }
+                color={if can_submit_booking?(assigns), do: "blue", else: "zinc"}
+                class="px-6 py-3 shrink-0"
               >
                 {YscWeb.BookingUserMessages.tahoe_review_booking_button()}
               </.button>

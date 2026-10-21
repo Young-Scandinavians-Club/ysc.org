@@ -707,7 +707,9 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         booked_status_label(day, assigns)
 
       :fully_blocked_gray ->
-        "Unavailable"
+        if winter_buyout_blocked?(day, assigns),
+          do: "Winter",
+          else: "Unavailable"
 
       :check_in_allowed ->
         ""
@@ -808,6 +810,15 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   end
 
   defp day_aria_status(day, assigns) do
+    if winter_buyout_blocked?(day, assigns) &&
+         day_visual_state(day, assigns) == :fully_blocked_gray do
+      "Winter, entire cabin not available"
+    else
+      day_aria_status_text(day, assigns)
+    end
+  end
+
+  defp day_aria_status_text(day, assigns) do
     status = day_status_label(day, assigns)
 
     detail =
@@ -1349,6 +1360,9 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         day_info.is_blacked_out ->
           :blackout
 
+        winter_buyout_blocked?(day, assigns) ->
+          :other
+
         assigns.selected_booking_mode == :day && day_info.has_buyout ->
           :bookings
 
@@ -1594,6 +1608,9 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
         info.is_blacked_out ->
           "Not available"
+
+        mode == :buyout && winter_buyout_blocked?(day, assigns) ->
+          "Winter"
 
         mode == :buyout && !info.can_book_buyout ->
           buyout_unavailable_label(info)

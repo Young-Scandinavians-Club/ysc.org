@@ -1130,9 +1130,11 @@ defmodule YscWeb.ClearLakeBookingLive do
             </div>
             <!-- Right Column: Sticky Reservation Summary (1 column on large screens) -->
             <aside class="lg:sticky lg:top-24 lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto">
-              <div class="bg-white rounded-xl border-2 border-teal-600 overflow-hidden">
-                <div class="bg-teal-600 p-4 text-white text-center">
-                  <h3 class="text-lg type-subhead">Booking Summary</h3>
+              <div class="bg-white rounded-xl border border-zinc-200 shadow-xs overflow-hidden">
+                <div class="px-6 py-4 border-b border-zinc-100 bg-zinc-50/50">
+                  <h3 class="text-base text-zinc-900 type-subhead">
+                    Booking Summary
+                  </h3>
                 </div>
                 <div class="p-6 space-y-4">
                   <!-- Dates -->
@@ -1516,19 +1518,25 @@ defmodule YscWeb.ClearLakeBookingLive do
                     @availability_error
                   )
                 }
-                class={
+                variant={
                   if can_submit_booking?(
                        @selected_booking_mode,
                        @checkin_date,
                        @checkout_date,
                        @guests_count,
                        @availability_error
-                     ) do
-                    "px-6 py-3"
-                  else
-                    "px-6 py-3 bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed"
-                  end
+                     ), do: "solid", else: "outline"
                 }
+                color={
+                  if can_submit_booking?(
+                       @selected_booking_mode,
+                       @checkin_date,
+                       @checkout_date,
+                       @guests_count,
+                       @availability_error
+                     ), do: "teal", else: "zinc"
+                }
+                class="px-6 py-3"
               >
                 Continue to payment
               </.button>
@@ -1553,35 +1561,12 @@ defmodule YscWeb.ClearLakeBookingLive do
             <.info_tabs active={info_tab} accent={:teal} />
             <%!-- The Cabin & Rooms: what you are deciding to book --%>
             <div :if={info_tab == :general} id="cabin-overview">
-              <header class="max-w-3xl">
-                <h2 class="mb-4 text-2xl sm:text-3xl text-zinc-900 type-title">
-                  Welcome to the YSC Clear Lake Cabin
-                </h2>
-                <p class="text-lg text-zinc-600 leading-relaxed">
-                  Your year-round gateway to North America's oldest natural lake —
-                  <strong>2.5 million years</strong>
-                  old — in <strong>Kelseyville</strong>. Since <strong>1963</strong>
-                  this has been a <strong>Member Sanctuary</strong>: we don't just stay here, we keep it together.
-                </p>
-              </header>
-              <.info_callout
-                id="clear-lake-not-a-hotel"
-                icon="hero-home"
-                accent={:teal}
-                class="mt-8"
-              >
-                <p>
-                  <strong>Remember:</strong>
-                  the Clear Lake Cabin is your cabin — not a hotel. To keep rates reasonable for everyone, please follow the guidelines below.
-                </p>
-              </.info_callout>
-
-              <.info_sections class="mt-10">
+              <.info_sections>
                 <.info_section
                   id="general-info"
                   heading_id="clear-lake-about-heading"
                   title="About the Cabin"
-                  description="Clear Lake and the surrounding region offer year-round outdoor opportunities."
+                  description="Your year-round gateway to North America's oldest natural lake (2.5 million years old), in Kelseyville. A Member Sanctuary since 1963: we don't just stay here, we keep it together."
                 >
                   <.stat_strip id="clear-lake-at-a-glance" columns={4}>
                     <:stat
@@ -1612,15 +1597,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                   />
                 </.info_section>
 
-                <div :if={browse_rooms != []} class="py-10">
-                  <YscWeb.Components.RoomBrowser.room_browser
-                    id="property-room-browser"
-                    rooms={browse_rooms}
-                    property_name="YSC Clear Lake Cabin"
-                    accent={:teal}
-                    intro="You don't pick a specific room when you book. Shared cabin stays share the house with other members. Entire cabin stays include every room."
-                  />
-                </div>
+                <YscWeb.Components.RoomBrowser.room_browser
+                  :if={browse_rooms != []}
+                  id="property-room-browser"
+                  rooms={browse_rooms}
+                  property_name="YSC Clear Lake Cabin"
+                  accent={:teal}
+                  intro="You don't pick a specific room when you book. Shared cabin stays share the house with other members. Entire cabin stays include every room."
+                />
 
                 <.info_section
                   id="sleeping-at-the-cabin"
@@ -1738,7 +1722,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                       rel="noopener noreferrer"
                       class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-900"
                     >
-                      <.icon name="hero-map-pin" class="w-4 h-4" /> Open in Maps
+                      Open in Google Maps
+                      <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
                     </a>
                   </div>
                   <details class="group border-y border-zinc-200">
@@ -1825,44 +1810,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </.info_callout>
                     </div>
                   </details>
-                  <div class="space-y-4">
-                    <div class="rounded-lg overflow-hidden border border-zinc-200 h-72">
-                      <.live_component
-                        id="clear-lake-cabin-map"
-                        module={YscWeb.Components.MapComponent}
-                        latitude={38.98087180833886}
-                        longitude={-122.73563627025182}
-                        locked={true}
-                        class="w-full h-full"
-                      />
-                    </div>
-                    <YscWeb.Components.MapNavigationButtons.map_navigation_buttons
-                      latitude={38.98087180833886}
-                      longitude={-122.73563627025182}
-                      class="w-full"
-                    />
-                  </div>
-                </.info_section>
-
-                <.info_section
-                  heading_id="clear-lake-how-to-book-heading"
-                  title="How to Book"
-                  description="Everything happens on this website."
-                >
-                  <.numbered_steps id="clear-lake-booking-steps">
-                    <:step>
-                      Use the <strong>booking form above</strong>
-                      to choose Shared cabin vs Entire cabin, dates, and guests, then pay on this site.
-                    </:step>
-                    <:step>
-                      You'll get a confirmation email with a link to view and manage your booking.
-                    </:step>
-                  </.numbered_steps>
-                  <p class="text-sm text-zinc-600 leading-relaxed">
-                    Cancellation and refunds are on the
-                    <strong>Cabin & Booking Rules</strong>
-                    tab under Cancellation Policy.
-                  </p>
+                  <.live_component
+                    id="clear-lake-cabin-map"
+                    module={YscWeb.Components.MapComponent}
+                    latitude={38.98087180833886}
+                    longitude={-122.73563627025182}
+                    locked={true}
+                    class="w-full"
+                  />
                 </.info_section>
 
                 <.info_section
