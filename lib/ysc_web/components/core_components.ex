@@ -4832,7 +4832,10 @@ defmodule YscWeb.CoreComponents do
   defp cabin_showcase_cta_class(:emerald), do: "hover:bg-emerald-700"
 
   @doc """
-  Compact dashboard shortcut card used on the signed-in homepage.
+  Compact dashboard shortcut cell used in the signed-in homepage quick-action bar.
+
+  Renders a neutral icon beside a two-line label; the parent supplies the
+  dividers and border so several cells read as one unified bar.
 
   ## Examples
 
@@ -4840,7 +4843,6 @@ defmodule YscWeb.CoreComponents do
         id="home-quick-action-tahoe"
         navigate={~p"/bookings/tahoe"}
         icon="hero-home"
-        tone={:blue}
         title="Lake Tahoe"
         subtitle="Book a stay"
       />
@@ -4851,44 +4853,28 @@ defmodule YscWeb.CoreComponents do
   attr :title, :string, required: true
   attr :subtitle, :string, required: true
 
-  attr :tone, :atom,
-    required: true,
-    values: [:blue, :emerald, :orange, :purple, :zinc],
-    doc: "Icon well background and icon color"
-
   def quick_action_card(assigns) do
     ~H"""
     <.link
       id={@id}
       navigate={@navigate}
-      class="shrink-0 w-38 sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-xs hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition duration-150 group"
+      class="group flex items-center gap-3 px-4 py-3 min-h-14 bg-white hover:bg-zinc-50 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-900"
     >
-      <div class={[
-        "w-8 h-8 lg:w-10 lg:h-10 rounded-md flex items-center justify-center mb-2 lg:mb-4",
-        quick_action_card_well_class(@tone)
-      ]}>
-        <.icon
-          name={@icon}
-          class={["w-4 h-4 lg:w-5 lg:h-5", quick_action_card_icon_class(@tone)]}
-        />
-      </div>
-      <p class="font-bold text-sm lg:text-base text-zinc-900">{@title}</p>
-      <p class="text-xs lg:text-sm text-zinc-500">{@subtitle}</p>
+      <.icon
+        name={@icon}
+        class="w-5 h-5 shrink-0 text-zinc-500 group-hover:text-zinc-900 transition-colors duration-150"
+      />
+      <span class="min-w-0">
+        <span class="block text-sm font-semibold text-zinc-900 leading-tight">
+          {@title}
+        </span>
+        <span class="block text-xs text-zinc-500 leading-snug truncate">
+          {@subtitle}
+        </span>
+      </span>
     </.link>
     """
   end
-
-  defp quick_action_card_well_class(:blue), do: "bg-blue-50"
-  defp quick_action_card_well_class(:emerald), do: "bg-emerald-50"
-  defp quick_action_card_well_class(:orange), do: "bg-orange-50"
-  defp quick_action_card_well_class(:purple), do: "bg-purple-50"
-  defp quick_action_card_well_class(:zinc), do: "bg-zinc-50"
-
-  defp quick_action_card_icon_class(:blue), do: "text-blue-600"
-  defp quick_action_card_icon_class(:emerald), do: "text-emerald-600"
-  defp quick_action_card_icon_class(:orange), do: "text-orange-600"
-  defp quick_action_card_icon_class(:purple), do: "text-purple-600"
-  defp quick_action_card_icon_class(:zinc), do: "text-zinc-600"
 
   @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.

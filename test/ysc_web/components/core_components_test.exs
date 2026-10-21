@@ -363,7 +363,7 @@ defmodule YscWeb.CoreComponentsTest do
   end
 
   describe "quick_action_card/1" do
-    test "renders a Tahoe booking shortcut with blue tone" do
+    test "renders a Tahoe booking shortcut with a neutral icon" do
       assigns = %{}
 
       html =
@@ -372,7 +372,6 @@ defmodule YscWeb.CoreComponentsTest do
           id="home-quick-action-tahoe"
           navigate="/bookings/tahoe"
           icon="hero-home"
-          tone={:blue}
           title="Lake Tahoe"
           subtitle="Book a stay"
         />
@@ -383,12 +382,12 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "Lake Tahoe"
       assert html =~ "Book a stay"
       assert html =~ "hero-home"
-      assert html =~ "bg-blue-50"
-      assert html =~ "text-blue-600"
-      assert html =~ "snap-center"
+      assert html =~ "text-zinc-500"
+      refute html =~ "bg-blue-50"
+      refute html =~ "snap-center"
     end
 
-    test "renders emerald, orange, and zinc tones" do
+    test "renders several shortcuts without per-tone colour" do
       assigns = %{}
 
       html =
@@ -397,7 +396,6 @@ defmodule YscWeb.CoreComponentsTest do
           id="home-quick-action-clear-lake"
           navigate="/bookings/clear-lake"
           icon="hero-home"
-          tone={:emerald}
           title="Clear Lake"
           subtitle="Book a stay"
         />
@@ -405,7 +403,6 @@ defmodule YscWeb.CoreComponentsTest do
           id="home-quick-action-expenses"
           navigate="/expensereports"
           icon="hero-receipt-refund"
-          tone={:orange}
           title="Expenses"
           subtitle="View reports"
         />
@@ -413,7 +410,6 @@ defmodule YscWeb.CoreComponentsTest do
           id="home-quick-action-settings"
           navigate="/users/settings"
           icon="hero-cog-6-tooth"
-          tone={:zinc}
           title="Settings"
           subtitle="Preferences"
         />
@@ -422,14 +418,10 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ ~s(id="home-quick-action-clear-lake")
       assert html =~ ~s(id="home-quick-action-expenses")
       assert html =~ ~s(id="home-quick-action-settings")
-      assert html =~ "bg-emerald-50"
-      assert html =~ "text-emerald-600"
-      assert html =~ "bg-orange-50"
-      assert html =~ "text-orange-600"
-      assert html =~ "bg-zinc-50"
-      assert html =~ "text-zinc-600"
       assert html =~ "hero-receipt-refund"
       assert html =~ "hero-cog-6-tooth"
+      refute html =~ "bg-emerald-50"
+      refute html =~ "bg-orange-50"
     end
   end
 
