@@ -494,16 +494,7 @@ defmodule YscWeb.FamilyManagementLive do
       </div>
     <% end %>
 
-    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-      <div class="flex items-center justify-between gap-3">
-        <h2 class="text-zinc-900 text-xl type-subhead">
-          Family Members
-          <span class="text-zinc-500 font-normal text-sm ml-2">
-            ({length(@active_rows)})
-          </span>
-        </h2>
-      </div>
-
+    <.settings_section title="Family Members" count={length(@active_rows)}>
       <p id="family-members-help" class="text-sm text-zinc-500">
         People on your family membership. Send an invite so they can create their own sign-in and use member benefits. Children who are 18 or older need their own membership and cannot be invited.
       </p>
@@ -575,16 +566,9 @@ defmodule YscWeb.FamilyManagementLive do
           </table>
         </div>
       <% end %>
-    </section>
+    </.settings_section>
 
-    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-      <h2 class="text-zinc-900 text-xl type-subhead">
-        Pending Invitations
-        <span class="text-zinc-500 font-normal text-sm ml-2">
-          ({length(@pending_invites)})
-        </span>
-      </h2>
-
+    <.settings_section title="Pending Invitations" count={length(@pending_invites)}>
       <%= if @pending_invites == [] do %>
         <div
           id="pending-invites-empty"
@@ -655,7 +639,7 @@ defmodule YscWeb.FamilyManagementLive do
           </table>
         </div>
       <% end %>
-    </section>
+    </.settings_section>
 
     <.modal
       :if={@family_member_form}
@@ -808,8 +792,7 @@ defmodule YscWeb.FamilyManagementLive do
       subtitle="You are part of a family membership. Below you can see who manages your family membership and the other members on your account."
     />
 
-    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-      <h2 class="text-zinc-900 text-xl type-subhead">Family membership manager</h2>
+    <.settings_section title="Family membership manager">
       <%= if @primary_user do %>
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p class="text-sm font-semibold text-blue-900">
@@ -826,15 +809,12 @@ defmodule YscWeb.FamilyManagementLive do
           Family membership manager information is not available.
         </p>
       <% end %>
-    </section>
+    </.settings_section>
 
-    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-      <h2 class="text-zinc-900 text-xl type-subhead">
-        Other Family Members
-        <span class="text-zinc-500 font-normal text-sm ml-2">
-          ({length(@other_family_members)})
-        </span>
-      </h2>
+    <.settings_section
+      title="Other Family Members"
+      count={length(@other_family_members)}
+    >
       <%= if @other_family_members == [] do %>
         <p class="text-zinc-500 text-sm italic">
           No other family members in your group.
@@ -871,10 +851,9 @@ defmodule YscWeb.FamilyManagementLive do
           </table>
         </div>
       <% end %>
-    </section>
+    </.settings_section>
 
-    <section class="rounded-sm border border-zinc-100 py-4 px-4 space-y-4">
-      <h2 class="text-zinc-900 text-xl type-subhead">Leave Family Membership</h2>
+    <.settings_section title="Leave Family Membership">
       <p class="text-sm text-zinc-600">
         You can leave this family membership at any time. You will no longer share membership benefits and can purchase your own membership or join another family later.
       </p>
@@ -887,7 +866,7 @@ defmodule YscWeb.FamilyManagementLive do
       >
         Leave family membership
       </.button>
-    </section>
+    </.settings_section>
     """
   end
 
