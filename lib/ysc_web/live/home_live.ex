@@ -1291,71 +1291,85 @@ defmodule YscWeb.HomeLive do
                     |> Enum.filter(& &1)
                     |> Enum.uniq() %>
                   <% days_until_this_event = days_until_event(event) %>
-                  <div class="bg-white border border-zinc-200 rounded-xl p-5">
-                    <div class="flex justify-between items-start mb-3">
+                  <div
+                    id={"home-ticket-#{event.id}"}
+                    class="flex bg-white border border-zinc-200 rounded-xl overflow-hidden"
+                  >
+                    <%!-- Ticket stub: date block, perforated from the body --%>
+                    <div class="flex flex-col items-center justify-center w-18 shrink-0 bg-blue-700 text-white border-r-2 border-dashed border-blue-300/60 px-2 py-4">
+                      <span class="text-xs text-blue-100 type-eyebrow">
+                        {ticket_stub_month(event)}
+                      </span>
+                      <span class="text-3xl type-display leading-none">
+                        {ticket_stub_day(event)}
+                      </span>
+                      <.icon name="hero-ticket" class="w-4 h-4 mt-3 text-blue-200" />
+                    </div>
+                    <div class="flex-1 min-w-0 p-5">
                       <span class={[
-                        "px-2 py-1 text-xs font-bold rounded-sm",
+                        "inline-block px-2 py-1 mb-2 text-xs font-bold rounded-sm",
                         case days_until_this_event do
                           0 -> "bg-amber-50 text-amber-700"
-                          _ -> "bg-zinc-100 text-zinc-700"
+                          _ -> "bg-blue-50 text-blue-700"
                         end
                       ]}>
                         {DateDisplay.relative_days_phrase(days_until_this_event)}
                       </span>
-                      <.icon name="hero-ticket" class="w-5 h-5 text-zinc-400" />
-                    </div>
-                    <.link navigate={~p"/events/#{event.id}"} class="block group">
-                      <h3 class="text-zinc-900 mb-2 group-hover:text-blue-600 transition-colors type-subhead">
-                        {event.title}
-                      </h3>
-                    </.link>
-                    <p class="text-xs text-zinc-500 flex items-center gap-1 mb-2">
-                      <.icon name="hero-calendar" class="w-3 h-3" />
-                      {DateDisplay.format_datetime_display(event.start_date)}
-                    </p>
-                    <div
-                      :if={event.location_name}
-                      class="text-xs text-zinc-500 flex items-center gap-1"
-                    >
-                      <.icon name="hero-map-pin" class="w-3 h-3" />
-                      <span class="truncate">{event.location_name}</span>
-                    </div>
-                    <div class="mt-4 pt-4 border-t border-zinc-100 space-y-3">
-                      <div class="flex flex-wrap gap-1.5">
-                        <%= for {tier_name, tickets} <- grouped_tiers do %>
-                          <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-zinc-100 text-zinc-600 rounded-full">
-                            <span class="text-zinc-500">{length(tickets)}×</span>{tier_name}
-                          </span>
-                        <% end %>
+                      <.link navigate={~p"/events/#{event.id}"} class="block group">
+                        <h3 class="text-zinc-900 mb-2 group-hover:text-blue-600 transition-colors type-subhead">
+                          {event.title}
+                        </h3>
+                      </.link>
+                      <p class="text-xs text-zinc-500 flex items-center gap-1 mb-1">
+                        <.icon name="hero-calendar" class="w-3 h-3" />
+                        {DateDisplay.format_datetime_display(event.start_date)}
+                      </p>
+                      <div
+                        :if={event.location_name}
+                        class="text-xs text-zinc-500 flex items-center gap-1"
+                      >
+                        <.icon name="hero-map-pin" class="w-3 h-3" />
+                        <span class="truncate">{event.location_name}</span>
                       </div>
-                      <div class="flex flex-wrap items-center gap-3">
-                        <.button
-                          navigate={~p"/events/#{event.id}/tickets/qr?return_to=/"}
-                          color="zinc"
-                          class="py-1.5! whitespace-nowrap"
-                        >
-                          <.icon name="hero-qr-code" class="w-4 h-4" />
-                          Show tickets for check-in
-                        </.button>
-                        <%= if length(order_ids) == 1 do %>
-                          <.link
+                      <div class="mt-4 pt-4 border-t border-zinc-100 space-y-3">
+                        <div class="flex flex-wrap gap-1.5">
+                          <%= for {tier_name, tickets} <- grouped_tiers do %>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-full">
+                              <span class="text-blue-500">{length(tickets)}×</span>{tier_name}
+                            </span>
+                          <% end %>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                          <.button
                             navigate={
-                              ~p"/orders/#{List.first(order_ids)}/confirmation"
+                              ~p"/events/#{event.id}/tickets/qr?return_to=/"
                             }
-                            class="inline-flex items-center min-h-11 -my-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
+                            color="blue"
+                            class="py-1.5! whitespace-nowrap"
                           >
-                            View order & receipt
-                          </.link>
-                        <% else %>
-                          <%= if length(order_ids) > 1 do %>
+                            <.icon name="hero-qr-code" class="w-4 h-4" />
+                            Show tickets for check-in
+                          </.button>
+                          <%= if length(order_ids) == 1 do %>
                             <.link
-                              navigate={~p"/users/tickets"}
+                              navigate={
+                                ~p"/orders/#{List.first(order_ids)}/confirmation"
+                              }
                               class="inline-flex items-center min-h-11 -my-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
                             >
-                              View all tickets
+                              View order & receipt
                             </.link>
+                          <% else %>
+                            <%= if length(order_ids) > 1 do %>
+                              <.link
+                                navigate={~p"/users/tickets"}
+                                class="inline-flex items-center min-h-11 -my-3 text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
+                              >
+                                View all tickets
+                              </.link>
+                            <% end %>
                           <% end %>
-                        <% end %>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1845,6 +1859,20 @@ defmodule YscWeb.HomeLive do
 
   defp days_until_booking(booking) do
     DateDisplay.days_until_cabin_checkin(booking)
+  end
+
+  defp ticket_stub_month(event) do
+    case DateDisplay.event_start_datetime(event) do
+      %DateTime{} = dt -> Calendar.strftime(dt, "%b")
+      _ -> ""
+    end
+  end
+
+  defp ticket_stub_day(event) do
+    case DateDisplay.event_start_datetime(event) do
+      %DateTime{} = dt -> Calendar.strftime(dt, "%-d")
+      _ -> ""
+    end
   end
 
   defp days_until_event(event) do

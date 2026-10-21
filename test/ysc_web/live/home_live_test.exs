@@ -570,6 +570,7 @@ defmodule YscWeb.HomeLiveTest do
 
       assert has_element?(view, "h3", event_title)
       assert has_element?(view, "span", tier_name)
+      assert has_element?(view, "#home-ticket-#{data.event.id} .bg-blue-700")
     end
 
     test "hides event tickets for events that already started today", %{
