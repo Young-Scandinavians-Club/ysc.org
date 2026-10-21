@@ -4261,6 +4261,17 @@ cropper-canvas {
   text-transform: uppercase;
 }
 
+/* Diagonal hatch for calendar days that cannot be picked, so "unavailable" never
+   relies on colour alone. Layers over the element's own background colour. */
+
+@utility calendar-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    color-mix(in srgb, var(--color-zinc-400) 40%, transparent) 6px 7px
+  );
+}
+
 /* One-shot attention ring for a badge that has just become relevant (e.g. an
    event happening today). Plays once on appearance; never loops. */
 

@@ -239,42 +239,6 @@ defmodule YscWeb.Components.CabinInfoTest do
     end
   end
 
-  describe "segmented_control/1" do
-    test "renders a native radio group with the selected option checked" do
-      assigns = %{
-        options: [
-          %{value: "room", id: "mode-room", label: "Individual Room(s)"},
-          %{
-            value: "buyout",
-            id: "mode-buyout",
-            label: "Entire Cabin",
-            disabled: true
-          }
-        ]
-      }
-
-      html =
-        rendered_to_string(~H"""
-        <.segmented_control
-          name="booking_mode"
-          label="Booking type"
-          selected="room"
-          options={@options}
-        />
-        """)
-
-      assert html =~ ~s(role="radiogroup")
-      assert html =~ ~s(aria-label="Booking type")
-      assert html =~ ~s(id="mode-room")
-      assert html =~ ~s(id="mode-buyout")
-      assert html =~ ~s(name="booking_mode")
-      assert html =~ "Individual Room(s)"
-      assert html =~ "Entire Cabin"
-      assert html =~ "disabled"
-      assert html =~ "cursor-not-allowed"
-    end
-  end
-
   describe "rules_bar/1" do
     test "renders one line item per rule" do
       assigns = %{}

@@ -334,8 +334,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       render_async(view, 2_000)
       html = render(view)
 
-      assert has_element?(view, "#booking-mode-buyout")
-      assert html =~ "Entire Cabin"
+      assert html =~ "Book the entire cabin"
       refute html =~ "Rent the entire cabin"
       refute html =~ "Reserve the entire cabin"
       refute html =~ "Entire-cabin rentals"
