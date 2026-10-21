@@ -562,13 +562,15 @@ defmodule YscWeb.ClearLakeBookingLive do
               :if={@sleeping_mode == :winter}
               id="sleeping-alert"
               icon="hero-sparkles"
+              title="Beds set up"
             >
-              Beds set up. Bring your own linens
+              Bring your own linens
             </:item>
             <:item
               :if={@sleeping_mode == :mixed}
               id="sleeping-alert"
               icon="hero-moon"
+              title="Sleeping"
             >
               Setup depends on season — lawn in summer, beds in winter
             </:item>
@@ -576,14 +578,17 @@ defmodule YscWeb.ClearLakeBookingLive do
               :if={@sleeping_mode not in [:winter, :mixed]}
               id="sleeping-alert"
               icon="hero-moon"
+              title="Sleeping"
             >
               Lawn camp or bring your own setup
             </:item>
-            <:item icon="hero-no-symbol">No pets or smoking</:item>
-            <:item icon="hero-lifebuoy">
-              Free boat mooring — email the Cabin Master before you arrive
+            <:item icon="hero-no-symbol" title="House rules">
+              No pets or smoking
             </:item>
-            <:item icon="hero-hand-raised">
+            <:item icon="hero-lifebuoy" title="Boat access">
+              Free mooring — email the Cabin Master before you arrive
+            </:item>
+            <:item icon="hero-hand-raised" title="Community">
               Shared cabin — please help with chores before you leave
             </:item>
           </.essentials_strip>

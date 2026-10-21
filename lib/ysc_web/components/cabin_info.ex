@@ -97,14 +97,20 @@ defmodule YscWeb.Components.CabinInfo do
   defp tab_underline(:teal), do: "border-teal-600"
 
   @doc """
-  One quiet line of must-know rules, shown once under the hero. Items wrap on
-  small screens. Each `:item` takes a hero `icon`.
+  The must-know rules, once, directly under the hero: a single hairline panel
+  with one cell per rule. Each cell has a tinted icon, a small label and the
+  rule itself, so it scans in a second. Cells sit in a row on wide screens, two
+  by two on tablets and stacked on phones.
+
+  Each `:item` takes a hero `icon`, a short `title` and an optional `id`; the
+  slot body is the rule.
   """
   attr :id, :string, default: nil
   attr :accent, :atom, default: :blue, values: [:blue, :teal]
 
   slot :item, required: true do
     attr :icon, :string, required: true
+    attr :title, :string, required: true
     attr :id, :string
   end
 
@@ -112,22 +118,32 @@ defmodule YscWeb.Components.CabinInfo do
     ~H"""
     <ul
       id={@id}
-      class="flex flex-wrap gap-x-6 gap-y-2 py-3 border-y border-zinc-200 text-sm text-zinc-700"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-lg border border-zinc-200 bg-zinc-200"
     >
       <li
         :for={item <- @item}
         id={Map.get(item, :id)}
-        class="flex items-center gap-2"
+        class="flex items-start gap-3 bg-white px-4 py-3.5"
       >
-        <.icon name={item.icon} class={["w-4 h-4 shrink-0", accent_icon(@accent)]} />
-        <span>{render_slot(item)}</span>
+        <span class={[
+          "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full",
+          accent_tint(@accent)
+        ]}>
+          <.icon name={item.icon} class="size-4" />
+        </span>
+        <div class="min-w-0">
+          <p class="type-eyebrow text-xs text-zinc-500">{item.title}</p>
+          <p class="mt-0.5 text-sm font-medium text-zinc-900 leading-snug">
+            {render_slot(item)}
+          </p>
+        </div>
       </li>
     </ul>
     """
   end
 
-  defp accent_icon(:blue), do: "text-blue-600"
-  defp accent_icon(:teal), do: "text-teal-600"
+  defp accent_tint(:blue), do: "bg-blue-50 text-blue-700"
+  defp accent_tint(:teal), do: "bg-teal-50 text-teal-700"
 
   @doc """
   One-line helper bar of constraints that affect picking dates, set directly above

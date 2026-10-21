@@ -1203,12 +1203,16 @@ defmodule YscWeb.TahoeBookingLive do
         <div class="max-w-(--breakpoint-xl) mx-auto px-4 space-y-10">
           <%!-- Essentials: the must-know rules, once, directly under the hero --%>
           <.essentials_strip id="tahoe-essentials" accent={:blue}>
-            <:item icon="hero-sparkles">Bring your own bed linens</:item>
-            <:item icon="hero-no-symbol">No pets or smoking</:item>
-            <:item icon="hero-cloud">
-              Winter: carry chains or use 4WD with snow tires
+            <:item icon="hero-sparkles" title="Linens">
+              Bring your own bed linens
             </:item>
-            <:item icon="hero-hand-raised">
+            <:item icon="hero-no-symbol" title="House rules">
+              No pets or smoking
+            </:item>
+            <:item icon="hero-cloud" title="Winter driving">
+              Carry chains or use 4WD with snow tires
+            </:item>
+            <:item icon="hero-hand-raised" title="Community">
               Member-run cabin — please help with chores before you leave
             </:item>
           </.essentials_strip>
