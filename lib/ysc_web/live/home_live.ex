@@ -1534,10 +1534,10 @@ defmodule YscWeb.HomeLive do
               <%!-- Loading skeleton for news --%>
               <div
                 :if={!@async_data_loaded}
-                class="divide-y divide-zinc-200 border-y border-zinc-200"
+                class="space-y-5"
               >
                 <%= for _i <- 1..3 do %>
-                  <div class="flex gap-4 py-4 animate-pulse">
+                  <div class="flex gap-4 animate-pulse">
                     <div class="w-20 h-14 rounded-md bg-zinc-200 shrink-0"></div>
                     <div class="flex-1 space-y-2 pt-1">
                       <div class="h-3 bg-zinc-200 rounded-sm w-1/4"></div>
@@ -1549,12 +1549,12 @@ defmodule YscWeb.HomeLive do
 
               <div
                 :if={@async_data_loaded}
-                class="divide-y divide-zinc-200 border-y border-zinc-200"
+                class="space-y-5"
               >
                 <%= for post <- Enum.take(@latest_news, 3) do %>
                   <.link
                     navigate={~p"/posts/#{post.url_name}"}
-                    class="flex gap-4 py-4 group"
+                    class="flex gap-4 group"
                   >
                     <div class="w-20 h-14 rounded-md bg-zinc-200 overflow-hidden shrink-0">
                       <.live_component
