@@ -1574,83 +1574,85 @@ defmodule YscWeb.ClearLakeBookingLive do
                   heading_id="clear-lake-sleeping-heading"
                   title="Sleeping at the Cabin"
                 >
-                  <%= cond do %>
-                    <% @sleeping_mode == :winter -> %>
-                      <div class="space-y-4">
-                        <p class="type-eyebrow text-xs text-zinc-500">
-                          Winter ({@winter_season_window})
-                        </p>
-                        <p class="text-base text-zinc-900 type-subhead">
-                          Indoor beds are set up in three separate rooms.
-                        </p>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          {winter_beds_setup_copy()}
-                        </p>
-                        <div
-                          id="winter-sleeping-photos"
-                          class="grid grid-cols-2 gap-3"
+                  <%!-- Both setups are always shown so members can see what
+                       each season looks like before choosing dates. The
+                       selected dates only decide which one leads. --%>
+                  <div class="flex flex-col gap-8">
+                    <p
+                      :if={@sleeping_mode == :mixed}
+                      id="sleeping-mixed-note"
+                      class="order-first text-base text-zinc-900 type-subhead"
+                    >
+                      Your stay covers both seasons.
+                    </p>
+                    <div
+                      id="winter-sleeping"
+                      class={[
+                        "space-y-4",
+                        if(@sleeping_mode == :summer,
+                          do: "order-2",
+                          else: "order-1"
+                        )
+                      ]}
+                    >
+                      <p class="type-eyebrow text-xs text-zinc-500">
+                        Winter ({@winter_season_window})
+                      </p>
+                      <p class="text-base text-zinc-900 type-subhead">
+                        Indoor beds are set up in three separate rooms.
+                      </p>
+                      <p class="text-sm text-zinc-600 leading-relaxed">
+                        {winter_beds_setup_copy()}
+                      </p>
+                      <div
+                        id="winter-sleeping-photos"
+                        class="grid grid-cols-2 gap-3"
+                      >
+                        <a
+                          :for={
+                            {image, index} <-
+                              Enum.with_index(winter_sleeping_images())
+                          }
+                          id={"winter-sleeping-photo-#{index}"}
+                          href={image.src}
+                          target="_blank"
+                          rel="noopener"
+                          class="block overflow-hidden rounded-lg bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
                         >
-                          <a
-                            :for={
-                              {image, index} <-
-                                Enum.with_index(winter_sleeping_images())
-                            }
-                            id={"winter-sleeping-photo-#{index}"}
-                            href={image.src}
-                            target="_blank"
-                            rel="noopener"
-                            class="block overflow-hidden rounded-lg bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
-                          >
-                            <img
-                              src={image.src}
-                              alt={image.alt}
-                              loading="lazy"
-                              decoding="async"
-                              class="aspect-[4/3] w-full object-cover transition-transform duration-300 hover:scale-105"
-                            />
-                          </a>
-                        </div>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help in the Social Hall.
-                        </p>
-                        <p class="text-xs text-zinc-500 leading-relaxed">
-                          Summer ({@summer_season_window}): beds come down — lawn camp or bring your own sleeping setup.
-                        </p>
+                          <img
+                            src={image.src}
+                            alt={image.alt}
+                            loading="lazy"
+                            decoding="async"
+                            class="aspect-[4/3] w-full object-cover transition-transform duration-300 hover:scale-105"
+                          />
+                        </a>
                       </div>
-                    <% @sleeping_mode == :mixed -> %>
-                      <div class="space-y-4">
-                        <p class="text-base text-zinc-900 type-subhead">
-                          Your stay covers both seasons.
-                        </p>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          <strong>
-                            Summer ({@summer_season_window}):
-                          </strong>
-                          Beds are not set up. Lawn camp or use the cabin with your own sleeping setup. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
-                        </p>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          <strong>
-                            Winter ({@winter_season_window}):
-                          </strong>
-                          Indoor beds are set up in three separate rooms. {winter_beds_setup_copy()} Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels.
-                        </p>
-                      </div>
-                    <% true -> %>
-                      <div class="space-y-4">
-                        <p class="type-eyebrow text-xs text-zinc-500">
-                          Summer ({@summer_season_window})
-                        </p>
-                        <p class="text-base text-zinc-900 type-subhead">
-                          Beds are not set up in the cabin.
-                        </p>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          Lawn camp or use the cabin with your own sleeping setup. Pack a sleeping bag, pillow, and a tent if you're camping on the lawn. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
-                        </p>
-                        <p class="text-xs text-zinc-500 leading-relaxed">
-                          Winter ({@winter_season_window}): indoor beds are set up in three rooms — pack linens if you book those dates.
-                        </p>
-                      </div>
-                  <% end %>
+                      <p class="text-sm text-zinc-600 leading-relaxed">
+                        Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help in the Social Hall.
+                      </p>
+                    </div>
+                    <div
+                      id="summer-sleeping"
+                      class={[
+                        "space-y-4",
+                        if(@sleeping_mode == :summer,
+                          do: "order-1",
+                          else: "order-2"
+                        )
+                      ]}
+                    >
+                      <p class="type-eyebrow text-xs text-zinc-500">
+                        Summer ({@summer_season_window})
+                      </p>
+                      <p class="text-base text-zinc-900 type-subhead">
+                        Beds are not set up in the cabin.
+                      </p>
+                      <p class="text-sm text-zinc-600 leading-relaxed">
+                        Lawn camp or use the cabin with your own sleeping setup. Pack a sleeping bag, pillow, and a tent if you're camping on the lawn. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
+                      </p>
+                    </div>
+                  </div>
                   <p class="text-sm text-zinc-600 leading-relaxed">
                     Also pack bath and beach towels, a reusable water bottle, sunscreen, and a swimsuit.
                   </p>
