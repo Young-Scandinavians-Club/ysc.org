@@ -20,8 +20,8 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
 
   def booking_guest_info_form(assigns) do
     ~H"""
-    <div class="bg-white rounded-lg border border-zinc-200 p-8 shadow-xs">
-      <h2 class="text-xl mb-2 type-subhead">Guest Information</h2>
+    <div class="bg-white rounded-xl border border-zinc-200 p-6 sm:p-8">
+      <h2 class="text-lg mb-2 type-subhead">Guest Information</h2>
       <p :if={@intro_text} class="text-sm text-zinc-600 mb-4">{@intro_text}</p>
       <p :if={!@intro_text} class="text-sm text-zinc-600 mb-4">
         Please provide details for everyone staying in {room_names(@booking)}.
