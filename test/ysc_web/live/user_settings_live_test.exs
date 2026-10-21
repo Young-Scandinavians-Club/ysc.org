@@ -1660,7 +1660,7 @@ defmodule YscWeb.UserSettingsLiveTest do
           current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
         })
 
-      expect(Stripe.SubscriptionMock, :create, 0, fn _params ->
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params, _opts ->
         flunk("must not create a second Stripe subscription")
       end)
 
@@ -1684,7 +1684,7 @@ defmodule YscWeb.UserSettingsLiveTest do
          %{conn: conn} do
       user = active_user_with_default_payment_method("carderr")
 
-      stub(Stripe.SubscriptionMock, :create, fn _params ->
+      stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
         {:error,
          %Stripe.Error{
            source: :stripe,

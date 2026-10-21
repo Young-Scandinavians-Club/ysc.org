@@ -197,6 +197,40 @@ defmodule Ysc.Merch.GalleryTest do
                Merch.add_product_photo(product, second.id, "Black")
     end
 
+    test "add_product_photos appends many photos in order" do
+      %{product: product} = product_with_colors()
+      first = image_fixture()
+      second = image_fixture()
+      third = image_fixture()
+
+      {:ok, _} = Merch.add_product_photo(product, first.id)
+
+      assert [
+               {:ok, %ProductImage{position: 1, image_id: second_id}},
+               {:ok, %ProductImage{position: 2, image_id: third_id}}
+             ] =
+               Merch.add_product_photos(product, [second.id, third.id])
+
+      assert second_id == second.id
+      assert third_id == third.id
+    end
+
+    test "add_product_photos uses a constant number of queries" do
+      %{product: product} = product_with_colors()
+      ids = Enum.map(1..8, fn _ -> image_fixture().id end)
+
+      {results, count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Merch.add_product_photos(product, ids) end,
+          pattern: ~r/SELECT|INSERT/i,
+          caller_pids: [self()]
+        )
+
+      assert Enum.all?(results, &match?({:ok, %ProductImage{}}, &1))
+      assert length(results) == 8
+      assert count <= 3
+    end
+
     test "the same photo cannot be added twice" do
       %{product: product} = product_with_colors()
       image = image_fixture()
@@ -204,6 +238,33 @@ defmodule Ysc.Merch.GalleryTest do
 
       assert {:error, changeset} = Merch.add_product_photo(product, image.id)
       assert %{product_id: [_]} = errors_on(changeset)
+    end
+
+    test "add_product_photos reports duplicates and missing images without dropping the rest" do
+      %{product: product} = product_with_colors()
+      existing = image_fixture()
+      fresh = image_fixture()
+      {:ok, _} = Merch.add_product_photo(product, existing.id)
+
+      missing_id = Ecto.ULID.generate()
+
+      assert [
+               {:error, duplicate},
+               {:ok, %ProductImage{image_id: fresh_id}},
+               {:error, missing},
+               {:error, repeated}
+             ] =
+               Merch.add_product_photos(product, [
+                 existing.id,
+                 fresh.id,
+                 missing_id,
+                 fresh.id
+               ])
+
+      assert fresh_id == fresh.id
+      assert %{product_id: [_]} = errors_on(duplicate)
+      assert %{product_id: [_]} = errors_on(repeated)
+      assert %{image_id: [_]} = errors_on(missing)
     end
 
     test "blank colors mean every color" do

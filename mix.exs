@@ -395,10 +395,16 @@ defmodule Ysc.MixProject do
       # 1.8.14: LongPoll fetch timer leak (we use websocket only); VerifiedRoutes
       # :router must be a compile-time module; local path validation is shared
       # across redirect, static_path, and ~p (also rejects CR/LF in paths).
-      # 1.8.15: phoenix.js does not let an async transport close tear down the
-      # replacement transport; phx.gen.cert Chromium cert and phx.new Tailwind
-      # 4.3.3 are unused (we already ship Tailwind 4.3.3).
-      {:phoenix, "~> 1.8.15"},
+      # 1.8.16: phoenix.js connection-handling races (#6867) and WebSocket
+      # close code 1000 is no longer special-cased (#6880). Endpoint.socket/3
+      # accepts max_channels_per_transport (default 100). We mount LiveView
+      # websocket only, broadcast "disconnect" on logout, and keep the
+      # default channel cap. Requires phoenix_pubsub ~> 2.4 (lock 2.4.1);
+      # we only call subscribe/2, unsubscribe/2, broadcast/3. 1.8.15
+      # replaceTransport detach-before-close is superseded by the
+      # Connection class. phx.gen.cert Chromium cert and phx.new Tailwind
+      # 4.3.3 are unused (we already ship 4.3.3).
+      {:phoenix, "~> 1.8.16"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
       {:plug, "~> 1.20.2", override: true},
       {:plug_cowboy, "~> 2.9"},

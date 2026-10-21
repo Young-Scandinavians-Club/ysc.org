@@ -1,20 +1,23 @@
 defmodule YscWeb.PhoenixUpgradeTest do
   @moduledoc """
-  Guards the Phoenix 1.8.14 → 1.8.15 upgrade.
+  Guards the Phoenix 1.8.15 → 1.8.16 upgrade.
 
-  1.8.15 is a patch. `replaceTransport` noops the old connection's
-  handlers before `close()` so an asynchronous transport close cannot
-  tear down the replacement (we import `phoenix` via esbuild
-  `NODE_PATH=deps` and only mount the LiveView websocket). `phx.gen.cert`
-  Chromium acceptance and `phx.new` Tailwind 4.3.3 are unused — we
-  already ship Tailwind 4.3.3 and do not generate certs.
+  1.8.16 is a patch. phoenix.js rewrites connection lifecycle around a
+  per-transport `Connection` object so late close/error events, overlapping
+  disconnect/connect, heartbeat timeouts, and LongPoll fallback cannot tear
+  down a healthy replacement (#6867). Close code 1000 is no longer treated
+  as a permanent disconnect (#6880); any close that we did not initiate
+  reconnects, because proxies also use 1000. `Phoenix.Endpoint.socket/3`
+  accepts `:max_channels_per_transport` (default 100).
 
-  1.8.14 remains: LongPoll `fetch` timers are cleared after success or
-  abort, `use Phoenix.VerifiedRoutes` requires a compile-time `:router`
-  module, and local-path checks are shared via `Phoenix.URL` so
-  redirects, static paths, and `~p` all reject CR/LF in addition to tabs
-  and backslashes. `host_to_binary/1` still treats a nil endpoint host
-  as `"localhost"`.
+  Phoenix 1.8.16 requires `phoenix_pubsub ~> 2.4` (lock 2.4.1). That adds
+  `Phoenix.PubSub.Sender` and `unsubscribe_sender/3`. We only call
+  `subscribe/2`, `unsubscribe/2`, and `broadcast/3` with the default
+  dispatcher. `phoenix_template` stays 1.0.4.
+
+  We import `phoenix` via esbuild `NODE_PATH=deps` and mount only the
+  LiveView websocket. Logout still broadcasts `"disconnect"`. We do not
+  set `:max_channels_per_transport` on the LiveView socket.
   """
   use ExUnit.Case, async: true
 
@@ -27,29 +30,67 @@ defmodule YscWeb.PhoenixUpgradeTest do
                        "../../deps/phoenix/assets/js/phoenix/socket.js",
                        __DIR__
                      )
+  @phoenix_connection_js Path.expand(
+                           "../../deps/phoenix/assets/js/phoenix/connection.js",
+                           __DIR__
+                         )
   @phoenix_changelog Path.expand("../../deps/phoenix/CHANGELOG.md", __DIR__)
   @phoenix_cert Path.expand(
                   "../../deps/phoenix/lib/mix/tasks/phx.gen.cert.ex",
                   __DIR__
                 )
+  @phoenix_endpoint_ex Path.expand(
+                         "../../deps/phoenix/lib/phoenix/endpoint.ex",
+                         __DIR__
+                       )
+  @phoenix_socket_ex Path.expand(
+                       "../../deps/phoenix/lib/phoenix/socket.ex",
+                       __DIR__
+                     )
   @app_js Path.expand("../../assets/js/app.js", __DIR__)
   @endpoint_ex Path.expand("../../lib/ysc_web/endpoint.ex", __DIR__)
   @ysc_web_ex Path.expand("../../lib/ysc_web.ex", __DIR__)
+  @user_auth_ex Path.expand("../../lib/ysc_web/user_auth.ex", __DIR__)
+  @application_ex Path.expand("../../lib/ysc/application.ex", __DIR__)
   @mix_exs Path.expand("../../mix.exs", __DIR__)
+  @mix_lock Path.expand("../../mix.lock", __DIR__)
   @config_exs Path.expand("../../config/config.exs", __DIR__)
 
-  describe "1.8.15 lock and JS client" do
-    test "locks the Hex package to 1.8.15" do
-      assert to_string(Application.spec(:phoenix, :vsn)) == "1.8.15"
-      assert File.read!(@mix_exs) =~ ~s({:phoenix, "~> 1.8.15"})
+  describe "1.8.16 lock and JS client" do
+    test "locks the Hex package to 1.8.16" do
+      assert to_string(Application.spec(:phoenix, :vsn)) == "1.8.16"
+      assert File.read!(@mix_exs) =~ ~s({:phoenix, "~> 1.8.16"})
     end
 
-    test "companion phoenix_pubsub lock is 2.3.0 with the APIs we use" do
-      assert to_string(Application.spec(:phoenix_pubsub, :vsn)) == "2.3.0"
+    test "companion phoenix_pubsub lock is 2.4.1 with the APIs we use" do
+      assert to_string(Application.spec(:phoenix_pubsub, :vsn)) == "2.4.1"
+      lock = File.read!(@mix_lock)
+      assert lock =~ ~s|"phoenix_pubsub": {:hex, :phoenix_pubsub, "2.4.1"|
+      refute lock =~ ~s|"phoenix_pubsub": {:hex, :phoenix_pubsub, "2.3.0"|
+
       assert {:module, _} = Code.ensure_loaded(Phoenix.PubSub)
       assert function_exported?(Phoenix.PubSub, :subscribe, 2)
       assert function_exported?(Phoenix.PubSub, :broadcast, 3)
       assert function_exported?(Phoenix.PubSub, :unsubscribe, 2)
+      assert function_exported?(Phoenix.PubSub, :unsubscribe_sender, 3)
+
+      assert {:module, Phoenix.PubSub.Sender} =
+               Code.ensure_loaded(Phoenix.PubSub.Sender)
+    end
+
+    test "companion phoenix_template lock stays 1.0.4" do
+      assert to_string(Application.spec(:phoenix_template, :vsn)) == "1.0.4"
+      lock = File.read!(@mix_lock)
+      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
+      refute lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
+    end
+
+    test "app PubSub uses the default dispatcher and no sender metadata" do
+      source = File.read!(@application_ex)
+      assert source =~ "{Phoenix.PubSub, name: Ysc.PubSub}"
+      refute source =~ "dispatcher:"
+      refute source =~ "unsubscribe_sender"
+      refute source =~ "unsubscribe_match"
     end
 
     test "phoenix.js reconnects on document resume when visibilitychange is skipped" do
@@ -81,52 +122,96 @@ defmodule YscWeb.PhoenixUpgradeTest do
     end
   end
 
-  describe "1.8.15 replaceTransport does not tear down the replacement" do
-    test "changelog documents the async transport-close fix" do
+  describe "1.8.16 connection races and close code 1000" do
+    test "changelog documents the JS race and close-code 1000 fixes" do
       changelog = File.read!(@phoenix_changelog)
 
-      assert changelog =~ "## v1.8.15 (2026-09-25)"
-
-      assert changelog =~
-               "Fix asynchronous transport close tearing down the replacement transport"
-
-      assert changelog =~ "#6852"
+      assert changelog =~ "## v1.8.16 (2026-10-20)"
+      assert changelog =~ "Fix a lot of connection handling races"
+      assert changelog =~ "#6867"
+      assert changelog =~ "Don't treat WebSocket close code 1000 as special"
+      assert changelog =~ "#6880"
+      assert changelog =~ "max_channels_per_transport"
     end
 
-    test "source detaches old handlers before close so late events stay off the new conn" do
+    test "Connection only forwards events while it is the socket's current transport" do
+      source = File.read!(@phoenix_connection_js)
+
+      assert source =~ "export default class Connection"
+      assert source =~ "this.ended = false"
+      assert source =~ "this.closing = false"
+      assert source =~ "isCurrent(){ return this.socket.connection === this }"
+
+      assert source =~
+               "transport.onopen = () => { if(this.isCurrent()){ socket.onConnOpen() } }"
+
+      assert source =~
+               "transport.onerror = error => { if(this.isCurrent()){ socket.onConnError(error) } }"
+
+      assert source =~
+               "transport.onmessage = event => { if(this.isCurrent()){ socket.onConnMessage(event) } }"
+
+      assert source =~ "if(this.isCurrent() && !this.closeHandled)"
+    end
+
+    test "replaceTransport ends the old connection before close so late events stay off the new one" do
       source = File.read!(@phoenix_socket_js)
 
       assert source =~ "replaceTransport(newTransport)"
-
-      assert source =~
-               "the old conn closes asynchronously, so detach its handlers"
-
-      assert source =~ "belonged to the new transport"
-      assert source =~ "const wasOpen = this.isConnected()"
-      assert source =~ "this.conn.onopen = function (){ } // noop"
-      assert source =~ "this.conn.onerror = function (){ } // noop"
-      assert source =~ "this.conn.onmessage = function (){ } // noop"
-      assert source =~ "this.conn.onclose = function (){ } // noop"
-      assert source =~ "this.conn.close()"
-      assert source =~ "this.conn = null"
+      assert source =~ "this.connection = null"
+      assert source =~ "connection.ended = true"
+      assert source =~ "connection.close()"
       assert source =~ "this.clearHeartbeats()"
 
       assert source =~
-               ~s|if(wasOpen){ this.triggerChanError("connection_closed") }|
+               ~s|if(wasOpen){ this.triggerChanError("connection_closed", connection) }|
+
+      assert source =~ "teardownAndReconnect(reconnect)"
+      assert source =~ "stillUses(connection)"
     end
 
-    test "bundled phoenix.js ships the same detach-before-close replaceTransport" do
+    test "onConnClose reconnects on any close we did not initiate, including 1000" do
+      source = File.read!(@phoenix_socket_js)
+
+      assert source =~
+               "proxies and load balancers also close with 1000 (normal closure)"
+
+      assert source =~ "const closedByUs = !!(connection && connection.closing)"
+
+      assert source =~
+               "if(this.stillUses(connection) && !closedByUs && !this.closeWasClean)"
+
+      refute source =~ "closeCode !== 1000"
+      refute source =~ "closeCode !== 1e3"
+    end
+
+    test "bundled phoenix.js ships Connection isolation and 1000 reconnect" do
       js = File.read!(@phoenix_js)
 
-      assert js =~ "replaceTransport(newTransport)"
-      assert js =~ "const wasOpen = this.isConnected()"
-      assert js =~ "this.conn.onopen = function()"
-      assert js =~ "this.conn.onerror = function()"
-      assert js =~ "this.conn.onmessage = function()"
-      assert js =~ "this.conn.onclose = function()"
-      assert js =~ "this.conn.close()"
-      assert js =~ "this.clearHeartbeats()"
-      assert js =~ ~s|this.triggerChanError("connection_closed")|
+      assert js =~ "isCurrent()"
+      assert js =~ "this.ended = false"
+      assert js =~ "connection.ended = true"
+      assert js =~ "stillUses(connection)"
+      assert js =~ "const closedByUs = !!(connection && connection.closing)"
+
+      # Bundled phoenix.js strips comments; reconnect on 1000 is the
+      # `!closedByUs && !this.closeWasClean` gate, not a closeCode check.
+      refute js =~ "closeCode !== 1e3"
+      refute js =~ "closeCode !== 1000"
+    end
+
+    test "logout still broadcasts disconnect; the socket stop no longer pins close 1001" do
+      auth = File.read!(@user_auth_ex)
+      socket = File.read!(@phoenix_socket_ex)
+
+      assert auth =~
+               ~s|YscWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})|
+
+      assert socket =~
+               ~s|def __info__(%Broadcast{event: "disconnect"}, state) do|
+
+      assert socket =~ "{:stop, {:shutdown, :disconnected}, state}"
+      refute socket =~ "{:stop, {:shutdown, :disconnected}, 1001, state}"
     end
 
     test "app.js loads phoenix from deps and still reconnects after disconnect settles" do
@@ -146,7 +231,33 @@ defmodule YscWeb.PhoenixUpgradeTest do
     end
   end
 
-  describe "1.8.15 unused generator changes" do
+  describe "1.8.16 max_channels_per_transport on Endpoint.socket/3" do
+    test "Endpoint.socket/3 copies a positive cap into the transport config" do
+      endpoint = File.read!(@phoenix_endpoint_ex)
+      socket = File.read!(@phoenix_socket_ex)
+
+      assert endpoint =~ ~s|* `:max_channels_per_transport`|
+      assert endpoint =~ "defp put_socket_opts(transport_opts, opts)"
+      assert endpoint =~ "Keyword.fetch(opts, :max_channels_per_transport)"
+
+      assert endpoint =~
+               ~s|:max_channels_per_transport must be a positive integer|
+
+      assert socket =~
+               "max_channels_per_transport: Keyword.get(options, :max_channels_per_transport, 100)"
+    end
+
+    test "LiveView socket keeps the default cap" do
+      source = File.read!(@endpoint_ex)
+
+      assert source =~ ~s|socket "/live", Phoenix.LiveView.Socket|
+      assert source =~ "websocket: [connect_info:"
+      refute source =~ "max_channels_per_transport"
+      refute source =~ "longpoll:"
+    end
+  end
+
+  describe "1.8.16 unused generator changes" do
     test "phx.gen.cert is unused; Chromium SAN extensions stay in the task" do
       cert = File.read!(@phoenix_cert)
       mix_exs = File.read!(@mix_exs)
@@ -304,6 +415,26 @@ defmodule YscWeb.PhoenixUpgradeTest do
       assert js =~ "function forceReconnect()"
       assert js =~ "liveSocket.disconnect();"
       assert js =~ "setTimeout(() => liveSocket.connect(), 100)"
+    end
+  end
+
+  describe "phoenix_pubsub 2.4.1 subscribe APIs we do not use" do
+    test "list-shaped :metadata is reserved for senders and raises" do
+      name = :"ysc_phoenix_upgrade_pubsub_#{System.unique_integer([:positive])}"
+      start_supervised!({Phoenix.PubSub, name: name})
+
+      assert Phoenix.PubSub.subscribe(name, "users:1") == :ok
+      assert Phoenix.PubSub.broadcast(name, "users:1", :ping) == :ok
+      assert_receive :ping
+      assert Phoenix.PubSub.unsubscribe(name, "users:1") == :ok
+
+      assert_raise RuntimeError,
+                   "passing metadata in the shape of [module | term] to subscribe is unsupported",
+                   fn ->
+                     Phoenix.PubSub.subscribe(name, "users:1",
+                       metadata: [:reserved_sender]
+                     )
+                   end
     end
   end
 end

@@ -144,7 +144,7 @@ defmodule Ysc.SubscriptionsActivationTest do
       user = user_with_default_pm()
       stripe_sub_id = "sub_new_#{System.unique_integer([:positive])}"
 
-      expect(Stripe.SubscriptionMock, :create, fn params ->
+      expect(Stripe.SubscriptionMock, :create, fn params, _opts ->
         assert params.customer == user.stripe_id
         assert is_binary(params.default_payment_method)
 
@@ -173,7 +173,7 @@ defmodule Ysc.SubscriptionsActivationTest do
     test "returns already_active when Stripe reports an existing subscription" do
       user = user_with_default_pm()
 
-      expect(Stripe.SubscriptionMock, :create, fn _params ->
+      expect(Stripe.SubscriptionMock, :create, fn _params, _opts ->
         {:error, :user_already_has_active_subscription}
       end)
 
@@ -187,7 +187,7 @@ defmodule Ysc.SubscriptionsActivationTest do
     test "returns error when Stripe subscription create fails" do
       user = user_with_default_pm()
 
-      expect(Stripe.SubscriptionMock, :create, fn _params ->
+      expect(Stripe.SubscriptionMock, :create, fn _params, _opts ->
         {:error,
          %Stripe.Error{
            message: "card declined",
@@ -235,7 +235,7 @@ defmodule Ysc.SubscriptionsActivationTest do
           current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
         })
 
-      expect(Stripe.SubscriptionMock, :create, fn _params ->
+      expect(Stripe.SubscriptionMock, :create, fn _params, _opts ->
         {:ok,
          Ysc.Stripe.SubscriptionFixtures.subscription(
            id: stripe_sub_id,
@@ -277,7 +277,7 @@ defmodule Ysc.SubscriptionsActivationTest do
 
       stripe_sub_id = "sub_ach_#{System.unique_integer([:positive])}"
 
-      expect(Stripe.SubscriptionMock, :create, fn params ->
+      expect(Stripe.SubscriptionMock, :create, fn params, _opts ->
         assert params.customer == user.stripe_id
         assert is_binary(params.default_payment_method)
 

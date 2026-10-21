@@ -355,7 +355,7 @@ defmodule Ysc.SubscriptionsPlanChangeTest do
         prices: [%{price: "price_board_test", quantity: 1}]
       }
 
-      expect(Stripe.SubscriptionMock, :create, fn stripe_params ->
+      expect(Stripe.SubscriptionMock, :create, fn stripe_params, _opts ->
         assert stripe_params.pause_collection == %{behavior: :void}
         assert stripe_params.cancel_at_period_end == false
         assert stripe_params.customer == user.stripe_id
