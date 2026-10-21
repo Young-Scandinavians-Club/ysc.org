@@ -7,6 +7,7 @@ defmodule Ysc.PublicContentCacheTest do
   alias Ysc.Posts.Post
   alias Ysc.Repo
 
+  import Ecto.Query
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures, only: [event_fixture: 1]
 
@@ -142,6 +143,153 @@ defmodule Ysc.PublicContentCacheTest do
                posts,
                &(&1.id == post.id and &1.title == "Updated Title")
              )
+    end
+  end
+
+  describe "editor autosave (stub %Post{})" do
+    setup do
+      author = user_fixture(%{role: "admin"})
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Live Article",
+            "body" => "Body",
+            "url_name" => "live-article-#{System.unique_integer([:positive])}",
+            "state" => "published",
+            "featured_post" => false,
+            "published_on" => DateTime.utc_now()
+          },
+          author
+        )
+
+      %{author: author, post: post}
+    end
+
+    test "content edits to a published post refresh the cached list", %{
+      author: author,
+      post: post
+    } do
+      assert Enum.any?(
+               PublicContentCache.list_recent_posts(10),
+               &(&1.id == post.id)
+             )
+
+      assert {:ok, _} =
+               Posts.update_post_editor(
+                 %Post{id: post.id},
+                 %{"title" => "Edited Title"},
+                 author
+               )
+
+      assert Enum.any?(
+               PublicContentCache.list_recent_posts(10),
+               &(&1.id == post.id and &1.title == "Edited Title")
+             )
+    end
+
+    test "cached post page is dropped when the post is edited", %{
+      author: author,
+      post: post
+    } do
+      load = fn -> Posts.get_post!(post.id) end
+
+      assert PublicContentCache.fetch_post_page("page", load).title ==
+               "Live Article"
+
+      assert {:ok, _} =
+               Posts.update_post_editor(
+                 %Post{id: post.id},
+                 %{"title" => "Edited Title"},
+                 author
+               )
+
+      assert PublicContentCache.fetch_post_page("page", load).title ==
+               "Edited Title"
+    end
+
+    test "draft edits refresh cached post pages", %{author: author} do
+      {:ok, draft} =
+        Posts.create_post(
+          %{
+            "title" => "Draft",
+            "body" => "Body",
+            "url_name" => "draft-#{System.unique_integer([:positive])}",
+            "state" => "draft",
+            "featured_post" => false
+          },
+          author
+        )
+
+      load = fn -> Posts.get_post!(draft.id) end
+      assert PublicContentCache.fetch_post_page("draft", load).title == "Draft"
+
+      assert {:ok, _} =
+               Posts.update_post_editor(
+                 %Post{id: draft.id},
+                 %{"title" => "Draft v2"},
+                 author
+               )
+
+      assert PublicContentCache.fetch_post_page("draft", load).title ==
+               "Draft v2"
+    end
+
+    test "reprocessing the cover image refreshes list and page caches", %{
+      post: post
+    } do
+      image = Ysc.MerchFixtures.image_fixture()
+
+      Repo.update_all(from(p in Post, where: p.id == ^post.id),
+        set: [image_id: image.id]
+      )
+
+      load = fn -> Posts.get_post!(post.id) |> Repo.preload(:featured_image) end
+
+      assert PublicContentCache.fetch_post_page("cover", load).featured_image.optimized_image_path ==
+               nil
+
+      assert [%{featured_image: %{optimized_image_path: nil}}] =
+               Enum.filter(
+                 PublicContentCache.list_recent_posts(10),
+                 &(&1.id == post.id)
+               )
+
+      Ysc.Media.update_processed_image(image, %{
+        optimized_image_path: "optimized.webp"
+      })
+
+      assert PublicContentCache.fetch_post_page("cover", load).featured_image.optimized_image_path ==
+               "optimized.webp"
+
+      assert [%{featured_image: %{optimized_image_path: "optimized.webp"}}] =
+               Enum.filter(
+                 PublicContentCache.list_recent_posts(10),
+                 &(&1.id == post.id)
+               )
+    end
+  end
+
+  describe "cross-node invalidation" do
+    test "a version replicated from another node drops cached post pages" do
+      {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+      load = fn -> Agent.get_and_update(counter, &{&1 + 1, &1 + 1}) end
+
+      assert PublicContentCache.fetch_post_page("remote", load) == 1
+      assert PublicContentCache.fetch_post_page("remote", load) == 1
+
+      # What Ysc.DistributedCache.Sync does when another node bumps the version.
+      send(
+        Process.whereis(Ysc.DistributedCache.Sync),
+        {:distributed_cache_put, :other@node, :ysc_cache,
+         "public_content:version:post_pages", System.system_time(:microsecond),
+         []}
+      )
+
+      :sys.get_state(Ysc.DistributedCache.Sync)
+
+      assert PublicContentCache.fetch_post_page("remote", load) == 2
     end
   end
 

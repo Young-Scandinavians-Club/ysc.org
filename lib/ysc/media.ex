@@ -315,6 +315,7 @@ defmodule Ysc.Media do
       image
       |> Media.Image.edit_image_changeset(attrs)
       |> Repo.update()
+      |> tap(&invalidate_post_caches/1)
     end
   end
 
@@ -341,9 +342,17 @@ defmodule Ysc.Media do
   def update_processed_image(%Media.Image{} = image, attrs) do
     changeset = Media.Image.processed_image_changeset(image, attrs)
     image = Repo.update!(changeset)
+    invalidate_post_caches({:ok, image})
     broadcast_image_updated(image)
     image
   end
+
+  # Posts embed their cover image, so cached post pages and list slices on
+  # every node must be dropped when it changes (e.g. async optimization).
+  defp invalidate_post_caches({:ok, %Media.Image{id: id}}),
+    do: Ysc.Posts.invalidate_caches_for_image(id)
+
+  defp invalidate_post_caches(_), do: :ok
 
   def process_image_upload(
         %Media.Image{} = image,
