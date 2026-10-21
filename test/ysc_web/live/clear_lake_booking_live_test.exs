@@ -2430,7 +2430,12 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         {checkin, checkout} = future_stay_on(12, 15)
 
         {:ok, view, _html} =
-          live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+          live_clear_lake(
+            conn,
+            clear_lake_path_with_stay(checkin, checkout, %{
+              "info_tab" => "manual"
+            })
+          )
 
         assert has_element?(
                  view,
@@ -2450,7 +2455,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {checkin, checkout} = future_stay_on(12, 15)
 
       {:ok, view, _html} =
-        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+        live_clear_lake(
+          conn,
+          clear_lake_path_with_stay(checkin, checkout, %{"info_tab" => "manual"})
+        )
 
       assert has_element?(
                view,
@@ -2499,7 +2507,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {checkin, checkout} = future_stay_on(7, 15)
 
       {:ok, view, _html} =
-        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+        live_clear_lake(
+          conn,
+          clear_lake_path_with_stay(checkin, checkout, %{"info_tab" => "manual"})
+        )
 
       assert has_element?(view, "#sleeping-at-the-cabin")
 
@@ -2533,7 +2544,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {checkin, checkout} = future_stay_on(10, 30, 4)
 
       {:ok, view, _html} =
-        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+        live_clear_lake(
+          conn,
+          clear_lake_path_with_stay(checkin, checkout, %{"info_tab" => "manual"})
+        )
 
       assert has_element?(
                view,
@@ -2589,7 +2603,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {checkin, checkout} = future_stay_on(7, 15)
 
       {:ok, view, _html} =
-        live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+        live_clear_lake(
+          conn,
+          clear_lake_path_with_stay(checkin, checkout, %{"info_tab" => "manual"})
+        )
 
       assert has_element?(view, "#before-you-go")
       assert has_element?(view, "#clear-lake-training-videos")
@@ -2688,18 +2705,22 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert state.socket.assigns.active_tab == :information
     end
 
-    test "information rules sub-tab renders house rules content", %{conn: conn} do
+    test "information manual sub-tab renders house manual content", %{
+      conn: conn
+    } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} =
+      {:ok, view, html} =
         live_clear_lake(
           conn,
-          ~p"/bookings/clear-lake?tab=information&info_tab=rules"
+          ~p"/bookings/clear-lake?tab=information&info_tab=manual"
         )
 
-      assert html =~ "No Pets"
+      assert html =~ "No pets or smoking"
       assert html =~ "Cabin Master"
+      assert has_element?(view, "#house-manual")
+      refute has_element?(view, "#cabin-rules")
     end
 
     test "rules tab shows configured cancellation policy percentages", %{
@@ -3515,7 +3536,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         user = user_with_membership(:lifetime)
         conn = log_in_user(conn, user)
 
-        {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+        {:ok, view, _html} =
+          live_clear_lake(conn, ~p"/bookings/clear-lake?info_tab=manual")
 
         html = render(view)
 
@@ -3540,7 +3562,12 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         {checkin, checkout} = clear_lake_booking_dates(30, 3)
 
         {:ok, _view, html} =
-          live_clear_lake(conn, clear_lake_path_with_stay(checkin, checkout))
+          live_clear_lake(
+            conn,
+            clear_lake_path_with_stay(checkin, checkout, %{
+              "info_tab" => "manual"
+            })
+          )
 
         assert html =~ "Clear Lake"
         assert html =~ "Nov 1 – Apr 30"
@@ -3584,9 +3611,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
-      assert has_element?(view, "#info-tab-rooms")
+      refute has_element?(view, "#info-tab-rooms")
 
-      view |> element("#info-tab-rooms") |> render_click()
+      assert has_element?(view, "#property-room-browser")
       assert has_element?(view, "#browse-room-#{room.id}", room.name)
       refute has_element?(view, "#browse-room-pick-#{room.id}")
 
@@ -3612,7 +3639,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       refute has_element?(view, "#info-tab-rooms")
     end
 
-    test "falls back to general info when requested via the URL", %{conn: conn} do
+    test "falls back to general info when the legacy rooms tab is requested", %{
+      conn: conn
+    } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 

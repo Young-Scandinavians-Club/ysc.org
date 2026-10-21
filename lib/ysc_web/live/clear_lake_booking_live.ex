@@ -24,6 +24,7 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias Ysc.Subscriptions
   alias YscWeb.DateDisplay
   alias YscWeb.BookingDisplay
+  import YscWeb.Components.CabinInfo
 
   @impl true
   def mount(params, _session, socket) do
@@ -555,74 +556,37 @@ defmodule YscWeb.ClearLakeBookingLive do
       <!-- Booking Dashboard Section -->
       <section :if={@user} class="py-8">
         <div class="max-w-(--breakpoint-xl) mx-auto px-4 space-y-10">
-          <!-- Essential Alerts Bar (High-Contrast) -->
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-zinc-900 text-white p-4 rounded-xl">
-            <div id="sleeping-alert" class="flex items-center gap-3">
-              <%= cond do %>
-                <% @sleeping_mode == :winter -> %>
-                  <span class="text-xl shrink-0">🛏️</span>
-                  <div>
-                    <p class="text-xs text-teal-400 type-eyebrow">
-                      Beds set up
-                    </p>
-                    <p class="text-xs font-bold leading-tight">
-                      Bring your own linens
-                    </p>
-                  </div>
-                <% @sleeping_mode == :mixed -> %>
-                  <span class="text-xl shrink-0">⛺</span>
-                  <div>
-                    <p class="text-xs text-teal-400 type-eyebrow">
-                      Sleeping
-                    </p>
-                    <p class="text-xs font-bold leading-tight">
-                      Setup depends on season — lawn in summer, beds in winter
-                    </p>
-                  </div>
-                <% true -> %>
-                  <span class="text-xl shrink-0">⛺</span>
-                  <div>
-                    <p class="text-xs text-teal-400 type-eyebrow">
-                      Sleeping
-                    </p>
-                    <p class="text-xs font-bold leading-tight">
-                      Lawn camp or bring your own setup
-                    </p>
-                  </div>
-              <% end %>
-            </div>
-            <div class="flex items-center gap-3">
-              <span class="text-xl shrink-0">🚫</span>
-              <div>
-                <p class="text-xs text-zinc-400 type-eyebrow">
-                  House rules
-                </p>
-                <p class="text-xs font-bold leading-tight">No pets or smoking</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-3">
-              <span class="text-xl shrink-0">⚓</span>
-              <div>
-                <p class="text-xs text-amber-400 type-eyebrow">
-                  Access
-                </p>
-                <p class="text-xs font-bold leading-tight">
-                  Free boat mooring — email the Cabin Master before you arrive
-                </p>
-              </div>
-            </div>
-            <div class="flex items-center gap-3">
-              <span class="text-xl shrink-0">🧹</span>
-              <div>
-                <p class="text-xs text-zinc-400 type-eyebrow">
-                  Community
-                </p>
-                <p class="text-xs font-bold leading-tight">
-                  Shared cabin — please help with chores before you leave
-                </p>
-              </div>
-            </div>
-          </div>
+          <%!-- Essentials: the must-know rules, once, directly under the hero --%>
+          <.essentials_strip id="clear-lake-essentials" accent={:teal}>
+            <:item
+              :if={@sleeping_mode == :winter}
+              id="sleeping-alert"
+              icon="hero-sparkles"
+            >
+              Beds set up. Bring your own linens
+            </:item>
+            <:item
+              :if={@sleeping_mode == :mixed}
+              id="sleeping-alert"
+              icon="hero-moon"
+            >
+              Setup depends on season — lawn in summer, beds in winter
+            </:item>
+            <:item
+              :if={@sleeping_mode not in [:winter, :mixed]}
+              id="sleeping-alert"
+              icon="hero-moon"
+            >
+              Lawn camp or bring your own setup
+            </:item>
+            <:item icon="hero-no-symbol">No pets or smoking</:item>
+            <:item icon="hero-lifebuoy">
+              Free boat mooring — email the Cabin Master before you arrive
+            </:item>
+            <:item icon="hero-hand-raised">
+              Shared cabin — please help with chores before you leave
+            </:item>
+          </.essentials_strip>
           <!-- Active Bookings -->
           <div :if={length(@active_bookings) > 0} class="space-y-4">
             <h2 class="text-sm text-zinc-400 type-eyebrow">
@@ -675,191 +639,94 @@ defmodule YscWeb.ClearLakeBookingLive do
           >
             <!-- Left Column: Selection Area (2 columns on large screens) -->
             <div class="lg:col-span-2 space-y-8">
-              <!-- Step 1: Booking Mode Selection -->
-              <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
+              <%!-- Step 1: Booking mode (compact segmented control) --%>
+              <div class="space-y-3">
                 <.step_heading
                   id="booking-step-mode"
                   step={1}
                   accent={:teal}
-                  class="mb-4"
+                  class="mb-1"
                 >
                   Choose Booking Type
                 </.step_heading>
-                <p class="text-base text-zinc-600 mb-6">
-                  Select how you'd like to book the Clear Lake cabin:
-                </p>
-                <fieldset>
-                  <form id="booking-mode-form" phx-change="booking-mode-changed">
-                    <div
-                      class="grid grid-cols-1 md:grid-cols-2 gap-4"
-                      role="radiogroup"
-                    >
-                      <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
-                        if(
-                          @selected_booking_mode == :day ||
-                            @selected_booking_mode == nil,
-                          do: "border-teal-600 bg-teal-50 shadow-xs",
-                          else:
-                            "border-zinc-300 hover:border-teal-400 hover:bg-zinc-50"
-                        ),
-                        if(!@day_booking_allowed,
-                          do: "opacity-50 cursor-not-allowed",
-                          else: ""
-                        )
-                      ]}>
-                        <input
-                          type="radio"
-                          id="booking-mode-day"
-                          name="booking_mode"
-                          value="day"
-                          checked={
-                            @selected_booking_mode == :day ||
-                              @selected_booking_mode == nil
-                          }
-                          disabled={!@day_booking_allowed}
-                          class="sr-only"
-                        />
-                        <div class="flex items-center gap-3 mb-2">
-                          <div class={[
-                            "w-6 h-6 rounded-full border-2 flex items-center justify-center",
-                            if(
-                              @selected_booking_mode == :day ||
-                                @selected_booking_mode == nil,
-                              do: "border-teal-600 bg-teal-600",
-                              else: "border-zinc-300 bg-white"
-                            )
-                          ]}>
-                            <svg
-                              :if={
-                                @selected_booking_mode == :day ||
-                                  @selected_booking_mode == nil
-                              }
-                              class="w-4 h-4 text-white"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path
-                                fill-rule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clip-rule="evenodd"
-                              />
-                            </svg>
-                          </div>
-                          <span class="text-lg font-semibold text-zinc-900">
-                            {BookingModeDisplay.stay_type_label(:day)}
-                          </span>
-                        </div>
-                        <p class="text-sm text-zinc-600 ml-9">
-                          Book space for your group. Other YSC members may also stay at the cabin during the same dates.
-                        </p>
-                      </label>
-                      <label class={[
-                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
-                        if(@selected_booking_mode == :buyout,
-                          do: "border-teal-600 bg-teal-50 shadow-xs",
-                          else:
-                            "border-zinc-300 hover:border-teal-400 hover:bg-zinc-50"
-                        ),
-                        if(
+                <form id="booking-mode-form" phx-change="booking-mode-changed">
+                  <.segmented_control
+                    name="booking_mode"
+                    label="Booking type"
+                    accent={:teal}
+                    selected={
+                      if(@selected_booking_mode == :buyout,
+                        do: "buyout",
+                        else: "day"
+                      )
+                    }
+                    options={[
+                      %{
+                        value: "day",
+                        id: "booking-mode-day",
+                        label: BookingModeDisplay.stay_type_label(:day),
+                        disabled: !@day_booking_allowed
+                      },
+                      %{
+                        value: "buyout",
+                        id: "booking-mode-buyout",
+                        label: BookingModeDisplay.stay_type_label(:buyout),
+                        disabled:
                           !@buyout_booking_allowed ||
                             (@selected_booking_mode == :buyout &&
-                               @availability_error),
-                          do: "opacity-50 cursor-not-allowed",
-                          else: ""
-                        )
-                      ]}>
-                        <input
-                          type="radio"
-                          id="booking-mode-buyout"
-                          name="booking_mode"
-                          value="buyout"
-                          checked={@selected_booking_mode == :buyout}
-                          disabled={
-                            !@buyout_booking_allowed ||
-                              (@selected_booking_mode == :buyout &&
-                                 @availability_error)
-                          }
-                          class="sr-only"
-                        />
-                        <div class="flex items-center gap-3 mb-2">
-                          <div class={[
-                            "w-6 h-6 rounded-full border-2 flex items-center justify-center",
-                            if(@selected_booking_mode == :buyout,
-                              do: "border-teal-600 bg-teal-600",
-                              else: "border-zinc-300 bg-white"
-                            )
-                          ]}>
-                            <svg
-                              :if={@selected_booking_mode == :buyout}
-                              class="w-4 h-4 text-white"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path
-                                fill-rule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clip-rule="evenodd"
-                              />
-                            </svg>
-                          </div>
-                          <span class="text-lg font-semibold text-zinc-900">
-                            {BookingModeDisplay.stay_type_label(:buyout)}
-                          </span>
-                        </div>
-                        <p class="text-sm text-zinc-600 ml-9">
-                          Exclusive use of the property. Great for large families.
-                        </p>
-                        <p
-                          :if={
-                            @selected_booking_mode == :buyout && @availability_error &&
-                              @checkin_date && @checkout_date
-                          }
-                          class="text-xs text-amber-600 mt-2 ml-9 font-medium"
-                        >
-                          Entire cabin isn't available: Other members have already booked spots on these dates.
-                        </p>
-                      </label>
-                    </div>
-                  </form>
-                </fieldset>
-                <div class="mt-4">
-                  <p class="text-sm text-zinc-600">
-                    <span
-                      :if={
-                        !@day_booking_allowed && !@buyout_booking_allowed &&
-                          (@checkin_date || @checkout_date)
+                               @availability_error)
                       }
-                      class="text-amber-600 font-medium"
-                    >
-                      {YscWeb.BookingUserMessages.clear_lake_no_booking_options()}
-                    </span>
-                    <span
-                      :if={
-                        !@day_booking_allowed && @selected_booking_mode == :day &&
-                          @checkin_date
-                      }
-                      class="text-amber-600 font-medium"
-                    >
-                      Shared cabin stays are not available for the selected dates. Try different dates or book the entire cabin if that option is open.
-                    </span>
-                    <span
-                      :if={
-                        !@buyout_booking_allowed &&
-                          @selected_booking_mode == :buyout &&
-                          @checkin_date
-                      }
-                      class="text-amber-600 font-medium"
-                    >
-                      Booking the entire cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
-                    </span>
-                  </p>
-                </div>
-              </section>
+                    ]}
+                  />
+                </form>
+                <p id="booking-mode-hint" class="text-sm text-zinc-600">
+                  <%= if @selected_booking_mode == :buyout do %>
+                    Exclusive use of the property. Great for large families.
+                  <% else %>
+                    Book space for your group. Other YSC members may also stay at the cabin during the same dates.
+                  <% end %>
+                </p>
+                <p
+                  :if={
+                    @selected_booking_mode == :buyout && @availability_error &&
+                      @checkin_date && @checkout_date
+                  }
+                  class="text-xs text-amber-700 font-medium"
+                >
+                  Entire cabin isn't available: Other members have already booked spots on these dates.
+                </p>
+                <p
+                  :if={
+                    !@day_booking_allowed && !@buyout_booking_allowed &&
+                      (@checkin_date || @checkout_date)
+                  }
+                  class="text-sm text-amber-700 font-medium"
+                >
+                  {YscWeb.BookingUserMessages.clear_lake_no_booking_options()}
+                </p>
+                <p
+                  :if={
+                    !@day_booking_allowed && @selected_booking_mode == :day &&
+                      @checkin_date
+                  }
+                  class="text-sm text-amber-700 font-medium"
+                >
+                  Shared cabin stays are not available for the selected dates. Try different dates or book the entire cabin if that option is open.
+                </p>
+                <p
+                  :if={
+                    !@buyout_booking_allowed && @selected_booking_mode == :buyout &&
+                      @checkin_date
+                  }
+                  class="text-sm text-amber-700 font-medium"
+                >
+                  Booking the entire cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
+                </p>
+              </div>
               <!-- Step 2a: Day Booking Details (shown when day mode selected) -->
               <div :if={@selected_booking_mode == :day}>
                 <!-- Section 1: Stay Details -->
-                <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
+                <section class="pt-8 border-t border-zinc-200">
                   <.step_heading
                     id="booking-step-stay-details"
                     step={2}
@@ -989,7 +856,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               </div>
               <!-- Step 2b: Buyout Calendar (shown when buyout mode selected) -->
               <div :if={@selected_booking_mode == :buyout}>
-                <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
+                <section class="pt-8 border-t border-zinc-200">
                   <div class="flex items-center justify-between mb-4">
                     <.step_heading
                       id="booking-step-buyout-dates"
@@ -1054,7 +921,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               </div>
               <!-- Step 3: Select Your Dates (for day mode) -->
               <div :if={@selected_booking_mode == :day}>
-                <section class="bg-zinc-50 p-6 rounded-sm border border-zinc-200">
+                <section class="pt-8 border-t border-zinc-200">
                   <div class="flex items-center justify-between mb-4">
                     <.step_heading
                       id="booking-step-day-dates"
@@ -1435,14 +1302,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                         @checkout_date,
                         @guests_count,
                         @availability_error
-                      ) && @can_book
+                      ) && @can_book && (@checkin_date || @checkout_date)
                     }
-                    class="p-3 bg-amber-50 border border-amber-200 rounded-sm"
+                    class="border-l-2 border-amber-500 pl-3"
                   >
-                    <p class="text-xs font-semibold text-amber-900 mb-2">
+                    <p class="text-xs font-semibold text-zinc-900 mb-1">
                       Missing Information:
                     </p>
-                    <ul class="text-xs text-amber-800 space-y-1 list-disc list-inside">
+                    <ul class="text-xs text-zinc-600 space-y-1 list-disc list-inside">
                       <li :if={!@checkin_date || !@checkout_date}>
                         Please select check-in and check-out dates
                       </li>
@@ -1503,6 +1370,20 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Change dates or guests
                     </.button>
                   </div>
+                  <.refund_summary
+                    id="clear-lake-refund-summary"
+                    columns={[
+                      %{
+                        label: BookingModeDisplay.stay_type_label(:day),
+                        rules: RefundPolicyDisplay.policy_rules(@day_refund_policy)
+                      },
+                      %{
+                        label: BookingModeDisplay.stay_type_label(:buyout),
+                        rules:
+                          RefundPolicyDisplay.policy_rules(@buyout_refund_policy)
+                      }
+                    ]}
+                  />
                 </div>
               </div>
             </aside>
@@ -1559,650 +1440,408 @@ defmodule YscWeb.ClearLakeBookingLive do
           >
             {raw(@booking_disabled_reason)}
           </.warning_callout>
-          <!-- Information Sections (Tab System) -->
+          <%!-- Information Sections (Tab System) --%>
           <div
             id="information-section"
             class="mt-12 max-w-(--breakpoint-xl) mx-auto"
           >
             <% browse_rooms =
               YscWeb.Components.RoomBrowser.browsable_rooms(:clear_lake) %>
-            <% info_tab =
-              effective_info_tab(
-                Map.get(assigns, :info_tab, :general),
-                browse_rooms
-              ) %>
-            <!-- Tab Navigation (Sticky) -->
-            <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-zinc-200 mb-8 -mx-4 px-4 py-2">
-              <nav class="flex gap-2 overflow-x-auto" role="tablist">
-                <button
-                  phx-click="switch-info-tab"
-                  phx-value-tab="general"
-                  class={[
-                    "px-4 py-2 text-sm font-bold rounded-md transition whitespace-nowrap",
-                    if(info_tab == :general,
-                      do: "bg-teal-50 text-teal-600 border border-teal-100",
-                      else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-                    )
-                  ]}
-                >
-                  📋 General Information
-                </button>
-                <button
-                  phx-click="switch-info-tab"
-                  phx-value-tab="rules"
-                  class={[
-                    "px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap",
-                    if(info_tab == :rules,
-                      do: "bg-teal-50 text-teal-600 border border-teal-100",
-                      else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-                    )
-                  ]}
-                >
-                  📜 Cabin & Booking Rules
-                </button>
-                <button
-                  :if={browse_rooms != []}
-                  id="info-tab-rooms"
-                  phx-click="switch-info-tab"
-                  phx-value-tab="rooms"
-                  class={[
-                    "px-4 py-2 text-sm font-medium rounded-md transition whitespace-nowrap",
-                    if(info_tab == :rooms,
-                      do: "bg-teal-50 text-teal-600 border border-teal-100",
-                      else: "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-                    )
-                  ]}
-                >
-                  🛏️ Rooms
-                </button>
-              </nav>
-            </div>
-            <!-- Tab Content -->
-            <div class="space-y-16">
-              <!-- General Information Tab -->
-              <div
-                :if={info_tab == :general}
-                class="space-y-16"
+            <% info_tab = Map.get(assigns, :info_tab, :general) %>
+            <.info_tabs active={info_tab} accent={:teal} />
+            <%!-- The Cabin & Rooms: what you are deciding to book --%>
+            <div :if={info_tab == :general} id="cabin-overview">
+              <header class="max-w-3xl">
+                <h1 class="text-3xl text-zinc-900 mb-4 type-display">
+                  Welcome to the YSC Clear Lake Cabin
+                </h1>
+                <p class="text-lg text-zinc-600 leading-relaxed">
+                  Your year-round gateway to North America's oldest natural lake —
+                  <strong>2.5 million years</strong>
+                  old — in <strong>Kelseyville</strong>. Since <strong>1963</strong>
+                  this has been a <strong>Member Sanctuary</strong>: we don't just stay here, we keep it together.
+                </p>
+              </header>
+              <.info_callout
+                id="clear-lake-not-a-hotel"
+                icon="hero-home"
+                accent={:teal}
+                class="mt-8"
               >
-                <!-- Welcome Header -->
-                <section>
-                  <div class="prose prose-zinc max-w-none mb-10">
-                    <h1 class="text-3xl text-zinc-900 mb-4 type-display">
-                      Welcome to the YSC Clear Lake Cabin
-                    </h1>
-                    <p class="text-lg text-zinc-600 leading-relaxed">
-                      Your year-round gateway to North America's oldest natural lake —
-                      <strong>2.5 million years</strong>
-                      old — in <strong>Kelseyville</strong>. Since
-                      <strong>1963</strong>
-                      this has been a <strong>Member Sanctuary</strong>: we don't just stay here, we keep it together.
-                    </p>
-                  </div>
-                  <!-- Important Notice -->
-                  <div class="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-xl not-prose mb-10">
-                    <span class="text-2xl shrink-0">💡</span>
-                    <p class="text-sm text-amber-900 m-0">
-                      <strong>Remember:</strong>
-                      The Clear Lake Cabin is
-                      <strong>your cabin — not a hotel.</strong>
-                      To ensure everyone enjoys their stay at a reasonable rate, please follow the guidelines below.
-                    </p>
-                  </div>
-                </section>
-                <!-- About the Cabin -->
-                <section id="general-info">
-                  <.icon_heading
-                    id="clear-lake-about-heading"
-                    icon="🌲"
-                    size={:lg}
-                    class="text-zinc-900 mb-6"
-                  >
-                    About the Cabin
-                  </.icon_heading>
-                  <p class="mb-8 text-zinc-700">
-                    Clear Lake and the surrounding region offer year-round outdoor opportunities:
-                  </p>
-                  <!-- At-A-Glance Hero Grid -->
-                  <div id="clear-lake-at-a-glance">
-                    <.at_glance_grid>
-                      <.at_glance_stat
-                        accent={:teal}
-                        icon="⚓"
-                        label="Dock"
-                        value="100-Foot Private"
-                        detail="Boat mooring & swimming"
-                      />
-                      <.at_glance_stat
-                        accent={:teal}
-                        icon="🎵"
-                        label="Social Hall"
-                        value="Dance Floor"
-                        detail="Fireplace & games"
-                      />
-                      <.at_glance_stat
-                        accent={:teal}
-                        icon="⛺"
-                        label="Sleeping"
-                        value="Seasonal"
-                        detail="Lawn in summer, 3 rooms of beds in winter"
-                      />
-                      <.at_glance_stat
-                        accent={:teal}
-                        icon="🌅"
-                        label="Season"
-                        value="Year-Round"
-                        detail="Summer & winter stays"
-                      />
-                    </.at_glance_grid>
-                  </div>
+                <p>
+                  <strong class="font-semibold text-zinc-900">Remember:</strong>
+                  the Clear Lake Cabin is your cabin — not a hotel. To keep rates reasonable for everyone, please follow the guidelines below.
+                </p>
+              </.info_callout>
 
+              <.info_sections class="mt-10">
+                <.info_section
+                  id="general-info"
+                  heading_id="clear-lake-about-heading"
+                  title="About the Cabin"
+                  description="Clear Lake and the surrounding region offer year-round outdoor opportunities."
+                >
+                  <.stat_strip id="clear-lake-at-a-glance" columns={4}>
+                    <:stat
+                      label="Dock"
+                      value="100-foot private"
+                      detail="Boat mooring & swimming"
+                    />
+                    <:stat
+                      label="Social Hall"
+                      value="Dance floor"
+                      detail="Fireplace & games"
+                    />
+                    <:stat
+                      label="Sleeping"
+                      value="Seasonal"
+                      detail="Lawn in summer, 3 rooms of beds in winter"
+                    />
+                    <:stat
+                      label="Season"
+                      value="Year-round"
+                      detail="Summer & winter stays"
+                    />
+                  </.stat_strip>
                   <YscWeb.Components.ImageCarousel.image_carousel
                     id="clear-lake-experience-carousel"
                     images={clear_lake_experience_carousel_images()}
-                    class="mb-12 rounded-xl overflow-hidden"
+                    class="rounded-lg overflow-hidden"
                   />
-                  <!-- Nearby Destinations -->
-                  <section class="mb-12">
-                    <.icon_heading id="clear-lake-nearby-heading" icon="🏔️">
-                      Nearby Destinations
-                    </.icon_heading>
-                    <.nearby_destination_list
-                      id="clear-lake-nearby-destinations"
-                      accent={:teal}
-                    >
-                      <:destination
-                        icon="🍷"
-                        name="Red Hills Wineries"
-                        minutes={10}
-                      />
-                      <:destination
-                        icon="🥾"
-                        name="Mt. Konocti Trails"
-                        minutes={15}
-                      />
-                      <:destination
-                        icon="🏘️"
-                        name="Historic Kelseyville"
-                        minutes={10}
-                      />
-                    </.nearby_destination_list>
-                    <p class="text-sm text-zinc-600 mt-4">
-                      Times are approximate from the cabin.
-                    </p>
-                  </section>
-                </section>
-                <!-- How to Book -->
-                <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs">
-                  <.icon_heading id="clear-lake-how-to-book-heading" icon="🗓️">
-                    How to Book
-                  </.icon_heading>
-                  <ul class="space-y-2 text-zinc-700">
-                    <li>
-                      Use the <strong>booking form above</strong>
-                      to choose Shared cabin vs Entire cabin, dates, and guests, then pay on this site.
-                    </li>
-                    <li>
-                      You'll get a confirmation email with a link to view and manage your booking.
-                    </li>
-                    <li>
-                      Cancellation and refunds are on the
-                      <strong>Cabin & Booking Rules</strong>
-                      tab under Cancellation Policy.
-                    </li>
-                  </ul>
-                </section>
-                <section id="getting-there">
-                  <.icon_heading
-                    id="clear-lake-getting-there-heading"
-                    icon="🚗"
-                    size={:lg}
-                  >
-                    Getting There
-                  </.icon_heading>
-                  <div class="grid md:grid-cols-2 gap-8 items-start">
-                    <div>
-                      <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-6">
-                        <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
-                          Address
-                        </p>
-                        <p class="text-xl font-medium text-zinc-900 mb-6">
-                          9325 Bass Road<br />Kelseyville, CA 95451
-                        </p>
-                        <a
-                          href="https://www.google.com/maps/dir/?api=1&destination=9325+Bass+Road+Kelseyville+CA+95451"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="inline-flex items-center gap-2 text-teal-600 font-semibold hover:text-teal-800"
-                        >
-                          <.icon name="hero-map-pin" class="w-4 h-4" /> Open in Maps
-                        </a>
-                        <h3 class="text-zinc-900 mb-3 mt-6 type-subhead">
-                          From the Bay Area
-                        </h3>
-                        <p class="text-base text-zinc-600 mb-4">
-                          Public transportation is very limited — <strong>driving is essential</strong>. Follow the step-by-step directions below for full details.
-                        </p>
-                      </div>
-                      <details class="group border border-zinc-200 rounded-xl overflow-hidden mt-4">
-                        <summary class="p-4 cursor-pointer font-bold text-zinc-700 flex justify-between items-center list-none bg-zinc-50 hover:bg-zinc-100 transition-colors">
-                          Step-by-Step Directions from San Francisco
-                          <.icon
-                            name="hero-chevron-down"
-                            class="w-5 h-5 text-zinc-500 chevron-icon shrink-0"
-                          />
-                        </summary>
-                        <div class="p-4 border-t border-zinc-100 bg-white">
-                          <!-- Vertical Trail Directions -->
-                          <div class="relative pl-8 space-y-6 mt-2">
-                            <!-- Trail line -->
-                            <div class="absolute left-3 top-0 bottom-0 w-0.5 bg-teal-300">
-                            </div>
-                            <!-- Direction steps -->
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">1</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Take HWY 101 North
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  Past Santa Rosa
-                                </p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">2</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Exit at River Road / Guerneville
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">Exit 494</p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">3</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Turn right onto Mark West Springs Rd
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  Becomes Porter Creek Rd — go 10.5 miles until it ends
-                                </p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">4</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Turn left at stop sign onto Petrified Forest Rd
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  Toward Calistoga — continue 4.6 miles
-                                </p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">5</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Turn left at stop sign onto Foothill Blvd / HWY 128
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  Go 0.8 miles
-                                </p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">6</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Turn right onto Tubbs Lane
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  Go 1.3 miles to the end
-                                </p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">7</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Turn left onto HWY 29
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  Go 28 miles over Mt. St. Helena through Middletown to Lower Lake
-                                </p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">8</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Turn left onto HWY 29 at Lower Lake
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  Shell Station on left — go 7.5 miles
-                                </p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">9</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Turn right onto Soda Bay Road / HWY 281
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  Kits Corner Store on right — go 4.3 miles
-                                </p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-600 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <span class="text-white text-xs font-bold">10</span>
-                              </div>
-                              <div class="flex-1 pb-6">
-                                <p class="text-sm font-semibold text-zinc-900">
-                                  Turn right onto Bass Road
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  Just after Montezuma Way and a church — go 0.3 miles
-                                </p>
-                              </div>
-                            </div>
-                            <div class="relative flex gap-4">
-                              <div class="shrink-0 w-6 h-6 rounded-full bg-teal-700 border-4 border-white shadow-xs flex items-center justify-center z-10">
-                                <.icon name="hero-flag" class="w-4 h-4 text-white" />
-                              </div>
-                              <div class="flex-1">
-                                <p class="text-sm font-bold text-teal-700">
-                                  Turn right at the third driveway with the YSC sign
-                                </p>
-                                <p class="text-xs text-zinc-600 mt-1">
-                                  You've arrived!
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                            <p class="text-sm text-amber-800">
-                              <strong>Note:</strong>
-                              If you reach Konocti Harbor Inn, you've gone too far — turn around.
-                            </p>
-                          </div>
-                        </div>
-                      </details>
-                    </div>
+                </.info_section>
 
-                    <div class="space-y-4">
-                      <div class="rounded-xl overflow-hidden border border-zinc-200 shadow-xs h-80">
-                        <.live_component
-                          id="clear-lake-cabin-map"
-                          module={YscWeb.Components.MapComponent}
-                          latitude={38.98087180833886}
-                          longitude={-122.73563627025182}
-                          locked={true}
-                          class="w-full h-full"
-                        />
-                      </div>
-                      <YscWeb.Components.MapNavigationButtons.map_navigation_buttons
-                        latitude={38.98087180833886}
-                        longitude={-122.73563627025182}
-                        class="w-full"
-                      />
-                    </div>
-                  </div>
-                </section>
-                <!-- Pre-Arrival Checklist & Door Code -->
-                <section class="grid md:grid-cols-2 gap-6">
-                  <div
-                    id="door-code-access"
-                    class="bg-teal-600 rounded-xl p-8 text-white shadow-xs"
-                  >
-                    <div class="flex items-center gap-3 mb-6">
-                      <div class="p-2 bg-white/20 rounded-md">🔑</div>
-                      <h2 class="text-xl text-white type-subhead">
-                        Door Code & Access
-                      </h2>
-                    </div>
-                    <p class="text-teal-100 mb-6 leading-relaxed">
-                      {YscWeb.BookingUserMessages.cabin_access_info_tab_body()}
-                    </p>
-                    <div class="bg-teal-700/50 border border-white/10 rounded-xl p-4 text-sm">
-                      <p class="font-semibold text-teal-50 mb-2">Important:</p>
-                      <ul class="list-disc list-inside space-y-1 text-teal-100 text-xs">
-                        <li>
-                          Save the door code before you arrive — cell service can be limited
-                        </li>
-                        <li>
-                          If you don't receive it, check spam, then email <a
-                            href={"mailto:#{EmailConfig.clear_lake_email()}"}
-                            class="text-teal-200 hover:text-white underline"
-                          >
-                            {EmailConfig.clear_lake_email()}
-                          </a>.
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                  <div
-                    id="pre-arrival-checklist"
-                    class="bg-zinc-900 rounded-xl p-8 text-white"
-                  >
-                    <h2 class="text-xl mb-6 type-subhead">Pre-Arrival Checklist</h2>
-                    <ul class="space-y-4">
-                      <li class="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          class="w-5 h-5 rounded-sm border-zinc-700 bg-zinc-800 text-teal-500 focus:ring-0"
-                        />
-                        <div>
-                          <span class="font-semibold">Screenshot Door Code</span>
-                          <p class="text-xs text-zinc-400 mt-1">
-                            Cell service can be limited at the cabin
-                          </p>
-                        </div>
-                      </li>
-                      <li class="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          class="w-5 h-5 rounded-sm border-zinc-700 bg-zinc-800 text-teal-500 focus:ring-0"
-                        />
-                        <div>
-                          <span class="font-semibold">Download Offline Maps</span>
-                          <p class="text-xs text-zinc-400 mt-1">
-                            Kelseyville / Clear Lake area
-                          </p>
-                        </div>
-                      </li>
-                    </ul>
-                  </div>
-                </section>
-                <!-- Parking -->
-                <section
-                  id="parking-transportation"
-                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs"
+                <div :if={browse_rooms != []} class="py-10">
+                  <YscWeb.Components.RoomBrowser.room_browser
+                    id="property-room-browser"
+                    rooms={browse_rooms}
+                    property_name="YSC Clear Lake Cabin"
+                    accent={:teal}
+                    intro="You don't pick a specific room when you book. Shared cabin stays share the house with other members. Entire cabin stays include every room."
+                  />
+                </div>
+
+                <.info_section
+                  heading_id="clear-lake-nearby-heading"
+                  title="Nearby Destinations"
+                  description="Times are approximate from the cabin."
                 >
-                  <.icon_heading id="clear-lake-parking-heading" icon="🚙">
-                    Parking
-                  </.icon_heading>
-                  <ul class="list-disc list-inside space-y-1 text-zinc-700">
-                    <li>
-                      Park parallel in the lot along the water line, as close to the next car as possible.
-                    </li>
-                    <li>Choose a spot based on your departure time.</li>
-                    <li>
-                      Leaving early Sunday? Don't park in the back or you may get blocked in.
-                    </li>
-                    <li>Do not block the driveway or neighbors' access.</li>
-                  </ul>
-                </section>
-                <!-- CTA Card when booking is unavailable -->
-                <div
-                  :if={!@can_book}
-                  class="p-8 rounded-xl bg-teal-50 border border-teal-100 flex flex-col md:flex-row items-center justify-between gap-6"
+                  <.nearby_list id="clear-lake-nearby-destinations">
+                    <:place name="Red Hills Wineries" minutes={10} />
+                    <:place name="Mt. Konocti Trails" minutes={15} />
+                    <:place name="Historic Kelseyville" minutes={10} />
+                  </.nearby_list>
+                </.info_section>
+
+                <.info_section
+                  id="getting-there"
+                  heading_id="clear-lake-getting-there-heading"
+                  title="Getting There"
+                  description="Public transportation is very limited — driving is essential."
                 >
                   <div>
-                    <h4 class="text-xl text-teal-900 type-subhead">
-                      Ready to reserve?
-                    </h4>
-                    <p class="text-teal-700">{raw(@booking_disabled_reason)}</p>
+                    <p class="type-eyebrow text-xs text-zinc-500">Address</p>
+                    <p class="mt-1 text-lg font-medium text-zinc-900">
+                      9325 Bass Road<br />Kelseyville, CA 95451
+                    </p>
+                    <a
+                      href="https://www.google.com/maps/dir/?api=1&destination=9325+Bass+Road+Kelseyville+CA+95451"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-900"
+                    >
+                      <.icon name="hero-map-pin" class="w-4 h-4" /> Open in Maps
+                    </a>
+                  </div>
+                  <details class="group border-y border-zinc-200">
+                    <summary class="flex items-center justify-between gap-4 min-h-11 py-3 cursor-pointer list-none text-sm font-semibold text-zinc-900">
+                      Step-by-step directions from San Francisco
+                      <.icon
+                        name="hero-chevron-down"
+                        class="w-4 h-4 shrink-0 text-zinc-500 transition-transform group-open:rotate-180"
+                      />
+                    </summary>
+                    <div class="pb-6 pt-2 space-y-6">
+                      <.numbered_steps id="clear-lake-directions" dot={:teal}>
+                        <:step>
+                          <strong>Take HWY 101 North</strong>
+                          <span class="block text-xs text-zinc-500">
+                            Past Santa Rosa
+                          </span>
+                        </:step>
+                        <:step>
+                          <strong>Exit at River Road / Guerneville</strong>
+                          <span class="block text-xs text-zinc-500">Exit 494</span>
+                        </:step>
+                        <:step>
+                          <strong>Turn right onto Mark West Springs Rd</strong>
+                          <span class="block text-xs text-zinc-500">
+                            Becomes Porter Creek Rd — go 10.5 miles until it ends
+                          </span>
+                        </:step>
+                        <:step>
+                          <strong>Turn left at stop sign onto Petrified Forest Rd</strong>
+                          <span class="block text-xs text-zinc-500">
+                            Toward Calistoga — continue 4.6 miles
+                          </span>
+                        </:step>
+                        <:step>
+                          <strong>Turn left at stop sign onto Foothill Blvd / HWY 128</strong>
+                          <span class="block text-xs text-zinc-500">Go 0.8 miles</span>
+                        </:step>
+                        <:step>
+                          <strong>Turn right onto Tubbs Lane</strong>
+                          <span class="block text-xs text-zinc-500">
+                            Go 1.3 miles to the end
+                          </span>
+                        </:step>
+                        <:step>
+                          <strong>Turn left onto HWY 29</strong>
+                          <span class="block text-xs text-zinc-500">
+                            Go 28 miles over Mt. St. Helena through Middletown to Lower Lake
+                          </span>
+                        </:step>
+                        <:step>
+                          <strong>Turn left onto HWY 29 at Lower Lake</strong>
+                          <span class="block text-xs text-zinc-500">
+                            Shell Station on left — go 7.5 miles
+                          </span>
+                        </:step>
+                        <:step>
+                          <strong>Turn right onto Soda Bay Road / HWY 281</strong>
+                          <span class="block text-xs text-zinc-500">
+                            Kits Corner Store on right — go 4.3 miles
+                          </span>
+                        </:step>
+                        <:step>
+                          <strong>Turn right onto Bass Road</strong>
+                          <span class="block text-xs text-zinc-500">
+                            Just after Montezuma Way and a church — go 0.3 miles
+                          </span>
+                        </:step>
+                        <:step>
+                          <strong>Turn right at the third driveway with the YSC sign</strong>
+                          <span class="block text-xs text-zinc-500">
+                            You've arrived!
+                          </span>
+                        </:step>
+                      </.numbered_steps>
+                      <.info_callout
+                        icon="hero-exclamation-triangle"
+                        accent={:amber}
+                      >
+                        <p>
+                          <strong class="font-semibold text-zinc-900">Note:</strong>
+                          if you reach Konocti Harbor Inn, you've gone too far — turn around.
+                        </p>
+                      </.info_callout>
+                    </div>
+                  </details>
+                  <div class="space-y-4">
+                    <div class="rounded-lg overflow-hidden border border-zinc-200 h-72">
+                      <.live_component
+                        id="clear-lake-cabin-map"
+                        module={YscWeb.Components.MapComponent}
+                        latitude={38.98087180833886}
+                        longitude={-122.73563627025182}
+                        locked={true}
+                        class="w-full h-full"
+                      />
+                    </div>
+                    <YscWeb.Components.MapNavigationButtons.map_navigation_buttons
+                      latitude={38.98087180833886}
+                      longitude={-122.73563627025182}
+                      class="w-full"
+                    />
+                  </div>
+                </.info_section>
+
+                <.info_section
+                  heading_id="clear-lake-how-to-book-heading"
+                  title="How to Book"
+                  description="Everything happens on this website."
+                >
+                  <.numbered_steps id="clear-lake-booking-steps">
+                    <:step>
+                      Use the <strong>booking form above</strong>
+                      to choose Shared cabin vs Entire cabin, dates, and guests, then pay on this site.
+                    </:step>
+                    <:step>
+                      You'll get a confirmation email with a link to view and manage your booking.
+                    </:step>
+                  </.numbered_steps>
+                  <p class="text-sm text-zinc-600 leading-relaxed">
+                    Cancellation and refunds are on the
+                    <strong class="font-semibold text-zinc-900">Cabin & Booking Rules</strong>
+                    tab under Cancellation Policy.
+                  </p>
+                </.info_section>
+
+                <.info_section
+                  id="amenities"
+                  heading_id="clear-lake-on-property-heading"
+                  title="On the Property"
+                >
+                  <.icon_list>
+                    <:item icon="hero-lifebuoy" title="Private dock:">
+                      Deep-water swimming, sunbathing, boat mooring.
+                    </:item>
+                    <:item icon="hero-musical-note" title="Social Hall:">
+                      Cedar hall with wood-burning fireplace and dance floor.
+                    </:item>
+                    <:item icon="hero-home" title="Group kitchen:">
+                      Industrial stoves, ample fridge space.
+                    </:item>
+                  </.icon_list>
+                </.info_section>
+
+                <.info_section
+                  :if={!@can_book}
+                  id="clear-lake-ready-to-reserve"
+                  title="Ready to reserve?"
+                >
+                  <div class="space-y-4">
+                    <p class="text-sm text-zinc-600 leading-relaxed">
+                      {raw(@booking_disabled_reason)}
+                    </p>
                     <p
                       :if={@booking_error_title == "Membership Required"}
-                      class="text-teal-600 text-sm mt-2"
+                      class="text-sm text-zinc-500"
                     >
                       Pay or renew your membership to book a cabin.
                     </p>
+                    <.link
+                      :if={@booking_error_title == "Sign In Required"}
+                      navigate={
+                        ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
+                      }
+                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors"
+                    >
+                      Sign In to Book
+                    </.link>
+                    <.link
+                      :if={@booking_error_title == "Application under review"}
+                      navigate={~p"/pending-review"}
+                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors"
+                    >
+                      View application status
+                    </.link>
+                    <.link
+                      :if={@booking_error_title == "Membership Required"}
+                      navigate={~p"/users/membership"}
+                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors"
+                    >
+                      Pay or renew membership
+                    </.link>
                   </div>
-                  <.link
-                    :if={@booking_error_title == "Sign In Required"}
-                    navigate={
-                      ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
-                    }
-                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-xs"
-                  >
-                    Sign In to Book
-                  </.link>
-                  <.link
-                    :if={@booking_error_title == "Application under review"}
-                    navigate={~p"/pending-review"}
-                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-xs"
-                  >
-                    View application status
-                  </.link>
-                  <.link
-                    :if={@booking_error_title == "Membership Required"}
-                    navigate={~p"/users/membership"}
-                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-xs"
-                  >
-                    Pay or renew membership
-                  </.link>
-                </div>
-                <!-- Before you go -->
-                <section
-                  id="before-you-go"
-                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs"
+                </.info_section>
+              </.info_sections>
+              <p class="mt-4 pt-8 border-t border-zinc-200 text-sm text-zinc-500 italic text-center">
+                The Clear Lake cabin has been a member-run treasure since 1963. Thank you for doing your part to keep it clean for the next YSC member.
+              </p>
+            </div>
+            <%!-- Arrival & House Manual: the on-site field guide --%>
+            <div :if={info_tab == :manual} id="house-manual">
+              <.info_sections>
+                <.info_section
+                  id="door-code-access"
+                  title="Door Code & Access"
+                  description="How you get in, and what to do before you leave home."
                 >
-                  <.icon_heading id="clear-lake-before-you-go-heading" icon="📋">
-                    Before you go
-                  </.icon_heading>
-                  <p class="text-sm text-zinc-600 mb-6">
-                    On-site details for after you book. The dumpster padlock code is in your check-in email.
+                  <p class="text-sm text-zinc-600 leading-relaxed">
+                    {YscWeb.BookingUserMessages.cabin_access_info_tab_body()}
                   </p>
-                  <ul class="space-y-4 text-zinc-700">
-                    <li class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Training videos (required):</strong>
-                        Watch the
-                        <.link
-                          id="clear-lake-training-videos"
-                          href={PropertyDisplay.training_videos_url(:clear_lake)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="text-teal-700 underline hover:text-teal-900"
-                        >
-                          Clear Lake training videos
-                        </.link>
-                        (8 short videos) before you arrive.
-                      </span>
-                    </li>
-                    <li class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Lockbox & keys:</strong>
-                        Left side of the single entry door (across the main grass). Four keys open the cabin, pantry, pool storage, and bathrooms — lock all of those when you leave and return the keys to the lockbox.
-                      </span>
-                    </li>
-                    <li class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Water:</strong>
-                        The spigot by the lawn entry gate is not drinkable (hose and pools). All other spigots are potable — don't waste fresh water. See the
-                        <.link
-                          id="clear-lake-water-operations"
-                          href={~p"/documents/clear_lake_water_operations.pdf"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="text-teal-700 underline hover:text-teal-900"
-                        >
-                          potable water operations guide
-                        </.link>
-                        (PDF) for startup, shutdown, and tank fill.
-                      </span>
-                    </li>
-                    <li :if={@sleeping_mode != :winter} class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Thursday morning sprinklers:</strong>
-                        If you're staying Wednesday–Thursday, move sleeping gear off the lawn to the deck or concrete patio so it doesn't get soaked.
-                      </span>
-                    </li>
-                    <li class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Garbage:</strong>
-                        Use the dumpsters before you leave.
-                      </span>
-                    </li>
-                    <li class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Opening & closing:</strong>
-                        Printed checklists in the Cabin Master Room — use them to open and shut down the cabin.
-                      </span>
-                    </li>
-                  </ul>
-                </section>
-                <!-- Sleeping at the cabin -->
-                <section
-                  id="sleeping-at-the-cabin"
-                  class={[
-                    "rounded-xl p-6 shadow-xs border-2",
-                    if(@sleeping_mode == :winter,
-                      do: "bg-amber-50 border-amber-200",
-                      else: "bg-teal-50 border-teal-200"
-                    )
-                  ]}
+                  <.icon_list>
+                    <:item icon="hero-exclamation-circle">
+                      Save the door code before you arrive — cell service can be limited.
+                    </:item>
+                    <:item icon="hero-exclamation-circle">
+                      If you don't receive it, check spam, then email <a
+                        href={"mailto:#{EmailConfig.clear_lake_email()}"}
+                        class="text-teal-700 underline hover:text-teal-900"
+                      >{EmailConfig.clear_lake_email()}</a>.
+                    </:item>
+                  </.icon_list>
+                  <div id="pre-arrival-checklist" class="space-y-3">
+                    <h3 class="type-subhead text-sm text-zinc-900">
+                      Pre-Arrival Checklist
+                    </h3>
+                    <.checklist items={[
+                      {"Screenshot the door code",
+                       "Cell service can be limited at the cabin"},
+                      {"Download offline maps", "Kelseyville / Clear Lake area"}
+                    ]} />
+                  </div>
+                </.info_section>
+
+                <.info_section
+                  id="before-you-go"
+                  heading_id="clear-lake-before-you-go-heading"
+                  title="Before You Go"
+                  description="On-site details for after you book. The dumpster padlock code is in your check-in email."
                 >
-                  <h2 class={[
-                    "text-lg mb-3 flex items-center gap-2 type-subhead",
-                    if(@sleeping_mode == :winter,
-                      do: "text-amber-900",
-                      else: "text-teal-900"
-                    )
-                  ]}>
-                    <span class="text-xl">
-                      {if(@sleeping_mode == :winter, do: "🛏️", else: "⛺")}
-                    </span>
-                    Sleeping at the cabin
-                  </h2>
+                  <.icon_list>
+                    <:item
+                      icon="hero-video-camera"
+                      title="Training videos (required):"
+                    >
+                      Watch the
+                      <.link
+                        id="clear-lake-training-videos"
+                        href={PropertyDisplay.training_videos_url(:clear_lake)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-teal-700 underline hover:text-teal-900"
+                      >Clear Lake training videos</.link>
+                      (8 short videos) before you arrive.
+                    </:item>
+                    <:item icon="hero-key" title="Lockbox & keys:">
+                      Left side of the single entry door (across the main grass). Four keys open the cabin, pantry, pool storage, and bathrooms — lock all of those when you leave and return the keys to the lockbox.
+                    </:item>
+                    <:item icon="hero-beaker" title="Water:">
+                      The spigot by the lawn entry gate is not drinkable (hose and pools). All other spigots are potable — don't waste fresh water. See the
+                      <.link
+                        id="clear-lake-water-operations"
+                        href={~p"/documents/clear_lake_water_operations.pdf"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-teal-700 underline hover:text-teal-900"
+                      >potable water operations guide</.link>
+                      (PDF) for startup, shutdown, and tank fill.
+                    </:item>
+                    <:item
+                      :if={@sleeping_mode != :winter}
+                      icon="hero-sun"
+                      title="Thursday morning sprinklers:"
+                    >
+                      If you're staying Wednesday–Thursday, move sleeping gear off the lawn to the deck or concrete patio so it doesn't get soaked.
+                    </:item>
+                    <:item icon="hero-trash" title="Garbage:">
+                      Use the dumpsters before you leave.
+                    </:item>
+                    <:item
+                      icon="hero-clipboard-document-check"
+                      title="Opening & closing:"
+                    >
+                      Printed checklists in the Cabin Master Room — use them to open and shut down the cabin.
+                    </:item>
+                  </.icon_list>
+                </.info_section>
+
+                <.info_section
+                  id="sleeping-at-the-cabin"
+                  heading_id="clear-lake-sleeping-heading"
+                  title="Sleeping at the Cabin"
+                >
                   <%= cond do %>
                     <% @sleeping_mode == :winter -> %>
-                      <div class="space-y-3">
-                        <p class="text-sm font-semibold text-amber-800">
+                      <div class="space-y-4">
+                        <p class="type-eyebrow text-xs text-zinc-500">
                           Winter ({@winter_season_window})
                         </p>
-                        <p class="text-base text-amber-900 leading-relaxed font-semibold">
+                        <p class="text-base font-semibold text-zinc-900">
                           Indoor beds are set up in three separate rooms.
                         </p>
-                        <p class="text-sm text-amber-800 leading-relaxed">
+                        <p class="text-sm text-zinc-600 leading-relaxed">
                           {winter_beds_setup_copy()}
                         </p>
                         <div
@@ -2218,7 +1857,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             href={image.src}
                             target="_blank"
                             rel="noopener"
-                            class="block overflow-hidden rounded-lg border border-amber-200 bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                            class="block overflow-hidden rounded-lg bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
                           >
                             <img
                               src={image.src}
@@ -2229,436 +1868,150 @@ defmodule YscWeb.ClearLakeBookingLive do
                             />
                           </a>
                         </div>
-                        <p class="text-sm text-amber-800 leading-relaxed">
+                        <p class="text-sm text-zinc-600 leading-relaxed">
                           Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help in the Social Hall.
                         </p>
-                        <p class="text-xs text-amber-700 leading-relaxed">
+                        <p class="text-xs text-zinc-500 leading-relaxed">
                           Summer ({@summer_season_window}): beds come down — lawn camp or bring your own sleeping setup.
                         </p>
                       </div>
                     <% @sleeping_mode == :mixed -> %>
                       <div class="space-y-4">
-                        <p class="text-sm font-semibold text-teal-800">
+                        <p class="text-base font-semibold text-zinc-900">
                           Your stay covers both seasons.
                         </p>
-                        <p class="text-sm text-teal-900 leading-relaxed">
-                          <strong>Summer ({@summer_season_window}):</strong>
+                        <p class="text-sm text-zinc-600 leading-relaxed">
+                          <strong class="font-medium text-zinc-900">
+                            Summer ({@summer_season_window}):
+                          </strong>
                           Beds are not set up. Lawn camp or use the cabin with your own sleeping setup. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
                         </p>
-                        <p class="text-sm text-teal-900 leading-relaxed">
-                          <strong>Winter ({@winter_season_window}):</strong>
+                        <p class="text-sm text-zinc-600 leading-relaxed">
+                          <strong class="font-medium text-zinc-900">
+                            Winter ({@winter_season_window}):
+                          </strong>
                           Indoor beds are set up in three separate rooms. {winter_beds_setup_copy()} Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels.
                         </p>
                       </div>
                     <% true -> %>
-                      <div class="space-y-3">
-                        <p class="text-sm font-semibold text-teal-800">
+                      <div class="space-y-4">
+                        <p class="type-eyebrow text-xs text-zinc-500">
                           Summer ({@summer_season_window})
                         </p>
-                        <p class="text-base text-teal-900 leading-relaxed font-semibold">
+                        <p class="text-base font-semibold text-zinc-900">
                           Beds are not set up in the cabin.
                         </p>
-                        <p class="text-sm text-teal-800 leading-relaxed">
+                        <p class="text-sm text-zinc-600 leading-relaxed">
                           Lawn camp or use the cabin with your own sleeping setup. Pack a sleeping bag, pillow, and a tent if you're camping on the lawn. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
                         </p>
-                        <p class="text-xs text-teal-700 leading-relaxed">
+                        <p class="text-xs text-zinc-500 leading-relaxed">
                           Winter ({@winter_season_window}): indoor beds are set up in three rooms — pack linens if you book those dates.
                         </p>
                       </div>
                   <% end %>
-                  <p class={[
-                    "text-sm mt-4 leading-relaxed",
-                    if(@sleeping_mode == :winter,
-                      do: "text-amber-800",
-                      else: "text-teal-800"
-                    )
-                  ]}>
+                  <p class="text-sm text-zinc-600 leading-relaxed">
                     Also pack bath and beach towels, a reusable water bottle, sunscreen, and a swimsuit.
                   </p>
-                </section>
-                <section
-                  id="amenities"
-                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs"
+                </.info_section>
+
+                <.info_section
+                  id="parking-transportation"
+                  heading_id="clear-lake-parking-heading"
+                  title="Parking"
                 >
-                  <.icon_heading id="clear-lake-on-property-heading" icon="🏠">
-                    On the property
-                  </.icon_heading>
-                  <ul class="space-y-3 text-zinc-700">
-                    <li class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Private dock</strong>
-                        — Deep-water swimming, sunbathing, boat mooring.
-                      </span>
-                    </li>
-                    <li class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Social Hall</strong>
-                        — Cedar hall with wood-burning fireplace and dance floor.
-                      </span>
-                    </li>
-                    <li class="flex gap-3">
-                      <span class="text-teal-600 font-bold">•</span>
-                      <span>
-                        <strong>Group kitchen</strong>
-                        — Industrial stoves, ample fridge space.
-                      </span>
-                    </li>
-                  </ul>
-                </section>
-                <!-- Footer -->
-                <div class="mt-12 pt-8 border-t border-zinc-100 text-center">
-                  <p class="text-sm text-zinc-600 italic">
-                    The Clear Lake cabin has been a member-run treasure since 1963. Thank you for doing your part to keep it clean for the next YSC member.
-                  </p>
-                </div>
-              </div>
-              <!-- Rooms Tab -->
-              <div :if={info_tab == :rooms and browse_rooms != []}>
-                <YscWeb.Components.RoomBrowser.room_browser
-                  id="property-room-browser"
-                  rooms={browse_rooms}
-                  property_name="YSC Clear Lake Cabin"
-                  accent={:teal}
-                  intro="You don't pick a specific room when you book. Shared cabin stays share the house with other members. Entire cabin stays include every room."
-                />
-              </div>
-              <!-- Tab Content: Cabin & Booking Rules -->
-              <div
-                :if={info_tab == :rules}
-                id="cabin-rules"
-                class="flex flex-col gap-16"
-              >
-                <!-- Golden Rules Banner -->
-                <section class="bg-zinc-100 rounded-xl p-6">
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-xs">
-                      <div class="text-4xl mb-3">🚫</div>
-                      <div class="font-bold text-red-900 text-lg mb-1">No Pets</div>
-                      <div class="text-sm text-red-700">No exceptions</div>
-                    </div>
-                    <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-xs">
-                      <%= cond do %>
-                        <% @sleeping_mode == :winter -> %>
-                          <div class="text-4xl mb-3">🧺</div>
-                          <div class="font-bold text-amber-900 text-lg mb-1">
-                            Bring Own Linens
-                          </div>
-                          <div class="text-sm text-amber-700">
-                            Sheets, pillowcases, comforter or sleeping bag, and towels
-                          </div>
-                        <% @sleeping_mode == :mixed -> %>
-                          <div class="text-4xl mb-3">⛺</div>
-                          <div class="font-bold text-amber-900 text-lg mb-1">
-                            Seasonal Sleeping
-                          </div>
-                          <div class="text-sm text-amber-700">
-                            Summer: own setup. Winter: linens for indoor beds
-                          </div>
-                        <% true -> %>
-                          <div class="text-4xl mb-3">⛺</div>
-                          <div class="font-bold text-amber-900 text-lg mb-1">
-                            Bring Your Sleeping Setup
-                          </div>
-                          <div class="text-sm text-amber-700">
-                            Sleeping bag, pillow, towels — lawn camp or cabin with your own setup
-                          </div>
-                      <% end %>
-                    </div>
-                    <div class="bg-white rounded-xl p-5 text-center border border-zinc-200 shadow-xs">
-                      <div class="text-4xl mb-3">🚭</div>
-                      <div class="font-bold text-red-900 text-lg mb-1">
-                        No Smoking
-                      </div>
-                      <div class="text-sm text-red-700">Indoors or on decks</div>
-                    </div>
-                  </div>
-                </section>
-                <!-- Your Stay, Your Way - Accordions -->
-                <section class="bg-zinc-50 rounded-xl p-8 lg:p-12">
-                  <div class="max-w-3xl">
-                    <h2 class="text-3xl text-zinc-900 mb-4 type-title">
-                      Your Stay, Your Way
-                    </h2>
-                    <p class="text-zinc-600 mb-10 leading-relaxed">
-                      Since 1963, our cabin has been a place of relaxation and connection. Here's what you need to know for the perfect getaway.
-                    </p>
+                  <.icon_list>
+                    <:item icon="hero-truck">
+                      Park parallel in the lot along the water line, as close to the next car as possible.
+                    </:item>
+                    <:item icon="hero-clock">
+                      Choose a spot based on your departure time. Leaving early Sunday? Don't park in the back or you may get blocked in.
+                    </:item>
+                    <:item icon="hero-no-symbol">
+                      Do not block the driveway or neighbors' access.
+                    </:item>
+                  </.icon_list>
+                </.info_section>
 
-                    <div class="space-y-4">
-                      <details class="group bg-white border border-zinc-200 rounded-xl transition">
-                        <summary class="p-5 cursor-pointer font-bold flex justify-between items-center list-none hover:text-teal-700">
-                          <span class="flex items-center gap-3">
-                            <span class="text-xl">🌊</span>
-                            <span>Lake Life & Activities</span>
-                          </span>
-                          <.icon
-                            name="hero-chevron-down"
-                            class="w-5 h-5 text-zinc-500 chevron-icon transition-transform"
-                          />
-                        </summary>
-                        <div class="px-5 pb-5 text-base text-zinc-600 space-y-3 border-t border-zinc-50 pt-4">
-                          <p>
-                            <strong>Private Dock Access:</strong>
-                            Enjoy swimming, boating, and fishing from our exclusive 100-foot dock. Perfect for morning coffee on the water or sunset views.
-                          </p>
-                          <p>
-                            <strong>Peaceful Atmosphere:</strong>
-                            We maintain quiet hours starting at midnight to ensure everyone can enjoy restful nights by the lake.
-                          </p>
-                          <p>
-                            <strong>Family-Friendly:</strong>
-                            Most weekends welcome families and guests of all ages. Check specific event descriptions for any age restrictions.
-                          </p>
-                          <p>
-                            <strong>Bring Your Guests:</strong>
-                            Non-member guests are welcome. Include every guest in your booking.
-                          </p>
-                        </div>
-                      </details>
-
-                      <details class="group bg-white border border-zinc-200 rounded-xl transition">
-                        <summary class="p-5 cursor-pointer font-bold flex justify-between items-center list-none hover:text-teal-700">
-                          <span class="flex items-center gap-3">
-                            <span class="text-xl">⚓</span>
-                            <span>Property & Water Access</span>
-                          </span>
-                          <.icon
-                            name="hero-chevron-down"
-                            class="w-5 h-5 text-zinc-500 chevron-icon transition-transform"
-                          />
-                        </summary>
-                        <div class="px-5 pb-5 text-sm text-zinc-600 space-y-4 border-t border-zinc-50 pt-4">
-                          <p>
-                            <strong>Boating & Dock Access:</strong>
-                            Members enjoy free mooring at our private dock. Please email the Cabin Master at {EmailConfig.clear_lake_email()} in advance.
-                            <em>Note: trailers must be parked off-site.</em>
-                          </p>
-                          <div class="p-4 bg-rose-50 border border-rose-100 rounded-lg text-rose-800 text-xs">
-                            <strong>⚠️ Quagga Mussel Warning:</strong>
-                            Mandatory boat inspection required. Violations result in a $1,000 fine from Lake County.
-                          </div>
-                        </div>
-                      </details>
-
-                      <.link
-                        navigate={~p"/code-of-conduct"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="flex items-center justify-between p-5 bg-white border border-zinc-200 rounded-xl font-bold hover:bg-zinc-100 transition-colors"
-                      >
-                        <span class="flex items-center gap-3">
-                          <span class="text-xl">📜</span>
-                          <span>Code of Conduct</span>
-                        </span>
-                        <.icon
-                          name="hero-arrow-top-right-on-square"
-                          class="w-5 h-5 text-zinc-500"
-                        />
-                      </.link>
-                    </div>
-                  </div>
-                </section>
-                <!-- Booking Policies -->
-                <section class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs">
-                  <.icon_heading
-                    id="clear-lake-booking-policies-heading"
-                    class="text-zinc-900 mb-6"
+                <.info_section
+                  heading_id="clear-lake-etiquette-heading"
+                  title="Cabin Etiquette"
+                  description="Since 1963, our cabin has been a place of relaxation and connection."
+                >
+                  <.icon_list>
+                    <:item icon="hero-moon" title="Quiet hours:">
+                      Start at midnight so everyone can enjoy restful nights by the lake.
+                    </:item>
+                    <:item icon="hero-user-group" title="Family-friendly:">
+                      Most weekends welcome families and guests of all ages. Check specific event descriptions for any age restrictions.
+                    </:item>
+                  </.icon_list>
+                  <.link
+                    navigate={~p"/code-of-conduct"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-2 min-h-11 text-sm font-medium text-teal-700 hover:text-teal-900"
                   >
-                    <:leading>
-                      <.icon name="hero-document-text" class="w-6 h-6" />
-                    </:leading>
-                    Booking Policies
-                  </.icon_heading>
-                  <div class="space-y-4">
-                    <div class="p-5 bg-zinc-50 rounded-xl border border-zinc-200">
-                      <h3 class="text-zinc-900 mb-2 type-subhead">
-                        Booking requirements
-                      </h3>
-                      <ul class="list-disc list-inside space-y-2 text-zinc-700">
-                        <li>
-                          All bookings must be made and paid in advance on the website
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </section>
-                <section
-                  id="cancellation-policy"
-                  class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs mb-12"
-                >
-                  <.icon_heading id="clear-lake-cancellation-heading">
-                    <:leading>
-                      <.icon name="hero-receipt-refund" class="w-6 h-6" />
-                    </:leading>
-                    Cancellation Policy
-                  </.icon_heading>
-                  <div>
-                    <div class="bg-zinc-50 rounded-xl border border-zinc-200 overflow-hidden mb-4">
-                      <div class="overflow-x-auto">
-                        <table class="w-full border-collapse">
-                          <thead>
-                            <tr class="bg-zinc-100 text-zinc-900">
-                              <th class="px-4 py-3 text-left font-bold">
-                                Days Before Check-In
-                              </th>
-                              <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                {BookingModeDisplay.stay_type_label(:buyout)}
-                              </th>
-                              <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                {BookingModeDisplay.stay_type_label(:day)}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <%= if RefundPolicyDisplay.policy_rules(
-                                     @buyout_refund_policy
-                                   ) != [] or
-                                     RefundPolicyDisplay.policy_rules(
-                                       @day_refund_policy
-                                     ) != [] do %>
-                              <% all_days =
-                                RefundPolicyDisplay.unique_threshold_days_desc([
-                                  RefundPolicyDisplay.policy_rules(
-                                    @buyout_refund_policy
-                                  ),
-                                  RefundPolicyDisplay.policy_rules(
-                                    @day_refund_policy
-                                  )
-                                ]) %>
-                              <%= for days <- all_days do %>
-                                <% buyout_rule =
-                                  RefundPolicyDisplay.find_rule_for_days(
-                                    RefundPolicyDisplay.policy_rules(
-                                      @buyout_refund_policy
-                                    ),
-                                    days
-                                  )
+                    Read the Code of Conduct
+                    <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
+                  </.link>
+                </.info_section>
 
-                                day_rule =
-                                  RefundPolicyDisplay.find_rule_for_days(
-                                    RefundPolicyDisplay.policy_rules(
-                                      @day_refund_policy
-                                    ),
-                                    days
-                                  ) %>
-                                <tr class="border-b border-zinc-100 hover:bg-white">
-                                  <td class="px-4 py-3 font-semibold text-zinc-900">
-                                    {days}+ days
-                                  </td>
-                                  <td class={[
-                                    "px-4 py-3 text-center border-l border-zinc-100",
-                                    if(
-                                      buyout_rule &&
-                                        buyout_rule.refund_percentage,
-                                      do:
-                                        RefundPolicyDisplay.refund_percentage_tier_class(
-                                          buyout_rule.refund_percentage
-                                        ),
-                                      else: "text-zinc-500"
-                                    )
-                                  ]}>
-                                    <%= if buyout_rule && buyout_rule.refund_percentage do %>
-                                      {RefundPolicyDisplay.refund_percentage_int(
-                                        buyout_rule.refund_percentage
-                                      )}%
-                                    <% else %>
-                                      —
-                                    <% end %>
-                                  </td>
-                                  <td class={[
-                                    "px-4 py-3 text-center border-l border-zinc-100",
-                                    if(day_rule && day_rule.refund_percentage,
-                                      do:
-                                        RefundPolicyDisplay.refund_percentage_tier_class(
-                                          day_rule.refund_percentage
-                                        ),
-                                      else: "text-zinc-500"
-                                    )
-                                  ]}>
-                                    <%= if day_rule && day_rule.refund_percentage do %>
-                                      {RefundPolicyDisplay.refund_percentage_int(
-                                        day_rule.refund_percentage
-                                      )}%
-                                    <% else %>
-                                      —
-                                    <% end %>
-                                  </td>
-                                </tr>
-                              <% end %>
-                            <% else %>
-                              <tr>
-                                <td
-                                  colspan="3"
-                                  class="px-4 py-3 text-center text-zinc-600"
-                                >
-                                  Policy information will be displayed here
-                                </td>
-                              </tr>
-                            <% end %>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
-                      <h3 class="text-blue-900 mb-3 type-subhead">
-                        Cancellation Policy Summary
-                      </h3>
-                      <div class="space-y-4 text-sm text-blue-900">
-                        <%= if RefundPolicyDisplay.policy_rules(
-                                 @buyout_refund_policy
-                               ) != [] do %>
-                          <div>
-                            <p class="font-semibold mb-2">
-                              {BookingModeDisplay.stay_type_label(:buyout)}:
-                            </p>
-                            <ul class="list-disc list-inside space-y-1 ml-2">
-                              <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(
-                                    RefundPolicyDisplay.policy_rules(
-                                      @buyout_refund_policy
-                                    )
-                                  ) do %>
-                                <li>
-                                  {RefundPolicyDisplay.rule_threshold_summary(rule)}
-                                </li>
-                              <% end %>
-                            </ul>
-                          </div>
-                        <% end %>
-                        <%= if RefundPolicyDisplay.policy_rules(@day_refund_policy) !=
-                                 [] do %>
-                          <div>
-                            <p class="font-semibold mb-2">
-                              {BookingModeDisplay.stay_type_label(:day)}:
-                            </p>
-                            <ul class="list-disc list-inside space-y-1 ml-2">
-                              <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(
-                                    RefundPolicyDisplay.policy_rules(
-                                      @day_refund_policy
-                                    )
-                                  ) do %>
-                                <li>
-                                  {RefundPolicyDisplay.rule_threshold_summary(rule)}
-                                </li>
-                              <% end %>
-                            </ul>
-                          </div>
-                        <% end %>
-                        <%= if RefundPolicyDisplay.policy_rules(
-                                 @buyout_refund_policy
-                               ) == [] and
-                                 RefundPolicyDisplay.policy_rules(
-                                   @day_refund_policy
-                                 ) == [] do %>
-                          <p class="text-blue-800">
-                            Cancellation policy details will be displayed here once available.
-                          </p>
-                        <% end %>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              </div>
+                <.info_section
+                  heading_id="clear-lake-dock-heading"
+                  title="Dock & Boating"
+                  description="Swim, boat, and fish from our exclusive 100-foot private dock."
+                >
+                  <p class="text-sm text-zinc-600 leading-relaxed">
+                    Members enjoy free mooring at our private dock. Please email the Cabin Master at {EmailConfig.clear_lake_email()} in advance.
+                    <span class="text-zinc-500">Trailers must be parked off-site.</span>
+                  </p>
+                  <.info_callout icon="hero-exclamation-triangle" accent={:red}>
+                    <p>
+                      <strong class="font-semibold text-zinc-900">
+                        Quagga mussel warning:
+                      </strong>
+                      mandatory boat inspection required. Violations result in a $1,000 fine from Lake County.
+                    </p>
+                  </.info_callout>
+                </.info_section>
+              </.info_sections>
+            </div>
+            <%!-- Booking & Cancellation Policies: the fine print --%>
+            <div :if={info_tab == :rules} id="cabin-rules">
+              <.info_sections>
+                <.info_section
+                  heading_id="clear-lake-booking-policies-heading"
+                  title="Booking & Payment"
+                  description="Bookings are made and paid for on this website."
+                >
+                  <.spec_list>
+                    <:row label="Payment">
+                      All bookings must be made and paid in advance on this website.
+                    </:row>
+                    <:row label="Guests">
+                      Non-member guests are welcome. Include every guest in your booking.
+                    </:row>
+                  </.spec_list>
+                </.info_section>
+
+                <.info_section
+                  id="cancellation-policy"
+                  heading_id="clear-lake-cancellation-heading"
+                  title="Cancellation Policy"
+                  description="What you get back depends on how far ahead of check-in you cancel."
+                >
+                  <.refund_table columns={[
+                    %{
+                      label: BookingModeDisplay.stay_type_label(:buyout),
+                      rules: RefundPolicyDisplay.policy_rules(@buyout_refund_policy)
+                    },
+                    %{
+                      label: BookingModeDisplay.stay_type_label(:day),
+                      rules: RefundPolicyDisplay.policy_rules(@day_refund_policy)
+                    }
+                  ]} />
+                </.info_section>
+              </.info_sections>
             </div>
           </div>
         </div>
@@ -3199,8 +2552,8 @@ defmodule YscWeb.ClearLakeBookingLive do
     info_tab =
       case tab do
         "general" -> :general
+        "manual" -> :manual
         "rules" -> :rules
-        "rooms" -> :rooms
         _ -> :general
       end
 
@@ -3739,15 +3092,13 @@ defmodule YscWeb.ClearLakeBookingLive do
     end
   end
 
-  # The Rooms tab only exists for properties with individually bookable rooms.
-  defp effective_info_tab(:rooms, []), do: :general
-  defp effective_info_tab(info_tab, _browse_rooms), do: info_tab
-
   defp parse_info_tab_from_params(params) do
     case Map.get(params, "info_tab") do
       "general" -> :general
+      "manual" -> :manual
       "rules" -> :rules
-      "rooms" -> :rooms
+      # The Rooms tab was folded into The Cabin & Rooms.
+      "rooms" -> :general
       _ -> nil
     end
   end

@@ -152,7 +152,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} =
         live(
           conn,
-          ~p"/bookings/tahoe?tab=information&info_tab=general"
+          ~p"/bookings/tahoe?tab=information&info_tab=manual"
         )
 
       render_async(view, 2_000)
@@ -334,7 +334,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
       render_async(view, 2_000)
       html = render(view)
 
-      assert html =~ "Book the entire cabin"
+      assert has_element?(view, "#booking-mode-buyout")
+      assert html =~ "Entire Cabin"
       refute html =~ "Rent the entire cabin"
       refute html =~ "Reserve the entire cabin"
       refute html =~ "Entire-cabin rentals"
@@ -2142,12 +2143,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
     test "lists the property's rooms", %{conn: conn, room: room} do
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
-      assert has_element?(view, "#info-tab-rooms")
-      refute has_element?(view, "#property-room-browser")
-
-      view |> element("#info-tab-rooms") |> render_click()
-
-      assert assert_patch(view) =~ "info_tab"
+      # Rooms live inside The Cabin & Rooms, not a tab of their own.
+      refute has_element?(view, "#info-tab-rooms")
       assert has_element?(view, "#property-room-browser")
       assert has_element?(view, "#browse-room-#{room.id}", room.name)
       assert has_element?(view, "#browse-room-pick-#{room.id}")
