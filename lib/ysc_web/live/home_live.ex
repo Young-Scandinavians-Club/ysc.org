@@ -1009,7 +1009,7 @@ defmodule YscWeb.HomeLive do
     <div
       :if={@current_user != nil}
       id="member-dashboard"
-      class="flex-1 w-full bg-zinc-50/40 min-h-screen pb-16"
+      class="flex-1 w-full bg-zinc-50/40 min-h-screen pb-24 -mb-8"
     >
       <%!-- Passkey Setup Prompt Banner.
            Hidden until the async user load confirms the prompt should be shown,
