@@ -2444,10 +2444,10 @@ defmodule YscWeb.BookingReceiptLive do
   defp get_cabin_access_url(property) do
     case property do
       :tahoe ->
-        ~p"/bookings/tahoe?tab=information&info_tab=general#door-code-access"
+        ~p"/bookings/tahoe?tab=information&info_tab=manual#door-code-access"
 
       :clear_lake ->
-        ~p"/bookings/clear-lake?tab=information#door-code-access"
+        ~p"/bookings/clear-lake?tab=information&info_tab=manual#door-code-access"
 
       _ ->
         ~p"/"
@@ -2456,9 +2456,14 @@ defmodule YscWeb.BookingReceiptLive do
 
   defp get_cabin_rules_url(property) do
     case property do
-      :tahoe -> ~p"/bookings/tahoe?tab=information&info_tab=rules#cabin-rules"
-      :clear_lake -> ~p"/bookings/clear-lake?tab=information#cabin-rules"
-      _ -> ~p"/"
+      :tahoe ->
+        ~p"/bookings/tahoe?tab=information&info_tab=manual#house-manual"
+
+      :clear_lake ->
+        ~p"/bookings/clear-lake?tab=information&info_tab=manual#house-manual"
+
+      _ ->
+        ~p"/"
     end
   end
 

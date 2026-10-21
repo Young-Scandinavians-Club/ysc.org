@@ -229,13 +229,13 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert has_element?(
                view,
-               ~s(a#cabin-access-info-link[href="/bookings/tahoe?tab=information&info_tab=general#door-code-access"]),
+               ~s(a#cabin-access-info-link[href="/bookings/tahoe?tab=information&info_tab=manual#door-code-access"]),
                "How cabin access works"
              )
 
       assert has_element?(
                view,
-               ~s(a[href="/bookings/tahoe?tab=information&info_tab=rules#cabin-rules"]),
+               ~s(a[href="/bookings/tahoe?tab=information&info_tab=manual#house-manual"]),
                "Read Cabin Rules"
              )
     end
@@ -256,13 +256,13 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert has_element?(
                view,
-               ~s(a#cabin-access-info-link[href="/bookings/clear-lake?tab=information#door-code-access"]),
+               ~s(a#cabin-access-info-link[href="/bookings/clear-lake?tab=information&info_tab=manual#door-code-access"]),
                "How cabin access works"
              )
 
       assert has_element?(
                view,
-               ~s(a[href="/bookings/clear-lake?tab=information#cabin-rules"]),
+               ~s(a[href="/bookings/clear-lake?tab=information&info_tab=manual#house-manual"]),
                "Read Cabin Rules"
              )
     end
