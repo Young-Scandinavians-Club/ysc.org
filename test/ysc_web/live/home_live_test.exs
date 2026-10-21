@@ -817,8 +817,11 @@ defmodule YscWeb.HomeLiveTest do
 
       html = render(view)
 
-      assert html =~
-               "will automatically renew on Mar 5, 2027 unless you turn off automatic renewal"
+      assert has_element?(
+               view,
+               "#home-membership-renewal-date",
+               "Mar 5, 2027"
+             )
 
       assert html =~ "Mar 5, 2027"
       refute html =~ "Mar 4, 2027"

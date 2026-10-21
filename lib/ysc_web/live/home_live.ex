@@ -1139,7 +1139,7 @@ defmodule YscWeb.HomeLive do
                 icon="hero-cog-6-tooth"
                 tone={:zinc}
                 title="Account"
-                subtitle="Membership & billing"
+                subtitle="Settings & billing"
               />
             </div>
           </div>
@@ -1394,7 +1394,7 @@ defmodule YscWeb.HomeLive do
                     ]}
                     aria-hidden="true"
                   ></span>
-                  <h2 class="text-xs text-zinc-500 type-eyebrow truncate">
+                  <h2 class="text-xs text-zinc-900 type-eyebrow truncate">
                     <%= cond do %>
                       <% @current_user.state == :pending_approval -> %>
                         Application Under Review
@@ -1420,12 +1420,29 @@ defmodule YscWeb.HomeLive do
               <p class="text-sm text-zinc-600 leading-relaxed">
                 <%= cond do %>
                   <% @active_membership? -> %>
-                    {get_membership_description(
-                      @current_membership,
-                      @is_sub_account || false,
-                      @primary_user,
-                      @timezone
-                    )}
+                    <%= case membership_renewal_note(
+                           @current_membership,
+                           @is_sub_account || false,
+                           @timezone
+                         ) do %>
+                      <% {:renews, date} -> %>
+                        Auto-renews <strong
+                          id="home-membership-renewal-date"
+                          class="font-medium text-zinc-900"
+                        >{date}</strong>.
+                      <% {:ends, date} -> %>
+                        Won't auto-renew. Active until <strong
+                          id="home-membership-renewal-date"
+                          class="font-medium text-zinc-900"
+                        >{date}</strong>.
+                      <% nil -> %>
+                        {get_membership_description(
+                          @current_membership,
+                          @is_sub_account || false,
+                          @primary_user,
+                          @timezone
+                        )}
+                    <% end %>
                   <% @current_user.state == :pending_approval -> %>
                     <span class="block mb-1 font-semibold text-zinc-900">
                       Pending Approval
@@ -1742,6 +1759,26 @@ defmodule YscWeb.HomeLive do
 
       _ ->
         "You have an active membership with access to our cabins and events."
+    end
+  end
+
+  # Scannable renewal line for paid (non-lifetime, non-sub-account) memberships;
+  # nil falls back to the full sentence from `get_membership_description/4`.
+  defp membership_renewal_note(nil, _is_sub_account, _timezone), do: nil
+  defp membership_renewal_note(_membership, true, _timezone), do: nil
+
+  defp membership_renewal_note(membership, false, timezone) do
+    plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
+    renewal_date = YscWeb.UserAuth.get_membership_renewal_date(membership)
+
+    if plan_type in [nil, :lifetime] or is_nil(renewal_date) do
+      nil
+    else
+      date = format_membership_date(renewal_date, timezone)
+
+      if membership_scheduled_for_cancellation?(membership),
+        do: {:ends, date},
+        else: {:renews, date}
     end
   end
 
