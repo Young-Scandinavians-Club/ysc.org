@@ -31,7 +31,7 @@ defmodule YscWeb.Components.News.NewsCard do
 
     ~H"""
     <div class={[
-      "group flex flex-col bg-white rounded-xl p-4 border border-zinc-100 hover:border-zinc-200 transition-colors duration-150",
+      "group relative flex flex-col bg-white rounded-xl p-4 border border-zinc-100 hover:border-zinc-200 transition duration-150 motion-safe:active:scale-[0.98]",
       @class
     ]}>
       <.link navigate={~p"/posts/#{@post.url_name}"} class="block">
@@ -65,7 +65,7 @@ defmodule YscWeb.Components.News.NewsCard do
 
         <.link
           navigate={~p"/posts/#{@post.url_name}"}
-          class="text-2xl text-zinc-900 mb-4 group-hover:text-blue-600 group-hover:underline transition-colors type-subhead"
+          class="text-2xl text-zinc-900 mb-4 group-hover:text-blue-600 group-hover:underline transition-colors type-subhead after:absolute after:inset-0 after:content-['']"
         >
           {@post.title}
         </.link>
