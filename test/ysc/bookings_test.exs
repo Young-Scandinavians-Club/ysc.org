@@ -7391,7 +7391,9 @@ defmodule Ysc.BookingsTest do
   describe "attach_modification_payment_intent/2" do
     defp put_active_modification_hold(booking, attrs_extra \\ %{}) do
       expires_at =
-        DateTime.utc_now() |> DateTime.add(30, :minute) |> DateTime.truncate(:second)
+        DateTime.utc_now()
+        |> DateTime.add(30, :minute)
+        |> DateTime.truncate(:second)
 
       attrs =
         Map.merge(

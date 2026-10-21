@@ -7012,6 +7012,8 @@ defmodule Ysc.Bookings do
 
   @doc false
   def ci_query_explain_attach_modification_payment_intent_query do
-    attach_modification_payment_intent_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+    attach_modification_payment_intent_query(
+      Ysc.Ci.QueryExplain.Fixtures.ulid()
+    )
   end
 end
