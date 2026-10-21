@@ -1234,6 +1234,17 @@ defmodule Ysc.Bookings do
   `CheckoutCancel` — the same atomic abandon as hold expiry / remount resubmit.
   Blind overwrite would leave a displaced Intent open for a concurrent tab to
   pay while the DB and expiry worker only know about the replacement.
+
+  Only a `:complete` booking that still has a modification hold row is updated
+  (`modification_hold_attrs` and `modification_hold_expires_at` both non-nil).
+  Deferred PI create can finish after release / complete-cancel cleared the
+  hold; a plain `Repo.update` of a stale in-memory attrs map would rewrite the
+  hold without `expires_at`, so ModHoldExpiry never reconciles and a closed-tab
+  capture orphans (cabin `payment_intent.succeeded` is a no-op for
+  modifications). Same WHERE fail-close as hold `attach_payment_intent/2`.
+
+  An already-past `expires_at` is still attachable: ModHoldExpiry selects those
+  rows and Stripe-reconciles. Cleared holds set both fields to nil.
   """
   def attach_modification_payment_intent(booking_id, payment_intent_id)
 
@@ -1260,15 +1271,11 @@ defmodule Ysc.Bookings do
                booking.id
              ) do
           :ok ->
-            booking
-            |> Booking.changeset(
-              %{
-                modification_hold_attrs:
-                  Map.put(attrs, "payment_intent_id", payment_intent_id)
-              },
-              skip_validation: true
+            persist_modification_payment_intent(
+              booking,
+              attrs,
+              payment_intent_id
             )
-            |> Repo.update()
 
           {:error, _} = error ->
             error
@@ -1277,6 +1284,39 @@ defmodule Ysc.Bookings do
       _ ->
         {:error, :no_modification_hold}
     end
+  end
+
+  defp persist_modification_payment_intent(booking, attrs, payment_intent_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    new_attrs = Map.put(attrs, "payment_intent_id", payment_intent_id)
+
+    {count, _} =
+      attach_modification_payment_intent_query(booking.id)
+      |> Repo.update_all(
+        set: [modification_hold_attrs: new_attrs, updated_at: now]
+      )
+
+    if count == 1 do
+      {:ok, %{booking | modification_hold_attrs: new_attrs, updated_at: now}}
+    else
+      Ysc.Logging.warning(
+        "Refusing to attach PaymentIntent to inactive modification hold",
+        booking_id: booking.id,
+        payment_intent_id: payment_intent_id,
+        status: booking.status
+      )
+
+      {:error, :no_modification_hold}
+    end
+  end
+
+  defp attach_modification_payment_intent_query(booking_id) do
+    from(b in Booking,
+      where: b.id == ^booking_id,
+      where: b.status == :complete,
+      where: not is_nil(b.modification_hold_attrs),
+      where: not is_nil(b.modification_hold_expires_at)
+    )
   end
 
   defp reconcile_previous_modification_payment_intent(
@@ -6968,5 +7008,10 @@ defmodule Ysc.Bookings do
   @doc false
   def ci_query_explain_attach_payment_intent_query do
     attach_hold_payment_intent_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_attach_modification_payment_intent_query do
+    attach_modification_payment_intent_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end
