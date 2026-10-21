@@ -1205,66 +1205,87 @@ defmodule YscWeb.HomeLive do
                   <.link
                     id={"home-itinerary-booking-#{booking.id}"}
                     navigate={~p"/bookings/#{booking.id}/receipt"}
-                    class="relative bg-white rounded-xl overflow-hidden flex flex-col md:flex-row transition-colors duration-150 group border border-zinc-200 hover:border-zinc-300"
+                    class="flex bg-white rounded-xl overflow-hidden transition-colors duration-150 group border border-zinc-200 hover:border-zinc-300"
                   >
+                    <%!-- Stub: check-in day, tinted by property --%>
                     <div class={[
-                      "h-1 md:h-auto md:w-1 shrink-0",
+                      "flex flex-col items-center justify-center w-18 shrink-0 text-white border-r-2 border-dashed px-2 py-4",
                       if(booking.property == :tahoe,
-                        do: "bg-blue-600",
-                        else: "bg-emerald-600"
+                        do: "bg-blue-700 border-blue-300/60",
+                        else: "bg-emerald-700 border-emerald-300/60"
                       )
                     ]}>
+                      <span class={[
+                        "text-xs type-eyebrow",
+                        if(booking.property == :tahoe,
+                          do: "text-blue-100",
+                          else: "text-emerald-100"
+                        )
+                      ]}>
+                        {Calendar.strftime(booking.checkin_date, "%b")}
+                      </span>
+                      <span class="text-3xl type-display leading-none">
+                        {Calendar.strftime(booking.checkin_date, "%-d")}
+                      </span>
+                      <.icon
+                        name="hero-home"
+                        class={[
+                          "w-4 h-4 mt-3",
+                          if(booking.property == :tahoe,
+                            do: "text-blue-200",
+                            else: "text-emerald-200"
+                          )
+                        ]}
+                      />
                     </div>
-                    <div class="p-5 flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 items-center">
-                      <div class="space-y-1 md:border-r border-zinc-100 pr-6">
-                        <p class="text-xs text-zinc-500 type-eyebrow">
-                          Destination
-                        </p>
-                        <p class="text-xl text-zinc-900 type-title">
+                    <div class="flex-1 min-w-0 p-5 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                      <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                          <span class={[
+                            "inline-flex items-center px-2 py-1 text-xs font-bold rounded-sm",
+                            case days_until_this_booking do
+                              :started -> "bg-green-50 text-green-700"
+                              0 -> "bg-amber-50 text-amber-700"
+                              _ -> "bg-zinc-100 text-zinc-700"
+                            end
+                          ]}>
+                            {case days_until_this_booking do
+                              :started -> "Currently staying"
+                              0 -> "Checking in today"
+                              1 -> "Tomorrow"
+                              days -> "In #{days} days"
+                            end}
+                          </span>
+                          <span
+                            :if={booking.booking_mode == :buyout}
+                            class="inline-flex items-center px-2 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-sm"
+                          >
+                            {BookingModeDisplay.stay_type_label(:buyout)}
+                          </span>
+                        </div>
+                        <p class="text-zinc-900 type-subhead">
                           {PropertyDisplay.medium_name(booking.property)}
                         </p>
-                        <p class="text-xs font-mono text-zinc-500">
-                          {booking.reference_id}
-                        </p>
-                      </div>
-                      <div class="space-y-2">
-                        <p class="text-xs text-zinc-500 type-eyebrow">
-                          Dates
-                        </p>
-                        <p class="font-bold text-zinc-800">
+                        <p class="mt-1 text-xs text-zinc-500 flex items-center gap-1">
+                          <.icon name="hero-calendar" class="w-3 h-3 shrink-0" />
                           {format_booking_date(booking.checkin_date)} — {format_booking_date(
                             booking.checkout_date
                           )}
                         </p>
-                        <span class={[
-                          "inline-flex items-center px-2.5 py-0.5 text-xs rounded-sm type-eyebrow",
-                          case days_until_this_booking do
-                            :started ->
-                              "bg-green-50 text-green-700 ring-1 ring-green-200/50"
-
-                            0 ->
-                              "bg-amber-50 text-amber-700 ring-1 ring-amber-200/50"
-
-                            _ ->
-                              "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200/50"
-                          end
-                        ]}>
-                          {case days_until_this_booking do
-                            :started -> "Currently Staying"
-                            0 -> "Checking in today"
-                            1 -> "Tomorrow"
-                            days -> "In #{days} days"
-                          end}
-                        </span>
-                        <%= if booking.booking_mode == :buyout do %>
-                          <span class="inline-block mt-1 px-2.5 py-0.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200/50 text-xs rounded-sm type-eyebrow">
-                            {BookingModeDisplay.stay_type_label(:buyout)}
-                          </span>
-                        <% end %>
+                        <p class="mt-1 text-xs font-mono text-zinc-500">
+                          {booking.reference_id}
+                        </p>
                       </div>
-                      <div class="flex md:justify-end">
-                        <span class="px-4 py-2 bg-zinc-900 text-white text-xs font-bold rounded-sm group-hover:bg-zinc-700 transition-colors duration-150">
-                          View Details
+                      <div class="shrink-0 md:pl-6 md:border-l md:border-zinc-100">
+                        <span class={[
+                          "inline-flex items-center gap-1 text-sm font-semibold transition-colors duration-150",
+                          if(booking.property == :tahoe,
+                            do: "text-blue-700 group-hover:text-blue-800",
+                            else: "text-emerald-700 group-hover:text-emerald-800"
+                          )
+                        ]}>
+                          View details
+                          <.icon name="hero-arrow-right" class="w-4 h-4" />
                         </span>
                       </div>
                     </div>
