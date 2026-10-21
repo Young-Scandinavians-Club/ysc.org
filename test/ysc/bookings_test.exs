@@ -7620,6 +7620,28 @@ defmodule Ysc.BookingsTest do
       assert is_nil(reloaded.modification_hold_expires_at)
     end
 
+    test "refuses to attach when attrs remain but expires_at was cleared" do
+      booking = booking_fixture(%{status: :complete})
+      booking = put_active_modification_hold(booking)
+
+      # The leftover of a stale changeset attach after release: attrs written
+      # back, expires_at left nil. ModHoldExpiry never selects those rows.
+      booking
+      |> Ecto.Changeset.change(%{modification_hold_expires_at: nil})
+      |> Repo.update!()
+
+      assert {:error, :no_modification_hold} =
+               Bookings.attach_modification_payment_intent(
+                 booking.id,
+                 "pi_mod_phantom_attrs"
+               )
+
+      reloaded = Repo.reload!(booking)
+      assert reloaded.modification_hold_attrs
+      assert is_nil(Bookings.modification_hold_payment_intent_id(reloaded))
+      assert is_nil(reloaded.modification_hold_expires_at)
+    end
+
     test "refuses to attach when the booking is no longer complete" do
       booking = booking_fixture(%{status: :complete})
       booking = put_active_modification_hold(booking)
