@@ -172,7 +172,7 @@ defmodule YscWeb.AdminMerchLive do
           []
 
         product ->
-          Enum.map(image_ids, &Merch.add_product_photo(product, &1))
+          Merch.add_product_photos(product, image_ids)
       end
 
     socket = refresh_editing(socket)
@@ -227,15 +227,36 @@ defmodule YscWeb.AdminMerchLive do
     |> Kernel.<>(".")
   end
 
-  # The photo list is part of the product being edited; reload it after a change.
+  # The photo list is part of the product being edited; reload that product
+  # after a change. The catalog table only needs this row's photo count, so
+  # skip `list_admin_products/0`.
   defp refresh_editing(socket) do
-    socket = load_products(socket)
+    case socket.assigns.editing_product do
+      %{id: id} ->
+        case Merch.get_admin_product(id) do
+          nil ->
+            socket
+            |> assign(:editing_product, nil)
+            |> load_products()
 
-    case socket.assigns.editing_product &&
-           Merch.get_admin_product(socket.assigns.editing_product.id) do
-      nil -> socket
-      product -> assign(socket, :editing_product, product)
+          product ->
+            products = replace_product(socket.assigns.products, product)
+
+            socket
+            |> assign(:editing_product, product)
+            |> assign(:products, products)
+        end
+
+      _ ->
+        socket
     end
+  end
+
+  defp replace_product(products, product) do
+    Enum.map(products, fn
+      %{id: id} when id == product.id -> product
+      other -> other
+    end)
   end
 
   defp photo_error(socket, :managed_by_printful) do
