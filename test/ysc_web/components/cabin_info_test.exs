@@ -282,47 +282,6 @@ defmodule YscWeb.Components.CabinInfoTest do
     end
   end
 
-  describe "refund_summary/1" do
-    test "describes each stay type's tiers from loosest to tightest" do
-      assigns = %{
-        columns: [
-          %{label: "Entire cabin", rules: [rule(21, "50"), rule(14, "0")]},
-          %{
-            label: "Individual room(s)",
-            rules: [rule(14, "50"), rule(7, "25")]
-          },
-          %{label: "Unconfigured", rules: []}
-        ]
-      }
-
-      html =
-        rendered_to_string(~H"""
-        <.refund_summary id="refunds" columns={@columns} />
-        """)
-
-      assert html =~
-               "Entire cabin: full refund more than 21 days before check-in; 50% within 21 days; no refund within 14 days."
-
-      assert html =~
-               "Individual room(s): full refund more than 14 days before check-in; 50% within 14 days; 25% within 7 days."
-
-      refute html =~ "Unconfigured"
-      assert html =~ "3% processing fee"
-    end
-
-    test "renders nothing when no stay type has any rules" do
-      assigns = %{columns: [%{label: "Entire cabin", rules: []}]}
-
-      html =
-        rendered_to_string(~H"""
-        <.refund_summary id="refunds" columns={@columns} />
-        """)
-
-      refute html =~ "refunds"
-      refute html =~ "processing fee"
-    end
-  end
-
   describe "cabin_modal/1" do
     test "renders an accessible dialog above the navbar with header, body and footer" do
       assigns = %{}

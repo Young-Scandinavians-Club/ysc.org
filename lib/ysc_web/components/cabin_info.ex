@@ -170,52 +170,6 @@ defmodule YscWeb.Components.CabinInfo do
   end
 
   @doc """
-  Short refund summary for the booking sidebar, one line per stay type.
-
-  `columns` is a list of `%{label: String.t(), rules: [rule]}`. A rule applies
-  when the cancellation is *within* its `days_before_checkin` (the refund engine
-  picks the tightest matching rule), and cancelling earlier than every rule is a
-  full refund. Stay types without rules are left out; nothing renders if none
-  have any.
-  """
-  attr :id, :string, default: nil
-  attr :columns, :list, required: true
-
-  def refund_summary(assigns) do
-    assigns = assign(assigns, :lines, refund_summary_lines(assigns.columns))
-
-    ~H"""
-    <p
-      :if={@lines != []}
-      id={@id}
-      class="mt-2 text-xs text-zinc-500 leading-relaxed"
-    >
-      <span :for={line <- @lines} class="block">{line}</span>
-      <span class="block">3% processing fee on cash refunds.</span>
-    </p>
-    """
-  end
-
-  @doc false
-  def refund_summary_lines(columns) do
-    columns
-    |> Enum.reject(&(&1.rules == []))
-    |> Enum.map(fn %{label: label, rules: rules} ->
-      [top | rest] = Enum.sort_by(rules, & &1.days_before_checkin, :desc)
-
-      tiers =
-        Enum.map([top | rest], fn rule ->
-          pct =
-            RefundPolicyDisplay.refund_percentage_int(rule.refund_percentage)
-
-          "#{if pct == 0, do: "no refund", else: "#{pct}%"} within #{rule.days_before_checkin} days"
-        end)
-
-      "#{label}: full refund more than #{top.days_before_checkin} days before check-in; #{Enum.join(tiers, "; ")}."
-    end)
-  end
-
-  @doc """
   Dialog shell for the booking pages' rules and review modals.
 
   Sits at `z-200`, above the sticky navbar (`z-100`) and the mobile booking bar,

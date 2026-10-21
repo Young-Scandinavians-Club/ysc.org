@@ -2456,21 +2456,6 @@ defmodule YscWeb.TahoeBookingLive do
                     >
                       You won't be charged yet.
                     </p>
-                    <.refund_summary
-                      id="tahoe-refund-summary"
-                      columns={[
-                        %{
-                          label: BookingModeDisplay.stay_type_label(:room),
-                          rules:
-                            RefundPolicyDisplay.policy_rules(@room_refund_policy)
-                        },
-                        %{
-                          label: BookingModeDisplay.stay_type_label(:buyout),
-                          rules:
-                            RefundPolicyDisplay.policy_rules(@buyout_refund_policy)
-                        }
-                      ]}
-                    />
                   </div>
                 </div>
               </div>
