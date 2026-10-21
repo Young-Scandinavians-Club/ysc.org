@@ -2481,7 +2481,16 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
                "#sleeping-at-the-cabin #winter-sleeping-photos"
              )
 
-      assert has_element?(view, "#winter-sleeping-photo-0 img")
+      assert has_element?(
+               view,
+               "#winter-sleeping-photos[phx-hook='GLightboxHook']"
+             )
+
+      assert has_element?(
+               view,
+               "#winter-sleeping-photo-0[data-glightbox-plain] img"
+             )
+
       assert has_element?(view, "#winter-sleeping-photo-3")
 
       # Both setups are always visible so members can preview either season
