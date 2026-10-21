@@ -1118,6 +1118,31 @@ defmodule Ysc.SubscriptionsTest do
       refute result == {:error, :user_already_has_active_subscription}
     end
 
+    test "passes a stable Stripe idempotency key when the caller omits one" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      price_id = "price_idem_#{System.unique_integer([:positive])}"
+      expected_key = "membership_sub_#{user.id}_#{price_id}"
+
+      expect(Stripe.SubscriptionMock, :create, fn _params, opts ->
+        assert opts[:headers]["Idempotency-Key"] ==
+                 Ysc.Stripe.Idempotency.key(expected_key)
+
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: "sub_idem_#{System.unique_integer([:positive])}",
+           customer: user.stripe_id,
+           status: "active"
+         )}
+      end)
+
+      assert {:ok, %Stripe.Subscription{}} =
+               Subscriptions.create_stripe_subscription(user, %{
+                 prices: [%{price: price_id, quantity: 1}]
+               })
+    end
+
     test "allows creating subscription when user has expired subscription" do
       user =
         user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})

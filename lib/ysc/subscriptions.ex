@@ -13,6 +13,12 @@ defmodule Ysc.Subscriptions do
   alias Ysc.Subscriptions.{Subscription, SubscriptionItem}
   alias Ysc.Stripe.SubscriptionHelpers
 
+  # Serialize find_blocking → Stripe.Subscription.create per user. Without this,
+  # two LiveView/API callers that both see no local row both mint Stripe
+  # subscriptions (two invoices / PaymentIntents). Matches merch/ticket checkout
+  # advisory locks; Stripe idempotency is belt-and-suspenders for the same price.
+  @membership_checkout_advisory_lock_namespace 8_233_204
+
   @doc """
   Returns the list of subscriptions for a given user.
 
@@ -1351,23 +1357,57 @@ defmodule Ysc.Subscriptions do
   """
   @dialyzer {:nowarn_function, create_stripe_subscription: 2}
   def create_stripe_subscription(user, params) do
-    case find_blocking_subscription(user) do
-      nil ->
-        do_create_stripe_subscription(user, params)
+    case Repo.transaction(
+           fn ->
+             lock_membership_stripe_create!(user.id)
 
-      %Subscription{stripe_status: "incomplete"} = incomplete_sub ->
-        retry_incomplete_subscription(user, incomplete_sub, params)
+             case find_blocking_subscription(user) do
+               nil ->
+                 case do_create_stripe_subscription(user, params) do
+                   {:ok, stripe_subscription} -> stripe_subscription
+                   {:error, reason} -> Repo.rollback(reason)
+                 end
 
-      %Subscription{} ->
-        {:error, :user_already_has_active_subscription}
+               %Subscription{stripe_status: "incomplete"} = incomplete_sub ->
+                 case retry_incomplete_subscription(
+                        user,
+                        incomplete_sub,
+                        params
+                      ) do
+                   {:ok, stripe_subscription} -> stripe_subscription
+                   {:error, reason} -> Repo.rollback(reason)
+                 end
+
+               %Subscription{} ->
+                 Repo.rollback(:user_already_has_active_subscription)
+             end
+           end,
+           timeout: :infinity
+         ) do
+      {:ok, stripe_subscription} -> {:ok, stripe_subscription}
+      {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp lock_membership_stripe_create!(user_id) do
+    Repo.query!("SELECT pg_advisory_xact_lock($1, $2)", [
+      @membership_checkout_advisory_lock_namespace,
+      :erlang.phash2(user_id, 2_147_483_647)
+    ])
   end
 
   defp do_create_stripe_subscription(user, params) do
     # Handle both keyword lists and maps
     prices = params[:prices] || params["prices"] || params.prices
     expand = params[:expand] || params["expand"] || []
-    idempotency_key = params[:idempotency_key] || params["idempotency_key"]
+
+    # Stable per user+prices when the caller omits a key (web membership
+    # settings / account-setup activation). Mobile already passes one. Without
+    # this, dual-tab creates mint two Stripe subscriptions before either local
+    # row exists for find_blocking_subscription/1.
+    idempotency_key =
+      params[:idempotency_key] || params["idempotency_key"] ||
+        default_membership_create_idempotency_key(user, prices)
 
     stripe_params = %{
       customer: user.stripe_id,
@@ -1398,19 +1438,13 @@ defmodule Ysc.Subscriptions do
       )
 
     result =
-      if idempotency_key do
-        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-          stripe_subscription_module().create(stripe_params,
-            headers: %{
-              "Idempotency-Key" => Ysc.Stripe.Idempotency.key(idempotency_key)
-            }
-          )
-        end)
-      else
-        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-          stripe_subscription_module().create(stripe_params)
-        end)
-      end
+      Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+        stripe_subscription_module().create(stripe_params,
+          headers: %{
+            "Idempotency-Key" => Ysc.Stripe.Idempotency.key(idempotency_key)
+          }
+        )
+      end)
 
     case result do
       {:ok, _} = ok ->
@@ -1423,6 +1457,17 @@ defmodule Ysc.Subscriptions do
       error ->
         error
     end
+  end
+
+  defp default_membership_create_idempotency_key(user, prices) do
+    price_part =
+      prices
+      |> List.wrap()
+      |> Enum.map_join("_", fn price ->
+        price[:price] || price["price"] || price.price
+      end)
+
+    "membership_sub_#{user.id}_#{price_part}"
   end
 
   # Used by create_stripe_subscription/2 to find the specific blocking

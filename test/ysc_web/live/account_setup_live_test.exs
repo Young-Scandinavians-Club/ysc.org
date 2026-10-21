@@ -1396,7 +1396,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       stripe_sub_id = "sub_mount_#{System.unique_integer([:positive])}"
 
-      expect(Stripe.SubscriptionMock, :create, fn _params ->
+      expect(Stripe.SubscriptionMock, :create, fn _params, _opts ->
         {:ok,
          Ysc.Stripe.SubscriptionFixtures.subscription(
            id: stripe_sub_id,
