@@ -448,9 +448,9 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "2 Tickets"
+      assert has_element?(view, "#event-details-ticket-count-badge", "(2)")
     end
 
     test "displays ticket tier name", %{conn: conn} do
@@ -635,7 +635,26 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert has_element?(view, "button", "View All My Tickets")
+      assert has_element?(view, "button", "View all my tickets")
+    end
+
+    test "renders a single check-in QR link", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(view, "#order-confirmation-checkin-qr")
+
+      refute has_element?(
+               view,
+               "#order-confirmation-items-section a[href*='/qr']"
+             )
     end
 
     test "displays back to event button", %{conn: conn} do
@@ -716,8 +735,8 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "lg:grid-cols-3"
-      assert html =~ "lg:col-span-2"
+      assert html =~ "lg:grid-cols-12"
+      assert html =~ "lg:col-span-8"
     end
 
     test "includes event details card", %{conn: conn} do
@@ -729,9 +748,9 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "Event Details"
+      assert has_element?(view, "#order-confirmation-event", event.title)
     end
 
     test "includes tickets card", %{conn: conn} do
@@ -796,7 +815,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       # Icons should be present
       assert html =~ "hero-check-circle"
-      assert html =~ "hero-ticket"
+      assert html =~ "hero-qr-code"
     end
   end
 
@@ -815,7 +834,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       assert html =~ "hero-check-circle"
     end
 
-    test "includes ticket icon", %{conn: conn} do
+    test "includes check-in QR icon", %{conn: conn} do
       user = create_user_with_membership()
       event = create_event(%{})
       tier = create_ticket_tier(event)
@@ -826,7 +845,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "hero-ticket"
+      assert html =~ "hero-qr-code"
     end
   end
 
@@ -919,7 +938,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
   end
 
   describe "ticket counts and badges" do
-    test "single ticket shows Ticket in badge", %{conn: conn} do
+    test "single ticket shows count in badge", %{conn: conn} do
       user = create_user_with_membership()
       event = create_event(%{})
       tier = create_ticket_tier(event)
@@ -928,12 +947,12 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "1 Ticket"
+      assert has_element?(view, "#event-details-ticket-count-badge", "(1)")
     end
 
-    test "multiple tickets show Tickets plural", %{conn: conn} do
+    test "multiple tickets show combined count", %{conn: conn} do
       user = create_user_with_membership()
       event = create_event(%{})
       tier = create_ticket_tier(event)
@@ -943,9 +962,9 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "2 Tickets"
+      assert has_element?(view, "#event-details-ticket-count-badge", "(2)")
     end
 
     test "event details badge excludes donation tickets from count", %{
@@ -970,12 +989,12 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert has_element?(view, "#event-details-ticket-count-badge", "1 Ticket")
+      assert has_element?(view, "#event-details-ticket-count-badge", "(1)")
 
       refute has_element?(
                view,
                "#event-details-ticket-count-badge",
-               "2 Tickets"
+               "(2)"
              )
 
       assert has_element?(

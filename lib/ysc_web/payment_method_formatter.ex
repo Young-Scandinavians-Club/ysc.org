@@ -610,6 +610,15 @@ defmodule YscWeb.PaymentMethodFormatter do
   def payment_brand_label(nil), do: nil
 
   def payment_brand_label(brand) when is_binary(brand) do
+    if String.contains?(brand, "@") do
+      # Link wallets identify the payer by email; keep it as typed.
+      brand
+    else
+      brand_label(brand)
+    end
+  end
+
+  defp brand_label(brand) do
     case String.downcase(brand) do
       "amex" ->
         "Amex"

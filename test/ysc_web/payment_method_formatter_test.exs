@@ -63,6 +63,11 @@ defmodule YscWeb.PaymentMethodFormatterTest do
       assert PaymentMethodFormatter.payment_brand_label("diners_club") ==
                "Diners Club"
     end
+
+    test "leaves Link email identifiers lowercase" do
+      assert PaymentMethodFormatter.payment_brand_label("admin@ysc.org") ==
+               "admin@ysc.org"
+    end
   end
 
   describe "extract_payment_method_details/1" do

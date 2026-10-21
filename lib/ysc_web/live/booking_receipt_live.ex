@@ -206,7 +206,7 @@ defmodule YscWeb.BookingReceiptLive do
       class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4"
     >
       <!-- Header -->
-      <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-100 pb-8">
+      <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-8">
         <div>
           <%= if @booking.status == :canceled do %>
             <div class="flex items-center gap-2 text-red-600 mb-2">
@@ -346,9 +346,9 @@ defmodule YscWeb.BookingReceiptLive do
         </div>
       <% end %>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         <!-- Left Column: Main Content -->
-        <div class="lg:col-span-2 flex flex-col gap-8">
+        <div class="lg:col-span-8 flex flex-col gap-10 min-w-0">
           <%= if @booking.status == :canceled do %>
             <!-- Cancelled Booking Notice -->
             <div class="bg-red-50 border-2 border-red-300 rounded-lg p-6">
@@ -371,17 +371,16 @@ defmodule YscWeb.BookingReceiptLive do
               </div>
             </div>
           <% end %>
-          <!-- Stay Details Card -->
+          <!-- Stay Details: cover photo + hairline stat strip -->
           <div class={[
-            "rounded-lg border overflow-hidden",
+            "rounded-xl border overflow-hidden",
             if(@booking.status == :canceled,
               do: "bg-zinc-100 border-zinc-300 opacity-60",
-              else: "bg-zinc-50 border-zinc-200"
+              else: "bg-white border-zinc-200"
             )
           ]}>
-            <!-- Property Image -->
             <div class={[
-              "h-48 bg-zinc-200 relative",
+              "h-48 bg-zinc-100 relative overflow-hidden",
               if(@booking.status == :canceled, do: "opacity-50 grayscale")
             ]}>
               <img
@@ -398,37 +397,14 @@ defmodule YscWeb.BookingReceiptLive do
                   </div>
                 </div>
               <% end %>
-              <div class="absolute inset-0 bg-linear-to-t from-black/40 to-transparent flex items-end p-6">
-                <div class="flex items-center justify-between w-full">
-                  <h2 class={[
-                    "text-xl flex items-center gap-2 type-subhead",
-                    if(@booking.status == :canceled,
-                      do: "text-zinc-300 line-through",
-                      else: "text-white"
-                    )
-                  ]}>
-                    <.icon name="hero-information-circle" class="w-8 h-8" />
-                    Stay Details
-                  </h2>
-                  <span class={[
-                    "text-sm font-medium px-3 py-1 rounded-full",
-                    if(@booking.status == :canceled,
-                      do: "bg-zinc-300 text-zinc-600",
-                      else: "bg-blue-100 text-blue-700"
-                    )
-                  ]}>
-                    {BookingDisplay.nights_label(
-                      Date.diff(@booking.checkout_date, @booking.checkin_date),
-                      capitalize: true
-                    )}
-                  </span>
-                </div>
-              </div>
             </div>
-            <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-200 border-t border-zinc-200">
               <.labeled_value
                 label="Check-in"
+                class="bg-zinc-50 p-5"
                 muted={@booking.status == :canceled}
+                value_class={receipt_stat_value_class(@booking)}
+                detail_class="text-xs"
                 detail_id="booking-receipt-checkin-time"
               >
                 {DateDisplay.format_date_long(@booking.checkin_date, "—")}
@@ -438,7 +414,10 @@ defmodule YscWeb.BookingReceiptLive do
               </.labeled_value>
               <.labeled_value
                 label="Check-out"
+                class="bg-zinc-50 p-5"
                 muted={@booking.status == :canceled}
+                value_class={receipt_stat_value_class(@booking)}
+                detail_class="text-xs"
                 detail_id="booking-receipt-checkout-time"
               >
                 {DateDisplay.format_date_long(@booking.checkout_date, "—")}
@@ -448,96 +427,94 @@ defmodule YscWeb.BookingReceiptLive do
               </.labeled_value>
               <.labeled_value
                 label={receipt_rooms_or_type_label(@booking)}
+                class="bg-zinc-50 p-5"
                 muted={@booking.status == :canceled}
+                value_class={receipt_stat_value_class(@booking)}
+                detail_class="text-xs"
                 value_id="receipt-booking-type"
               >
                 {receipt_rooms_or_type_value(@booking)}
-                <:detail :if={@booking.booking_mode != :buyout}>
-                  {BookingDisplay.guest_headcount_label(@booking)}
+                <:detail>
+                  {BookingDisplay.nights_label(
+                    Date.diff(@booking.checkout_date, @booking.checkin_date),
+                    capitalize: true
+                  )}
+                  <%= if @booking.booking_mode != :buyout do %>
+                    · {BookingDisplay.guest_headcount_label(@booking)}
+                  <% end %>
                 </:detail>
               </.labeled_value>
             </div>
           </div>
           <!-- Guest Information (if booking guests exist) -->
           <%= if Ecto.assoc_loaded?(@booking.booking_guests) && length(@booking.booking_guests) > 0 do %>
-            <div class={[
-              "rounded-lg border overflow-hidden",
-              if(@booking.status == :canceled,
-                do: "bg-zinc-100 border-zinc-300 opacity-60",
-                else: "bg-white border-zinc-200"
-              )
-            ]}>
-              <div class="p-8">
-                <h2 class={[
-                  "text-xl mb-6 flex items-center gap-2 type-subhead",
-                  if(@booking.status == :canceled,
-                    do: "text-zinc-500 line-through",
-                    else: "text-zinc-900"
-                  )
-                ]}>
-                  <.icon name="hero-users" class="w-6 h-6" /> Guest Information
-                </h2>
-                <div class="space-y-4">
-                  <%= for guest <- Enum.sort_by(@booking.booking_guests, & &1.order_index) do %>
-                    <div class={[
-                      "flex items-center gap-4 p-4 rounded-lg border-l-4",
-                      if(guest.is_child,
-                        do: "bg-green-50 border-green-300",
-                        else: "bg-blue-50 border-blue-300"
-                      )
-                    ]}>
-                      <.numbered_badge
-                        id={"receipt-guest-#{guest.id}-badge"}
-                        size={:md}
-                        tone={if(guest.is_child, do: :success, else: :info)}
-                      >
-                        <%= if guest.is_booking_user do %>
-                          <%= if Ecto.assoc_loaded?(@booking.user) && @booking.user do %>
-                            <.user_avatar_image
-                              user={@booking.user}
-                              class="w-8 h-8"
-                            />
-                          <% else %>
-                            <.icon name="hero-user-circle" class="w-5 h-5" />
-                          <% end %>
+            <section id="booking-receipt-guests">
+              <h2 class={[
+                "text-lg mb-4 type-subhead",
+                if(@booking.status == :canceled,
+                  do: "text-zinc-500 line-through",
+                  else: "text-zinc-900"
+                )
+              ]}>
+                Guest Information
+              </h2>
+              <div class={[
+                "divide-y divide-zinc-200 border border-zinc-200 rounded-xl overflow-hidden",
+                if(@booking.status == :canceled,
+                  do: "bg-zinc-100 opacity-60",
+                  else: "bg-white"
+                )
+              ]}>
+                <%= for guest <- Enum.sort_by(@booking.booking_guests, & &1.order_index) do %>
+                  <div class="flex items-center gap-4 px-5 py-4">
+                    <.numbered_badge
+                      id={"receipt-guest-#{guest.id}-badge"}
+                      size={:md}
+                      tone={if(guest.is_child, do: :success, else: :info)}
+                    >
+                      <%= if guest.is_booking_user do %>
+                        <%= if Ecto.assoc_loaded?(@booking.user) && @booking.user do %>
+                          <.user_avatar_image
+                            user={@booking.user}
+                            class="w-8 h-8"
+                          />
                         <% else %>
-                          {guest.order_index + 1}
+                          <.icon name="hero-user-circle" class="w-5 h-5" />
                         <% end %>
-                      </.numbered_badge>
-                      <div class="flex-1">
-                        <div class="flex items-center justify-between mb-1">
-                          <h3 class={[
-                            "type-subhead",
-                            if(@booking.status == :canceled,
-                              do: "text-zinc-500 line-through",
-                              else: "text-zinc-900"
-                            )
-                          ]}>
-                            <%= if guest.is_booking_user do %>
-                              {guest.first_name} {guest.last_name}
-                              <span class="text-xs font-normal text-zinc-500 ml-2">
-                                (Booking Member)
-                              </span>
-                            <% else %>
-                              {guest.first_name} {guest.last_name}
-                            <% end %>
-                          </h3>
-                          <span class={[
-                            "text-xs font-medium px-2 py-1 rounded-sm",
-                            if(guest.is_child,
-                              do: "bg-green-200 text-green-800",
-                              else: "bg-blue-200 text-blue-800"
-                            )
-                          ]}>
-                            {if guest.is_child, do: "Child", else: "Adult"}
-                          </span>
-                        </div>
-                      </div>
+                      <% else %>
+                        {guest.order_index + 1}
+                      <% end %>
+                    </.numbered_badge>
+                    <div class="flex-1 min-w-0 flex items-center justify-between gap-3">
+                      <h3 class={[
+                        "text-sm font-semibold",
+                        if(@booking.status == :canceled,
+                          do: "text-zinc-500 line-through",
+                          else: "text-zinc-900"
+                        )
+                      ]}>
+                        {guest.first_name} {guest.last_name}
+                        <span
+                          :if={guest.is_booking_user}
+                          class="text-xs font-normal text-zinc-500 ml-2"
+                        >
+                          (Booking Member)
+                        </span>
+                      </h3>
+                      <span class={[
+                        "text-xs font-medium px-2 py-1 rounded-sm shrink-0",
+                        if(guest.is_child,
+                          do: "bg-green-100 text-green-800",
+                          else: "bg-blue-100 text-blue-800"
+                        )
+                      ]}>
+                        {if guest.is_child, do: "Child", else: "Adult"}
+                      </span>
                     </div>
-                  <% end %>
-                </div>
+                  </div>
+                <% end %>
               </div>
-            </div>
+            </section>
           <% end %>
           <!-- Utility Cards (Hidden for cancelled bookings) -->
           <%= if @booking.status != :canceled do %>
@@ -581,42 +558,26 @@ defmodule YscWeb.BookingReceiptLive do
           <% end %>
         </div>
         <!-- Right Column: Sidebar -->
-        <aside class="space-y-6">
+        <aside class="lg:col-span-4 space-y-4">
           <!-- Payment Summary Loading Skeleton -->
-          <div
-            :if={!@async_data_loaded}
-            class="rounded-lg p-8 shadow-xl bg-zinc-900 animate-pulse"
-          >
-            <div class="h-3 w-32 bg-zinc-700 rounded-sm mb-6"></div>
-            <div class="space-y-4">
-              <div class="flex justify-between">
-                <div class="h-4 w-24 bg-zinc-700 rounded-sm"></div>
-                <div class="h-4 w-16 bg-zinc-700 rounded-sm"></div>
-              </div>
-              <div class="border-t border-zinc-700 pt-4 flex justify-between">
-                <div class="h-4 w-20 bg-zinc-700 rounded-sm"></div>
-                <div class="h-6 w-24 bg-zinc-700 rounded-sm"></div>
-              </div>
-              <div class="border-t border-zinc-700 pt-4 space-y-2">
-                <div class="h-3 w-28 bg-zinc-700 rounded-sm"></div>
-                <div class="h-3 w-40 bg-zinc-700 rounded-sm"></div>
-              </div>
-            </div>
-          </div>
+          <.payment_summary_skeleton :if={!@async_data_loaded} announce?={false} />
           <!-- Payment Summary -->
           <%= if @async_data_loaded && @payment do %>
-            <div class={[
-              "rounded-lg p-8 shadow-xl",
-              if(@booking.status == :canceled,
-                do: "bg-red-50 border-2 border-red-200",
-                else: "bg-zinc-900 text-white"
-              )
-            ]}>
+            <div
+              id="booking-receipt-payment-summary"
+              class={[
+                "rounded-xl p-6 border text-zinc-900",
+                if(@booking.status == :canceled,
+                  do: "bg-red-50 border-red-200",
+                  else: "bg-zinc-50/70 border-zinc-200"
+                )
+              ]}
+            >
               <h3 class={[
-                "text-xs mb-6 type-eyebrow",
+                "text-xs mb-5 type-eyebrow",
                 if(@booking.status == :canceled,
                   do: "text-red-700",
-                  else: "text-zinc-400"
+                  else: "text-zinc-500"
                 )
               ]}>
                 {if @booking.status == :canceled,
@@ -626,18 +587,18 @@ defmodule YscWeb.BookingReceiptLive do
               <%= if @show_reservation_updated && @booking.status != :canceled do %>
                 <div
                   id="reservation-updated-notice"
-                  class="mb-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4"
+                  class="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4"
                 >
                   <div class="flex items-start gap-3">
                     <.icon
                       name="hero-check-circle"
-                      class="w-5 h-5 text-emerald-400 shrink-0 mt-0.5"
+                      class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5"
                     />
                     <div>
-                      <p class="font-semibold text-emerald-300">
+                      <p class="font-semibold text-emerald-800">
                         Booking updated
                       </p>
-                      <p class="text-sm text-zinc-400 mt-1">
+                      <p class="text-sm text-zinc-600 mt-1">
                         Your changes are saved. The details below reflect your updated booking.
                       </p>
                     </div>
@@ -645,8 +606,7 @@ defmodule YscWeb.BookingReceiptLive do
                 </div>
               <% end %>
               <div class={[
-                "space-y-4 text-sm",
-                if(@booking.status == :canceled, do: "text-zinc-900", else: "")
+                "space-y-3 text-sm"
               ]}>
                 <!-- Price Breakdown -->
                 <%= if @price_breakdown do %>
@@ -661,12 +621,7 @@ defmodule YscWeb.BookingReceiptLive do
                             id={"payment-summary-buyout-segment-#{index}"}
                             class="flex justify-between"
                           >
-                            <span class={
-                              if(@booking.status == :canceled,
-                                do: "text-zinc-600",
-                                else: "text-zinc-400"
-                              )
-                            }>
+                            <span class="text-zinc-500">
                               {BookingDisplay.season_rate_label(segment.season_name)}
                               <%= if segment.price_per_night do %>
                                 ({MoneyHelper.format_money!(segment.price_per_night)} × {segment.nights} {if segment.nights ==
@@ -677,12 +632,7 @@ defmodule YscWeb.BookingReceiptLive do
                                                                                                                "nights"})
                               <% end %>
                             </span>
-                            <span class={
-                              if(@booking.status == :canceled,
-                                do: "text-zinc-700",
-                                else: "text-zinc-300"
-                              )
-                            }>
+                            <span class="text-zinc-900">
                               {MoneyHelper.format_money!(segment.total)}
                             </span>
                           </div>
@@ -693,12 +643,7 @@ defmodule YscWeb.BookingReceiptLive do
                             id="payment-summary-buyout-line"
                             class="flex justify-between"
                           >
-                            <span class={
-                              if(@booking.status == :canceled,
-                                do: "text-zinc-600",
-                                else: "text-zinc-400"
-                              )
-                            }>
+                            <span class="text-zinc-500">
                               Entire cabin
                               ({MoneyHelper.format_money!(
                                 @price_breakdown.price_per_night
@@ -706,12 +651,7 @@ defmodule YscWeb.BookingReceiptLive do
                                 @price_breakdown.nights
                               )})
                             </span>
-                            <span class={
-                              if(@booking.status == :canceled,
-                                do: "text-zinc-700",
-                                else: "text-zinc-300"
-                              )
-                            }>
+                            <span class="text-zinc-900">
                               {MoneyHelper.format_money!(
                                 buyout_line_amount(@price_breakdown, @booking)
                               )}
@@ -724,12 +664,7 @@ defmodule YscWeb.BookingReceiptLive do
                         <% total_guest_nights =
                           @price_breakdown.nights * @price_breakdown.guests_count %>
                         <div class="flex justify-between">
-                          <span class={
-                            if(@booking.status == :canceled,
-                              do: "text-zinc-600",
-                              else: "text-zinc-400"
-                            )
-                          }>
+                          <span class="text-zinc-500">
                             Shared cabin stay
                             ({BookingDisplay.people_label(
                               @price_breakdown.guests_count
@@ -737,12 +672,7 @@ defmodule YscWeb.BookingReceiptLive do
                               @price_breakdown.nights
                             )})
                           </span>
-                          <span class={
-                            if(@booking.status == :canceled,
-                              do: "text-zinc-700",
-                              else: "text-zinc-300"
-                            )
-                          }>
+                          <span class="text-zinc-900">
                             {MoneyHelper.format_money!(
                               Money.mult(
                                 @price_breakdown.price_per_guest_per_night,
@@ -773,12 +703,7 @@ defmodule YscWeb.BookingReceiptLive do
                           <div class="flex justify-between">
                             <span
                               id="receipt-base-price-people"
-                              class={
-                                if(@booking.status == :canceled,
-                                  do: "text-zinc-600",
-                                  else: "text-zinc-400"
-                                )
-                              }
+                              class="text-zinc-500"
                             >
                               Base Price
                               <%= if @price_breakdown[:adult_price_per_night] do %>
@@ -794,24 +719,14 @@ defmodule YscWeb.BookingReceiptLive do
                                 )})
                               <% end %>
                             </span>
-                            <span class={
-                              if(@booking.status == :canceled,
-                                do: "text-zinc-700",
-                                else: "text-zinc-300"
-                              )
-                            }>
+                            <span class="text-zinc-900">
                               {MoneyHelper.format_money!(@price_breakdown.base)}
                             </span>
                           </div>
                         <% end %>
                         <%= if @price_breakdown[:children] && @price_breakdown[:children_count] && @price_breakdown[:children_count] > 0 do %>
                           <div class="flex justify-between">
-                            <span class={
-                              if(@booking.status == :canceled,
-                                do: "text-zinc-600",
-                                else: "text-zinc-400"
-                              )
-                            }>
+                            <span class="text-zinc-500">
                               Children
                               ({BookingDisplay.children_label(
                                 @price_breakdown[:children_count]
@@ -819,12 +734,7 @@ defmodule YscWeb.BookingReceiptLive do
                                 @price_breakdown.nights
                               )})
                             </span>
-                            <span class={
-                              if(@booking.status == :canceled,
-                                do: "text-zinc-700",
-                                else: "text-zinc-300"
-                              )
-                            }>
+                            <span class="text-zinc-900">
                               {MoneyHelper.format_money!(@price_breakdown.children)}
                             </span>
                           </div>
@@ -841,7 +751,7 @@ defmodule YscWeb.BookingReceiptLive do
                     <span class={
                       if(@booking.status == :canceled,
                         do: "text-zinc-600",
-                        else: "text-emerald-400"
+                        else: "text-emerald-700"
                       )
                     }>
                       {@price_breakdown[:entitlement_summary] || "Member discount"}
@@ -849,7 +759,7 @@ defmodule YscWeb.BookingReceiptLive do
                     <span class={
                       if(@booking.status == :canceled,
                         do: "text-zinc-700",
-                        else: "text-emerald-400"
+                        else: "text-emerald-700"
                       )
                     }>
                       −{MoneyHelper.format_money!(
@@ -860,33 +770,18 @@ defmodule YscWeb.BookingReceiptLive do
                 <% end %>
                 <%= if @multiple_payments? && @booking.total_price do %>
                   <div class="flex justify-between">
-                    <span class={
-                      if(@booking.status == :canceled,
-                        do: "text-zinc-600",
-                        else: "text-zinc-400"
-                      )
-                    }>
+                    <span class="text-zinc-500">
                       Booking total
                     </span>
-                    <span class={
-                      if(@booking.status == :canceled,
-                        do: "text-zinc-700",
-                        else: "text-zinc-300"
-                      )
-                    }>
+                    <span class="text-zinc-900">
                       {MoneyHelper.format_money!(@booking.total_price)}
                     </span>
                   </div>
                   <div
                     id="booking-payment-history"
-                    class="space-y-2 border-t border-zinc-800 pt-4"
+                    class="space-y-2 border-t border-zinc-200 pt-4"
                   >
-                    <p class={
-                      if(@booking.status == :canceled,
-                        do: "text-xs text-zinc-600 type-eyebrow",
-                        else: "text-xs text-zinc-500 type-eyebrow"
-                      )
-                    }>
+                    <p class="text-xs text-zinc-500 type-eyebrow">
                       Payments
                     </p>
                     <%= for entry <- @booking_payment_entries do %>
@@ -895,12 +790,7 @@ defmodule YscWeb.BookingReceiptLive do
                         class="flex justify-between gap-3 text-xs"
                       >
                         <div class="min-w-0">
-                          <p class={
-                            if(@booking.status == :canceled,
-                              do: "text-zinc-500",
-                              else: "text-zinc-400"
-                            )
-                          }>
+                          <p class="text-zinc-500">
                             {DateDisplay.format_in_zone(
                               entry.payment.payment_date,
                               @timezone,
@@ -908,7 +798,7 @@ defmodule YscWeb.BookingReceiptLive do
                             )}
                           </p>
                           <%= if entry.method_description do %>
-                            <p class="inline-flex items-center gap-1.5 text-zinc-300 mt-0.5 min-w-0">
+                            <p class="inline-flex items-center gap-1.5 text-zinc-700 mt-0.5 min-w-0">
                               <%= if entry.method_logo do %>
                                 <img
                                   src={entry.method_logo}
@@ -924,40 +814,58 @@ defmodule YscWeb.BookingReceiptLive do
                             </p>
                           <% end %>
                         </div>
-                        <span class={
-                          if(@booking.status == :canceled,
-                            do: "text-zinc-700 shrink-0",
-                            else: "text-zinc-300 shrink-0"
-                          )
-                        }>
+                        <span class="text-zinc-900 shrink-0">
                           {MoneyHelper.format_money!(entry.payment.amount)}
                         </span>
                       </div>
                     <% end %>
                   </div>
                 <% end %>
+                <%= unless @multiple_payments? do %>
+                  <div
+                    id="payment-method-summary"
+                    class="flex justify-between items-center gap-2"
+                  >
+                    <span class="text-zinc-500">
+                      Method
+                    </span>
+                    <span class="inline-flex items-center gap-2 justify-end text-right min-w-0 font-medium">
+                      <%= if @payment_method_logo do %>
+                        <img
+                          src={@payment_method_logo}
+                          alt=""
+                          class="h-4 w-auto max-w-12 object-contain shrink-0"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      <% end %>
+                      <span class="min-w-0">{@payment_method_description}</span>
+                    </span>
+                  </div>
+                  <div id="payment-date-summary" class="flex justify-between">
+                    <span class="text-zinc-500">
+                      Date
+                    </span>
+                    <span class="font-medium">
+                      {DateDisplay.format_in_zone(
+                        @payment.payment_date,
+                        @timezone,
+                        "—"
+                      )}
+                    </span>
+                  </div>
+                <% end %>
                 <div class={[
-                  "flex justify-between",
+                  "flex justify-between items-baseline border-t pt-4",
                   if(@booking.status == :canceled,
-                    do: "border-t border-red-200 pt-4",
-                    else: "border-t border-zinc-800 pt-4"
+                    do: "border-red-200",
+                    else: "border-zinc-200"
                   )
                 ]}>
-                  <span class={
-                    if(@booking.status == :canceled,
-                      do: "text-zinc-600",
-                      else: "text-zinc-400"
-                    )
-                  }>
+                  <span class="font-semibold text-zinc-900">
                     Total Paid
                   </span>
-                  <span class={[
-                    "font-bold text-xl",
-                    if(@booking.status == :canceled,
-                      do: "text-zinc-900",
-                      else: "text-blue-400"
-                    )
-                  ]}>
+                  <span class="font-bold text-lg tabular-nums text-zinc-900">
                     {MoneyHelper.format_money!(receipt_total_paid_amount(assigns))}
                   </span>
                 </div>
@@ -965,7 +873,7 @@ defmodule YscWeb.BookingReceiptLive do
                   <%= if @refund_data.total_refunded do %>
                     <div class="flex justify-between border-t border-red-200 pt-4">
                       <span class="text-zinc-600">Refunded</span>
-                      <span class="font-bold text-green-600 text-xl">
+                      <span class="font-bold text-green-600 text-lg tabular-nums">
                         {MoneyHelper.format_money!(@refund_data.total_refunded)}
                       </span>
                     </div>
@@ -1023,7 +931,7 @@ defmodule YscWeb.BookingReceiptLive do
                       <span class="font-semibold text-zinc-900">
                         Amount still charged
                       </span>
-                      <span class="font-bold text-red-600 text-xl">
+                      <span class="font-bold text-red-600 text-lg tabular-nums">
                         {case Money.sub(
                                 receipt_total_paid_amount(assigns),
                                 @refund_data.total_refunded
@@ -1045,56 +953,6 @@ defmodule YscWeb.BookingReceiptLive do
                       </p>
                     </div>
                   <% end %>
-                <% end %>
-                <%= unless @multiple_payments? do %>
-                  <div
-                    id="payment-method-summary"
-                    class={[
-                      "flex justify-between items-center gap-2",
-                      if(@booking.status == :canceled,
-                        do: "border-t border-red-200 pt-4",
-                        else: "border-t border-zinc-800 pt-4"
-                      )
-                    ]}
-                  >
-                    <span class={
-                      if(@booking.status == :canceled,
-                        do: "text-zinc-600",
-                        else: "text-zinc-400"
-                      )
-                    }>
-                      Method
-                    </span>
-                    <span class="inline-flex items-center gap-2 justify-end text-right min-w-0">
-                      <%= if @payment_method_logo do %>
-                        <img
-                          src={@payment_method_logo}
-                          alt=""
-                          class="h-5 w-auto max-w-12 object-contain shrink-0"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      <% end %>
-                      <span class="min-w-0">{@payment_method_description}</span>
-                    </span>
-                  </div>
-                  <div id="payment-date-summary" class="flex justify-between">
-                    <span class={
-                      if(@booking.status == :canceled,
-                        do: "text-zinc-600",
-                        else: "text-zinc-400"
-                      )
-                    }>
-                      Date
-                    </span>
-                    <span>
-                      {DateDisplay.format_in_zone(
-                        @payment.payment_date,
-                        @timezone,
-                        "—"
-                      )}
-                    </span>
-                  </div>
                 <% end %>
               </div>
             </div>
@@ -1283,6 +1141,12 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp receipt_timezone(socket), do: YscWeb.TimeZone.from_connect_params(socket)
+
+  defp receipt_stat_value_class(%{status: :canceled}),
+    do: "text-base font-semibold text-zinc-500 line-through"
+
+  defp receipt_stat_value_class(_booking),
+    do: "text-base font-semibold text-zinc-900"
 
   defp receipt_rooms_or_type_label(booking) do
     if Ecto.assoc_loaded?(booking.rooms) && booking.rooms != [] do

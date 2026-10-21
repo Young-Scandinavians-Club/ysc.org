@@ -3862,7 +3862,7 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Skeleton placeholder mimicking the dark payment summary sidebar card used on
+  Skeleton placeholder mimicking the payment summary receipt card used on
   order/booking confirmation pages (subtotal/total rows + payment method line).
 
   ## Examples
@@ -3875,24 +3875,24 @@ defmodule YscWeb.CoreComponents do
   def payment_summary_skeleton(assigns) do
     ~H"""
     <div
-      class={["rounded-lg p-8 shadow-xl bg-zinc-900", @class]}
+      class={["rounded-xl p-6 border border-zinc-200 bg-zinc-50/70", @class]}
       role={@announce? && "status"}
       aria-label={@announce? && "Loading payment summary"}
     >
       <span :if={@announce?} class="sr-only">Loading payment summary…</span>
-      <.skeleton_block class="h-3 w-32 rounded-sm mb-6 bg-zinc-700" />
+      <.skeleton_block class="h-3 w-32 rounded-sm mb-6" />
       <div class="space-y-4">
         <div class="flex justify-between">
-          <.skeleton_block class="h-4 w-24 rounded-sm bg-zinc-700" />
-          <.skeleton_block class="h-4 w-16 rounded-sm bg-zinc-700" />
+          <.skeleton_block class="h-4 w-24 rounded-sm" />
+          <.skeleton_block class="h-4 w-16 rounded-sm" />
         </div>
-        <div class="border-t border-zinc-700 pt-4 flex justify-between">
-          <.skeleton_block class="h-4 w-20 rounded-sm bg-zinc-700" />
-          <.skeleton_block class="h-6 w-24 rounded-sm bg-zinc-700" />
+        <div class="border-t border-zinc-200 pt-4 flex justify-between">
+          <.skeleton_block class="h-4 w-20 rounded-sm" />
+          <.skeleton_block class="h-6 w-24 rounded-sm" />
         </div>
-        <div class="border-t border-zinc-700 pt-4 space-y-2">
-          <.skeleton_block class="h-3 w-28 rounded-sm bg-zinc-700" />
-          <.skeleton_block class="h-3 w-40 rounded-sm bg-zinc-700" />
+        <div class="border-t border-zinc-200 pt-4 space-y-2">
+          <.skeleton_block class="h-3 w-28 rounded-sm" />
+          <.skeleton_block class="h-3 w-40 rounded-sm" />
         </div>
       </div>
     </div>
