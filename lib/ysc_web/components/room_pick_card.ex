@@ -4,8 +4,8 @@ defmodule YscWeb.Components.RoomPickCard do
 
   Shares its look with the browse-only cards in `YscWeb.Components.RoomBrowser`
   (title, one metadata line, quiet price footer) and adds the selection state:
-  a visually hidden radio or checkbox, a check indicator, and a neutral overlay
-  that explains why a room can't be picked.
+  a visually hidden radio or checkbox, a check indicator, and a short note that
+  explains why a room can't be picked. The photo is never covered.
   """
   use Phoenix.Component
 
@@ -18,7 +18,7 @@ defmodule YscWeb.Components.RoomPickCard do
 
   attr :reason, :string,
     default: nil,
-    doc: "Why the room can't be picked; shown over the photo when disabled"
+    doc: "Why the room can't be picked; shown under the photo when disabled"
 
   attr :multiple, :boolean,
     default: false,
@@ -53,7 +53,7 @@ defmodule YscWeb.Components.RoomPickCard do
           phx-value-room-id={if(!@disabled, do: @room.id)}
           class="sr-only"
         />
-        <div class="relative h-36 w-full overflow-hidden bg-zinc-200">
+        <div class="relative h-36 w-full shrink-0 overflow-hidden bg-zinc-200">
           <%= if @room.image && @room.image.id do %>
             <.live_component
               id={"room-image-#{if(@disabled, do: "disabled-")}#{@room.id}"}
@@ -68,13 +68,6 @@ defmodule YscWeb.Components.RoomPickCard do
               <.icon name="hero-photo" class="w-12 h-12" />
             </div>
           <% end %>
-          <p
-            :if={@disabled && @reason}
-            class="absolute inset-x-0 bottom-0 z-10 flex items-start gap-2 bg-zinc-900/80 px-3 py-2 text-xs text-white"
-          >
-            <.icon name="hero-no-symbol" class="w-4 h-4 shrink-0" />
-            <span>{@reason}</span>
-          </p>
         </div>
         <div class="flex flex-1 flex-col gap-3 p-4">
           <div class="flex items-start justify-between gap-3">
@@ -106,6 +99,16 @@ defmodule YscWeb.Components.RoomPickCard do
             </span>
           </div>
           <.room_meta room={@room} />
+          <p
+            :if={@disabled && @reason}
+            class="flex items-start gap-1.5 text-xs text-zinc-700 leading-relaxed"
+          >
+            <.icon
+              name="hero-no-symbol"
+              class="mt-0.5 w-4 h-4 shrink-0 text-zinc-500"
+            />
+            <span>{@reason}</span>
+          </p>
           <p
             :if={@room.min_billable_occupancy > 1}
             id={"room-#{@room.id}-min-charge-badge"}
