@@ -90,7 +90,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
-              class="w-8 h-5 bg-red-800 border border-red-900 rounded-sm flex items-center justify-center text-[9px] font-bold text-red-100"
+              class="w-8 h-5 bg-red-200 border border-red-400 rounded-sm flex items-center justify-center text-[9px] font-bold text-red-900"
               aria-hidden="true"
             >
               X
@@ -99,7 +99,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
-              class="w-8 h-5 bg-red-200 border border-red-400 rounded-sm flex items-center justify-center text-[9px] font-bold text-red-900 line-through"
+              class="w-8 h-5 bg-red-800 border border-red-900 rounded-sm flex items-center justify-center text-[9px] font-bold text-red-100 line-through"
               aria-hidden="true"
             >
               --
@@ -607,6 +607,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   defp day_shows_ok_badge?(day, assigns) do
     !other_month?(day, assigns.current.date) &&
       !selection_restricted?(day, assigns) &&
+      !date_disabled?(day, assigns) &&
       day_visual_state(day, assigns) in [
         :available,
         :check_in_allowed,
