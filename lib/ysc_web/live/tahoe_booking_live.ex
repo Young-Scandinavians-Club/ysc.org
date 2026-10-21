@@ -1951,7 +1951,23 @@ defmodule YscWeb.TahoeBookingLive do
                         room={room}
                         selected={room_already_selected}
                         disabled={is_disabled}
-                        reason={reason}
+                        reason={
+                          cond do
+                            is_unavailable && reason ->
+                              reason
+
+                            cannot_add_second_room ->
+                              YscWeb.BookingUserMessages.cannot_book_second_room_solo()
+
+                            max_rooms_reached ->
+                              YscWeb.BookingUserMessages.room_limit_reached(
+                                max_rooms_for_user(assigns)
+                              )
+
+                            true ->
+                              nil
+                          end
+                        }
                         multiple={can_select_multiple_rooms?(assigns)}
                         prices={
                           %{

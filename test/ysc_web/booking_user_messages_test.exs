@@ -303,6 +303,11 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     refute BookingUserMessages.single_membership_one_room() =~ "deselect"
 
+    assert BookingUserMessages.room_limit_reached(1) ==
+             BookingUserMessages.single_membership_one_room()
+
+    assert BookingUserMessages.room_limit_reached(2) =~ "maximum of 2 rooms"
+
     assert BookingUserMessages.membership_required_link_text() ==
              "Choose a membership"
 

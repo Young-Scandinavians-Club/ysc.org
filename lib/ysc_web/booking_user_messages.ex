@@ -145,6 +145,16 @@ defmodule YscWeb.BookingUserMessages do
     "You need more than one person in your group to book a second room."
   end
 
+  @doc """
+  Why the remaining room cards are disabled once the membership's room limit has
+  been reached.
+  """
+  def room_limit_reached(1), do: single_membership_one_room()
+
+  def room_limit_reached(max_rooms) when is_integer(max_rooms) do
+    "You've picked the maximum of #{max_rooms} rooms for your membership. Uncheck a room if you want a different one."
+  end
+
   def single_membership_one_room do
     "A Single membership can include one room per booking. Uncheck the room you already picked if you want a different one."
   end
