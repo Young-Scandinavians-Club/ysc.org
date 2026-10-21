@@ -91,9 +91,17 @@ defmodule YscWeb.UserSettingsMerchPaymentsTest do
              )
 
       assert has_element?(view, "#payment-merch-#{order.id}", "Club Tee")
+      assert has_element?(view, "#payment-merch-#{order.id}", "Club Gear Order")
+
+      assert has_element?(
+               view,
+               "#payment-merch-#{order.id}[aria-label='View Club Gear order']"
+             )
+
+      assert has_element?(view, "#payment-filter-merch", "Club Gear")
     end
 
-    test "the Merch filter narrows the list to merch orders", %{
+    test "the Club Gear filter narrows the list to shop orders", %{
       conn: conn,
       order: order,
       donation_payment: donation

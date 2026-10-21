@@ -9,6 +9,23 @@ defmodule YscWeb.Components.CabinInfoTest do
     %{days_before_checkin: days, refund_percentage: Decimal.new(percentage)}
   end
 
+  defp percentages(html) do
+    html
+    |> Floki.parse_document!()
+    |> Floki.find("tbody tr")
+    |> Enum.map(fn row ->
+      row
+      |> Floki.find("td")
+      |> Enum.map(
+        &(&1
+          |> Floki.text()
+          |> String.trim()
+          |> String.trim_trailing("%")
+          |> String.to_integer())
+      )
+    end)
+  end
+
   describe "info_tabs/1" do
     test "renders the three journey tabs and marks the active one" do
       assigns = %{}
@@ -181,7 +198,7 @@ defmodule YscWeb.Components.CabinInfoTest do
   end
 
   describe "refund_table/1" do
-    test "lists the union of thresholds with a column per stay type" do
+    test "lists bands between the union of thresholds, one column per stay type" do
       assigns = %{
         columns: [
           %{label: "Entire cabin", rules: [rule(21, "50"), rule(14, "0")]},
@@ -197,13 +214,15 @@ defmodule YscWeb.Components.CabinInfoTest do
       assert html =~ ~s(id="refunds")
       assert html =~ "Entire cabin"
       assert html =~ "Individual room(s)"
-      assert html =~ "21 or more days before check-in"
-      assert html =~ "14 or more days before check-in"
-      assert html =~ "50%"
-      assert html =~ "0%"
-      # Individual room(s) has no rule at the 21-day threshold.
-      assert html =~ "—"
+      assert html =~ "More than 21 days before check-in"
+      assert html =~ "15–21 days before check-in"
+      assert html =~ "14 days or fewer before check-in"
+      refute html =~ "or more days"
       refute html =~ "Policy information will be displayed here"
+
+      # Entire cabin: full refund early, 50% within 21 days, none within 14.
+      # Individual room(s): full until 14 days, then 50%.
+      assert percentages(html) == [[100, 100], [50, 100], [0, 50]]
     end
 
     test "shows an empty state when no column has rules" do
@@ -226,15 +245,21 @@ defmodule YscWeb.Components.CabinInfoTest do
       html =
         rendered_to_string(~H"""
         <.essentials_strip id="essentials" accent={:teal}>
-          <:item id="sleeping" icon="hero-moon">Bring your own linens</:item>
-          <:item icon="hero-no-symbol">No pets or smoking</:item>
+          <:item id="sleeping" icon="hero-moon" title="Sleeping">
+            Bring your own linens
+          </:item>
+          <:item icon="hero-no-symbol" title="House rules">
+            No pets or smoking
+          </:item>
         </.essentials_strip>
         """)
 
       assert html =~ ~s(id="essentials")
       assert html =~ ~s(id="sleeping")
       assert html =~ "hero-moon"
-      assert html =~ "text-teal-600"
+      assert html =~ "bg-teal-50"
+      assert html =~ "Sleeping"
+      assert html =~ "House rules"
       assert html =~ "No pets or smoking"
     end
   end
@@ -258,11 +283,15 @@ defmodule YscWeb.Components.CabinInfoTest do
   end
 
   describe "refund_summary/1" do
-    test "summarises the best refundable tier per stay type" do
+    test "describes each stay type's tiers from loosest to tightest" do
       assigns = %{
         columns: [
           %{label: "Entire cabin", rules: [rule(21, "50"), rule(14, "0")]},
-          %{label: "Individual room(s)", rules: [rule(14, "50"), rule(7, "25")]}
+          %{
+            label: "Individual room(s)",
+            rules: [rule(14, "50"), rule(7, "25")]
+          },
+          %{label: "Unconfigured", rules: []}
         ]
       }
 
@@ -271,13 +300,18 @@ defmodule YscWeb.Components.CabinInfoTest do
         <.refund_summary id="refunds" columns={@columns} />
         """)
 
-      assert html =~ "Entire cabin: 50% refund 21+ days before check-in"
-      assert html =~ "Individual room(s): 50% refund 14+ days before check-in"
+      assert html =~
+               "Entire cabin: full refund more than 21 days before check-in; 50% within 21 days; no refund within 14 days."
+
+      assert html =~
+               "Individual room(s): full refund more than 14 days before check-in; 50% within 14 days; 25% within 7 days."
+
+      refute html =~ "Unconfigured"
       assert html =~ "3% processing fee"
     end
 
-    test "renders nothing when no stay type has a refundable tier" do
-      assigns = %{columns: [%{label: "Entire cabin", rules: [rule(14, "0")]}]}
+    test "renders nothing when no stay type has any rules" do
+      assigns = %{columns: [%{label: "Entire cabin", rules: []}]}
 
       html =
         rendered_to_string(~H"""
@@ -286,6 +320,39 @@ defmodule YscWeb.Components.CabinInfoTest do
 
       refute html =~ "refunds"
       refute html =~ "processing fee"
+    end
+  end
+
+  describe "cabin_modal/1" do
+    test "renders an accessible dialog above the navbar with header, body and footer" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.cabin_modal
+          id="rules"
+          title="Rules & Policies"
+          description="Read before booking."
+          on_close="close-rules"
+        >
+          <.modal_section title="Quiet hours">10 PM – 7 AM</.modal_section>
+          <:footer><button type="button">I Understand</button></:footer>
+        </.cabin_modal>
+        """)
+
+      assert html =~ ~s(id="rules")
+      assert html =~ "z-200"
+      assert html =~ ~s(role="dialog")
+      assert html =~ ~s(aria-modal="true")
+      assert html =~ ~s(aria-labelledby="rules-title")
+      assert html =~ ~s(id="rules-title")
+      assert html =~ "Rules &amp; Policies"
+      assert html =~ "Read before booking."
+      assert html =~ ~s(phx-click="close-rules")
+      assert html =~ ~s(phx-key="escape")
+      assert html =~ "Quiet hours"
+      assert html =~ "10 PM – 7 AM"
+      assert html =~ "I Understand"
     end
   end
 

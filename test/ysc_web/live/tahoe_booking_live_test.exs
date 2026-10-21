@@ -387,7 +387,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       assert html =~ "Bring your own bed linens"
       assert html =~ "No pets or smoking"
-      assert html =~ "Winter: carry chains or use 4WD with snow tires"
+      assert html =~ "Carry chains or use 4WD with snow tires"
       assert html =~ "please help with chores before you leave"
       refute html =~ "BRING YOUR OWN LINENS"
       refute html =~ "NOT A HOTEL"
@@ -433,21 +433,6 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
 
       assert page_title(view) =~ "Tahoe Cabin"
-    end
-
-    test "how-to-book copy uses plain language instead of booking mode", %{
-      conn: conn
-    } do
-      user = user_with_membership(:lifetime)
-      conn = log_in_user(conn, user)
-
-      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
-      html = render(view)
-
-      assert html =~
-               "Choose whether you want individual rooms or the entire cabin."
-
-      refute html =~ "Choose your booking mode"
     end
 
     test "initializes with today's date if no params", %{conn: conn} do
@@ -1325,7 +1310,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert html =~ "Tahoe"
     end
 
-    test "terms modal shows refund-based cancellation copy", %{conn: conn} do
+    test "terms modal points to the cancellation policy and fees", %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
@@ -1336,16 +1321,43 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       html = render(view)
 
-      assert html =~ "📅 Cancellation Policy"
-      assert html =~ "Entire cabin:"
-      assert html =~ "50% refund"
-      assert html =~ "14 days before for no refund"
-      assert html =~ "7 days before for no refund"
+      # Wording comes from the configured refund policies; with none loaded the
+      # modal points members at the full policy instead of inventing numbers.
+      assert has_element?(
+               view,
+               "#tahoe-rules-modal-cancellation",
+               "Refunds depend on how far ahead of check-in you cancel"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-rules-modal-cancellation",
+               "3% processing fee"
+             )
 
       assert html =~
                "All guests (adults and children) must be paid for before arrival."
 
       refute html =~ "guests(adults"
+    end
+
+    test "rules modal renders above the navbar and closes on its backdrop", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+
+      render_click(view, "show-terms-modal")
+
+      assert has_element?(view, "#tahoe-rules-modal.z-200[role=dialog]")
+      assert has_element?(view, "#tahoe-rules-modal-title", "Rules & Policies")
+
+      view |> element("#tahoe-rules-modal-backdrop") |> render_click()
+
+      refute has_element?(view, "#tahoe-rules-modal")
     end
   end
 

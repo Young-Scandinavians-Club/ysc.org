@@ -45,6 +45,7 @@ defmodule YscWeb.TahoeBookingLive do
   alias YscWeb.DateDisplay
   alias YscWeb.BookingDisplay
   import YscWeb.Components.CabinInfo
+  import YscWeb.Components.RoomPickCard
   require Ysc.Logging
   import Ecto.Query
 
@@ -1203,18 +1204,22 @@ defmodule YscWeb.TahoeBookingLive do
         <div class="max-w-(--breakpoint-xl) mx-auto px-4 space-y-10">
           <%!-- Essentials: the must-know rules, once, directly under the hero --%>
           <.essentials_strip id="tahoe-essentials" accent={:blue}>
-            <:item icon="hero-sparkles">Bring your own bed linens</:item>
-            <:item icon="hero-no-symbol">No pets or smoking</:item>
-            <:item icon="hero-cloud">
-              Winter: carry chains or use 4WD with snow tires
+            <:item icon="hero-sparkles" title="Linens">
+              Bring your own bed linens
             </:item>
-            <:item icon="hero-hand-raised">
+            <:item icon="hero-no-symbol" title="House rules">
+              No pets or smoking
+            </:item>
+            <:item icon="hero-cloud" title="Winter driving">
+              Carry chains or use 4WD with snow tires
+            </:item>
+            <:item icon="hero-hand-raised" title="Community">
               Member-run cabin — please help with chores before you leave
             </:item>
           </.essentials_strip>
           <!-- Active Bookings -->
           <div :if={length(@active_bookings) > 0} class="space-y-4">
-            <h2 class="text-sm text-zinc-400 type-eyebrow">
+            <h2 class="text-sm text-zinc-500 type-eyebrow">
               <%= if Accounts.sub_account?(@user) || Accounts.primary_user?(@user) do %>
                 Your family's bookings
               <% else %>
@@ -1896,398 +1901,43 @@ defmodule YscWeb.TahoeBookingLive do
                         (is_unavailable && !room_already_selected) ||
                           (max_rooms_reached && !room_already_selected) ||
                           cannot_add_second_room %>
-                      <div class={[
-                        "border-2 rounded-lg overflow-hidden flex flex-col h-full transition",
-                        if(is_disabled,
-                          do:
-                            "border-zinc-200 bg-zinc-50 cursor-not-allowed opacity-60",
-                          else:
-                            if(
-                              (can_select_multiple_rooms?(assigns) &&
-                                 room.id in @selected_room_ids) ||
-                                (!can_select_multiple_rooms?(assigns) &&
-                                   @selected_room_id == room.id),
-                              do: "border-blue-500 bg-blue-50 shadow-xs",
-                              else:
-                                "border-zinc-300 hover:border-blue-400 cursor-pointer"
-                            )
-                        )
-                      ]}>
-                        <label
-                          :if={!is_disabled}
-                          class="block cursor-pointer flex flex-col h-full"
-                        >
-                          <input
-                            type={
-                              if can_select_multiple_rooms?(assigns),
-                                do: "checkbox",
-                                else: "radio"
-                            }
-                            id={"room-#{room.id}"}
-                            name={
-                              if can_select_multiple_rooms?(assigns),
-                                do: "room_ids",
-                                else: "room_id"
-                            }
-                            value={room.id}
-                            checked={
-                              if can_select_multiple_rooms?(assigns) do
-                                room.id in @selected_room_ids
-                              else
-                                @selected_room_id == room.id
-                              end
-                            }
-                            aria-label={"Select #{room.name}"}
-                            phx-click="room-changed"
-                            phx-value-room-id={room.id}
-                            class="sr-only"
-                          />
-                          <!-- Room Image with Alert Overlay -->
-                          <div class="w-full h-32 bg-zinc-200 relative overflow-hidden">
-                            <!-- Availability Badge -->
-                            <div
-                              :if={!is_unavailable}
-                              class="absolute top-2 right-2 z-10 px-2 py-1 bg-green-500 text-white text-xs font-bold rounded-sm shadow-lg"
-                            >
-                              Available
-                            </div>
-                            <!-- Alert Overlay on Image -->
-                            <div
-                              :if={is_unavailable && reason}
-                              class="absolute top-0 left-0 right-0 bg-linear-to-r from-amber-50 to-amber-100 border-b border-amber-200 p-2 z-10"
-                            >
-                              <div class="flex items-start gap-2">
-                                <.icon
-                                  name="hero-exclamation-triangle-solid"
-                                  class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"
-                                />
-                                <div class="flex-1">
-                                  <p class="text-xs font-semibold text-amber-900 mb-1">
-                                    Not Available
-                                  </p>
-                                  <p class="text-xs text-amber-800">
-                                    {reason}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            <%= if room.image && room.image.id do %>
-                              <.live_component
-                                id={"room-image-#{room.id}"}
-                                module={YscWeb.Components.Image}
-                                image={room.image}
-                                aspect_class="h-full"
-                                preferred_type={:thumbnail}
-                                rounded_class=""
-                              />
-                            <% else %>
-                              <!-- Placeholder when no image -->
-                              <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="text-zinc-500 text-sm flex flex-col items-center justify-center">
-                                  <.icon
-                                    name="hero-photo"
-                                    class="w-20 h-20 mx-auto mb-2"
-                                  />Room Image
-                                </div>
-                              </div>
-                            <% end %>
-                          </div>
-                          <!-- Room Content -->
-                          <div class="p-4 flex-1 flex flex-col">
-                            <div class="flex items-start justify-between mb-2">
-                              <div class="flex-1">
-                                <div class="font-bold text-zinc-900 text-lg mb-1">
-                                  {room.name}
-                                </div>
-                                <div class="text-xs text-zinc-600 line-clamp-2">
-                                  {room.description}
-                                </div>
-                              </div>
-                              <div class="ml-3 shrink-0">
-                                <div class={
-                                  if (can_select_multiple_rooms?(assigns) &&
-                                        room.id in @selected_room_ids) or
-                                       (!can_select_multiple_rooms?(assigns) &&
-                                          @selected_room_id == room.id) do
-                                    "w-6 h-6 rounded-full border-2 flex items-center justify-center bg-blue-600 border-blue-600 shadow-md"
-                                  else
-                                    "w-6 h-6 rounded-full border-2 flex items-center justify-center border-zinc-300 bg-white"
-                                  end
-                                }>
-                                  <svg
-                                    :if={
-                                      (can_select_multiple_rooms?(assigns) &&
-                                         room.id in @selected_room_ids) or
-                                        (!can_select_multiple_rooms?(assigns) &&
-                                           @selected_room_id == room.id)
-                                    }
-                                    class="w-4 h-4 text-white"
-                                    fill="currentColor"
-                                    viewBox="0 0 20 20"
-                                  >
-                                    <path
-                                      fill-rule="evenodd"
-                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                      clip-rule="evenodd"
-                                    />
-                                  </svg>
-                                </div>
-                              </div>
-                            </div>
-                            <div class="flex items-center gap-2 mb-2 flex-wrap">
-                              <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-sm border border-blue-200">
-                                Max {room.capacity_max} Guests
-                              </span>
-                              <span
-                                :if={room.min_billable_occupancy > 1}
-                                id={"room-#{room.id}-min-charge-badge"}
-                                class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-sm border border-amber-200"
-                              >
-                                {YscWeb.BookingUserMessages.room_min_charge_badge(
-                                  room.min_billable_occupancy
-                                )}
-                              </span>
-                            </div>
-                            <!-- Room Features: Compact Badges -->
-                            <div
-                              :if={
-                                room.single_beds > 0 || room.queen_beds > 0 ||
-                                  room.king_beds > 0
-                              }
-                              class="mb-2 flex items-center gap-2 flex-wrap"
-                            >
-                              <span
-                                :if={room.single_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="Twin beds"
-                              >
-                                {raw(bed_icon_svg(:single, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.single_beds}</span>
-                              </span>
-                              <span
-                                :if={room.queen_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="Queen beds"
-                              >
-                                {raw(bed_icon_svg(:queen, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.queen_beds}</span>
-                              </span>
-                              <span
-                                :if={room.king_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="King beds"
-                              >
-                                {raw(bed_icon_svg(:king, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.king_beds}</span>
-                              </span>
-                            </div>
-                            <div class="border-t border-zinc-200 pt-2 mt-auto">
-                              <% season =
-                                Season.find_season_for_date(
-                                  @seasons,
-                                  @checkin_date
-                                ) %>
-                              <% season_id = if season, do: season.id, else: nil %>
-                              <div class="text-sm text-zinc-900 font-bold">
-                                <div :if={room.minimum_price}>
-                                  {MoneyHelper.format_money!(room.minimum_price)} min
-                                  <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    {YscWeb.BookingUserMessages.room_minimum_price_caption(
-                                      room.min_billable_occupancy
-                                    )}
-                                  </span>
-                                </div>
-                                <div :if={!room.minimum_price}>
-                                  <% fallback_adult_price =
-                                    get_default_adult_price(@property, season_id) %>
-                                  {MoneyHelper.format_money!(
-                                    room.adult_price_per_night ||
-                                      fallback_adult_price
-                                  )}/adult
-                                </div>
-                              </div>
-                              <div class="text-xs text-zinc-500">
-                                <% fallback_children_price =
-                                  get_default_children_price(@property, season_id) %>
-                                {MoneyHelper.format_money!(
-                                  room.children_price_per_night ||
-                                    fallback_children_price
-                                )}/child
-                              </div>
-                            </div>
-                          </div>
-                        </label>
-                        <div
-                          :if={is_disabled}
-                          class="block cursor-not-allowed flex flex-col h-full relative"
-                        >
-                          <input
-                            type={
-                              if can_select_multiple_rooms?(assigns),
-                                do: "checkbox",
-                                else: "radio"
-                            }
-                            name={
-                              if can_select_multiple_rooms?(assigns),
-                                do: "room_ids",
-                                else: "room_id"
-                            }
-                            value={room.id}
-                            checked={false}
-                            disabled={true}
-                            class="sr-only"
-                            readonly
-                          />
-                          <!-- Room Image with Alert Overlay -->
-                          <div class="w-full h-32 bg-zinc-200 relative overflow-hidden">
-                            <!-- Availability Badge -->
-                            <div
-                              :if={!is_unavailable}
-                              class="absolute top-2 right-2 z-10 px-2 py-1 bg-green-500 text-white text-xs font-bold rounded-sm shadow-lg"
-                            >
-                              Available
-                            </div>
-                            <!-- Alert Overlay on Image -->
-                            <div
-                              :if={is_unavailable && reason}
-                              class="absolute top-0 left-0 right-0 bg-linear-to-r from-amber-50 to-amber-100 border-b border-amber-200 p-2 z-10"
-                            >
-                              <div class="flex items-start gap-2">
-                                <.icon
-                                  name="hero-exclamation-triangle-solid"
-                                  class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"
-                                />
-                                <div class="flex-1">
-                                  <p class="text-xs font-semibold text-amber-900 mb-1">
-                                    Not Available
-                                  </p>
-                                  <p class="text-xs text-amber-800">
-                                    {reason}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                            <%= if room.image && room.image.id do %>
-                              <.live_component
-                                id={"room-image-disabled-#{room.id}"}
-                                module={YscWeb.Components.Image}
-                                image={room.image}
-                                aspect_class="h-full"
-                                preferred_type={:thumbnail}
-                                rounded_class=""
-                              />
-                            <% else %>
-                              <!-- Placeholder when no image -->
-                              <div class="absolute inset-0 flex items-center justify-center">
-                                <div class="text-zinc-500 text-sm flex flex-col items-center justify-center">
-                                  <.icon
-                                    name="hero-photo"
-                                    class="w-20 h-20 mx-auto mb-2"
-                                  />Room Image
-                                </div>
-                              </div>
-                            <% end %>
-                          </div>
-                          <!-- Room Content (Disabled) -->
-                          <div class="p-4 flex-1 flex flex-col opacity-60">
-                            <div class="flex items-start justify-between mb-2">
-                              <div class="flex-1">
-                                <div class="font-bold text-zinc-900 text-lg mb-1">
-                                  {room.name}
-                                </div>
-                                <div class="text-xs text-zinc-600 line-clamp-2">
-                                  {room.description}
-                                </div>
-                              </div>
-                              <div class="ml-3 shrink-0">
-                                <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center border-zinc-300 bg-white">
-                                </div>
-                              </div>
-                            </div>
-                            <div class="flex items-center gap-2 mb-2 flex-wrap">
-                              <span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-sm border border-blue-200">
-                                Max {room.capacity_max} Guests
-                              </span>
-                              <span
-                                :if={room.min_billable_occupancy > 1}
-                                id={"room-#{room.id}-min-charge-badge"}
-                                class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-sm border border-amber-200"
-                              >
-                                {YscWeb.BookingUserMessages.room_min_charge_badge(
-                                  room.min_billable_occupancy
-                                )}
-                              </span>
-                            </div>
-                            <!-- Room Features: Compact Badges -->
-                            <div
-                              :if={
-                                room.single_beds > 0 || room.queen_beds > 0 ||
-                                  room.king_beds > 0
-                              }
-                              class="mb-2 flex items-center gap-2 flex-wrap"
-                            >
-                              <span
-                                :if={room.single_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="Twin beds"
-                              >
-                                {raw(bed_icon_svg(:single, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.single_beds}</span>
-                              </span>
-                              <span
-                                :if={room.queen_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="Queen beds"
-                              >
-                                {raw(bed_icon_svg(:queen, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.queen_beds}</span>
-                              </span>
-                              <span
-                                :if={room.king_beds > 0}
-                                class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-                                title="King beds"
-                              >
-                                {raw(bed_icon_svg(:king, "w-3 h-3 text-zinc-600"))}
-                                <span>{room.king_beds}</span>
-                              </span>
-                            </div>
-                            <div class="border-t border-zinc-200 pt-2 mt-auto">
-                              <% season =
-                                Season.find_season_for_date(
-                                  @seasons,
-                                  @checkin_date
-                                ) %>
-                              <% season_id = if season, do: season.id, else: nil %>
-                              <div class="text-sm text-zinc-900 font-bold">
-                                <div :if={room.minimum_price}>
-                                  {MoneyHelper.format_money!(room.minimum_price)} min
-                                  <span class="text-xs text-zinc-500 font-normal ml-1">
-                                    {YscWeb.BookingUserMessages.room_minimum_price_caption(
-                                      room.min_billable_occupancy
-                                    )}
-                                  </span>
-                                </div>
-                                <div :if={!room.minimum_price}>
-                                  <% fallback_adult_price =
-                                    get_default_adult_price(@property, season_id) %>
-                                  {MoneyHelper.format_money!(
-                                    room.adult_price_per_night ||
-                                      fallback_adult_price
-                                  )}/adult
-                                </div>
-                              </div>
-                              <div class="text-xs text-zinc-500">
-                                <% fallback_children_price =
-                                  get_default_children_price(@property, season_id) %>
-                                {MoneyHelper.format_money!(
-                                  room.children_price_per_night ||
-                                    fallback_children_price
-                                )}/child
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <% price_season =
+                        Season.find_season_for_date(@seasons, @checkin_date) %>
+                      <% price_season_id = if price_season, do: price_season.id %>
+                      <.room_pick_card
+                        room={room}
+                        selected={room_already_selected}
+                        disabled={is_disabled}
+                        reason={reason}
+                        multiple={can_select_multiple_rooms?(assigns)}
+                        prices={
+                          %{
+                            adult:
+                              MoneyHelper.format_money!(
+                                room.adult_price_per_night ||
+                                  get_default_adult_price(
+                                    @property,
+                                    price_season_id
+                                  )
+                              ),
+                            child:
+                              MoneyHelper.format_money!(
+                                room.children_price_per_night ||
+                                  get_default_children_price(
+                                    @property,
+                                    price_season_id
+                                  )
+                              ),
+                            minimum:
+                              room.minimum_price &&
+                                MoneyHelper.format_money!(room.minimum_price),
+                            minimum_caption:
+                              YscWeb.BookingUserMessages.room_minimum_price_caption(
+                                room.min_billable_occupancy
+                              )
+                          }
+                        }
+                      />
                     <% end %>
                   </div>
                 </fieldset>
@@ -2313,9 +1963,11 @@ defmodule YscWeb.TahoeBookingLive do
             </div>
             <!-- Right Column: Sticky Reservation Summary (1 column on large screens) -->
             <aside class="lg:sticky lg:top-24 lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto">
-              <div class="bg-white rounded-xl border-2 border-blue-600 overflow-hidden">
-                <div class="bg-blue-600 p-4 text-white text-center">
-                  <h3 class="text-lg type-subhead">Booking Summary</h3>
+              <div class="bg-white rounded-xl border border-zinc-200 shadow-xs overflow-hidden">
+                <div class="px-6 py-4 border-b border-zinc-100 bg-zinc-50/50">
+                  <h3 class="text-base text-zinc-900 type-subhead">
+                    Booking Summary
+                  </h3>
                 </div>
 
                 <div class="p-6 space-y-4">
@@ -2651,7 +2303,7 @@ defmodule YscWeb.TahoeBookingLive do
                     <hr class="border-zinc-200 my-3" />
 
                     <div class="flex justify-between items-end">
-                      <span class="text-lg font-bold text-zinc-900">Total</span>
+                      <span class="text-lg text-zinc-900 type-subhead">Total</span>
                       <div class="text-right">
                         <span class="text-2xl text-blue-600 type-title">
                           {MoneyHelper.format_money!(@calculated_price)}
@@ -2741,13 +2393,15 @@ defmodule YscWeb.TahoeBookingLive do
                       phx-click="show-confirm-modal"
                       phx-disable-with="Loading..."
                       disabled={!can_submit_booking?(assigns)}
-                      class={
-                        if can_submit_booking?(assigns) do
-                          "w-full text-lg py-4"
-                        else
-                          "w-full bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed py-4"
-                        end
+                      variant={
+                        if can_submit_booking?(assigns),
+                          do: "solid",
+                          else: "outline"
                       }
+                      color={
+                        if can_submit_booking?(assigns), do: "blue", else: "zinc"
+                      }
+                      class="w-full text-lg py-4"
                     >
                       <span class="flex items-center justify-center gap-2">
                         <.icon name="hero-check-circle-solid" class="w-5 h-5" />{YscWeb.BookingUserMessages.tahoe_review_booking_button()}
@@ -2779,443 +2433,295 @@ defmodule YscWeb.TahoeBookingLive do
               </div>
             </aside>
           </div>
-          <!-- Review acknowledgments before checkout (stay is not booked yet) -->
-          <div
+          <%!-- Review acknowledgments before checkout (stay is not booked yet) --%>
+          <% all_confirmed? =
+            Map.get(assigns, :linens_confirmed, false) &&
+              Map.get(assigns, :chores_confirmed, false) &&
+              Map.get(assigns, :party_size_confirmed, false) &&
+              Map.get(assigns, :terms_agreed, false) %>
+          <.cabin_modal
             :if={Map.get(assigns, :show_confirm_modal, false)}
             id="tahoe-review-booking-modal"
-            class="fixed inset-0 z-50 overflow-y-auto"
-            phx-click-away="close-confirm-modal"
+            title={YscWeb.BookingUserMessages.tahoe_review_modal_title()}
+            description={YscWeb.BookingUserMessages.tahoe_review_modal_intro()}
+            on_close="close-confirm-modal"
           >
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div
-                class="fixed inset-0 transition-opacity bg-zinc-500/75"
-                aria-hidden="true"
-              >
-              </div>
-              <span
-                class="hidden sm:inline-block sm:align-middle sm:h-screen"
-                aria-hidden="true"
-              >
-                &#8203;
-              </span>
-              <div
-                class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
-                phx-click="ignore"
-                phx-click-stop
-              >
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div class="sm:flex sm:items-start">
-                    <div class="mx-auto shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
-                      <.icon
-                        name="hero-exclamation-triangle-solid"
-                        class="h-6 w-6 text-blue-600"
-                      />
-                    </div>
-                    <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                      <h3
-                        id="tahoe-review-booking-modal-title"
-                        class="text-lg text-zinc-900 mb-4 type-subhead"
-                      >
-                        {YscWeb.BookingUserMessages.tahoe_review_modal_title()}
-                      </h3>
-                      <div class="mt-2 flex flex-col gap-4">
-                        <p
-                          id="tahoe-review-booking-modal-intro"
-                          class="text-sm text-zinc-500"
-                        >
-                          {YscWeb.BookingUserMessages.tahoe_review_modal_intro()}
-                        </p>
-                        <label class="flex items-start gap-3 cursor-pointer p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
-                          <input
-                            type="checkbox"
-                            id="confirm-modal-terms-agreement"
-                            phx-click="toggle-terms-agreement"
-                            checked={Map.get(assigns, :terms_agreed, false)}
-                            class="mt-1 shrink-0"
-                          />
-                          <div class="flex-1">
-                            <span class="text-sm font-semibold text-zinc-900">
-                              I have read and agree to the Tahoe Cabin <button
-                                type="button"
-                                phx-click="show-terms-modal"
-                                class="text-blue-600 hover:text-blue-800 underline"
-                              >
-                                Rules & Policies
-                              </button>.
-                            </span>
-                          </div>
-                        </label>
-                        <label class="flex items-start gap-3 cursor-pointer p-3 bg-amber-50 border border-amber-200 rounded-sm">
-                          <input
-                            type="checkbox"
-                            phx-click="toggle-linens-confirmation"
-                            checked={Map.get(assigns, :linens_confirmed, false)}
-                            class="mt-1"
-                          />
-                          <div class="flex-1">
-                            <span class="text-sm font-semibold text-amber-900">
-                              I understand that no bed linens or towels are provided and I will bring my own.
-                            </span>
-                          </div>
-                        </label>
-                        <label class="flex items-start gap-3 cursor-pointer p-3 bg-blue-50 border border-blue-200 rounded-sm">
-                          <input
-                            type="checkbox"
-                            phx-click="toggle-chores-confirmation"
-                            checked={Map.get(assigns, :chores_confirmed, false)}
-                            class="mt-1"
-                          />
-                          <div class="flex-1">
-                            <span class="text-sm font-semibold text-blue-900">
-                              I agree to perform the required chores (cleaning the booked rooms, cleaning the kitchen and bathrooms) before I depart.
-                            </span>
-                          </div>
-                        </label>
-                        <label class="flex items-start gap-3 cursor-pointer p-3 bg-red-50 border border-red-200 rounded-sm">
-                          <input
-                            type="checkbox"
-                            phx-click="toggle-party-size-confirmation"
-                            checked={Map.get(assigns, :party_size_confirmed, false)}
-                            class="mt-1"
-                          />
-                          <div class="flex-1">
-                            <span class="text-sm font-semibold text-red-900">
-                              <% party_size_text =
-                                if assigns.selected_booking_mode == :buyout do
-                                  "17 guests (full cabin)"
-                                else
-                                  guests_count =
-                                    parse_guests_count(assigns.guests_count)
+            <% party_size_text =
+              if assigns.selected_booking_mode == :buyout do
+                "17 guests (full cabin)"
+              else
+                total =
+                  parse_guests_count(assigns.guests_count) +
+                    parse_children_count(assigns.children_count)
 
-                                  children_count =
-                                    parse_children_count(assigns.children_count)
-
-                                  total = guests_count + children_count
-
-                                  "#{total} #{if total == 1, do: "guest", else: "guests"}"
-                                end %> I confirm that the number of people in my booking ({party_size_text}) matches my actual party size.
-                            </span>
-                          </div>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="bg-zinc-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <.button
-                    id="tahoe-review-booking-continue"
-                    phx-click="create-booking"
-                    disabled={
-                      !Map.get(assigns, :linens_confirmed, false) ||
-                        !Map.get(assigns, :chores_confirmed, false) ||
-                        !Map.get(assigns, :party_size_confirmed, false) ||
-                        !Map.get(assigns, :terms_agreed, false)
-                    }
-                    class={
-                      [
-                        "w-full sm:ml-3 sm:w-auto px-4 py-2 text-sm font-semibold rounded-sm",
-                        if(
-                          Map.get(assigns, :linens_confirmed, false) &&
-                            Map.get(assigns, :chores_confirmed, false) &&
-                            Map.get(assigns, :party_size_confirmed, false) &&
-                            Map.get(assigns, :terms_agreed, false),
-                          do: "bg-blue-600 text-white hover:bg-blue-700",
-                          else: "bg-zinc-300 text-zinc-500 cursor-not-allowed"
-                        )
-                      ]
-                      |> Enum.filter(& &1)
-                      |> Enum.join(" ")
-                    }
-                  >
-                    {YscWeb.BookingUserMessages.tahoe_review_modal_continue_button()}
-                  </.button>
-                  <button
-                    type="button"
-                    id="tahoe-review-booking-go-back"
-                    phx-click="close-confirm-modal"
-                    class="mt-3 w-full sm:mt-0 sm:w-auto px-4 py-2 text-sm font-semibold text-zinc-700 bg-white border border-zinc-300 rounded-sm hover:bg-zinc-50"
-                  >
-                    {YscWeb.BookingUserMessages.tahoe_review_modal_back_button()}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- Terms & Policies Modal -->
-          <div
-            :if={Map.get(assigns, :show_terms_modal, false)}
-            class="fixed inset-0 z-50 overflow-y-auto"
-            phx-click="close-terms-modal"
-            phx-click-away="close-terms-modal"
-          >
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div
-                class="fixed inset-0 transition-opacity bg-zinc-500/75"
-                aria-hidden="true"
-              >
-              </div>
-              <span
-                class="hidden sm:inline-block sm:align-middle sm:h-screen"
-                aria-hidden="true"
-              >
-                &#8203;
-              </span>
-              <div
-                class="relative inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-lg transform transition sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"
-                phx-click-away="close-terms-modal"
-              >
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div class="flex items-start justify-between mb-4">
-                    <h3 class="text-2xl text-zinc-900 type-subhead">
-                      Tahoe Cabin Rules & Policies
-                    </h3>
-                    <button
+                "#{total} #{if total == 1, do: "guest", else: "guests"}"
+              end %>
+            <ul class="divide-y divide-zinc-100">
+              <li>
+                <label class="flex items-start gap-3.5 py-4 min-h-11 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    id="confirm-modal-terms-agreement"
+                    phx-click="toggle-terms-agreement"
+                    checked={Map.get(assigns, :terms_agreed, false)}
+                    class="mt-0.5 w-4 h-4 shrink-0 rounded-sm border-zinc-300 text-blue-600"
+                  />
+                  <span class="text-sm text-zinc-700 leading-relaxed">
+                    I have read and agree to the Tahoe Cabin <button
                       type="button"
-                      phx-click="close-terms-modal"
-                      class="text-zinc-500 hover:text-zinc-600 transition-colors"
-                      aria-label="Close modal"
+                      phx-click="show-terms-modal"
+                      class="font-medium text-blue-700 underline hover:text-blue-900"
                     >
-                      <.icon name="hero-x-mark" class="w-6 h-6" />
-                    </button>
-                  </div>
-                  <!-- Payment Notice -->
-                  <div class="mt-4 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                    <p class="text-sm font-medium text-amber-900">
-                      All guests (adults and children) must be paid for before arrival.
-                    </p>
-                  </div>
-                  <div class="mt-4 max-h-[70vh] overflow-y-auto pr-2 space-y-6 text-sm text-zinc-700">
-                    <!-- Arrival & Departure -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        🕒 Arrival & Departure
-                      </h4>
-                      <div class="space-y-1 ml-4">
-                        <p><strong>Check-In:</strong> 3:00 p.m.</p>
-                        <p><strong>Check-Out:</strong> 11:00 a.m.</p>
-                        <p>
-                          <strong>Registration:</strong>
-                          All guests must sign the guest book upon arrival.
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Bookings & Rates -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        📝 Bookings & Rates
-                      </h4>
-                      <div class="space-y-2 ml-4">
-                        <p>
-                          <strong>Booking:</strong>
-                          All stays must be booked and paid in advance via the website.
-                        </p>
-                        <p>
-                          <strong>Active stays:</strong>
-                          Only one active booking is allowed per membership. You may book your next stay once your current one is completed.
-                        </p>
-                        <div>
-                          <p class="font-semibold mb-1">
-                            Winter limits ({season_month_span_label(
-                              @seasons,
-                              "Winter",
-                              "winter"
-                            )}):
-                          </p>
-                          <ul class="list-disc list-inside ml-2 space-y-1">
-                            <li>Single Members: Max 1 room.</li>
-                            <li>
-                              Family Members: Max 2 rooms (must be same dates).
-                            </li>
-                            <li>
-                              You cannot book the entire cabin during winter ({season_month_span_label(
-                                @seasons,
-                                "Winter",
-                                "winter"
-                              )}).
-                            </li>
-                          </ul>
-                        </div>
-                        <div>
-                          <p class="font-semibold mb-1">
-                            Pricing (Per Person/Night):
-                          </p>
-                          <p>Adults: $45 | Children (5–17): $25 | Under 5: Free.</p>
-                        </div>
-                      </div>
-                    </div>
-                    <!-- Location & Parking -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        🚗 Location & Parking
-                      </h4>
-                      <div class="space-y-1 ml-4">
-                        <p>
-                          <strong>Address:</strong>
-                          2685 Cedar Lane, Homewood, CA 96141.
-                        </p>
-                        <p>
-                          <strong>Winter Driving:</strong>
-                          You must carry chains or drive a 4WD with snow tires. Check Caltrans (800-427-7623) before travel.
-                        </p>
-                        <p>
-                          <strong>Parking:</strong>
-                          Extremely limited; carpooling is encouraged.
-                        </p>
-                        <p>
-                          <strong>Street Parking Ban:</strong>
-                          Do NOT park on the street from Nov 1st – May 1st. You will be towed for snow removal.
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Bear Safety -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        🐻 Bear Safety & The Electric Wire
-                      </h4>
-                      <div class="space-y-2 ml-4">
-                        <p>
-                          The cabin is protected by an electric bear wire. It is safe if handled correctly:
-                        </p>
-                        <div>
-                          <p class="font-semibold mb-1">To Enter:</p>
-                          <p>
-                            Disconnect the TOP handle first (this disables the system). Then remove the middle and bottom wires.
-                          </p>
-                        </div>
-                        <div>
-                          <p class="font-semibold mb-1">To Secure:</p>
-                          <p>
-                            When leaving or at night, replace wires from BOTTOM to TOP. The top wire activates the barrier.
-                          </p>
-                        </div>
-                        <p>
-                          <strong>Trash:</strong>
-                          Use bearproof lids on all garbage cans at all times.
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Cabin Etiquette -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        🏠 Cabin Etiquette
-                      </h4>
-                      <div class="space-y-1 ml-4">
-                        <p>
-                          <strong>Quiet Hours:</strong>
-                          10:00 p.m. – 7:00 a.m. (Please step lightly on the stairs).
-                        </p>
-                        <p>
-                          <strong>Children:</strong>
-                          For safety and noise, children are not permitted to play on the stairs.
-                        </p>
-                        <p>
-                          <strong>Prohibited:</strong>
-                          No pets. No smoking or vaping inside the cabin.
-                        </p>
-                        <p>
-                          <strong>Storage:</strong>
-                          Store ski boots in the laundry room racks; all other ski gear goes in the outside stairwell. Do not clutter common areas.
-                        </p>
-                      </div>
-                    </div>
-                    <!-- What to Bring -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        🧺 What to Bring
-                      </h4>
-                      <div class="space-y-1 ml-4">
-                        <p>
-                          <strong>Linens:</strong>
-                          You must bring your own sheets, pillowcases, towels, and sleeping bags. None are provided.
-                        </p>
-                        <p>
-                          <strong>Food:</strong>
-                          Bring your own food. A full kitchen and spices are available.
-                        </p>
-                        <p>
-                          <strong>Firewood:</strong>
-                          Bring fire starter/kindling and some dry wood to start the stove.
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Cleaning & Chores -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        🧹 Cleaning & Chores (Required)
-                      </h4>
-                      <div class="space-y-1 ml-4">
-                        <p>
-                          <strong>Kitchen:</strong>
-                          Leave it spotless; remove all food from the refrigerator.
-                        </p>
-                        <p>
-                          <strong>Rooms:</strong>
-                          Clean your room and strip the beds.
-                        </p>
-                        <p>
-                          <strong>Laundry:</strong>
-                          If you use club bedding, you must wash, dry, and fold it before leaving.
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Cancellation Policy -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        📅 Cancellation Policy
-                      </h4>
-                      <div class="space-y-1 ml-4">
-                        <p>
-                          <strong>{BookingModeDisplay.stay_type_label(:buyout)}:</strong>
-                          Cancel fewer than 21 days before check-in for a 50% refund. Cancel fewer than
-                          14 days before for no refund.
-                        </p>
-                        <p>
-                          <strong>Rooms:</strong>
-                          Cancel fewer than 14 days before check-in for a 50% refund. Cancel fewer than
-                          7 days before for no refund.
-                        </p>
-                        <p class="mt-2">
-                          <strong>Note:</strong>
-                          All cash refunds are subject to a 3% processing fee. Road closure cancellations must be reported immediately to the cabin contact at {EmailConfig.tahoe_email()} for credit.
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Compliance & Disciplinary Actions -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        ⚠️ Compliance & Disciplinary Actions
-                      </h4>
-                      <div class="space-y-1 ml-4">
-                        <p>
-                          Failure to comply with the rules and policies may lead to disciplinary actions or penalties, up to board discretion.
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Board Authority -->
-                    <div>
-                      <h4 class="text-lg text-zinc-900 mb-2 type-subhead">
-                        📋 Board Authority
-                      </h4>
-                      <div class="space-y-1 ml-4">
-                        <p>
-                          Any booking may be cancelled or adjusted for any reason by the board of directors.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="bg-zinc-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="button"
-                    phx-click="close-terms-modal"
-                    class="w-full sm:w-auto px-6 py-2 text-sm font-semibold text-white bg-blue-600 rounded-sm hover:bg-blue-700 transition-colors"
-                  >
-                    I Understand
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+                      Rules & Policies
+                    </button>.
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label class="flex items-start gap-3.5 py-4 min-h-11 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    phx-click="toggle-linens-confirmation"
+                    checked={Map.get(assigns, :linens_confirmed, false)}
+                    class="mt-0.5 w-4 h-4 shrink-0 rounded-sm border-zinc-300 text-blue-600"
+                  />
+                  <span class="text-sm text-zinc-700 leading-relaxed">
+                    I understand that no bed linens or towels are provided and I will bring my own.
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label class="flex items-start gap-3.5 py-4 min-h-11 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    phx-click="toggle-chores-confirmation"
+                    checked={Map.get(assigns, :chores_confirmed, false)}
+                    class="mt-0.5 w-4 h-4 shrink-0 rounded-sm border-zinc-300 text-blue-600"
+                  />
+                  <span class="text-sm text-zinc-700 leading-relaxed">
+                    I agree to perform the required chores (cleaning the booked rooms, cleaning the kitchen and bathrooms) before I depart.
+                  </span>
+                </label>
+              </li>
+              <li>
+                <label class="flex items-start gap-3.5 py-4 min-h-11 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    phx-click="toggle-party-size-confirmation"
+                    checked={Map.get(assigns, :party_size_confirmed, false)}
+                    class="mt-0.5 w-4 h-4 shrink-0 rounded-sm border-zinc-300 text-blue-600"
+                  />
+                  <span class="text-sm text-zinc-700 leading-relaxed">
+                    I confirm that the number of people in my booking (<strong>{party_size_text}</strong>) matches my actual party size.
+                  </span>
+                </label>
+              </li>
+            </ul>
+            <:footer>
+              <button
+                type="button"
+                id="tahoe-review-booking-go-back"
+                phx-click="close-confirm-modal"
+                class="w-full sm:w-auto px-4 py-2.5 min-h-11 text-sm font-semibold text-zinc-700 bg-white border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+              >
+                {YscWeb.BookingUserMessages.tahoe_review_modal_back_button()}
+              </button>
+              <.button
+                id="tahoe-review-booking-continue"
+                phx-click="create-booking"
+                disabled={!all_confirmed?}
+                class={
+                  "w-full sm:w-auto px-4 py-2.5 min-h-11 text-sm font-semibold rounded-lg " <>
+                    if(all_confirmed?,
+                      do: "bg-blue-600 text-white hover:bg-blue-700",
+                      else: "bg-zinc-300 text-zinc-500 cursor-not-allowed"
+                    )
+                }
+              >
+                {YscWeb.BookingUserMessages.tahoe_review_modal_continue_button()}
+              </.button>
+            </:footer>
+          </.cabin_modal>
+          <%!-- Rules & Policies --%>
+          <.cabin_modal
+            :if={Map.get(assigns, :show_terms_modal, false)}
+            id="tahoe-rules-modal"
+            title="Tahoe Cabin Rules & Policies"
+            size={:lg}
+            on_close="close-terms-modal"
+          >
+            <% terms_season =
+              if @checkin_date,
+                do: Season.find_season_for_date(@seasons, @checkin_date) %>
+            <% terms_season_id = if terms_season, do: terms_season.id %>
+            <% winter_span = season_month_span_label(@seasons, "Winter", "winter") %>
+            <.info_callout icon="hero-banknotes" accent={:blue} class="mt-5">
+              <p>
+                All guests (adults and children) must be paid for before arrival.
+              </p>
+            </.info_callout>
+            <.modal_section title="Arrival & departure">
+              <p>
+                <strong>Check-in:</strong>
+                {BookingDisplay.checkin_time_label()}
+              </p>
+              <p>
+                <strong>Check-out:</strong>
+                {BookingDisplay.checkout_time_label()}
+              </p>
+              <p>
+                <strong>Registration:</strong>
+                All guests must sign the guest book upon arrival.
+              </p>
+            </.modal_section>
+            <.modal_section title="Bookings & rates">
+              <p>
+                <strong>Booking:</strong>
+                All stays must be booked and paid in advance via the website.
+              </p>
+              <p>
+                <strong>Active stays:</strong>
+                Only one active booking is allowed per membership. You may book your next stay once your current one is completed.
+              </p>
+              <p>
+                <strong>
+                  Winter limits ({winter_span}):
+                </strong>
+                Single members can book 1 room; Family members up to 2 rooms (same dates). The entire cabin can't be booked in winter.
+              </p>
+              <p>
+                <strong>
+                  Pricing (per person, per night):
+                </strong>
+                Adults {MoneyHelper.format_money!(
+                  get_default_adult_price(@property, terms_season_id)
+                )} · Children (5–17) {MoneyHelper.format_money!(
+                  get_default_children_price(@property, terms_season_id)
+                )} · Under 5 free.
+              </p>
+            </.modal_section>
+            <.modal_section title="Location & parking">
+              <p>
+                <strong>Address:</strong> 2685 Cedar Lane, Homewood, CA 96141.
+              </p>
+              <p>
+                <strong>Winter driving:</strong>
+                You must carry chains or drive a 4WD with snow tires. Check Caltrans (800-427-7623) before travel.
+              </p>
+              <p>
+                <strong>Parking:</strong>
+                Extremely limited; carpooling is encouraged.
+              </p>
+              <p>
+                <strong>Street parking ban:</strong>
+                Do not park on the street from Nov 1 – May 1. You will be towed for snow removal.
+              </p>
+            </.modal_section>
+            <.modal_section title="Bear safety">
+              <p>
+                The cabin is protected by an electric bear wire. It is safe if handled correctly.
+              </p>
+              <p>
+                <strong>To enter:</strong>
+                Disconnect the top handle first (this disables the system), then remove the middle and bottom wires.
+              </p>
+              <p>
+                <strong>To secure:</strong>
+                When leaving or at night, replace wires from bottom to top. The top wire activates the barrier.
+              </p>
+              <p>
+                <strong>Trash:</strong>
+                Use bearproof lids on all garbage cans at all times.
+              </p>
+            </.modal_section>
+            <.modal_section title="Cabin etiquette">
+              <p>
+                <strong>Quiet hours:</strong>
+                10:00 p.m. – 7:00 a.m. Please step lightly on the stairs.
+              </p>
+              <p>
+                <strong>Children:</strong>
+                For safety and noise, children are not permitted to play on the stairs.
+              </p>
+              <p>
+                <strong>Prohibited:</strong>
+                No pets. No smoking or vaping inside the cabin.
+              </p>
+              <p>
+                <strong>Storage:</strong>
+                Ski boots go in the laundry room racks; all other ski gear in the outside stairwell. Do not clutter common areas.
+              </p>
+            </.modal_section>
+            <.modal_section title="What to bring">
+              <p>
+                <strong>Linens:</strong>
+                Your own sheets, pillowcases, towels, and sleeping bags. None are provided.
+              </p>
+              <p>
+                <strong>Food:</strong>
+                Bring your own food. A full kitchen and spices are available.
+              </p>
+              <p>
+                <strong>Firewood:</strong>
+                Bring fire starter or kindling and some dry wood to start the stove.
+              </p>
+            </.modal_section>
+            <.modal_section title="Cleaning & chores">
+              <p>
+                <strong>Kitchen:</strong>
+                Leave it spotless; remove all food from the refrigerator.
+              </p>
+              <p>
+                <strong>Rooms:</strong> Clean your room and strip the beds.
+              </p>
+              <p>
+                <strong>Laundry:</strong>
+                If you use club bedding, wash, dry, and fold it before leaving.
+              </p>
+            </.modal_section>
+            <.modal_section
+              id="tahoe-rules-modal-cancellation"
+              title="Cancellation policy"
+            >
+              <% buyout_lines = cancellation_policy_lines(@buyout_refund_policy) %>
+              <% room_lines = cancellation_policy_lines(@room_refund_policy) %>
+              <p :if={buyout_lines != []}>
+                <strong>
+                  {BookingModeDisplay.stay_type_label(:buyout)}:
+                </strong>
+                <span :for={line <- buyout_lines} class="block">{line}</span>
+              </p>
+              <p :if={room_lines != []}>
+                <strong>
+                  {BookingModeDisplay.stay_type_label(:room)}:
+                </strong>
+                <span :for={line <- room_lines} class="block">{line}</span>
+              </p>
+              <p :if={buyout_lines == [] and room_lines == []}>
+                Refunds depend on how far ahead of check-in you cancel. See Cancellation Policy on the Booking & Cancellation Policies tab.
+              </p>
+              <p class="text-xs text-zinc-500">
+                Cash refunds are subject to a 3% processing fee. Report road closure cancellations immediately to the cabin contact at {EmailConfig.tahoe_email()} for credit.
+              </p>
+            </.modal_section>
+            <.modal_section title="Compliance & board authority">
+              <p>
+                Failure to comply with the rules and policies may lead to disciplinary action or penalties, at the board's discretion.
+              </p>
+              <p>
+                Any booking may be cancelled or adjusted for any reason by the board of directors.
+              </p>
+            </.modal_section>
+            <:footer>
+              <button
+                type="button"
+                phx-click="close-terms-modal"
+                class="w-full sm:w-auto px-6 py-2.5 min-h-11 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                I Understand
+              </button>
+            </:footer>
+          </.cabin_modal>
           <!-- Booking Eligibility Banner (shown when user can't book) -->
           <.warning_callout
             :if={!@can_book}
@@ -3227,41 +2733,19 @@ defmodule YscWeb.TahoeBookingLive do
           <%!-- Information Sections (Tab System) --%>
           <div
             id="information-section"
-            class="mt-12 max-w-(--breakpoint-xl) mx-auto"
+            class="mt-12 max-w-(--breakpoint-xl) mx-auto cabin-copy"
           >
             <% browse_rooms = YscWeb.Components.RoomBrowser.browsable_rooms(:tahoe) %>
             <% info_tab = Map.get(assigns, :info_tab, :general) %>
             <.info_tabs active={info_tab} accent={:blue} />
             <%!-- The Cabin & Rooms: what you are deciding to book --%>
             <div :if={info_tab == :general} id="cabin-overview">
-              <header class="max-w-3xl">
-                <h1 class="text-3xl text-zinc-900 mb-4 type-display">
-                  Welcome to the YSC Tahoe Cabin
-                </h1>
-                <p class="text-lg text-zinc-600 leading-relaxed">
-                  Your year-round retreat in the heart of Lake Tahoe. Since <strong>1993</strong>, the YSC has proudly owned this beautiful cabin, located just minutes from Tahoe City, on the
-                  <strong>west shore</strong>
-                  of <strong>Lake Tahoe</strong>.
-                </p>
-              </header>
-              <.info_callout
-                id="tahoe-not-a-hotel"
-                icon="hero-home"
-                accent={:blue}
-                class="mt-8"
-              >
-                <p>
-                  <strong class="font-semibold text-zinc-900">Remember:</strong>
-                  the Tahoe Cabin is your cabin — not a hotel. To keep rates reasonable for everyone, please follow the guidelines below.
-                </p>
-              </.info_callout>
-
-              <.info_sections class="mt-10">
+              <.info_sections>
                 <.info_section
                   id="general-info"
                   heading_id="tahoe-about-heading"
                   title="About the Cabin"
-                  description="The Lake Tahoe region offers endless outdoor opportunities."
+                  description="Since 1993 the YSC has proudly owned this cabin, just minutes from Tahoe City on the west shore of Lake Tahoe. The region offers endless outdoor opportunities, year-round."
                 >
                   <.stat_strip id="tahoe-at-a-glance" columns={4}>
                     <:stat label="Capacity" value="17 guests" detail="7 bedrooms" />
@@ -3313,15 +2797,14 @@ defmodule YscWeb.TahoeBookingLive do
                   />
                 </.info_section>
 
-                <div :if={browse_rooms != []} class="py-10">
-                  <YscWeb.Components.RoomBrowser.room_browser
-                    id="property-room-browser"
-                    rooms={browse_rooms}
-                    property_name="YSC Tahoe Cabin"
-                    accent={:blue}
-                    pick_event={if @can_book, do: "browse-room-pick"}
-                  />
-                </div>
+                <YscWeb.Components.RoomBrowser.room_browser
+                  :if={browse_rooms != []}
+                  id="property-room-browser"
+                  rooms={browse_rooms}
+                  property_name="YSC Tahoe Cabin"
+                  accent={:blue}
+                  pick_event={if @can_book, do: "browse-room-pick"}
+                />
 
                 <.info_section
                   heading_id="tahoe-nearby-heading"
@@ -3347,6 +2830,15 @@ defmodule YscWeb.TahoeBookingLive do
                     <p class="mt-1 text-lg font-medium text-zinc-900">
                       2685 Cedar Lane<br />Homewood, CA 96141
                     </p>
+                    <a
+                      href="https://www.google.com/maps/dir/?api=1&destination=39.12591794747629,-120.16648676079016"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900"
+                    >
+                      Open in Google Maps
+                      <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
+                    </a>
                   </div>
                   <.numbered_steps
                     id="tahoe-directions"
@@ -3370,49 +2862,14 @@ defmodule YscWeb.TahoeBookingLive do
                       — the cabin is on your left.
                     </:step>
                   </.numbered_steps>
-                  <div class="space-y-4">
-                    <div class="rounded-lg overflow-hidden border border-zinc-200 h-72">
-                      <.live_component
-                        id="tahoe-cabin-map"
-                        module={YscWeb.Components.MapComponent}
-                        latitude={39.12591794747629}
-                        longitude={-120.16648676079016}
-                        locked={true}
-                        class="w-full h-full"
-                      />
-                    </div>
-                    <YscWeb.Components.MapNavigationButtons.map_navigation_buttons
-                      latitude={39.12591794747629}
-                      longitude={-120.16648676079016}
-                      class="w-full"
-                    />
-                  </div>
-                </.info_section>
-
-                <.info_section
-                  heading_id="tahoe-how-to-book-heading"
-                  title="How to Book"
-                  description="Everything happens on this website."
-                >
-                  <.numbered_steps id="tahoe-booking-steps">
-                    <:step>
-                      Choose whether you want individual rooms or the entire cabin.
-                    </:step>
-                    <:step>
-                      Select your check-in and check-out dates, number of adults and children using the <strong>booking form above</strong>.
-                    </:step>
-                    <:step>
-                      After selecting your dates, available rooms will appear. Browse and select the rooms that best fit your group size and needs.
-                    </:step>
-                    <:step>
-                      Review your booking summary, then complete your booking and payment <strong>through this website</strong>. You'll receive a confirmation email with your booking details.
-                    </:step>
-                  </.numbered_steps>
-                  <p class="text-sm text-zinc-600 leading-relaxed">
-                    Afterwards you can view and manage your booking from the link in your confirmation email. Refunds and cancellations are covered under
-                    <strong class="font-semibold text-zinc-900">Cancellation Policy</strong>
-                    on the Cabin & Booking Rules tab.
-                  </p>
+                  <.live_component
+                    id="tahoe-cabin-map"
+                    module={YscWeb.Components.MapComponent}
+                    latitude={39.12591794747629}
+                    longitude={-120.16648676079016}
+                    locked={true}
+                    class="w-full"
+                  />
                 </.info_section>
               </.info_sections>
             </div>
@@ -3673,13 +3130,13 @@ defmodule YscWeb.TahoeBookingLive do
                 title={"Winter season #{@winter_season_label} bookings are open"}
               >
                 <p>
-                  <strong class="font-medium text-zinc-900">
+                  <strong>
                     Individual rooms:
                   </strong>
                   book them throughout the winter. Room limits per membership apply — see Room limits below.
                 </p>
                 <p>
-                  <strong class="font-medium text-zinc-900">Entire cabin:</strong>
+                  <strong>Entire cabin:</strong>
                   {buyout_mode_availability_copy(@seasons)}
                 </p>
               </.info_callout>
@@ -3718,7 +3175,7 @@ defmodule YscWeb.TahoeBookingLive do
                       <p :for={
                         season <- seasonal_availability_notice_seasons(@seasons)
                       }>
-                        <strong class="font-medium text-zinc-900">
+                        <strong>
                           {season.name} ({format_season_month_span(season)}):
                         </strong>
                         <%= if season.name == "Winter" do %>
@@ -3730,12 +3187,12 @@ defmodule YscWeb.TahoeBookingLive do
                     </:row>
                     <:row label="Room limits">
                       <p>
-                        <strong class="font-medium text-zinc-900">Single membership:</strong>
+                        <strong>Single membership:</strong>
                         Can only book <strong>1 room</strong>
                         during winter season
                       </p>
                       <p>
-                        <strong class="font-medium text-zinc-900">
+                        <strong>
                           Family membership (and lifetime members):
                         </strong>
                         Allowed to book <strong>2 rooms</strong>
@@ -3758,7 +3215,7 @@ defmodule YscWeb.TahoeBookingLive do
                       class="w-4 h-4 shrink-0 text-zinc-400"
                     />
                     <span>
-                      <strong class="font-medium text-zinc-700">Board authority:</strong>
+                      <strong>Board authority:</strong>
                       the board reserves the right to cancel bookings that violate these rules.
                     </span>
                   </p>
@@ -3782,13 +3239,12 @@ defmodule YscWeb.TahoeBookingLive do
                   ]} />
                   <.fine_print>
                     <:note>
-                      <strong class="font-medium text-zinc-700">Cash refunds</strong>
-                      incur a
-                      <strong class="font-medium text-zinc-700">3% processing fee</strong>
+                      <strong>Cash refunds</strong>
+                      incur a <strong>3% processing fee</strong>
                       to cover the club's credit card handling costs.
                     </:note>
                     <:note>
-                      <strong class="font-medium text-zinc-700">
+                      <strong>
                         Road closure cancellations
                       </strong>
                       may be credited toward a future stay — email the cabin contact at {EmailConfig.tahoe_email()}.
@@ -3820,13 +3276,11 @@ defmodule YscWeb.TahoeBookingLive do
                 id="tahoe-review-booking-mobile"
                 phx-click="show-confirm-modal"
                 disabled={!can_submit_booking?(assigns)}
-                class={
-                  if can_submit_booking?(assigns) do
-                    "px-6 py-3 shrink-0"
-                  else
-                    "px-6 py-3 shrink-0 bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed"
-                  end
+                variant={
+                  if can_submit_booking?(assigns), do: "solid", else: "outline"
                 }
+                color={if can_submit_booking?(assigns), do: "blue", else: "zinc"}
+                class="px-6 py-3 shrink-0"
               >
                 {YscWeb.BookingUserMessages.tahoe_review_booking_button()}
               </.button>
@@ -5407,6 +4861,15 @@ defmodule YscWeb.TahoeBookingLive do
 
   # First night on or after today when the entire cabin can be booked, so the
   # buyout calendar opens on a month with something to pick (not all winter).
+  # Member-facing cancellation lines for a policy, shortest notice first, worded
+  # the way the cancellation flow words them. Empty when no rules are loaded.
+  defp cancellation_policy_lines(policy) do
+    policy
+    |> RefundPolicyDisplay.policy_rules()
+    |> RefundPolicyDisplay.rules_sorted_asc()
+    |> Enum.map(&RefundPolicyDisplay.cancellation_rule_summary/1)
+  end
+
   defp buyout_focus_date(seasons, today) when is_list(seasons) do
     today
     |> Stream.iterate(&Date.add(&1, 1))
@@ -6837,43 +6300,6 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   # Bed icon SVG helpers
-  defp bed_icon_svg(bed_type, class)
-
-  defp bed_icon_svg(:single, class) do
-    """
-    <svg class="#{class}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="twinBedTitle">
-      <path d="M6 9h12" />
-      <rect x="6" y="9" width="12" height="8" rx="2" />
-      <path d="M8 17v2m8-2v2" />
-      <rect x="9.75" y="10.25" width="4.5" height="2.5" rx="1" />
-    </svg>
-    """
-  end
-
-  defp bed_icon_svg(:queen, class) do
-    """
-    <svg class="#{class}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="queenBedTitle">
-      <path d="M4 9h16" />
-      <rect x="4" y="9" width="16" height="8" rx="2" />
-      <path d="M7 17v2m10-2v2" />
-      <rect x="7.5" y="10.25" width="5" height="2.5" rx="1" />
-      <rect x="11.5" y="10.25" width="5" height="2.5" rx="1" />
-    </svg>
-    """
-  end
-
-  defp bed_icon_svg(:king, class) do
-    """
-    <svg class="#{class}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="kingBedTitle">
-      <path d="M3 9h18" />
-      <rect x="3" y="9" width="18" height="8" rx="2" />
-      <path d="M6 17v2m12-2v2" />
-      <rect x="6.25" y="10.25" width="6" height="2.5" rx="1" />
-      <rect x="11.75" y="10.25" width="6" height="2.5" rx="1" />
-    </svg>
-    """
-  end
-
   # Helper to get default adult price from pricing rules (property-level fallback)
   defp get_default_adult_price(property, season_id) do
     pricing_rule =

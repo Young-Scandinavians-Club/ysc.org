@@ -569,13 +569,15 @@ defmodule YscWeb.ClearLakeBookingLive do
               :if={@sleeping_mode == :winter}
               id="sleeping-alert"
               icon="hero-sparkles"
+              title="Beds set up"
             >
-              Beds set up. Bring your own linens
+              Bring your own linens
             </:item>
             <:item
               :if={@sleeping_mode == :mixed}
               id="sleeping-alert"
               icon="hero-moon"
+              title="Sleeping"
             >
               Setup depends on season — lawn in summer, beds in winter
             </:item>
@@ -583,20 +585,23 @@ defmodule YscWeb.ClearLakeBookingLive do
               :if={@sleeping_mode not in [:winter, :mixed]}
               id="sleeping-alert"
               icon="hero-moon"
+              title="Sleeping"
             >
               Lawn camp or bring your own setup
             </:item>
-            <:item icon="hero-no-symbol">No pets or smoking</:item>
-            <:item icon="hero-lifebuoy">
-              Free boat mooring — email the Cabin Master before you arrive
+            <:item icon="hero-no-symbol" title="House rules">
+              No pets or smoking
             </:item>
-            <:item icon="hero-hand-raised">
+            <:item icon="hero-lifebuoy" title="Boat access">
+              Free mooring — email the Cabin Master before you arrive
+            </:item>
+            <:item icon="hero-hand-raised" title="Community">
               Shared cabin — please help with chores before you leave
             </:item>
           </.essentials_strip>
           <!-- Active Bookings -->
           <div :if={length(@active_bookings) > 0} class="space-y-4">
-            <h2 class="text-sm text-zinc-400 type-eyebrow">
+            <h2 class="text-sm text-zinc-500 type-eyebrow">
               Your bookings
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1102,9 +1107,11 @@ defmodule YscWeb.ClearLakeBookingLive do
             </div>
             <!-- Right Column: Sticky Reservation Summary (1 column on large screens) -->
             <aside class="lg:sticky lg:top-24 lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto">
-              <div class="bg-white rounded-xl border-2 border-teal-600 overflow-hidden">
-                <div class="bg-teal-600 p-4 text-white text-center">
-                  <h3 class="text-lg type-subhead">Booking Summary</h3>
+              <div class="bg-white rounded-xl border border-zinc-200 shadow-xs overflow-hidden">
+                <div class="px-6 py-4 border-b border-zinc-100 bg-zinc-50/50">
+                  <h3 class="text-base text-zinc-900 type-subhead">
+                    Booking Summary
+                  </h3>
                 </div>
                 <div class="p-6 space-y-4">
                   <!-- Dates -->
@@ -1340,7 +1347,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       <hr class="border-zinc-200" />
 
                       <div class="flex justify-between items-end">
-                        <span class="text-lg font-bold text-zinc-900">Total</span>
+                        <span class="text-lg text-zinc-900 type-subhead">Total</span>
                         <div class="text-right">
                           <span
                             :if={!@availability_error}
@@ -1488,19 +1495,25 @@ defmodule YscWeb.ClearLakeBookingLive do
                     @availability_error
                   )
                 }
-                class={
+                variant={
                   if can_submit_booking?(
                        @selected_booking_mode,
                        @checkin_date,
                        @checkout_date,
                        @guests_count,
                        @availability_error
-                     ) do
-                    "px-6 py-3"
-                  else
-                    "px-6 py-3 bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed"
-                  end
+                     ), do: "solid", else: "outline"
                 }
+                color={
+                  if can_submit_booking?(
+                       @selected_booking_mode,
+                       @checkin_date,
+                       @checkout_date,
+                       @guests_count,
+                       @availability_error
+                     ), do: "teal", else: "zinc"
+                }
+                class="px-6 py-3"
               >
                 Continue to payment
               </.button>
@@ -1517,7 +1530,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           <%!-- Information Sections (Tab System) --%>
           <div
             id="information-section"
-            class="mt-12 max-w-(--breakpoint-xl) mx-auto"
+            class="mt-12 max-w-(--breakpoint-xl) mx-auto cabin-copy"
           >
             <% browse_rooms =
               YscWeb.Components.RoomBrowser.browsable_rooms(:clear_lake) %>
@@ -1525,35 +1538,12 @@ defmodule YscWeb.ClearLakeBookingLive do
             <.info_tabs active={info_tab} accent={:teal} />
             <%!-- The Cabin & Rooms: what you are deciding to book --%>
             <div :if={info_tab == :general} id="cabin-overview">
-              <header class="max-w-3xl">
-                <h1 class="text-3xl text-zinc-900 mb-4 type-display">
-                  Welcome to the YSC Clear Lake Cabin
-                </h1>
-                <p class="text-lg text-zinc-600 leading-relaxed">
-                  Your year-round gateway to North America's oldest natural lake —
-                  <strong>2.5 million years</strong>
-                  old — in <strong>Kelseyville</strong>. Since <strong>1963</strong>
-                  this has been a <strong>Member Sanctuary</strong>: we don't just stay here, we keep it together.
-                </p>
-              </header>
-              <.info_callout
-                id="clear-lake-not-a-hotel"
-                icon="hero-home"
-                accent={:teal}
-                class="mt-8"
-              >
-                <p>
-                  <strong class="font-semibold text-zinc-900">Remember:</strong>
-                  the Clear Lake Cabin is your cabin — not a hotel. To keep rates reasonable for everyone, please follow the guidelines below.
-                </p>
-              </.info_callout>
-
-              <.info_sections class="mt-10">
+              <.info_sections>
                 <.info_section
                   id="general-info"
                   heading_id="clear-lake-about-heading"
                   title="About the Cabin"
-                  description="Clear Lake and the surrounding region offer year-round outdoor opportunities."
+                  description="Your year-round gateway to North America's oldest natural lake (2.5 million years old), in Kelseyville. A Member Sanctuary since 1963: we don't just stay here, we keep it together."
                 >
                   <.stat_strip id="clear-lake-at-a-glance" columns={4}>
                     <:stat
@@ -1584,15 +1574,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                   />
                 </.info_section>
 
-                <div :if={browse_rooms != []} class="py-10">
-                  <YscWeb.Components.RoomBrowser.room_browser
-                    id="property-room-browser"
-                    rooms={browse_rooms}
-                    property_name="YSC Clear Lake Cabin"
-                    accent={:teal}
-                    intro="You don't pick a specific room when you book. Shared cabin stays share the house with other members. Entire cabin stays include every room."
-                  />
-                </div>
+                <YscWeb.Components.RoomBrowser.room_browser
+                  :if={browse_rooms != []}
+                  id="property-room-browser"
+                  rooms={browse_rooms}
+                  property_name="YSC Clear Lake Cabin"
+                  accent={:teal}
+                  intro="You don't pick a specific room when you book. Shared cabin stays share the house with other members. Entire cabin stays include every room."
+                />
 
                 <.info_section
                   id="sleeping-at-the-cabin"
@@ -1605,7 +1594,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <p class="type-eyebrow text-xs text-zinc-500">
                           Winter ({@winter_season_window})
                         </p>
-                        <p class="text-base font-semibold text-zinc-900">
+                        <p class="text-base text-zinc-900 type-subhead">
                           Indoor beds are set up in three separate rooms.
                         </p>
                         <p class="text-sm text-zinc-600 leading-relaxed">
@@ -1644,17 +1633,17 @@ defmodule YscWeb.ClearLakeBookingLive do
                       </div>
                     <% @sleeping_mode == :mixed -> %>
                       <div class="space-y-4">
-                        <p class="text-base font-semibold text-zinc-900">
+                        <p class="text-base text-zinc-900 type-subhead">
                           Your stay covers both seasons.
                         </p>
                         <p class="text-sm text-zinc-600 leading-relaxed">
-                          <strong class="font-medium text-zinc-900">
+                          <strong>
                             Summer ({@summer_season_window}):
                           </strong>
                           Beds are not set up. Lawn camp or use the cabin with your own sleeping setup. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
                         </p>
                         <p class="text-sm text-zinc-600 leading-relaxed">
-                          <strong class="font-medium text-zinc-900">
+                          <strong>
                             Winter ({@winter_season_window}):
                           </strong>
                           Indoor beds are set up in three separate rooms. {winter_beds_setup_copy()} Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels.
@@ -1665,7 +1654,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         <p class="type-eyebrow text-xs text-zinc-500">
                           Summer ({@summer_season_window})
                         </p>
-                        <p class="text-base font-semibold text-zinc-900">
+                        <p class="text-base text-zinc-900 type-subhead">
                           Beds are not set up in the cabin.
                         </p>
                         <p class="text-sm text-zinc-600 leading-relaxed">
@@ -1710,7 +1699,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                       rel="noopener noreferrer"
                       class="mt-3 inline-flex items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-900"
                     >
-                      <.icon name="hero-map-pin" class="w-4 h-4" /> Open in Maps
+                      Open in Google Maps
+                      <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
                     </a>
                   </div>
                   <details class="group border-y border-zinc-200">
@@ -1791,50 +1781,20 @@ defmodule YscWeb.ClearLakeBookingLive do
                         accent={:amber}
                       >
                         <p>
-                          <strong class="font-semibold text-zinc-900">Note:</strong>
+                          <strong>Note:</strong>
                           if you reach Konocti Harbor Inn, you've gone too far — turn around.
                         </p>
                       </.info_callout>
                     </div>
                   </details>
-                  <div class="space-y-4">
-                    <div class="rounded-lg overflow-hidden border border-zinc-200 h-72">
-                      <.live_component
-                        id="clear-lake-cabin-map"
-                        module={YscWeb.Components.MapComponent}
-                        latitude={38.98087180833886}
-                        longitude={-122.73563627025182}
-                        locked={true}
-                        class="w-full h-full"
-                      />
-                    </div>
-                    <YscWeb.Components.MapNavigationButtons.map_navigation_buttons
-                      latitude={38.98087180833886}
-                      longitude={-122.73563627025182}
-                      class="w-full"
-                    />
-                  </div>
-                </.info_section>
-
-                <.info_section
-                  heading_id="clear-lake-how-to-book-heading"
-                  title="How to Book"
-                  description="Everything happens on this website."
-                >
-                  <.numbered_steps id="clear-lake-booking-steps">
-                    <:step>
-                      Use the <strong>booking form above</strong>
-                      to choose Shared cabin vs Entire cabin, dates, and guests, then pay on this site.
-                    </:step>
-                    <:step>
-                      You'll get a confirmation email with a link to view and manage your booking.
-                    </:step>
-                  </.numbered_steps>
-                  <p class="text-sm text-zinc-600 leading-relaxed">
-                    Cancellation and refunds are on the
-                    <strong class="font-semibold text-zinc-900">Cabin & Booking Rules</strong>
-                    tab under Cancellation Policy.
-                  </p>
+                  <.live_component
+                    id="clear-lake-cabin-map"
+                    module={YscWeb.Components.MapComponent}
+                    latitude={38.98087180833886}
+                    longitude={-122.73563627025182}
+                    locked={true}
+                    class="w-full"
+                  />
                 </.info_section>
 
                 <.info_section
@@ -1875,21 +1835,21 @@ defmodule YscWeb.ClearLakeBookingLive do
                       navigate={
                         ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
                       }
-                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors"
+                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
                     >
                       Sign In to Book
                     </.link>
                     <.link
                       :if={@booking_error_title == "Application under review"}
                       navigate={~p"/pending-review"}
-                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors"
+                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
                     >
                       View application status
                     </.link>
                     <.link
                       :if={@booking_error_title == "Membership Required"}
                       navigate={~p"/users/membership"}
-                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition-colors"
+                      class="inline-flex px-8 py-3 bg-teal-600 text-white font-semibold rounded-lg hover:bg-teal-700 transition-colors"
                     >
                       Pay or renew membership
                     </.link>
@@ -2041,7 +2001,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   </p>
                   <.info_callout icon="hero-exclamation-triangle" accent={:red}>
                     <p>
-                      <strong class="font-semibold text-zinc-900">
+                      <strong>
                         Quagga mussel warning:
                       </strong>
                       mandatory boat inspection required. Violations result in a $1,000 fine from Lake County.

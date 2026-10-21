@@ -97,14 +97,20 @@ defmodule YscWeb.Components.CabinInfo do
   defp tab_underline(:teal), do: "border-teal-600"
 
   @doc """
-  One quiet line of must-know rules, shown once under the hero. Items wrap on
-  small screens. Each `:item` takes a hero `icon`.
+  The must-know rules, once, directly under the hero: a single hairline panel
+  with one cell per rule. Each cell has a tinted icon, a small label and the
+  rule itself, so it scans in a second. Cells sit in a row on wide screens, two
+  by two on tablets and stacked on phones.
+
+  Each `:item` takes a hero `icon`, a short `title` and an optional `id`; the
+  slot body is the rule.
   """
   attr :id, :string, default: nil
   attr :accent, :atom, default: :blue, values: [:blue, :teal]
 
   slot :item, required: true do
     attr :icon, :string, required: true
+    attr :title, :string, required: true
     attr :id, :string
   end
 
@@ -112,22 +118,32 @@ defmodule YscWeb.Components.CabinInfo do
     ~H"""
     <ul
       id={@id}
-      class="flex flex-wrap gap-x-6 gap-y-2 py-3 border-y border-zinc-200 text-sm text-zinc-700"
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px overflow-hidden rounded-lg border border-zinc-200 bg-zinc-200"
     >
       <li
         :for={item <- @item}
         id={Map.get(item, :id)}
-        class="flex items-center gap-2"
+        class="flex items-start gap-3 bg-white px-4 py-3.5"
       >
-        <.icon name={item.icon} class={["w-4 h-4 shrink-0", accent_icon(@accent)]} />
-        <span>{render_slot(item)}</span>
+        <span class={[
+          "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full",
+          accent_tint(@accent)
+        ]}>
+          <.icon name={item.icon} class="size-4" />
+        </span>
+        <div class="min-w-0">
+          <p class="type-eyebrow text-xs text-zinc-500">{item.title}</p>
+          <p class="mt-0.5 text-sm font-medium text-zinc-900 leading-snug">
+            {render_slot(item)}
+          </p>
+        </div>
       </li>
     </ul>
     """
   end
 
-  defp accent_icon(:blue), do: "text-blue-600"
-  defp accent_icon(:teal), do: "text-teal-600"
+  defp accent_tint(:blue), do: "bg-blue-50 text-blue-700"
+  defp accent_tint(:teal), do: "bg-teal-50 text-teal-700"
 
   @doc """
   One-line helper bar of constraints that affect picking dates, set directly above
@@ -156,9 +172,11 @@ defmodule YscWeb.Components.CabinInfo do
   @doc """
   Short refund summary for the booking sidebar, one line per stay type.
 
-  `columns` is a list of `%{label: String.t(), rules: [rule]}`. The best refund
-  tier is the largest percentage; among ties, the shortest notice. Stay types
-  without a refundable tier are left out, and nothing renders if none qualify.
+  `columns` is a list of `%{label: String.t(), rules: [rule]}`. A rule applies
+  when the cancellation is *within* its `days_before_checkin` (the refund engine
+  picks the tightest matching rule), and cancelling earlier than every rule is a
+  full refund. Stay types without rules are left out; nothing renders if none
+  have any.
   """
   attr :id, :string, default: nil
   attr :columns, :list, required: true
@@ -181,27 +199,123 @@ defmodule YscWeb.Components.CabinInfo do
   @doc false
   def refund_summary_lines(columns) do
     columns
+    |> Enum.reject(&(&1.rules == []))
     |> Enum.map(fn %{label: label, rules: rules} ->
-      {label, best_refund_rule(rules)}
-    end)
-    |> Enum.reject(fn {_label, rule} -> is_nil(rule) end)
-    |> Enum.map(fn {label, rule} ->
-      pct = RefundPolicyDisplay.refund_percentage_int(rule.refund_percentage)
+      [top | rest] = Enum.sort_by(rules, & &1.days_before_checkin, :desc)
 
-      "#{label}: #{pct}% refund #{rule.days_before_checkin}+ days before check-in"
+      tiers =
+        Enum.map([top | rest], fn rule ->
+          pct =
+            RefundPolicyDisplay.refund_percentage_int(rule.refund_percentage)
+
+          "#{if pct == 0, do: "no refund", else: "#{pct}%"} within #{rule.days_before_checkin} days"
+        end)
+
+      "#{label}: full refund more than #{top.days_before_checkin} days before check-in; #{Enum.join(tiers, "; ")}."
     end)
   end
 
-  defp best_refund_rule(rules) do
-    rules
-    |> Enum.filter(
-      &(RefundPolicyDisplay.refund_percentage_int(&1.refund_percentage) > 0)
-    )
-    |> Enum.sort_by(
-      &{-RefundPolicyDisplay.refund_percentage_int(&1.refund_percentage),
-       &1.days_before_checkin}
-    )
-    |> List.first()
+  @doc """
+  Dialog shell for the booking pages' rules and review modals.
+
+  Sits at `z-200`, above the sticky navbar (`z-100`) and the mobile booking bar,
+  but below toasts. `data-modal-open` lets `app.css` lift `<main>` out of its
+  hero-page stacking context while the dialog is open. A bottom sheet on phones, a centered panel from `sm` up.
+  The body scrolls inside the panel, so the header and footer stay in reach.
+  Clicking the backdrop or pressing Escape pushes `on_close`.
+  """
+  attr :id, :string, required: true
+  attr :title, :string, required: true
+
+  attr :on_close, :string,
+    required: true,
+    doc: "LiveView event to push to close"
+
+  attr :size, :atom, default: :md, values: [:md, :lg]
+  attr :description, :string, default: nil
+  attr :accent, :atom, default: :blue, values: [:blue, :teal]
+
+  slot :inner_block, required: true
+  slot :footer, required: true
+
+  def cabin_modal(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      data-modal-open
+      class="fixed inset-0 z-200 flex items-end sm:items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={"#{@id}-title"}
+      phx-window-keydown={@on_close}
+      phx-key="escape"
+    >
+      <div
+        id={"#{@id}-backdrop"}
+        class="absolute inset-0 bg-zinc-900/50"
+        phx-click={@on_close}
+        aria-hidden="true"
+      >
+      </div>
+      <div class={[
+        "relative flex flex-col w-full max-h-[92dvh] sm:max-h-[85dvh] bg-white rounded-t-xl sm:rounded-xl shadow-xl sm:m-6",
+        if(@size == :lg, do: "sm:max-w-3xl", else: "sm:max-w-lg")
+      ]}>
+        <header class="flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-zinc-200">
+          <div>
+            <h2 id={"#{@id}-title"} class="type-subhead text-xl text-zinc-900">
+              {@title}
+            </h2>
+            <p
+              :if={@description}
+              id={"#{@id}-intro"}
+              class="mt-1 text-sm text-zinc-500 leading-relaxed"
+            >
+              {@description}
+            </p>
+          </div>
+          <button
+            type="button"
+            phx-click={@on_close}
+            class="-m-2 p-2 min-h-11 min-w-11 inline-flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
+            aria-label="Close"
+          >
+            <.icon name="hero-x-mark" class="w-5 h-5" />
+          </button>
+        </header>
+        <div class="flex-1 overflow-y-auto overscroll-contain px-6 cabin-copy">
+          {render_slot(@inner_block)}
+        </div>
+        <footer class={[
+          "flex flex-col-reverse gap-3 px-6 py-4 border-t border-zinc-200 sm:flex-row sm:justify-end pb-[max(1rem,env(safe-area-inset-bottom))]"
+        ]}>
+          {render_slot(@footer)}
+        </footer>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  One topic inside a `cabin_modal/1`: the title on the left, rows on the right,
+  hairline-separated from the next topic. Use `spec_list/1` inside for rows.
+  """
+  attr :title, :string, required: true
+  attr :id, :string, default: nil
+  slot :inner_block, required: true
+
+  def modal_section(assigns) do
+    ~H"""
+    <section
+      id={@id}
+      class="py-5 grid grid-cols-1 gap-2 sm:grid-cols-[10rem_1fr] sm:gap-6 border-b border-zinc-100 last:border-b-0"
+    >
+      <h3 class="type-subhead text-sm text-zinc-900">{@title}</h3>
+      <div class="min-w-0 space-y-3 text-sm text-zinc-600 leading-relaxed">
+        {render_slot(@inner_block)}
+      </div>
+    </section>
+    """
   end
 
   @doc """
@@ -447,7 +561,7 @@ defmodule YscWeb.Components.CabinInfo do
           ]}
         />
         <span>
-          <strong :if={Map.get(item, :title)} class="font-semibold text-zinc-900">
+          <strong :if={Map.get(item, :title)}>
             {item.title}
           </strong>
           {render_slot(item)}
@@ -477,7 +591,7 @@ defmodule YscWeb.Components.CabinInfo do
         <span class={["w-2 h-2 rounded-full", dot_class(@dot)]}></span>
         <h3 class="type-subhead text-sm text-zinc-900">{@title}</h3>
       </div>
-      <ol class="space-y-3 text-sm text-zinc-700 leading-relaxed">
+      <ol class="space-y-3 text-sm text-zinc-600 leading-relaxed">
         <li :for={{step, index} <- Enum.with_index(@step, 1)} class="flex gap-3">
           <span class="font-mono text-xs font-bold text-zinc-400 mt-0.5">
             {String.pad_leading(Integer.to_string(index), 2, "0")}
@@ -576,23 +690,25 @@ defmodule YscWeb.Components.CabinInfo do
   end
 
   @doc """
-  Refund percentage by notice given, one column per stay type.
+  Refund percentage by how far ahead of check-in a guest cancels, one column
+  per stay type.
 
-  `columns` is a list of `%{label: String.t(), rules: [rule]}`. Rows are the
-  union of every column's `days_before_checkin` thresholds. A column with no
-  rule at a threshold shows an em dash. With no rules at all, an empty-state row
-  is shown instead.
+  `columns` is a list of `%{label: String.t(), rules: [rule]}`. A rule applies
+  when the cancellation is within its `days_before_checkin` (the tightest
+  matching rule wins, as in `Ysc.Bookings`), so rows are the bands between the
+  union of every column's thresholds; cancelling earlier than all of them is a
+  full refund. With no rules at all, an empty-state row is shown instead.
   """
   attr :id, :string, default: nil
   attr :columns, :list, required: true
 
   def refund_table(assigns) do
-    days =
+    thresholds =
       assigns.columns
       |> Enum.map(& &1.rules)
       |> RefundPolicyDisplay.unique_threshold_days_desc()
 
-    assigns = assign(assigns, :days, days)
+    assigns = assign(assigns, :bands, refund_bands(thresholds, assigns.columns))
 
     ~H"""
     <div id={@id} class="overflow-x-auto border border-zinc-200 rounded-lg">
@@ -613,19 +729,21 @@ defmodule YscWeb.Components.CabinInfo do
           </tr>
         </thead>
         <tbody class="divide-y divide-zinc-200 text-zinc-700">
-          <tr :if={@days == []}>
+          <tr :if={@bands == []}>
             <td colspan={length(@columns) + 1} class="px-4 py-3 text-zinc-500">
               Policy information will be displayed here
             </td>
           </tr>
-          <tr :for={days <- @days}>
+          <tr :for={band <- @bands}>
             <th scope="row" class="px-4 py-3 text-left font-medium text-zinc-900">
-              {days} or more days before check-in
+              {band.label}
             </th>
-            <td :for={column <- @columns} class="px-4 py-3 tabular-nums">
-              <.refund_cell rule={
-                RefundPolicyDisplay.find_rule_for_days(column.rules, days)
-              } />
+            <td :for={percentage <- band.percentages} class="px-4 py-3 tabular-nums">
+              <span class={
+                if(percentage == 0, do: "text-zinc-500", else: "font-medium")
+              }>
+                {percentage}%
+              </span>
             </td>
           </tr>
         </tbody>
@@ -634,27 +752,48 @@ defmodule YscWeb.Components.CabinInfo do
     """
   end
 
-  attr :rule, :map, default: nil
+  # Rows for the refund table: everything earlier than the loosest threshold is a
+  # full refund, then one band per threshold down to check-in.
+  defp refund_bands([], _columns), do: []
 
-  defp refund_cell(%{rule: %{refund_percentage: percentage}} = assigns)
-       when not is_nil(percentage) do
-    assigns =
-      assign(
-        assigns,
-        :percentage,
-        RefundPolicyDisplay.refund_percentage_int(percentage)
-      )
+  defp refund_bands([loosest | _] = thresholds, columns) do
+    full = %{
+      label: "More than #{loosest} days before check-in",
+      percentages: Enum.map(columns, fn _ -> 100 end)
+    }
 
-    ~H"""
-    <span class={if(@percentage == 0, do: "text-zinc-400", else: "font-medium")}>
-      {@percentage}%
-    </span>
-    """
+    lower_bounds = Enum.drop(thresholds, 1) ++ [nil]
+
+    bands =
+      thresholds
+      |> Enum.zip(lower_bounds)
+      |> Enum.map(fn {upper, lower} ->
+        %{
+          label: band_label(upper, lower),
+          percentages: Enum.map(columns, &refund_for_band(&1.rules, upper))
+        }
+      end)
+
+    [full | bands]
   end
 
-  defp refund_cell(assigns) do
-    ~H"""
-    <span class="text-zinc-400">—</span>
-    """
+  defp band_label(upper, nil), do: "#{upper} days or fewer before check-in"
+
+  defp band_label(upper, lower) when lower + 1 == upper,
+    do: "#{upper} days before check-in"
+
+  defp band_label(upper, lower),
+    do: "#{lower + 1}–#{upper} days before check-in"
+
+  # The tightest rule that still covers the band's upper edge; none means the
+  # band is looser than every rule, so a full refund.
+  defp refund_for_band(rules, upper) do
+    rules
+    |> Enum.filter(&(&1.days_before_checkin >= upper))
+    |> Enum.min_by(& &1.days_before_checkin, fn -> nil end)
+    |> case do
+      nil -> 100
+      rule -> RefundPolicyDisplay.refund_percentage_int(rule.refund_percentage)
+    end
   end
 end

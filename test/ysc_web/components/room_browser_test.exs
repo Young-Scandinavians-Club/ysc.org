@@ -40,12 +40,12 @@ defmodule YscWeb.Components.RoomBrowserTest do
       assert html =~ "Rooms at the Test Cabin"
       assert html =~ "Family Room"
       assert html =~ "Sleeps the whole family."
-      assert html =~ "Max 5 guests"
+      assert html =~ "Up to 5 guests"
       assert html =~ "Family"
     end
 
     test "uses singular wording for single-guest rooms" do
-      assert render_browser([room(%{capacity_max: 1})]) =~ "Max 1 guest"
+      assert render_browser([room(%{capacity_max: 1})]) =~ "Up to 1 guest"
     end
 
     test "shows a bed summary for each bed type" do
@@ -100,7 +100,7 @@ defmodule YscWeb.Components.RoomBrowserTest do
           pick_event: "browse-room-pick"
         })
 
-      assert html =~ "bg-teal-600"
+      assert html =~ "hover:border-teal-600"
     end
   end
 end
