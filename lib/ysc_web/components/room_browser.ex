@@ -10,6 +10,7 @@ defmodule YscWeb.Components.RoomBrowser do
   use Phoenix.Component
 
   import YscWeb.CoreComponents, only: [icon: 1]
+  import YscWeb.Components.CabinInfo, only: [info_section: 1]
 
   alias Ysc.Bookings.RoomsListCache
 
@@ -44,23 +45,12 @@ defmodule YscWeb.Components.RoomBrowser do
 
   def room_browser(assigns) do
     ~H"""
-    <section id={@id} class="space-y-8">
-      <div class="max-w-2xl">
-        <h2 class="type-subhead text-lg text-zinc-900">
-          Rooms at the {@property_name}
-        </h2>
-        <p class="mt-1.5 text-sm text-zinc-500 leading-relaxed">
-          <%= if @intro do %>
-            {@intro}
-          <% else %>
-            Browse the rooms we offer to find the one that suits your group.
-            <span :if={@pick_event}>
-              Found one you like? Choose it and we'll check whether it's free on your dates.
-            </span>
-          <% end %>
-        </p>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
+    <.info_section
+      id={@id}
+      title={"Rooms at the #{@property_name}"}
+      description={browser_intro(@intro, @pick_event)}
+    >
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch">
         <.room_card
           :for={room <- @rooms}
           room={room}
@@ -68,8 +58,18 @@ defmodule YscWeb.Components.RoomBrowser do
           pick_event={@pick_event}
         />
       </div>
-    </section>
+    </.info_section>
     """
+  end
+
+  defp browser_intro(intro, _pick_event) when is_binary(intro), do: intro
+
+  defp browser_intro(nil, nil),
+    do: "Browse the rooms we offer to find the one that suits your group."
+
+  defp browser_intro(nil, _pick_event) do
+    "Browse the rooms we offer to find the one that suits your group. " <>
+      "Found one you like? Choose it and we'll check whether it's free on your dates."
   end
 
   attr :room, :map, required: true
@@ -111,38 +111,25 @@ defmodule YscWeb.Components.RoomBrowser do
         <p :if={@room.description} class="text-sm text-zinc-600 leading-relaxed">
           {@room.description}
         </p>
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class={[
-            "px-2 py-1 text-xs font-semibold rounded-sm border",
-            capacity_badge(@accent)
-          ]}>
-            Max {@room.capacity_max} {if @room.capacity_max == 1,
-              do: "guest",
-              else: "guests"}
-          </span>
+        <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
+          <span>{capacity_label(@room.capacity_max)}</span>
           <span
-            :if={@room.min_billable_occupancy > 1}
-            class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-sm border border-amber-200"
-          >
-            {YscWeb.BookingUserMessages.room_min_charge_badge(
-              @room.min_billable_occupancy
-            )}
-          </span>
-        </div>
-        <ul
-          :if={bed_summary(@room) != []}
-          class="flex items-center gap-2 flex-wrap"
-          aria-label="Beds"
-        >
-          <li
             :for={{type, count, label} <- bed_summary(@room)}
-            class="inline-flex items-center gap-1 px-2 py-0.5 bg-zinc-100 text-zinc-700 text-xs rounded-sm border border-zinc-200"
-            title={label}
+            class="inline-flex items-center gap-1.5"
           >
+            <span aria-hidden="true">·</span>
             <.bed_icon type={type} />
             <span>{count} {label}</span>
-          </li>
-        </ul>
+          </span>
+        </p>
+        <p
+          :if={@room.min_billable_occupancy > 1}
+          class="text-xs text-amber-700"
+        >
+          {YscWeb.BookingUserMessages.room_min_charge_badge(
+            @room.min_billable_occupancy
+          )}
+        </p>
         <div :if={@pick_event} class="mt-auto pt-2">
           <button
             type="button"
@@ -150,7 +137,7 @@ defmodule YscWeb.Components.RoomBrowser do
             phx-click={@pick_event}
             phx-value-room-id={@room.id}
             class={[
-              "w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-md transition-colors",
+              "w-full inline-flex items-center justify-center gap-2 px-4 py-2 min-h-11 text-sm font-semibold rounded-md border border-zinc-300 bg-white text-zinc-900 transition-colors focus-visible:outline-hidden focus-visible:ring-2",
               pick_button(@accent)
             ]}
           >
@@ -162,11 +149,14 @@ defmodule YscWeb.Components.RoomBrowser do
     """
   end
 
-  defp capacity_badge(:blue), do: "bg-blue-100 text-blue-700 border-blue-200"
-  defp capacity_badge(:teal), do: "bg-teal-100 text-teal-700 border-teal-200"
+  defp capacity_label(1), do: "Up to 1 guest"
+  defp capacity_label(max), do: "Up to #{max} guests"
 
-  defp pick_button(:blue), do: "bg-blue-600 text-white hover:bg-blue-700"
-  defp pick_button(:teal), do: "bg-teal-600 text-white hover:bg-teal-700"
+  defp pick_button(:blue),
+    do: "hover:border-blue-600 hover:text-blue-700 focus-visible:ring-blue-600"
+
+  defp pick_button(:teal),
+    do: "hover:border-teal-600 hover:text-teal-700 focus-visible:ring-teal-600"
 
   defp bed_summary(room) do
     [

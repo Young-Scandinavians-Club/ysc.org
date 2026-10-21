@@ -650,6 +650,44 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute far_cell =~ "Too far in future"
     end
 
+    test "winter buyout nights read as a season rule, not as partially booked" do
+      today = ~D[2026-12-01]
+      winter_day = ~D[2026-12-15]
+
+      seasons = [
+        %Ysc.Bookings.Season{
+          name: "Winter",
+          property: :tahoe,
+          start_date: ~D[2026-11-01],
+          end_date: ~D[2027-04-30],
+          advance_booking_days: 365
+        }
+      ]
+
+      html =
+        render_component(AvailabilityCalendar,
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :tahoe,
+          selected_booking_mode: :buyout,
+          seasons: seasons
+        )
+
+      day_str = Date.to_iso8601(winter_day)
+      cell = extract_day_cell(html, day_str)
+      button = calendar_day_button(calendar_document(html), day_str)
+      aria = calendar_element_attr(button, "aria-label")
+
+      assert cell =~ "available in winter"
+      assert cell =~ "Winter"
+      refute cell =~ "Partially booked"
+      refute cell =~ "Another member has already booked"
+      assert aria =~ "Winter, entire cabin not available"
+      refute aria =~ "Partially booked"
+    end
+
     test "valid checkout before blackout shows check-out only, not not available" do
       today = ~D[2026-07-21]
       checkin = ~D[2026-07-24]
