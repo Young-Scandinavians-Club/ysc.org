@@ -88,6 +88,7 @@ defmodule Ysc.Merch.Orders do
     :service,
     :tracking_number,
     :tracking_url,
+    :items,
     :status,
     :shipped_at,
     :delivered_at

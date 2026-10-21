@@ -10,6 +10,7 @@ defmodule YscWeb.Emails.MerchOrderShipped do
     only: [address_lines: 1, greeting_name: 1, member_order_url: 1]
 
   alias Ysc.Merch.{Order, Shipment}
+  alias YscWeb.Emails.MerchItems
 
   def get_template_name, do: "merch_order_shipped"
 
@@ -21,6 +22,8 @@ defmodule YscWeb.Emails.MerchOrderShipped do
   shipment being announced.
   """
   def prepare_email_data(%Order{} = order, %Shipment{} = shipment) do
+    {items, part_of_order?} = MerchItems.for_shipment(order, shipment)
+
     %{
       first_name: greeting_name(order),
       order: %{reference_id: order.reference_id},
@@ -31,7 +34,9 @@ defmodule YscWeb.Emails.MerchOrderShipped do
         tracking_url: Shipment.safe_tracking_url(shipment.tracking_url),
         reshipment: shipment.reshipment
       },
-      items: YscWeb.Emails.MerchItems.for_order(order),
+      items: items,
+      # More of the order is still to come (or already came) in other parcels.
+      part_of_order: part_of_order? and not shipment.reshipment,
       delivery_estimate: Ysc.Merch.Shipping.delivery_estimate(order),
       ship_to: %{name: order.recipient_name, lines: address_lines(order)},
       order_url: member_order_url(order)

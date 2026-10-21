@@ -9,7 +9,7 @@ defmodule YscWeb.Emails.MerchItems do
   not loaded just means no thumbnail.
   """
   alias Ysc.Media.Image
-  alias Ysc.Merch.{Order, OrderItem}
+  alias Ysc.Merch.{Order, OrderItem, Shipment}
   alias YscWeb.Emails.Helpers
 
   @doc "Template data for each item of `order`."
@@ -17,6 +17,33 @@ defmodule YscWeb.Emails.MerchItems do
     do: Enum.map(items, &item/1)
 
   def for_order(_), do: []
+
+  @doc """
+  Template data for what is in one parcel of `order`, and whether the order
+  has more in it than this parcel.
+
+  A shipment that records its items shows just those, at the quantity in the
+  parcel. One that does not (an older shipment, or Printful gave no detail)
+  shows the whole order, which is then not "part" of anything.
+  """
+  @spec for_shipment(Order.t(), Shipment.t()) :: {[map()], boolean()}
+  def for_shipment(%Order{items: order_items} = order, %Shipment{} = shipment)
+      when is_list(order_items) do
+    case Shipment.contents(shipment, order_items) do
+      [] ->
+        {for_order(order), false}
+
+      lines ->
+        in_parcel = lines |> Enum.map(&elem(&1, 0)) |> Enum.sum()
+        in_order = order_items |> Enum.map(& &1.quantity) |> Enum.sum()
+
+        {Enum.map(lines, fn {quantity, line} ->
+           item(%{line | quantity: quantity})
+         end), in_parcel < in_order}
+    end
+  end
+
+  def for_shipment(order, _shipment), do: {for_order(order), false}
 
   defp item(%OrderItem{} = item) do
     %{

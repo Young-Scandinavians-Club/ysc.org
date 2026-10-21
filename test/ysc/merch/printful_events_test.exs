@@ -566,6 +566,406 @@ defmodule Ysc.Merch.PrintfulEventsTest do
     end
   end
 
+  describe "what is in each parcel" do
+    # An order of two different lines, one of each, and Printful's record of
+    # it: each item has an id of its own that shipments refer to.
+    setup do
+      # Someone with an empty cart, so the order is exactly these two lines.
+      member = member_fixture()
+      sticker = variant_fixture(nil, %{name: "Sticker Sheet"})
+      pin = variant_fixture(nil, %{name: "Flag Pin"})
+      lines = cart_lines_fixture(member, [{sticker, 1}, {pin, 1}])
+
+      {:ok, pending} =
+        Orders.create_pending_purchase(
+          member,
+          lines,
+          shipping_address_fixture(),
+          shipping_option_fixture()
+        )
+
+      order =
+        pending
+        |> Ecto.Changeset.change(
+          status: :submitted,
+          printful_order_id: System.unique_integer([:positive]) + 1_000
+        )
+        |> Repo.update!()
+        |> then(&Orders.get_order!(&1.id))
+
+      printful_items = [
+        %{"id" => 1001, "sync_variant_id" => sticker.printful_sync_variant_id},
+        %{"id" => 1002, "sync_variant_id" => pin.printful_sync_variant_id}
+      ]
+
+      line = fn variant ->
+        Enum.find(order.items, &(&1.variant_id == variant.id))
+      end
+
+      %{
+        buyer: member,
+        two: order,
+        printful_items: printful_items,
+        sticker_line: line.(sticker),
+        pin_line: line.(pin)
+      }
+    end
+
+    # The next email sent, as {html, to}.
+    defp next_email do
+      assert_received {:email, %Swoosh.Email{html_body: html, to: to}}
+      {html, to}
+    end
+
+    defp ship(order, printful_items, shipment) do
+      handle("package_shipped", order, %{"shipment" => shipment}, %{
+        "items" => printful_items,
+        "status" => "partial"
+      })
+    end
+
+    defp parcel(item_id, attrs \\ %{}) do
+      printful_shipment(
+        Map.merge(
+          %{"items" => [%{"item_id" => item_id, "quantity" => 1}]},
+          attrs
+        )
+      )
+    end
+
+    test "a parcel records the order lines it holds and the email lists only those",
+         %{
+           two: order,
+           printful_items: items,
+           sticker_line: sticker_line,
+           buyer: buyer
+         } do
+      ship(order, items, parcel(1001))
+
+      assert [recorded] = shipments(order)
+
+      assert recorded.items == [
+               %{"order_item_id" => sticker_line.id, "quantity" => 1}
+             ]
+
+      {html, to} = next_email()
+      assert to == [{"", buyer.email}]
+      assert html =~ "Sticker Sheet"
+      refute html =~ "Flag Pin"
+      assert html =~ "In this package"
+      assert html =~ "more than one package"
+    end
+
+    test "the other parcel lists the other item", %{
+      two: order,
+      printful_items: items
+    } do
+      ship(order, items, parcel(1001))
+      next_email()
+
+      ship(order, items, parcel(1002))
+
+      {html, _to} = next_email()
+      assert html =~ "Flag Pin"
+      refute html =~ "Sticker Sheet"
+
+      assert length(shipments(order)) == 2
+    end
+
+    test "one parcel holding everything is the whole order, not part of it", %{
+      two: order,
+      printful_items: items
+    } do
+      shipment =
+        printful_shipment(%{
+          "items" => [
+            %{"item_id" => 1001, "quantity" => 1},
+            %{"item_id" => 1002, "quantity" => 1}
+          ]
+        })
+
+      ship(order, items, shipment)
+
+      {html, _to} = next_email()
+      assert html =~ "Sticker Sheet"
+      assert html =~ "Flag Pin"
+      assert html =~ "Your order"
+      refute html =~ "more than one package"
+    end
+
+    test "a parcel we cannot place shows the whole order, not part of it", %{
+      two: order,
+      printful_items: items
+    } do
+      # An item id Printful's order record does not list.
+      ship(order, items, parcel(9999))
+
+      assert [%Shipment{items: []}] = shipments(order)
+
+      {html, _to} = next_email()
+      assert html =~ "Sticker Sheet"
+      assert html =~ "Flag Pin"
+      refute html =~ "more than one package"
+    end
+
+    test "no item detail from Printful at all falls back to the whole order",
+         %{two: order} do
+      handle("package_shipped", order, %{"shipment" => printful_shipment()})
+
+      assert [%Shipment{items: []}] = shipments(order)
+
+      {html, _to} = next_email()
+      assert html =~ "Sticker Sheet"
+      assert html =~ "Flag Pin"
+    end
+
+    test "a quantity beyond what was ordered is capped, a missing one is the line's",
+         %{
+           two: order,
+           printful_items: items,
+           sticker_line: sticker_line,
+           pin_line: pin_line
+         } do
+      ship(
+        order,
+        items,
+        parcel(1001, %{"items" => [%{"item_id" => 1001, "quantity" => 5}]})
+      )
+
+      ship(
+        order,
+        items,
+        printful_shipment(%{"items" => [%{"item_id" => 1002}]})
+      )
+
+      parcels =
+        order
+        |> shipments()
+        |> Enum.flat_map(& &1.items)
+        |> Enum.sort_by(& &1["order_item_id"])
+
+      assert parcels ==
+               Enum.sort_by(
+                 [
+                   %{"order_item_id" => sticker_line.id, "quantity" => 1},
+                   %{"order_item_id" => pin_line.id, "quantity" => 1}
+                 ],
+                 & &1["order_item_id"]
+               )
+    end
+
+    test "malformed item entries are skipped, not fatal", %{
+      two: order,
+      printful_items: items
+    } do
+      shipment =
+        printful_shipment(%{
+          "items" => [nil, "oops", %{"item_id" => "x"}, %{"item_id" => 1001}]
+        })
+
+      assert :ok = ship(order, items, shipment)
+      assert [%Shipment{items: [%{"quantity" => 1}]}] = shipments(order)
+    end
+
+    test "a later event fills in items a shipment was first recorded without",
+         %{two: order, printful_items: items, pin_line: pin_line} do
+      shipment = printful_shipment()
+      handle("package_shipped", order, %{"shipment" => shipment})
+      assert [%Shipment{items: []}] = shipments(order)
+
+      ship(
+        order,
+        items,
+        Map.put(shipment, "items", [%{"item_id" => 1002, "quantity" => 1}])
+      )
+
+      assert [%Shipment{items: [%{"order_item_id" => id}]}] = shipments(order)
+      assert id == pin_line.id
+    end
+
+    test "a later event without items does not erase the recorded ones", %{
+      two: order,
+      printful_items: items
+    } do
+      shipment = parcel(1001)
+      ship(order, items, shipment)
+
+      handle("package_shipped", order, %{
+        "shipment" => Map.delete(shipment, "items")
+      })
+
+      assert [%Shipment{items: [_]}] = shipments(order)
+    end
+  end
+
+  describe "announcing a shipment" do
+    test "waits for a tracking number and then announces it once", %{
+      order: order
+    } do
+      shipment =
+        printful_shipment(%{"tracking_number" => nil, "tracking_url" => nil})
+
+      handle("package_shipped", order, %{"shipment" => shipment})
+
+      assert [recorded] = shipments(order)
+      assert recorded.status == :shipped
+      assert is_nil(recorded.notified_at)
+      assert status(order) == :shipped
+      refute_email_sent()
+      assert sms_messages() == []
+
+      # Printful reports it again, now with the label.
+      handle("package_shipped", order, %{
+        "shipment" =>
+          Map.merge(shipment, %{
+            "tracking_number" => "9400111899223197428490",
+            "tracking_url" =>
+              "https://carrier.example.test/9400111899223197428490"
+          })
+      })
+
+      assert_email_sent(fn email ->
+        assert email.html_body =~ "9400111899223197428490"
+      end)
+
+      assert [%Shipment{notified_at: %DateTime{}}] = shipments(order)
+
+      # And never again.
+      handle("package_shipped", order, %{"shipment" => shipment})
+      refute_email_sent()
+      assert length(sms_messages()) == 1
+    end
+
+    test "the poll announces it once the tracking number has appeared", %{
+      order: order
+    } do
+      untracked =
+        printful_shipment(%{"tracking_number" => nil, "tracking_url" => nil})
+
+      sync = fn shipment ->
+        PrintfulEvents.sync_order(order, %{
+          "id" => order.printful_order_id,
+          "status" => "fulfilled",
+          "shipments" => [shipment]
+        })
+      end
+
+      sync.(untracked)
+      refute_email_sent()
+
+      sync.(Map.put(untracked, "tracking_number", "TRACK123"))
+      assert_email_sent(subject: ~r/on its way/)
+    end
+
+    test "goes out without tracking once the wait is over", %{order: order} do
+      seven_hours_ago = System.os_time(:second) - 7 * 3600
+
+      shipment =
+        printful_shipment(%{
+          "tracking_number" => nil,
+          "tracking_url" => nil,
+          "shipped_at" => seven_hours_ago
+        })
+
+      handle("package_shipped", order, %{"shipment" => shipment})
+
+      assert_email_sent(fn email ->
+        assert email.html_body =~ "tracking number isn&#39;t available" or
+                 email.html_body =~ "tracking number isn't available"
+      end)
+
+      assert [%Shipment{notified_at: %DateTime{}}] = shipments(order)
+    end
+
+    test "a link with no tracking number behind it is not kept or sent", %{
+      order: order
+    } do
+      shipment =
+        printful_shipment(%{
+          "tracking_number" => "  ",
+          "tracking_url" => "https://myorders.co/tracking/1/"
+        })
+
+      handle("package_shipped", order, %{"shipment" => shipment})
+
+      assert [%Shipment{tracking_number: nil, tracking_url: nil}] =
+               shipments(order)
+    end
+
+    test "blank and oversized values are cleaned up, not fatal", %{
+      order: order
+    } do
+      shipment =
+        printful_shipment(%{
+          "carrier" => "   ",
+          "service" => String.duplicate("s", 400),
+          "tracking_number" => "  ABC123  ",
+          "tracking_url" =>
+            "https://carrier.example.test/" <> String.duplicate("x", 2_000)
+        })
+
+      assert :ok = handle("package_shipped", order, %{"shipment" => shipment})
+
+      assert [recorded] = shipments(order)
+      assert recorded.carrier == nil
+      assert String.length(recorded.service) == 255
+      assert recorded.tracking_number == "ABC123"
+      assert recorded.tracking_url == nil
+    end
+
+    test "a long tracking link is stored whole", %{order: order} do
+      url = "https://carrier.example.test/" <> String.duplicate("x", 400)
+
+      handle("package_shipped", order, %{
+        "shipment" => printful_shipment(%{"tracking_url" => url})
+      })
+
+      assert [%Shipment{tracking_url: ^url}] = shipments(order)
+    end
+
+    test "a shipment Printful still calls pending is not announced even by a shipped event",
+         %{order: order} do
+      assert :ok =
+               handle("package_shipped", order, %{
+                 "shipment" => printful_shipment(%{"status" => "pending"})
+               })
+
+      assert shipments(order) == []
+      assert status(order) == :submitted
+      refute_email_sent()
+    end
+
+    test "a later event corrects the ship time", %{order: order} do
+      shipment = printful_shipment(%{"shipped_at" => 1_700_000_000})
+      handle("package_shipped", order, %{"shipment" => shipment})
+
+      later = 1_700_000_999
+
+      handle("package_shipped", order, %{
+        "shipment" => Map.put(shipment, "shipped_at", later)
+      })
+
+      assert [%Shipment{shipped_at: shipped_at}] = shipments(order)
+      assert DateTime.to_unix(shipped_at) == later
+    end
+
+    test "a parcel the poll finds already delivered is recorded, not announced",
+         %{order: order} do
+      shipment = printful_shipment(%{"status" => "delivered"})
+
+      PrintfulEvents.sync_order(order, %{
+        "id" => order.printful_order_id,
+        "status" => "fulfilled",
+        "shipments" => [shipment]
+      })
+
+      assert [%Shipment{status: :delivered}] = shipments(order)
+      assert status(order) == :shipped
+      refute_email_sent()
+      assert sms_messages() == []
+    end
+  end
+
   describe "sync_order/2 (polling)" do
     test "applies status, cost and shipments from a full order record", %{
       order: order,

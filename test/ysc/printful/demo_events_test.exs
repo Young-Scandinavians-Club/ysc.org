@@ -62,6 +62,40 @@ defmodule Ysc.Printful.DemoEventsTest do
     assert_email_sent(subject: ~r/on its way/)
   end
 
+  test "ship says which of the order's items are in the parcel", %{
+    order: order
+  } do
+    [line] = order.items
+
+    {:ok, demo} =
+      DemoClient.create_order(
+        %{
+          external_id: "#{order.reference_id}-items",
+          shipping: "STANDARD",
+          recipient: %{},
+          items: [
+            %{
+              sync_variant_id: line.variant.printful_sync_variant_id,
+              quantity: line.quantity
+            }
+          ]
+        },
+        true
+      )
+
+    order
+    |> Ecto.Changeset.change(
+      printful_order_id: demo["id"],
+      reference_id: order.reference_id
+    )
+    |> Repo.update!()
+
+    assert {:ok, "package_shipped"} = DemoEvents.trigger(demo["id"], :ship)
+
+    assert [%Shipment{items: items}] = Repo.all(Shipment)
+    assert items == [%{"order_item_id" => line.id, "quantity" => line.quantity}]
+  end
+
   test "each ship action is a new parcel", %{order: order, demo_id: id} do
     {:ok, _} = DemoEvents.trigger(id, :ship)
     {:ok, _} = DemoEvents.trigger(id, :ship)

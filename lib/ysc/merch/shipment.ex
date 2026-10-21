@@ -24,6 +24,11 @@ defmodule Ysc.Merch.Shipment do
       default: :shipped
 
     field :reshipment, :boolean, default: false
+
+    # What is in this parcel: `[%{"order_item_id" => id, "quantity" => n}]`.
+    # Empty when unknown, in which case the whole order is shown.
+    field :items, {:array, :map}, default: []
+
     field :shipped_at, :utc_datetime
     field :delivered_at, :utc_datetime
     field :notified_at, :utc_datetime
@@ -44,6 +49,7 @@ defmodule Ysc.Merch.Shipment do
       :tracking_url,
       :status,
       :reshipment,
+      :items,
       :shipped_at,
       :delivered_at
     ])
@@ -52,6 +58,30 @@ defmodule Ysc.Merch.Shipment do
     |> unique_constraint(:printful_shipment_id)
     |> foreign_key_constraint(:order_id)
   end
+
+  @doc """
+  The order lines in this parcel as `{quantity_in_parcel, order_item}`. Empty
+  when the shipment does not say what it holds (or none of it matches a line).
+  """
+  def contents(%__MODULE__{items: parcel}, order_items)
+      when is_list(parcel) and is_list(order_items) do
+    by_id = Map.new(order_items, &{&1.id, &1})
+
+    for %{"order_item_id" => id, "quantity" => quantity} <- parcel,
+        line = by_id[id],
+        not is_nil(line),
+        do: {quantity, line}
+  end
+
+  def contents(_shipment, _order_items), do: []
+
+  @doc """
+  Whether the member can follow this parcel: it has a tracking number. A link
+  alone is not enough, since Printful gives out a link with no number behind it
+  (`.../tracking/<id>/`) before the carrier has a label.
+  """
+  def trackable?(%__MODULE__{tracking_number: number}),
+    do: is_binary(number) and String.trim(number) != ""
 
   @doc """
   Whether `tracking_url` is safe to put in a link: an http(s) URL. Printful's

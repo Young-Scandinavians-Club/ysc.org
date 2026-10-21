@@ -273,6 +273,41 @@ defmodule YscWeb.ShopOrdersTest do
       refute has_element?(view, "#track-#{unsafe.id}")
     end
 
+    test "says what is in a parcel when the shipment records it", %{
+      conn: conn,
+      member: member
+    } do
+      order = order_for(member, :shipped)
+      [line | _] = order.items
+
+      with_items =
+        %Ysc.Merch.Shipment{}
+        |> Ysc.Merch.Shipment.changeset(%{
+          order_id: order.id,
+          printful_shipment_id: 91_004,
+          items: [%{"order_item_id" => line.id, "quantity" => 1}]
+        })
+        |> Repo.insert!()
+
+      without_items =
+        %Ysc.Merch.Shipment{}
+        |> Ysc.Merch.Shipment.changeset(%{
+          order_id: order.id,
+          printful_shipment_id: 91_005
+        })
+        |> Repo.insert!()
+
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop/orders/#{order.id}")
+
+      assert has_element?(
+               view,
+               "#shipment-contents-#{with_items.id}",
+               "1 × #{line.name}"
+             )
+
+      refute has_element?(view, "#shipment-contents-#{without_items.id}")
+    end
+
     test "has no tracking section before anything ships", %{
       conn: conn,
       member: member

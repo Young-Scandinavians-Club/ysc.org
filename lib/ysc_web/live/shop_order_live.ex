@@ -129,8 +129,23 @@ defmodule YscWeb.ShopOrderLive do
     {:noreply, update(socket, :rechecks, &(&1 + 1))}
   end
 
+  # Oldest first. A parcel with no ship time sorts first rather than crashing
+  # the page.
   defp sorted_shipments(order),
-    do: Enum.sort_by(order.shipments, & &1.shipped_at, {:asc, DateTime})
+    do:
+      Enum.sort_by(
+        order.shipments,
+        &(&1.shipped_at || ~U[1970-01-01 00:00:00Z]),
+        {:asc, DateTime}
+      )
+
+  defp parcel_contents(shipment, order_items) do
+    shipment
+    |> Ysc.Merch.Shipment.contents(order_items)
+    |> Enum.map_join(", ", fn {quantity, line} ->
+      "#{quantity} × #{line.name}"
+    end)
+  end
 
   defp shipment_status_text(%{status: :delivered, delivered_at: at})
        when not is_nil(at),
@@ -288,6 +303,15 @@ defmodule YscWeb.ShopOrderLive do
                     <p class="text-zinc-500">
                       {shipment_status_text(shipment)}
                       <span :if={shipment.tracking_number}>· {shipment.tracking_number}</span>
+                    </p>
+                    <p
+                      :if={
+                        Ysc.Merch.Shipment.contents(shipment, @order.items) != []
+                      }
+                      id={"shipment-contents-#{shipment.id}"}
+                      class="text-zinc-500"
+                    >
+                      {parcel_contents(shipment, @order.items)}
                     </p>
                   </div>
                   <.link

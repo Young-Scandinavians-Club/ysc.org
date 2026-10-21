@@ -48,7 +48,12 @@ defmodule Ysc.Printful.DemoEvents do
       "tracking_url" =>
         "https://tools.usps.com/go/TrackConfirmAction?tLabels=DEMO#{n}",
       "reshipment" => false,
-      "shipped_at" => System.os_time(:second)
+      "status" => "shipped",
+      "shipped_at" => System.os_time(:second),
+      "items" =>
+        for item <- order["items"] || [], is_integer(item["id"]) do
+          %{"item_id" => item["id"], "quantity" => item["quantity"]}
+        end
     }
 
     order
