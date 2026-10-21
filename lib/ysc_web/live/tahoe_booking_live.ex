@@ -1284,54 +1284,127 @@ defmodule YscWeb.TahoeBookingLive do
           >
             <!-- Left Column: Selection Area (2 columns on large screens) -->
             <div class="lg:col-span-2 flex flex-col gap-8">
-              <%!-- Step 1: Booking mode (compact segmented control) --%>
-              <div class="space-y-3">
-                <.step_heading id="booking-step-mode" step={1} class="mb-1">
+              <!-- Step 1: Booking Mode Selection -->
+              <section>
+                <.step_heading id="booking-step-mode" step={1} class="mb-4">
                   Choose Booking Type
                 </.step_heading>
-                <form id="booking-mode-form" phx-change="booking-mode-changed">
-                  <.segmented_control
-                    name="booking_mode"
-                    label="Booking type"
-                    accent={:blue}
-                    selected={
-                      if(@selected_booking_mode == :buyout,
-                        do: "buyout",
-                        else: "room"
-                      )
-                    }
-                    options={[
-                      %{
-                        value: "room",
-                        id: "booking-mode-room",
-                        label: "Individual Room(s)"
-                      },
-                      %{
-                        value: "buyout",
-                        id: "booking-mode-buyout",
-                        label: "Entire Cabin"
-                      }
-                    ]}
-                  />
-                </form>
-                <p
-                  :if={@selected_booking_mode != :buyout}
-                  id="booking-mode-hint"
-                  class="text-sm text-zinc-600"
-                >
-                  Book one or more rooms. Perfect for smaller groups or when you want to share the cabin with other members.
+                <p class="text-base text-zinc-600 mb-6">
+                  Select how you'd like to book the Tahoe cabin:
                 </p>
-                <p
-                  :if={@selected_booking_mode == :buyout}
-                  id="booking-mode-hint"
-                  class="text-sm text-zinc-600"
-                >
-                  Exclusive use for your group: all 7 bedrooms, 3 bathrooms, and the sauna.
-                  <span class="text-zinc-500">
-                    {buyout_mode_availability_copy(@seasons)}
-                  </span>
-                </p>
-              </div>
+                <fieldset>
+                  <form id="booking-mode-form" phx-change="booking-mode-changed">
+                    <div
+                      class="grid grid-cols-1 md:grid-cols-2 gap-4"
+                      role="radiogroup"
+                    >
+                      <label class={[
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
+                        if(
+                          @selected_booking_mode == :room ||
+                            @selected_booking_mode == nil,
+                          do: "border-blue-600 bg-blue-50 shadow-xs",
+                          else:
+                            "border-zinc-300 hover:border-blue-400 hover:bg-zinc-50"
+                        )
+                      ]}>
+                        <input
+                          type="radio"
+                          id="booking-mode-room"
+                          name="booking_mode"
+                          value="room"
+                          checked={
+                            @selected_booking_mode == :room ||
+                              @selected_booking_mode == nil
+                          }
+                          class="sr-only"
+                        />
+                        <div class="flex items-center gap-3 mb-2">
+                          <div class={[
+                            "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                            if(
+                              @selected_booking_mode == :room ||
+                                @selected_booking_mode == nil,
+                              do: "border-blue-600 bg-blue-600",
+                              else: "border-zinc-300 bg-white"
+                            )
+                          ]}>
+                            <svg
+                              :if={
+                                @selected_booking_mode == :room ||
+                                  @selected_booking_mode == nil
+                              }
+                              class="w-4 h-4 text-white"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fill-rule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clip-rule="evenodd"
+                              />
+                            </svg>
+                          </div>
+                          <span class="text-lg font-semibold text-zinc-900">
+                            Individual Room(s)
+                          </span>
+                        </div>
+                        <p class="text-sm text-zinc-600 ml-9">
+                          Book one or more individual rooms. Perfect for smaller groups or when you want to share the cabin with other members.
+                        </p>
+                      </label>
+                      <label class={[
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
+                        if(@selected_booking_mode == :buyout,
+                          do: "border-blue-600 bg-blue-50 shadow-xs",
+                          else:
+                            "border-zinc-300 hover:border-blue-400 hover:bg-zinc-50"
+                        )
+                      ]}>
+                        <input
+                          type="radio"
+                          id="booking-mode-buyout"
+                          name="booking_mode"
+                          value="buyout"
+                          checked={@selected_booking_mode == :buyout}
+                          class="sr-only"
+                        />
+                        <div class="flex items-center gap-3 mb-2">
+                          <div class={[
+                            "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                            if(@selected_booking_mode == :buyout,
+                              do: "border-blue-600 bg-blue-600",
+                              else: "border-zinc-300 bg-white"
+                            )
+                          ]}>
+                            <svg
+                              :if={@selected_booking_mode == :buyout}
+                              class="w-4 h-4 text-white"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fill-rule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clip-rule="evenodd"
+                              />
+                            </svg>
+                          </div>
+                          <span class="text-lg font-semibold text-zinc-900">
+                            Book the entire cabin
+                          </span>
+                        </div>
+                        <p class="text-sm text-zinc-600 ml-9">
+                          Book the entire cabin exclusively for your group. Includes all 7 bedrooms, 3 bathrooms, and the sauna.
+                        </p>
+                        <p class="text-xs text-amber-600 mt-2 ml-9 font-medium">
+                          {buyout_mode_availability_copy(@seasons)}
+                        </p>
+                      </label>
+                    </div>
+                  </form>
+                </fieldset>
+              </section>
               <%!-- Date-picking constraints, right above the calendar --%>
               <div class="space-y-3">
                 <.rules_bar id="tahoe-date-rules">

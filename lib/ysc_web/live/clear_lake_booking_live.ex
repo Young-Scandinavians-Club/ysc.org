@@ -639,90 +639,187 @@ defmodule YscWeb.ClearLakeBookingLive do
           >
             <!-- Left Column: Selection Area (2 columns on large screens) -->
             <div class="lg:col-span-2 space-y-8">
-              <%!-- Step 1: Booking mode (compact segmented control) --%>
-              <div class="space-y-3">
+              <!-- Step 1: Booking Mode Selection -->
+              <section>
                 <.step_heading
                   id="booking-step-mode"
                   step={1}
                   accent={:teal}
-                  class="mb-1"
+                  class="mb-4"
                 >
                   Choose Booking Type
                 </.step_heading>
-                <form id="booking-mode-form" phx-change="booking-mode-changed">
-                  <.segmented_control
-                    name="booking_mode"
-                    label="Booking type"
-                    accent={:teal}
-                    selected={
-                      if(@selected_booking_mode == :buyout,
-                        do: "buyout",
-                        else: "day"
-                      )
-                    }
-                    options={[
-                      %{
-                        value: "day",
-                        id: "booking-mode-day",
-                        label: BookingModeDisplay.stay_type_label(:day),
-                        disabled: !@day_booking_allowed
-                      },
-                      %{
-                        value: "buyout",
-                        id: "booking-mode-buyout",
-                        label: BookingModeDisplay.stay_type_label(:buyout),
-                        disabled:
+                <p class="text-base text-zinc-600 mb-6">
+                  Select how you'd like to book the Clear Lake cabin:
+                </p>
+                <fieldset>
+                  <form id="booking-mode-form" phx-change="booking-mode-changed">
+                    <div
+                      class="grid grid-cols-1 md:grid-cols-2 gap-4"
+                      role="radiogroup"
+                    >
+                      <label class={[
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
+                        if(
+                          @selected_booking_mode == :day ||
+                            @selected_booking_mode == nil,
+                          do: "border-teal-600 bg-teal-50 shadow-xs",
+                          else:
+                            "border-zinc-300 hover:border-teal-400 hover:bg-zinc-50"
+                        ),
+                        if(!@day_booking_allowed,
+                          do: "opacity-50 cursor-not-allowed",
+                          else: ""
+                        )
+                      ]}>
+                        <input
+                          type="radio"
+                          id="booking-mode-day"
+                          name="booking_mode"
+                          value="day"
+                          checked={
+                            @selected_booking_mode == :day ||
+                              @selected_booking_mode == nil
+                          }
+                          disabled={!@day_booking_allowed}
+                          class="sr-only"
+                        />
+                        <div class="flex items-center gap-3 mb-2">
+                          <div class={[
+                            "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                            if(
+                              @selected_booking_mode == :day ||
+                                @selected_booking_mode == nil,
+                              do: "border-teal-600 bg-teal-600",
+                              else: "border-zinc-300 bg-white"
+                            )
+                          ]}>
+                            <svg
+                              :if={
+                                @selected_booking_mode == :day ||
+                                  @selected_booking_mode == nil
+                              }
+                              class="w-4 h-4 text-white"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fill-rule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clip-rule="evenodd"
+                              />
+                            </svg>
+                          </div>
+                          <span class="text-lg font-semibold text-zinc-900">
+                            {BookingModeDisplay.stay_type_label(:day)}
+                          </span>
+                        </div>
+                        <p class="text-sm text-zinc-600 ml-9">
+                          Book space for your group. Other YSC members may also stay at the cabin during the same dates.
+                        </p>
+                      </label>
+                      <label class={[
+                        "flex flex-col p-6 border-2 rounded-xl cursor-pointer transition",
+                        if(@selected_booking_mode == :buyout,
+                          do: "border-teal-600 bg-teal-50 shadow-xs",
+                          else:
+                            "border-zinc-300 hover:border-teal-400 hover:bg-zinc-50"
+                        ),
+                        if(
                           !@buyout_booking_allowed ||
                             (@selected_booking_mode == :buyout &&
-                               @availability_error)
+                               @availability_error),
+                          do: "opacity-50 cursor-not-allowed",
+                          else: ""
+                        )
+                      ]}>
+                        <input
+                          type="radio"
+                          id="booking-mode-buyout"
+                          name="booking_mode"
+                          value="buyout"
+                          checked={@selected_booking_mode == :buyout}
+                          disabled={
+                            !@buyout_booking_allowed ||
+                              (@selected_booking_mode == :buyout &&
+                                 @availability_error)
+                          }
+                          class="sr-only"
+                        />
+                        <div class="flex items-center gap-3 mb-2">
+                          <div class={[
+                            "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                            if(@selected_booking_mode == :buyout,
+                              do: "border-teal-600 bg-teal-600",
+                              else: "border-zinc-300 bg-white"
+                            )
+                          ]}>
+                            <svg
+                              :if={@selected_booking_mode == :buyout}
+                              class="w-4 h-4 text-white"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fill-rule="evenodd"
+                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                clip-rule="evenodd"
+                              />
+                            </svg>
+                          </div>
+                          <span class="text-lg font-semibold text-zinc-900">
+                            {BookingModeDisplay.stay_type_label(:buyout)}
+                          </span>
+                        </div>
+                        <p class="text-sm text-zinc-600 ml-9">
+                          Exclusive use of the property. Great for large families.
+                        </p>
+                        <p
+                          :if={
+                            @selected_booking_mode == :buyout && @availability_error &&
+                              @checkin_date && @checkout_date
+                          }
+                          class="text-xs text-amber-600 mt-2 ml-9 font-medium"
+                        >
+                          Entire cabin isn't available: Other members have already booked spots on these dates.
+                        </p>
+                      </label>
+                    </div>
+                  </form>
+                </fieldset>
+                <div class="mt-4">
+                  <p class="text-sm text-zinc-600">
+                    <span
+                      :if={
+                        !@day_booking_allowed && !@buyout_booking_allowed &&
+                          (@checkin_date || @checkout_date)
                       }
-                    ]}
-                  />
-                </form>
-                <p id="booking-mode-hint" class="text-sm text-zinc-600">
-                  <%= if @selected_booking_mode == :buyout do %>
-                    Exclusive use of the property. Great for large families.
-                  <% else %>
-                    Book space for your group. Other YSC members may also stay at the cabin during the same dates.
-                  <% end %>
-                </p>
-                <p
-                  :if={
-                    @selected_booking_mode == :buyout && @availability_error &&
-                      @checkin_date && @checkout_date
-                  }
-                  class="text-xs text-amber-700 font-medium"
-                >
-                  Entire cabin isn't available: Other members have already booked spots on these dates.
-                </p>
-                <p
-                  :if={
-                    !@day_booking_allowed && !@buyout_booking_allowed &&
-                      (@checkin_date || @checkout_date)
-                  }
-                  class="text-sm text-amber-700 font-medium"
-                >
-                  {YscWeb.BookingUserMessages.clear_lake_no_booking_options()}
-                </p>
-                <p
-                  :if={
-                    !@day_booking_allowed && @selected_booking_mode == :day &&
-                      @checkin_date
-                  }
-                  class="text-sm text-amber-700 font-medium"
-                >
-                  Shared cabin stays are not available for the selected dates. Try different dates or book the entire cabin if that option is open.
-                </p>
-                <p
-                  :if={
-                    !@buyout_booking_allowed && @selected_booking_mode == :buyout &&
-                      @checkin_date
-                  }
-                  class="text-sm text-amber-700 font-medium"
-                >
-                  Booking the entire cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
-                </p>
-              </div>
+                      class="text-amber-600 font-medium"
+                    >
+                      {YscWeb.BookingUserMessages.clear_lake_no_booking_options()}
+                    </span>
+                    <span
+                      :if={
+                        !@day_booking_allowed && @selected_booking_mode == :day &&
+                          @checkin_date
+                      }
+                      class="text-amber-600 font-medium"
+                    >
+                      Shared cabin stays are not available for the selected dates. Try different dates or book the entire cabin if that option is open.
+                    </span>
+                    <span
+                      :if={
+                        !@buyout_booking_allowed &&
+                          @selected_booking_mode == :buyout &&
+                          @checkin_date
+                      }
+                      class="text-amber-600 font-medium"
+                    >
+                      Booking the entire cabin isn't available for the selected dates. Try different dates or choose a shared cabin stay if that option is open.
+                    </span>
+                  </p>
+                </div>
+              </section>
               <!-- Step 2a: Day Booking Details (shown when day mode selected) -->
               <div :if={@selected_booking_mode == :day}>
                 <!-- Section 1: Stay Details -->
@@ -1521,6 +1618,93 @@ defmodule YscWeb.ClearLakeBookingLive do
                 </div>
 
                 <.info_section
+                  id="sleeping-at-the-cabin"
+                  heading_id="clear-lake-sleeping-heading"
+                  title="Sleeping at the Cabin"
+                >
+                  <%= cond do %>
+                    <% @sleeping_mode == :winter -> %>
+                      <div class="space-y-4">
+                        <p class="type-eyebrow text-xs text-zinc-500">
+                          Winter ({@winter_season_window})
+                        </p>
+                        <p class="text-base font-semibold text-zinc-900">
+                          Indoor beds are set up in three separate rooms.
+                        </p>
+                        <p class="text-sm text-zinc-600 leading-relaxed">
+                          {winter_beds_setup_copy()}
+                        </p>
+                        <div
+                          id="winter-sleeping-photos"
+                          class="grid grid-cols-2 gap-3"
+                        >
+                          <a
+                            :for={
+                              {image, index} <-
+                                Enum.with_index(winter_sleeping_images())
+                            }
+                            id={"winter-sleeping-photo-#{index}"}
+                            href={image.src}
+                            target="_blank"
+                            rel="noopener"
+                            class="block overflow-hidden rounded-lg bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
+                          >
+                            <img
+                              src={image.src}
+                              alt={image.alt}
+                              loading="lazy"
+                              decoding="async"
+                              class="aspect-[4/3] w-full object-cover transition-transform duration-300 hover:scale-105"
+                            />
+                          </a>
+                        </div>
+                        <p class="text-sm text-zinc-600 leading-relaxed">
+                          Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help in the Social Hall.
+                        </p>
+                        <p class="text-xs text-zinc-500 leading-relaxed">
+                          Summer ({@summer_season_window}): beds come down — lawn camp or bring your own sleeping setup.
+                        </p>
+                      </div>
+                    <% @sleeping_mode == :mixed -> %>
+                      <div class="space-y-4">
+                        <p class="text-base font-semibold text-zinc-900">
+                          Your stay covers both seasons.
+                        </p>
+                        <p class="text-sm text-zinc-600 leading-relaxed">
+                          <strong class="font-medium text-zinc-900">
+                            Summer ({@summer_season_window}):
+                          </strong>
+                          Beds are not set up. Lawn camp or use the cabin with your own sleeping setup. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
+                        </p>
+                        <p class="text-sm text-zinc-600 leading-relaxed">
+                          <strong class="font-medium text-zinc-900">
+                            Winter ({@winter_season_window}):
+                          </strong>
+                          Indoor beds are set up in three separate rooms. {winter_beds_setup_copy()} Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels.
+                        </p>
+                      </div>
+                    <% true -> %>
+                      <div class="space-y-4">
+                        <p class="type-eyebrow text-xs text-zinc-500">
+                          Summer ({@summer_season_window})
+                        </p>
+                        <p class="text-base font-semibold text-zinc-900">
+                          Beds are not set up in the cabin.
+                        </p>
+                        <p class="text-sm text-zinc-600 leading-relaxed">
+                          Lawn camp or use the cabin with your own sleeping setup. Pack a sleeping bag, pillow, and a tent if you're camping on the lawn. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
+                        </p>
+                        <p class="text-xs text-zinc-500 leading-relaxed">
+                          Winter ({@winter_season_window}): indoor beds are set up in three rooms — pack linens if you book those dates.
+                        </p>
+                      </div>
+                  <% end %>
+                  <p class="text-sm text-zinc-600 leading-relaxed">
+                    Also pack bath and beach towels, a reusable water bottle, sunscreen, and a swimsuit.
+                  </p>
+                </.info_section>
+
+                <.info_section
                   heading_id="clear-lake-nearby-heading"
                   title="Nearby Destinations"
                   description="Times are approximate from the cabin."
@@ -1825,93 +2009,6 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Printed checklists in the Cabin Master Room — use them to open and shut down the cabin.
                     </:item>
                   </.icon_list>
-                </.info_section>
-
-                <.info_section
-                  id="sleeping-at-the-cabin"
-                  heading_id="clear-lake-sleeping-heading"
-                  title="Sleeping at the Cabin"
-                >
-                  <%= cond do %>
-                    <% @sleeping_mode == :winter -> %>
-                      <div class="space-y-4">
-                        <p class="type-eyebrow text-xs text-zinc-500">
-                          Winter ({@winter_season_window})
-                        </p>
-                        <p class="text-base font-semibold text-zinc-900">
-                          Indoor beds are set up in three separate rooms.
-                        </p>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          {winter_beds_setup_copy()}
-                        </p>
-                        <div
-                          id="winter-sleeping-photos"
-                          class="grid grid-cols-2 gap-3"
-                        >
-                          <a
-                            :for={
-                              {image, index} <-
-                                Enum.with_index(winter_sleeping_images())
-                            }
-                            id={"winter-sleeping-photo-#{index}"}
-                            href={image.src}
-                            target="_blank"
-                            rel="noopener"
-                            class="block overflow-hidden rounded-lg bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-600"
-                          >
-                            <img
-                              src={image.src}
-                              alt={image.alt}
-                              loading="lazy"
-                              decoding="async"
-                              class="aspect-[4/3] w-full object-cover transition-transform duration-300 hover:scale-105"
-                            />
-                          </a>
-                        </div>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help in the Social Hall.
-                        </p>
-                        <p class="text-xs text-zinc-500 leading-relaxed">
-                          Summer ({@summer_season_window}): beds come down — lawn camp or bring your own sleeping setup.
-                        </p>
-                      </div>
-                    <% @sleeping_mode == :mixed -> %>
-                      <div class="space-y-4">
-                        <p class="text-base font-semibold text-zinc-900">
-                          Your stay covers both seasons.
-                        </p>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          <strong class="font-medium text-zinc-900">
-                            Summer ({@summer_season_window}):
-                          </strong>
-                          Beds are not set up. Lawn camp or use the cabin with your own sleeping setup. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
-                        </p>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          <strong class="font-medium text-zinc-900">
-                            Winter ({@winter_season_window}):
-                          </strong>
-                          Indoor beds are set up in three separate rooms. {winter_beds_setup_copy()} Pack linens: sheets, pillowcases, comforter or sleeping bag, and towels.
-                        </p>
-                      </div>
-                    <% true -> %>
-                      <div class="space-y-4">
-                        <p class="type-eyebrow text-xs text-zinc-500">
-                          Summer ({@summer_season_window})
-                        </p>
-                        <p class="text-base font-semibold text-zinc-900">
-                          Beds are not set up in the cabin.
-                        </p>
-                        <p class="text-sm text-zinc-600 leading-relaxed">
-                          Lawn camp or use the cabin with your own sleeping setup. Pack a sleeping bag, pillow, and a tent if you're camping on the lawn. Sleeping mats are in the storage room next to the pool toy room — sanitize before and after use, and stack them neatly when you leave.
-                        </p>
-                        <p class="text-xs text-zinc-500 leading-relaxed">
-                          Winter ({@winter_season_window}): indoor beds are set up in three rooms — pack linens if you book those dates.
-                        </p>
-                      </div>
-                  <% end %>
-                  <p class="text-sm text-zinc-600 leading-relaxed">
-                    Also pack bath and beach towels, a reusable water bottle, sunscreen, and a swimsuit.
-                  </p>
                 </.info_section>
 
                 <.info_section

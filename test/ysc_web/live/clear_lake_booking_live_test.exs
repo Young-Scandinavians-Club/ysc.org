@@ -2432,9 +2432,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         {:ok, view, _html} =
           live_clear_lake(
             conn,
-            clear_lake_path_with_stay(checkin, checkout, %{
-              "info_tab" => "manual"
-            })
+            clear_lake_path_with_stay(checkin, checkout)
           )
 
         assert has_element?(
@@ -2457,7 +2455,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {:ok, view, _html} =
         live_clear_lake(
           conn,
-          clear_lake_path_with_stay(checkin, checkout, %{"info_tab" => "manual"})
+          clear_lake_path_with_stay(checkin, checkout)
         )
 
       assert has_element?(
@@ -2509,7 +2507,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {:ok, view, _html} =
         live_clear_lake(
           conn,
-          clear_lake_path_with_stay(checkin, checkout, %{"info_tab" => "manual"})
+          clear_lake_path_with_stay(checkin, checkout)
         )
 
       assert has_element?(view, "#sleeping-at-the-cabin")
@@ -2546,7 +2544,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {:ok, view, _html} =
         live_clear_lake(
           conn,
-          clear_lake_path_with_stay(checkin, checkout, %{"info_tab" => "manual"})
+          clear_lake_path_with_stay(checkin, checkout)
         )
 
       assert has_element?(
@@ -3537,7 +3535,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         conn = log_in_user(conn, user)
 
         {:ok, view, _html} =
-          live_clear_lake(conn, ~p"/bookings/clear-lake?info_tab=manual")
+          live_clear_lake(conn, ~p"/bookings/clear-lake")
 
         html = render(view)
 
@@ -3564,9 +3562,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         {:ok, _view, html} =
           live_clear_lake(
             conn,
-            clear_lake_path_with_stay(checkin, checkout, %{
-              "info_tab" => "manual"
-            })
+            clear_lake_path_with_stay(checkin, checkout)
           )
 
         assert html =~ "Clear Lake"

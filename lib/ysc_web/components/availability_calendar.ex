@@ -66,24 +66,72 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         </div>
 
         <div
-          class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-xs text-zinc-600"
+          class="mt-8 flex flex-wrap gap-4 text-xs text-zinc-600"
           role="list"
           aria-label="Calendar legend"
         >
           <div class="flex items-center gap-2" role="listitem">
-            <span
-              class="w-3.5 h-3.5 rounded-sm bg-white border border-zinc-300"
+            <div
+              class="w-8 h-5 bg-green-50 border border-dashed border-green-700 rounded-sm flex items-center justify-center text-[9px] font-bold text-green-900"
               aria-hidden="true"
-            ></span>
+            >
+              OK
+            </div>
             <span>Available</span>
           </div>
           <div class="flex items-center gap-2" role="listitem">
-            <span class="w-3.5 h-3.5 rounded-sm bg-blue-600" aria-hidden="true"></span>
+            <div
+              class="w-8 h-5 bg-blue-500 rounded-sm ring-2 ring-blue-200 flex items-center justify-center text-[9px] font-bold text-white"
+              aria-hidden="true"
+            >
+              Sel
+            </div>
             <span>Selected dates</span>
           </div>
           <div class="flex items-center gap-2" role="listitem">
-            <span class="w-3.5 h-3.5 rounded-sm bg-zinc-200" aria-hidden="true"></span>
-            <span>Unavailable — hover a date to see why</span>
+            <div
+              class="w-8 h-5 bg-red-800 border border-red-900 rounded-sm flex items-center justify-center text-[9px] font-bold text-red-100"
+              aria-hidden="true"
+            >
+              X
+            </div>
+            <span>Already booked</span>
+          </div>
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-red-200 border border-red-400 rounded-sm flex items-center justify-center text-[9px] font-bold text-red-900 line-through"
+              aria-hidden="true"
+            >
+              --
+            </div>
+            <span>Closed (maintenance or club event)</span>
+          </div>
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-zinc-100 calendar-hatch border border-zinc-300 rounded-sm flex items-center justify-center text-[9px] font-bold text-zinc-600"
+              aria-hidden="true"
+            >
+              N/A
+            </div>
+            <span>Not selectable (past, too far ahead, or stay rules)</span>
+          </div>
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-linear-to-r from-red-200 to-green-50 border border-zinc-400 rounded-sm flex items-center justify-center text-[8px] font-bold text-zinc-800"
+              aria-hidden="true"
+            >
+              In
+            </div>
+            <span>Valid check-in day</span>
+          </div>
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-linear-to-r from-green-50 to-red-200 border border-zinc-400 rounded-sm flex items-center justify-center text-[8px] font-bold text-zinc-800"
+              aria-hidden="true"
+            >
+              Out
+            </div>
+            <span>Valid check-out day</span>
           </div>
         </div>
       </div>
@@ -420,11 +468,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       |> assign(:day_classes, day_classes(day, calendar))
       |> assign(:aria_label, day_aria_label(day, calendar, tooltip?))
       |> assign(:tabindex, day_tabindex(day, calendar))
-      |> assign(
-        :show_status?,
-        !other_month?(day, calendar.current.date) &&
-          !day_labels_hidden?(day, calendar)
-      )
+      |> assign(:show_status?, !other_month?(day, calendar.current.date))
       |> assign(:status_label, status_label)
       |> assign(:has_detail?, day_has_detail?(day, calendar))
       |> assign(:detail_label, day_detail_label(day, calendar))
@@ -432,6 +476,12 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       |> assign(:is_today?, today?(day, calendar.today))
       |> assign(:tooltip_id, day_tooltip_id(assigns.id, day))
       |> assign(:day_number, Calendar.strftime(day, "%d"))
+      |> assign(:show_ok_badge?, day_shows_ok_badge?(day, calendar))
+      |> assign(
+        :show_unavailable_icon?,
+        day_shows_unavailable_icon?(day, calendar)
+      )
+      |> assign(:unavailable_icon_class, unavailable_icon_class(day, calendar))
 
     ~H"""
     <div
@@ -454,6 +504,22 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           aria-current={if(@is_today?, do: "date", else: false)}
           aria-describedby={if(@tooltip?, do: @tooltip_id, else: nil)}
         >
+          <span
+            :if={@show_ok_badge?}
+            class="absolute top-0.5 right-0.5 text-[8px] font-bold text-green-800 leading-none pointer-events-none"
+            aria-hidden="true"
+          >
+            OK
+          </span>
+          <.icon
+            :if={@show_unavailable_icon?}
+            name="hero-x-mark"
+            class={[
+              "absolute top-0.5 right-0.5 w-3 h-3 pointer-events-none",
+              @unavailable_icon_class
+            ]}
+            aria-hidden="true"
+          />
           <span class="text-sm font-medium" aria-hidden="true">
             {@day_number}
           </span>
@@ -485,17 +551,6 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       </div>
     </div>
     """
-  end
-
-  # Blocked, restricted and in-range cells show only the date: the hover
-  # tooltip and aria-label carry the reason, so the grid stays readable.
-  defp day_labels_hidden?(day, assigns) do
-    day_visual_state(day, assigns) in [
-      :fully_blocked_blackout,
-      :fully_blocked_booked,
-      :fully_blocked_gray,
-      :in_range
-    ] || selection_restricted?(day, assigns)
   end
 
   defp week_day_header_labels(week_rows) do
@@ -547,6 +602,33 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     assigns.today &&
       Date.beginning_of_month(assigns.today) ==
         Date.beginning_of_month(assigns.current.date)
+  end
+
+  defp day_shows_ok_badge?(day, assigns) do
+    !other_month?(day, assigns.current.date) &&
+      !selection_restricted?(day, assigns) &&
+      day_visual_state(day, assigns) in [
+        :available,
+        :check_in_allowed,
+        :check_out_allowed
+      ]
+  end
+
+  defp day_shows_unavailable_icon?(day, assigns) do
+    !other_month?(day, assigns.current.date) &&
+      day_visual_state(day, assigns) in [
+        :fully_blocked_blackout,
+        :fully_blocked_booked,
+        :fully_blocked_gray
+      ]
+  end
+
+  defp unavailable_icon_class(day, assigns) do
+    case day_visual_state(day, assigns) do
+      :fully_blocked_blackout -> "text-red-100"
+      :fully_blocked_booked -> "text-red-900"
+      _ -> "text-zinc-500"
+    end
   end
 
   # --- Helpers ---
@@ -833,26 +915,54 @@ defmodule YscWeb.Components.AvailabilityCalendar do
                 morning_blocked && afternoon_blocked ->
                   # Fully blocked. Use the style of the afternoon (current day).
                   case afternoon_style do
-                    _ -> blocked_day_classes()
+                    :gray ->
+                      "bg-zinc-100 calendar-hatch text-zinc-500 border border-zinc-300 cursor-not-allowed"
+
+                    :blackout ->
+                      "bg-red-800 text-red-100 border border-red-900 cursor-not-allowed"
+
+                    :booked ->
+                      "bg-red-200 text-red-900 border border-red-300 cursor-not-allowed"
+
+                    _ ->
+                      "bg-zinc-100 calendar-hatch text-zinc-500 border border-zinc-300 cursor-not-allowed"
                   end
 
                 !morning_blocked && !afternoon_blocked ->
                   # Fully available
-                  "bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50"
+                  "bg-green-50 text-zinc-900 border border-green-200 hover:bg-green-100"
 
                 morning_blocked && !afternoon_blocked ->
                   # Check-out day (Blocked -> Available)
                   case morning_style do
                     :gray ->
-                      "bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50"
+                      "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
+
+                    :blackout ->
+                      "bg-linear-to-r from-red-800 to-green-50 text-zinc-900 border border-zinc-300"
+
+                    :booked ->
+                      "bg-linear-to-r from-red-200 to-green-50 text-zinc-900 border border-zinc-300"
 
                     _ ->
-                      "bg-linear-to-r from-zinc-200 to-white text-zinc-900 border border-zinc-300"
+                      "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
                   end
 
                 !morning_blocked && afternoon_blocked ->
                   # Check-in day (Available -> Blocked)
-                  "bg-linear-to-r from-white to-zinc-200 text-zinc-900 border border-zinc-300"
+                  case afternoon_style do
+                    :gray ->
+                      "bg-linear-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
+
+                    :blackout ->
+                      "bg-linear-to-r from-green-50 to-red-800 text-zinc-900 border border-zinc-300"
+
+                    :booked ->
+                      "bg-linear-to-r from-green-50 to-red-200 text-zinc-900 border border-zinc-300"
+
+                    _ ->
+                      "bg-linear-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
+                  end
               end
             end
 
@@ -866,10 +976,8 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     end
   end
 
-  defp selection_restricted_classes, do: blocked_day_classes()
-
-  defp blocked_day_classes do
-    "bg-zinc-100/70 text-zinc-400 line-through border border-zinc-100 cursor-not-allowed"
+  defp selection_restricted_classes do
+    "bg-zinc-100 calendar-hatch text-zinc-500 border border-zinc-300 cursor-not-allowed"
   end
 
   defp selection_restricted?(day, assigns) do

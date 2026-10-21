@@ -130,57 +130,6 @@ defmodule YscWeb.Components.CabinInfo do
   defp accent_icon(:teal), do: "text-teal-600"
 
   @doc """
-  Compact segmented control for choosing a booking mode. Lives inside a
-  `phx-change` form: each option is a visually hidden radio, so keyboard and
-  screen-reader behaviour is a native radio group.
-
-  Options are `%{value: String.t(), id: String.t(), label: String.t()}`, with an
-  optional `disabled: true`.
-  """
-  attr :name, :string, required: true
-  attr :selected, :string, required: true
-  attr :options, :list, required: true
-  attr :accent, :atom, default: :blue, values: [:blue, :teal]
-  attr :label, :string, required: true, doc: "Accessible name of the group"
-
-  def segmented_control(assigns) do
-    ~H"""
-    <div
-      role="radiogroup"
-      aria-label={@label}
-      class="inline-flex w-full sm:w-auto p-1 rounded-lg bg-zinc-100"
-    >
-      <label
-        :for={option <- @options}
-        class={[
-          "flex-1 sm:flex-none text-center min-h-11 px-4 inline-flex items-center justify-center rounded-md text-sm font-medium cursor-pointer transition-colors has-focus-visible:ring-2",
-          segment_focus_ring(@accent),
-          if(@selected == option.value,
-            do: "bg-white text-zinc-900 shadow-xs",
-            else: "text-zinc-600 hover:text-zinc-900"
-          ),
-          Map.get(option, :disabled, false) && "opacity-50 cursor-not-allowed"
-        ]}
-      >
-        <input
-          type="radio"
-          id={option.id}
-          name={@name}
-          value={option.value}
-          checked={@selected == option.value}
-          disabled={Map.get(option, :disabled, false)}
-          class="sr-only"
-        />
-        {option.label}
-      </label>
-    </div>
-    """
-  end
-
-  defp segment_focus_ring(:blue), do: "has-focus-visible:ring-blue-600"
-  defp segment_focus_ring(:teal), do: "has-focus-visible:ring-teal-600"
-
-  @doc """
   One-line helper bar of constraints that affect picking dates, set directly above
   the calendar. Each `:rule` takes a hero `icon`.
   """

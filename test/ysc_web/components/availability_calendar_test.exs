@@ -273,7 +273,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute tomorrow_cell =~ "border-2 border-zinc-400"
     end
 
-    test "bookable day cells show only the date, with no status badge" do
+    test "shows OK badge on bookable day cells" do
       today = ~D[2026-07-21]
       bookable = Date.add(today, 2)
 
@@ -288,13 +288,13 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       bookable_iso = Date.to_iso8601(bookable)
       bookable_button = calendar_day_button(document, bookable_iso)
 
-      refute calendar_day_ok_badge?(document, bookable_iso)
+      assert calendar_day_ok_badge?(document, bookable_iso)
       refute calendar_element_attr(bookable_button, "aria-disabled") == "true"
 
       assert calendar_element_attr_contains?(
                bookable_button,
                "class",
-               "bg-white"
+               "bg-green-50"
              )
     end
   end
@@ -308,20 +308,13 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute html =~ " spot"
     end
 
-    test "renders a three-item availability legend" do
+    test "renders clear availability legend labels" do
       html = render_clear_lake_calendar()
-      document = calendar_document(html)
 
-      legend_items =
-        Floki.find(
-          document,
-          ~s|[aria-label="Calendar legend"] [role="listitem"]|
-        )
-
-      assert length(legend_items) == 3
-      assert html =~ "Available"
-      assert html =~ "Selected dates"
-      assert html =~ "Unavailable — hover a date to see why"
+      assert html =~ "Already booked"
+      assert html =~ "Closed (maintenance or club event)"
+      assert html =~ "Valid check-in day"
+      assert html =~ "Valid check-out day"
       refute html =~ "Not available for booking"
       refute html =~ ">Unavailable<"
     end
@@ -425,7 +418,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
       assert html =~ "15 booked"
 
-      # The date should still be available, not shown as unavailable
+      # The date should still be available (bg-green), not shown as unavailable (bg-red-200)
       refute html =~ "Not enough spots"
     end
 
@@ -453,7 +446,8 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       day_html = extract_day_cell(html, day_str)
 
       # Check-in day with buyout: morning open, afternoon blocked as a booking (not blackout).
-      assert day_html =~ "to-zinc-200"
+      assert day_html =~ "to-red-200"
+      refute day_html =~ "to-red-800"
       refute day_html =~ "Check-in allowed"
     end
 
@@ -562,7 +556,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       assert calendar_element_attr_contains?(
                valid_button,
                "class",
-               "bg-white"
+               "bg-green-50"
              )
 
       refute calendar_element_attr(valid_button, "aria-disabled") == "true"
@@ -570,7 +564,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute calendar_element_attr_contains?(
                restricted_button,
                "class",
-               "bg-white"
+               "bg-green-50"
              )
 
       assert calendar_element_attr_contains?(
@@ -586,7 +580,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
                "disabled"
              ]
 
-      assert valid_cell =~ "bg-white"
+      assert valid_cell =~ "bg-green-50"
       assert restricted_cell =~ "bg-zinc-100"
     end
 
@@ -790,12 +784,11 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       day_html = extract_day_cell(html, day_str)
 
       # The blackout day is a "check-in day" (morning available, afternoon blacked out),
-      # so it renders a half-and-half gradient rather than a fully blocked cell.
-      assert day_html =~ "to-zinc-200"
-      refute day_html =~ "line-through"
+      # so it renders a green-to-red-800 gradient rather than a fully blocked bg-red-800 cell.
+      assert day_html =~ "to-red-800"
     end
 
-    test "fully unavailable blackout cells show only a struck-through date" do
+    test "shows X icon on fully unavailable blackout cells" do
       blackout_start = blackout_calendar_test_date()
       blackout_end = Date.add(blackout_start, 2)
       fully_blocked_day = Date.add(blackout_start, 1)
@@ -814,8 +807,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       day_str = Calendar.strftime(fully_blocked_day, "%Y-%m-%d")
       day_html = extract_day_cell(html, day_str)
 
-      assert day_html =~ "line-through"
-      refute day_html =~ "hero-x-mark"
+      assert day_html =~ "hero-x-mark"
       refute day_html =~ "text-green-800"
     end
   end
