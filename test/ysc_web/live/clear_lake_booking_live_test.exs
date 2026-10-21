@@ -2484,11 +2484,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert has_element?(view, "#winter-sleeping-photo-0 img")
       assert has_element?(view, "#winter-sleeping-photo-3")
 
-      refute has_element?(
-               view,
-               "#sleeping-at-the-cabin",
-               "Beds are not set up in the cabin."
-             )
+      # Both setups are always visible so members can preview either season
+      assert has_element?(view, "#summer-sleeping")
 
       refute has_element?(
                view,
@@ -2519,7 +2516,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
              )
 
       assert has_element?(view, "#sleeping-at-the-cabin", "Lawn camp")
-      refute has_element?(view, "#winter-sleeping-photos")
+      assert has_element?(view, "#winter-sleeping-photos")
+      assert has_element?(view, "#winter-sleeping-photo-0 img")
+      assert has_element?(view, "#winter-sleeping-photo-3")
 
       refute has_element?(
                view,
@@ -2527,7 +2526,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
                "Bring your own linens"
              )
 
-      refute has_element?(
+      assert has_element?(
                view,
                "#sleeping-at-the-cabin",
                "Indoor beds are set up in three separate rooms."
@@ -2556,7 +2555,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert has_element?(
                view,
                "#sleeping-at-the-cabin",
-               "Beds are not set up."
+               "Beds are not set up in the cabin."
              )
 
       assert has_element?(
@@ -2566,7 +2565,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
              )
 
       assert has_element?(view, "#sleeping-at-the-cabin", "one queen bed each")
-      refute has_element?(view, "#winter-sleeping-photos")
+      assert has_element?(view, "#winter-sleeping-photos")
     end
 
     test "shows community treasure messaging instead of dugnad", %{conn: conn} do
