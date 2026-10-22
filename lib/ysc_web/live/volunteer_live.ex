@@ -7,7 +7,6 @@ defmodule YscWeb.VolunteerLive do
     <div class="py-6 lg:py-8 max-w-(--breakpoint-xl) mx-auto px-4">
       <.page_masthead
         id="volunteer-masthead"
-        size={:compact}
         eyebrow="Get involved"
         title="Volunteer with the YSC"
       />
