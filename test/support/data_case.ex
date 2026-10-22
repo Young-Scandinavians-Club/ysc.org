@@ -244,6 +244,43 @@ defmodule Ysc.DataCase do
   end
 
   @doc """
+  Makes deferred ticket checkout survive a leaked `Ysc.StripeMock`.
+
+  Same VM-global `:stripe_client` race as
+  `stub_stripe_mock_retrieve_for_test_refunds/0`. EventDetailsLive remaps
+  `checkout=free` on a paid order to payment checkout and
+  `send(self(), :create_checkout_payment_intent)`. A concurrent async test
+  can switch the client to `Ysc.StripeMock` after this process's
+  `stub_default_external_mocks/0` reset, so the LiveView crashes with
+  `Mox.UnexpectedCallError` unless this process has a stub.
+
+  Unlike the refund helper, this does **not** reset Application env (that
+  would steal `Ysc.StripeMock` from the concurrent test that needs it).
+
+  Do not use in tests that `deny/3` `create_payment_intent/2`.
+  """
+  def stub_stripe_mock_create_payment_intent_for_leaked_client do
+    # Cover create/retrieve/cancel/customer so deferred checkout and any
+    # follow-up handle_info after the assertion cannot raise UnexpectedCallError.
+    stub_with(Ysc.StripeMock, Ysc.TestStripeClient)
+
+    stub(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+      amount = Map.get(params, :amount) || Map.get(params, "amount") || 0
+
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: "pi_test_#{System.unique_integer([:positive])}",
+         client_secret: "pi_test_secret",
+         status: "requires_payment_method",
+         amount: amount,
+         currency: "usd"
+       }}
+    end)
+
+    :ok
+  end
+
+  @doc """
   Sets up the sandbox based on the test tags.
   Returns the owner PID so it can be passed to concurrent tasks.
   """
