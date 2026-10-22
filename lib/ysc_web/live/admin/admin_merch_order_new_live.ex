@@ -7,6 +7,10 @@ defmodule YscWeb.AdminMerchOrderNewLive do
   shows Printful's shipping options and what the order will cost the club
   before anything is sent. Placing the order sends it to Printful and emails
   the board a summary naming who placed it.
+
+  The first HTML is a skeleton. Product and event queries run after the
+  WebSocket connects so the HTTP response is never blocked on those loads,
+  and they run once instead of on both the disconnected and connected mounts.
   """
   use YscWeb, :admin_live_view
 
@@ -28,28 +32,44 @@ defmodule YscWeb.AdminMerchOrderNewLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    products = AdminOrders.orderable_products()
+    socket =
+      socket
+      |> assign(:active_page, :merch)
+      |> assign(:page_title, "New club-paid order")
+      |> assign(:step, :details)
+      |> assign(:products, [])
+      |> assign(:variant_options, [])
+      |> assign(:event_options, [])
+      |> assign(:form_options_loaded, false)
+      |> assign(:errors, %{})
+      |> assign(:lines_error, nil)
+      |> assign(:recipient_error, nil)
+      |> assign(:attempted?, false)
+      |> assign(:summary, [])
+      |> assign(:review, nil)
+      |> assign(:review_error, nil)
+      |> assign(:placing?, false)
+      |> assign(:address, nil)
+      |> assign(:order_lines, [])
+      |> AdminUserSearch.assign_blank()
+      |> assign_form(default_params())
 
     {:ok,
-     socket
-     |> assign(:active_page, :merch)
-     |> assign(:page_title, "New club-paid order")
-     |> assign(:step, :details)
-     |> assign(:products, products)
-     |> assign(:variant_options, variant_options(products))
-     |> assign(:event_options, event_options(AdminOrders.linkable_events()))
-     |> assign(:errors, %{})
-     |> assign(:lines_error, nil)
-     |> assign(:recipient_error, nil)
-     |> assign(:attempted?, false)
-     |> assign(:summary, [])
-     |> assign(:review, nil)
-     |> assign(:review_error, nil)
-     |> assign(:placing?, false)
-     |> assign(:address, nil)
-     |> assign(:order_lines, [])
-     |> AdminUserSearch.assign_blank()
-     |> assign_form(default_params())}
+     if connected?(socket) do
+       load_form_options(socket)
+     else
+       socket
+     end}
+  end
+
+  defp load_form_options(socket) do
+    products = AdminOrders.orderable_products()
+
+    socket
+    |> assign(:products, products)
+    |> assign(:variant_options, variant_options(products))
+    |> assign(:event_options, event_options(AdminOrders.linkable_events()))
+    |> assign(:form_options_loaded, true)
   end
 
   defp default_params do
@@ -582,8 +602,15 @@ defmodule YscWeb.AdminMerchOrderNewLive do
       </.admin_page_header>
 
       <div class="w-full max-w-3xl pb-16 pt-4">
+        <.admin_table_skeleton
+          :if={!@form_options_loaded}
+          id="admin-merch-order-new-loading"
+          rows={8}
+          columns={2}
+        />
+
         <.details_step
-          :if={@step == :details}
+          :if={@step == :details and @form_options_loaded}
           form={@form}
           params={@params}
           errors={@errors}
