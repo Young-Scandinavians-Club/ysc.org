@@ -688,6 +688,49 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute aria =~ "Partially booked"
     end
 
+    test "winter buyout reason wins over too-far-ahead for dates past the booking window" do
+      today = ~D[2026-12-01]
+      far_winter_day = ~D[2026-12-15]
+
+      seasons = [
+        %Ysc.Bookings.Season{
+          name: "Winter",
+          property: :tahoe,
+          start_date: ~D[2026-11-01],
+          end_date: ~D[2027-04-30],
+          advance_booking_days: 365
+        }
+      ]
+
+      render_for_mode = fn mode, day ->
+        html =
+          render_component(AvailabilityCalendar,
+            id: "calendar",
+            today: today,
+            min: today,
+            max: Date.add(today, 5),
+            property: :tahoe,
+            selected_booking_mode: mode,
+            seasons: seasons
+          )
+
+        extract_day_cell(html, Date.to_iso8601(day))
+      end
+
+      buyout_cell = render_for_mode.(:buyout, far_winter_day)
+      assert buyout_cell =~ "available in winter"
+      refute buyout_cell =~ "Too far ahead to book"
+
+      # A Saturday in the same window keeps the winter reason too.
+      saturday_cell = render_for_mode.(:buyout, ~D[2026-12-12])
+      assert saturday_cell =~ "available in winter"
+      refute saturday_cell =~ "cannot check in on Saturday"
+
+      room_cell = render_for_mode.(:room, far_winter_day)
+      assert room_cell =~ "Too far ahead to book"
+      refute room_cell =~ "available in winter"
+    end
+
     test "valid checkout before blackout shows check-out only, not not available" do
       today = ~D[2026-07-21]
       checkin = ~D[2026-07-24]
