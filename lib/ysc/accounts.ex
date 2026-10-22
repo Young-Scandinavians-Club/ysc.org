@@ -2617,6 +2617,9 @@ defmodule Ysc.Accounts do
   # Finding 95: `UserAuth.mount_current_user/2` only runs on mount, so deleting
   # `users_tokens` alone left a stolen session's socket able to book, buy, and
   # change account settings until that process died.
+  # Ecto.Multi opacity vs MapSet triggers Dialyzer call_without_opaque (same
+  # pattern as other Accounts Multi helpers).
+  @dialyzer {:nowarn_function, commit_password_change: 2}
   defp commit_password_change(user, changeset) do
     Ecto.Multi.new()
     |> Ecto.Multi.update(:user, changeset)
