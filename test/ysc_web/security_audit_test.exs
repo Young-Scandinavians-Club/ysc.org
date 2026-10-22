@@ -1712,6 +1712,12 @@ defmodule YscWeb.SecurityAuditTest do
       conn: conn
     } do
       Oban.Testing.with_testing_mode(:manual, fn ->
+        # Paid checkout remaps checkout=free → payment and defers Stripe
+        # PaymentIntent create. A concurrent async test can leak
+        # `:stripe_client` = Ysc.StripeMock; stub so the LiveView does not
+        # crash with Mox.UnexpectedCallError (CI seed 472843).
+        Ysc.DataCase.stub_stripe_mock_create_payment_intent_for_leaked_client()
+
         user = user_with_membership(:lifetime)
         conn = log_in_user(conn, user)
         event = event_with_tickets(tier_count: 1, state: :upcoming)
@@ -1725,6 +1731,11 @@ defmodule YscWeb.SecurityAuditTest do
             conn,
             ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
           )
+
+        # Drain deferred PI create + async event data before clicking.
+        render_async(view, 500)
+
+        refute has_element?(view, "#free-ticket-confirmation-modal")
 
         render_click(view, "confirm-free-tickets")
 
