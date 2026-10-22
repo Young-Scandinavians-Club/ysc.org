@@ -60,6 +60,14 @@ defmodule Ysc.TestStripeSubscriptionStub do
   end
 
   @impl true
+  def cancel(id), do: cancel(id, [])
+
+  @impl true
+  def cancel(id, _opts) do
+    {:ok, %Stripe.Subscription{id: id, status: "canceled"}}
+  end
+
+  @impl true
   def list(_params) do
     {:ok,
      %Stripe.List{

@@ -993,6 +993,189 @@ defmodule Ysc.SubscriptionsTest do
                Subscriptions.create_stripe_subscription(user, params)
     end
 
+    test "retries an incomplete subscription when the requested price still matches" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      stripe_sub_id = "sub_incomplete_same_#{System.unique_integer()}"
+      price_id = "price_family_#{System.unique_integer([:positive])}"
+
+      {:ok, incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete",
+          name: "Incomplete Family Checkout",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: incomplete_sub.id,
+          stripe_price_id: price_id,
+          stripe_product_id: "prod_family",
+          stripe_id: "si_#{System.unique_integer([:positive])}",
+          quantity: 1
+        })
+
+      invoice_id = "in_retry_same_plan"
+      new_pm = "pm_working_card"
+
+      expect(Stripe.SubscriptionMock, :update, fn ^stripe_sub_id, params ->
+        assert params[:default_payment_method] == new_pm
+
+        {:ok,
+         %Stripe.Subscription{
+           id: stripe_sub_id,
+           status: "incomplete",
+           latest_invoice: %Stripe.Invoice{id: invoice_id}
+         }}
+      end)
+
+      expect(Stripe.InvoiceMock, :pay, fn ^invoice_id, params ->
+        assert params[:payment_method] == new_pm
+        {:ok, %Stripe.Invoice{id: invoice_id, status: "paid"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :retrieve, fn ^stripe_sub_id ->
+        {:ok,
+         %Stripe.Subscription{
+           id: stripe_sub_id,
+           status: "active",
+           latest_invoice: %Stripe.Invoice{id: invoice_id, status: "paid"}
+         }}
+      end)
+
+      expect(Stripe.SubscriptionMock, :cancel, 0, fn _id ->
+        flunk("same-plan incomplete retry must not cancel the subscription")
+      end)
+
+      params = %{
+        prices: [%{price: price_id, quantity: 1}],
+        default_payment_method: new_pm
+      }
+
+      assert {:ok, %Stripe.Subscription{id: ^stripe_sub_id, status: "active"}} =
+               Subscriptions.create_stripe_subscription(user, params)
+    end
+
+    test "cancels a mismatched incomplete subscription instead of charging the old plan" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      stripe_sub_id = "sub_incomplete_family_#{System.unique_integer()}"
+      family_price = "price_family_#{System.unique_integer([:positive])}"
+      single_price = "price_single_#{System.unique_integer([:positive])}"
+      new_stripe_id = "sub_single_#{System.unique_integer([:positive])}"
+
+      {:ok, incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete",
+          name: "Incomplete Family Checkout",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: incomplete_sub.id,
+          stripe_price_id: family_price,
+          stripe_product_id: "prod_family",
+          stripe_id: "si_#{System.unique_integer([:positive])}",
+          quantity: 1
+        })
+
+      expect(Stripe.InvoiceMock, :pay, 0, fn _invoice_id, _params ->
+        flunk(
+          "must not pay the incomplete Family invoice after a Single request"
+        )
+      end)
+
+      expect(Stripe.SubscriptionMock, :cancel, fn ^stripe_sub_id ->
+        {:ok, %Stripe.Subscription{id: stripe_sub_id, status: "canceled"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :create, fn params, _opts ->
+        assert hd(params.items).price == single_price
+
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: new_stripe_id,
+           customer: user.stripe_id,
+           status: "active"
+         )}
+      end)
+
+      params = %{
+        prices: [%{price: single_price, quantity: 1}],
+        default_payment_method: "pm_working_card"
+      }
+
+      assert {:ok, %Stripe.Subscription{id: ^new_stripe_id}} =
+               Subscriptions.create_stripe_subscription(user, params)
+
+      reloaded = Subscriptions.get_subscription(incomplete_sub.id)
+      assert reloaded.stripe_status == "cancelled"
+    end
+
+    test "does not mint a second Stripe subscription when cancelling the mismatched incomplete fails" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      stripe_sub_id = "sub_incomplete_stuck_#{System.unique_integer()}"
+      family_price = "price_family_#{System.unique_integer([:positive])}"
+      single_price = "price_single_#{System.unique_integer([:positive])}"
+
+      {:ok, incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete",
+          name: "Incomplete Family Checkout",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: incomplete_sub.id,
+          stripe_price_id: family_price,
+          stripe_product_id: "prod_family",
+          stripe_id: "si_#{System.unique_integer([:positive])}",
+          quantity: 1
+        })
+
+      stripe_error = %Stripe.Error{
+        source: :stripe,
+        code: :rate_limit,
+        message: "Too many requests",
+        request_id: nil,
+        extra: %{},
+        user_message: nil
+      }
+
+      expect(Stripe.SubscriptionMock, :cancel, fn ^stripe_sub_id ->
+        {:error, stripe_error}
+      end)
+
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params, _opts ->
+        flunk(
+          "must not create a second subscription while the incomplete one is still open"
+        )
+      end)
+
+      params = %{
+        prices: [%{price: single_price, quantity: 1}],
+        default_payment_method: "pm_working_card"
+      }
+
+      assert {:error, ^stripe_error} =
+               Subscriptions.create_stripe_subscription(user, params)
+
+      reloaded = Subscriptions.get_subscription(incomplete_sub.id)
+      assert reloaded.stripe_status == "incomplete"
+    end
+
     test "prefers a hard-blocking subscription over an incomplete one" do
       user =
         user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})

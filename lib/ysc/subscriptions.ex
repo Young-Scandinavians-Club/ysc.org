@@ -1369,11 +1369,25 @@ defmodule Ysc.Subscriptions do
                  end
 
                %Subscription{stripe_status: "incomplete"} = incomplete_sub ->
-                 case retry_incomplete_subscription(
-                        user,
+                 result =
+                   if incomplete_subscription_matches_requested_prices?(
                         incomplete_sub,
                         params
                       ) do
+                     retry_incomplete_subscription(
+                       user,
+                       incomplete_sub,
+                       params
+                     )
+                   else
+                     replace_mismatched_incomplete_subscription(
+                       user,
+                       incomplete_sub,
+                       params
+                     )
+                   end
+
+                 case result do
                    {:ok, stripe_subscription} -> stripe_subscription
                    {:error, reason} -> Repo.rollback(reason)
                  end
@@ -1487,6 +1501,112 @@ defmodule Ysc.Subscriptions do
 
     Enum.find(blocking, &(&1.stripe_status != "incomplete")) ||
       Enum.find(blocking, &(&1.stripe_status == "incomplete"))
+  end
+
+  # Retrying an incomplete invoice always charges that subscription's existing
+  # price. If the member (or volunteer door sale) asked for a different plan,
+  # cancel the unpaid sub first and create the requested one instead of billing
+  # Family after a Single click (or the reverse).
+  defp incomplete_subscription_matches_requested_prices?(
+         %Subscription{} = incomplete_sub,
+         params
+       ) do
+    requested = requested_membership_price_ids(params)
+
+    existing =
+      incomplete_sub
+      |> subscription_items_for_price_match()
+      |> Enum.map(& &1.stripe_price_id)
+      |> Enum.filter(&(is_binary(&1) and &1 != ""))
+      |> Enum.sort()
+
+    # No stored items: cannot prove a mismatch; keep the original retry path
+    # (existing tests create incomplete rows without items).
+    existing == [] or existing == requested
+  end
+
+  defp requested_membership_price_ids(params) do
+    prices = params[:prices] || params["prices"] || params.prices
+
+    prices
+    |> List.wrap()
+    |> Enum.map(fn price ->
+      price[:price] || price["price"] || price.price
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.sort()
+  end
+
+  defp subscription_items_for_price_match(%Subscription{} = subscription) do
+    case subscription.subscription_items do
+      %Ecto.Association.NotLoaded{} ->
+        Repo.preload(subscription, :subscription_items).subscription_items
+
+      items when is_list(items) ->
+        items
+
+      _ ->
+        []
+    end
+  end
+
+  defp replace_mismatched_incomplete_subscription(
+         user,
+         incomplete_sub,
+         params
+       ) do
+    case abandon_incomplete_subscription_for_plan_change(incomplete_sub) do
+      :ok -> do_create_stripe_subscription(user, params)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp abandon_incomplete_subscription_for_plan_change(
+         %Subscription{} = incomplete_sub
+       ) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           stripe_subscription_module().cancel(incomplete_sub.stripe_id)
+         end) do
+      {:ok, _} ->
+        persist_abandoned_incomplete_subscription(incomplete_sub)
+
+      {:error, %Stripe.Error{code: code}}
+      when code in [:resource_missing, :resource_already_deleted] ->
+        persist_abandoned_incomplete_subscription(incomplete_sub)
+
+      {:error, reason} = error ->
+        Ysc.Logging.error(
+          "Failed to cancel incomplete subscription before creating a different membership plan",
+          stripe_subscription_id: incomplete_sub.stripe_id,
+          user_id: incomplete_sub.user_id,
+          error: inspect(reason)
+        )
+
+        error
+    end
+  end
+
+  defp persist_abandoned_incomplete_subscription(incomplete_sub) do
+    case mark_as_cancelled(incomplete_sub) do
+      {:ok, _} ->
+        Ysc.Logging.info(
+          "Abandoned incomplete membership subscription so a different plan can be created",
+          stripe_subscription_id: incomplete_sub.stripe_id,
+          user_id: incomplete_sub.user_id
+        )
+
+        :ok
+
+      {:error, reason} = error ->
+        Ysc.Logging.error(
+          "Failed to mark incomplete subscription cancelled after Stripe cancel",
+          stripe_subscription_id: incomplete_sub.stripe_id,
+          user_id: incomplete_sub.user_id,
+          reason: inspect(reason)
+        )
+
+        error
+    end
   end
 
   # Retries an "incomplete" subscription (first invoice never paid) using a

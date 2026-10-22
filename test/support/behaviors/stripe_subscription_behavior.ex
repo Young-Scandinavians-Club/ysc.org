@@ -18,6 +18,12 @@ defmodule Stripe.SubscriptionBehaviour do
   @callback retrieve(String.t()) ::
               {:ok, Stripe.Subscription.t()} | {:error, Stripe.Error.t()}
 
+  @callback cancel(String.t()) ::
+              {:ok, Stripe.Subscription.t()} | {:error, Stripe.Error.t()}
+
+  @callback cancel(String.t(), keyword() | map()) ::
+              {:ok, Stripe.Subscription.t()} | {:error, Stripe.Error.t()}
+
   @callback list(map()) ::
               {:ok, Stripe.List.t()} | {:error, Stripe.Error.t()}
 end
