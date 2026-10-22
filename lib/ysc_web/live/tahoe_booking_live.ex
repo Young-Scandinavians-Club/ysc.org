@@ -2684,21 +2684,25 @@ defmodule YscWeb.TahoeBookingLive do
               id="tahoe-rules-modal-cancellation"
               title="Cancellation policy"
             >
-              <% buyout_lines = cancellation_policy_lines(@buyout_refund_policy) %>
-              <% room_lines = cancellation_policy_lines(@room_refund_policy) %>
-              <p :if={buyout_lines != []}>
-                <strong>
-                  {BookingModeDisplay.stay_type_label(:buyout)}:
-                </strong>
-                <span :for={line <- buyout_lines} class="block">{line}</span>
-              </p>
-              <p :if={room_lines != []}>
-                <strong>
-                  {BookingModeDisplay.stay_type_label(:room)}:
-                </strong>
-                <span :for={line <- room_lines} class="block">{line}</span>
-              </p>
-              <p :if={buyout_lines == [] and room_lines == []}>
+              <% buyout_rules =
+                RefundPolicyDisplay.policy_rules(@buyout_refund_policy) %>
+              <% room_rules =
+                RefundPolicyDisplay.policy_rules(@room_refund_policy) %>
+              <.refund_table
+                :if={buyout_rules != [] or room_rules != []}
+                id="tahoe-rules-modal-refunds"
+                columns={[
+                  %{
+                    label: BookingModeDisplay.stay_type_label(:buyout),
+                    rules: buyout_rules
+                  },
+                  %{
+                    label: BookingModeDisplay.stay_type_label(:room),
+                    rules: room_rules
+                  }
+                ]}
+              />
+              <p :if={buyout_rules == [] and room_rules == []}>
                 Refunds depend on how far ahead of check-in you cancel. See Cancellation Policy on the Booking & Cancellation Policies tab.
               </p>
               <p class="text-xs text-zinc-500">
@@ -4862,15 +4866,6 @@ defmodule YscWeb.TahoeBookingLive do
 
   # First night on or after today when the entire cabin can be booked, so the
   # buyout calendar opens on a month with something to pick (not all winter).
-  # Member-facing cancellation lines for a policy, shortest notice first, worded
-  # the way the cancellation flow words them. Empty when no rules are loaded.
-  defp cancellation_policy_lines(policy) do
-    policy
-    |> RefundPolicyDisplay.policy_rules()
-    |> RefundPolicyDisplay.rules_sorted_asc()
-    |> Enum.map(&RefundPolicyDisplay.cancellation_rule_summary/1)
-  end
-
   defp buyout_focus_date(seasons, today) when is_list(seasons) do
     today
     |> Stream.iterate(&Date.add(&1, 1))

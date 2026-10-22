@@ -41,44 +41,87 @@ defmodule Ysc.Bookings.RefundPolicyDisplayTest do
     end
   end
 
-  describe "rule_threshold_summary/1" do
-    test "formats booking checkout policy lines" do
-      rule = %{days_before_checkin: 30, refund_percentage: Decimal.new("100")}
+  describe "refund_schedule_bands/1" do
+    test "lists bands between the union of thresholds, one percentage per stay type" do
+      columns = [
+        %{label: "Entire cabin", rules: [rule(21, "50"), rule(14, "0")]},
+        %{label: "Individual room(s)", rules: [rule(14, "50")]}
+      ]
 
-      assert RefundPolicyDisplay.rule_threshold_summary(rule) ==
-               "If you cancel 30 or more days before check-in, you'll receive a 100% refund."
+      bands = RefundPolicyDisplay.refund_schedule_bands(columns)
+
+      assert Enum.map(bands, & &1.label) == [
+               "More than 21 days before check-in",
+               "15–21 days before check-in",
+               "14 days or fewer before check-in"
+             ]
+
+      assert Enum.map(bands, & &1.percentages) == [
+               [100, 100],
+               [50, 100],
+               [0, 50]
+             ]
+    end
+
+    test "returns no bands when no column has rules" do
+      assert RefundPolicyDisplay.refund_schedule_bands([
+               %{label: "Entire cabin", rules: []}
+             ]) == []
     end
   end
 
-  describe "cancellation_rule_summary/1" do
-    test "formats no-refund rules" do
-      rule = %{days_before_checkin: 7, refund_percentage: Decimal.new("0")}
+  describe "cancellation_schedule_lines/1" do
+    test "uses non-overlapping bands that match the refund engine" do
+      rules = [rule(21, "50"), rule(14, "0")]
 
-      assert RefundPolicyDisplay.cancellation_rule_summary(rule) ==
-               "If you cancel within 7 days of your check-in date, you will not receive a refund."
+      assert RefundPolicyDisplay.cancellation_schedule_lines(rules) == [
+               "If you cancel more than 21 days before check-in, you'll receive a full refund.",
+               "If you cancel 15–21 days before check-in, you'll receive a 50% refund.",
+               "If you cancel 14 days or fewer before check-in, you will not receive a refund."
+             ]
     end
 
-    test "formats partial refund rules" do
-      rule = %{days_before_checkin: 14, refund_percentage: Decimal.new("50")}
+    test "formats a full-refund rule as the late-cancel band, not 'or more days'" do
+      lines = RefundPolicyDisplay.cancellation_schedule_lines([rule(30, "100")])
 
-      assert RefundPolicyDisplay.cancellation_rule_summary(rule) ==
-               "If you cancel within 14 days of your check-in date, you receive a 50% refund."
+      assert lines == [
+               "If you cancel more than 30 days before check-in, you'll receive a full refund.",
+               "If you cancel 30 days or fewer before check-in, you'll receive a full refund."
+             ]
+
+      refute Enum.any?(lines, &String.contains?(&1, "or more days"))
     end
 
-    test "formats full refund rules" do
-      rule = %{days_before_checkin: 30, refund_percentage: Decimal.new("100")}
-
-      assert RefundPolicyDisplay.cancellation_rule_summary(rule) ==
-               "If you cancel 30 or more days before your check-in date, you are eligible for a full refund."
+    test "returns an empty list when there are no rules" do
+      assert RefundPolicyDisplay.cancellation_schedule_lines([]) == []
+      assert RefundPolicyDisplay.cancellation_schedule_lines(nil) == []
     end
   end
 
   describe "applied_rule_summary/1" do
-    test "formats applied rule summaries" do
+    test "formats applied rule summaries using or-fewer, matching the engine" do
       rule = %{days_before_checkin: 14, refund_percentage: Decimal.new("75")}
 
       assert RefundPolicyDisplay.applied_rule_summary(rule) ==
-               "75% refund if cancelled 14 days or more before check-in."
+               "75% refund if you cancelled 14 days or fewer before check-in."
+    end
+
+    test "formats a zero-percent applied rule" do
+      rule = %{days_before_checkin: 7, refund_percentage: Decimal.new("0")}
+
+      assert RefundPolicyDisplay.applied_rule_summary(rule) ==
+               "No refund if you cancelled 7 days or fewer before check-in."
+    end
+
+    test "uses the non-overlapping band when the rest of the policy is provided" do
+      rules = [rule(21, "50"), rule(14, "0")]
+      applied = Enum.at(rules, 0)
+
+      assert RefundPolicyDisplay.applied_rule_summary(applied, rules) ==
+               "50% refund if you cancelled 15–21 days before check-in."
+
+      assert RefundPolicyDisplay.applied_rule_summary(Enum.at(rules, 1), rules) ==
+               "No refund if you cancelled 14 days or fewer before check-in."
     end
   end
 
@@ -135,5 +178,9 @@ defmodule Ysc.Bookings.RefundPolicyDisplayTest do
       assert RefundPolicyDisplay.policy_rules(%{}) == []
       assert RefundPolicyDisplay.rules_sorted_desc(:not_loaded) == []
     end
+  end
+
+  defp rule(days, percentage) do
+    %{days_before_checkin: days, refund_percentage: Decimal.new(percentage)}
   end
 end

@@ -6,6 +6,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.BookingsFixtures
   import Ysc.TestDataFactory
+  import Ecto.Query
 
   alias Ysc.Bookings
 
@@ -1339,6 +1340,82 @@ defmodule YscWeb.TahoeBookingLiveTest do
                "All guests (adults and children) must be paid for before arrival."
 
       refute html =~ "guests(adults"
+    end
+
+    test "terms modal refund table uses or-fewer bands, not or-more days", %{
+      conn: conn
+    } do
+      from(p in Ysc.Bookings.RefundPolicy,
+        where: p.property == :tahoe and p.booking_mode in [:buyout, :room]
+      )
+      |> Repo.update_all(set: [is_active: false])
+
+      {:ok, buyout_policy} =
+        Bookings.create_refund_policy(%{
+          property: :tahoe,
+          booking_mode: :buyout,
+          is_active: true,
+          name: "Tahoe buyout #{System.unique_integer([:positive])}"
+        })
+
+      {:ok, _} =
+        Bookings.create_refund_policy_rule(%{
+          refund_policy_id: buyout_policy.id,
+          days_before_checkin: 21,
+          refund_percentage: 50,
+          priority: 1
+        })
+
+      {:ok, _} =
+        Bookings.create_refund_policy_rule(%{
+          refund_policy_id: buyout_policy.id,
+          days_before_checkin: 14,
+          refund_percentage: 0,
+          priority: 0
+        })
+
+      {:ok, room_policy} =
+        Bookings.create_refund_policy(%{
+          property: :tahoe,
+          booking_mode: :room,
+          is_active: true,
+          name: "Tahoe room #{System.unique_integer([:positive])}"
+        })
+
+      {:ok, _} =
+        Bookings.create_refund_policy_rule(%{
+          refund_policy_id: room_policy.id,
+          days_before_checkin: 14,
+          refund_percentage: 50,
+          priority: 1
+        })
+
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+      render_click(view, "show-terms-modal")
+
+      assert has_element?(view, "#tahoe-rules-modal-refunds")
+
+      assert has_element?(
+               view,
+               "#tahoe-rules-modal-cancellation",
+               "More than 21 days before check-in"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-rules-modal-cancellation",
+               "14 days or fewer before check-in"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-rules-modal-cancellation",
+               "or more days"
+             )
     end
 
     test "rules modal renders above the navbar and closes on its backdrop", %{

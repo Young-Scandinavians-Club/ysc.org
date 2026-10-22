@@ -660,12 +660,12 @@ defmodule YscWeb.Components.CabinInfo do
   attr :columns, :list, required: true
 
   def refund_table(assigns) do
-    thresholds =
-      assigns.columns
-      |> Enum.map(& &1.rules)
-      |> RefundPolicyDisplay.unique_threshold_days_desc()
-
-    assigns = assign(assigns, :bands, refund_bands(thresholds, assigns.columns))
+    assigns =
+      assign(
+        assigns,
+        :bands,
+        RefundPolicyDisplay.refund_schedule_bands(assigns.columns)
+      )
 
     ~H"""
     <div id={@id} class="overflow-x-auto border border-zinc-200 rounded-lg">
@@ -707,50 +707,5 @@ defmodule YscWeb.Components.CabinInfo do
       </table>
     </div>
     """
-  end
-
-  # Rows for the refund table: everything earlier than the loosest threshold is a
-  # full refund, then one band per threshold down to check-in.
-  defp refund_bands([], _columns), do: []
-
-  defp refund_bands([loosest | _] = thresholds, columns) do
-    full = %{
-      label: "More than #{loosest} days before check-in",
-      percentages: Enum.map(columns, fn _ -> 100 end)
-    }
-
-    lower_bounds = Enum.drop(thresholds, 1) ++ [nil]
-
-    bands =
-      thresholds
-      |> Enum.zip(lower_bounds)
-      |> Enum.map(fn {upper, lower} ->
-        %{
-          label: band_label(upper, lower),
-          percentages: Enum.map(columns, &refund_for_band(&1.rules, upper))
-        }
-      end)
-
-    [full | bands]
-  end
-
-  defp band_label(upper, nil), do: "#{upper} days or fewer before check-in"
-
-  defp band_label(upper, lower) when lower + 1 == upper,
-    do: "#{upper} days before check-in"
-
-  defp band_label(upper, lower),
-    do: "#{lower + 1}–#{upper} days before check-in"
-
-  # The tightest rule that still covers the band's upper edge; none means the
-  # band is looser than every rule, so a full refund.
-  defp refund_for_band(rules, upper) do
-    rules
-    |> Enum.filter(&(&1.days_before_checkin >= upper))
-    |> Enum.min_by(& &1.days_before_checkin, fn -> nil end)
-    |> case do
-      nil -> 100
-      rule -> RefundPolicyDisplay.refund_percentage_int(rule.refund_percentage)
-    end
   end
 end

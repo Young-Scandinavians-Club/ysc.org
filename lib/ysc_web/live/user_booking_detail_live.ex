@@ -252,14 +252,14 @@ defmodule YscWeb.UserBookingDetailLive do
                     <div class="pt-3 border-t border-blue-200">
                       <p class="font-semibold mb-2">Refund schedule:</p>
                       <div class="text-sm text-blue-800 space-y-2">
-                        {RefundPolicyDisplay.rules_sorted_asc(
-                          @refund_info.policy_rules
-                        )
-                        |> Enum.map(
-                          &"<p>#{RefundPolicyDisplay.cancellation_rule_summary(&1)}</p>"
-                        )
-                        |> Enum.join("")
-                        |> raw()}
+                        <p :for={
+                          line <-
+                            RefundPolicyDisplay.cancellation_schedule_lines(
+                              @refund_info.policy_rules
+                            )
+                        }>
+                          {line}
+                        </p>
                       </div>
                     </div>
                   <% else %>
@@ -715,7 +715,7 @@ defmodule YscWeb.UserBookingDetailLive do
             %{
               estimated_refund: nil,
               applied_rule: nil,
-              policy_rules: [],
+              policy_rules: rules,
               modified: false
             }
         end
