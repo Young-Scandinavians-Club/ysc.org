@@ -335,79 +335,95 @@ defmodule YscWeb.BookingCheckoutLive do
       <div
         :if={!@checkout_data_loaded?}
         id="checkout-loading"
-        class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
+        class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start"
         role="status"
         aria-live="polite"
       >
         <span class="sr-only">Loading checkout details…</span>
-        <div class="lg:col-span-2 space-y-6">
-          <div class="flex items-center gap-6 p-6 bg-zinc-50 rounded-lg border border-zinc-200">
-            <.skeleton_block class="h-20 w-20 rounded-lg shrink-0" />
-            <div class="flex-1 space-y-2">
-              <.skeleton_block class="h-6 w-1/2 rounded-sm" />
-              <.skeleton_block class="h-4 w-2/3 rounded-sm" />
-              <.skeleton_block class="h-4 w-1/3 rounded-sm" />
+        <div class="lg:col-span-8 space-y-6 min-w-0">
+          <div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+            <.skeleton_block class="h-40 w-full rounded-none" />
+            <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-zinc-200">
+              <div :for={_ <- 1..3} class="space-y-2">
+                <.skeleton_block class="h-3 w-16 rounded-sm" />
+                <.skeleton_block class="h-5 w-24 rounded-sm" />
+              </div>
             </div>
           </div>
-          <div class="bg-white rounded-lg border border-zinc-200 p-8 space-y-4">
+          <div class="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
             <.skeleton_block class="h-6 w-40 rounded-sm" />
             <.payment_element_loading />
           </div>
         </div>
-        <aside class="space-y-6">
-          <.skeleton_block class="h-20 w-full rounded-lg" />
-          <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
-            <.skeleton_block class="h-4 w-1/3 rounded-sm" />
-            <.skeleton_block :for={_ <- 1..3} class="h-4 w-full rounded-sm" />
-          </div>
+        <aside class="lg:col-span-4 space-y-4">
+          <.skeleton_block class="h-20 w-full rounded-xl" />
+          <.payment_summary_skeleton announce?={false} />
         </aside>
       </div>
 
       <div
         :if={@checkout_data_loaded?}
-        class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
+        class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start"
       >
         <!-- Left Column: Booking Summary and Payment -->
-        <div class="lg:col-span-2 space-y-6">
-          <!-- Visual Booking Summary -->
-          <div class="flex items-center gap-6 p-6 bg-zinc-50 rounded-lg border border-zinc-200">
-            <div class="h-20 w-20 bg-zinc-200 rounded-lg overflow-hidden shrink-0">
+        <div class="lg:col-span-8 space-y-6 min-w-0">
+          <!-- Booking Summary: cover photo + hairline stat strip -->
+          <div
+            id="checkout-booking-summary"
+            class="bg-white rounded-xl border border-zinc-200 overflow-hidden"
+          >
+            <div class="h-40 bg-zinc-100 overflow-hidden">
               <img
                 src={PropertyDisplay.thumbnail_path(@booking.property)}
                 alt={titleize(@booking.property) <> " Cabin"}
                 class="object-cover h-full w-full"
               />
             </div>
-            <div class="flex-1">
-              <h2 class="text-2xl text-zinc-900 type-title">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-200 border-t border-zinc-200">
+              <.labeled_value
+                id="checkout-summary-cabin"
+                label="Cabin"
+                class="bg-zinc-50 p-5"
+                value_class="text-base font-semibold text-zinc-900"
+              >
                 {titleize(@booking.property)} Cabin
-              </h2>
-              <p class="text-zinc-500 mt-1">
+              </.labeled_value>
+              <.labeled_value
+                id="checkout-summary-dates"
+                label="Dates"
+                class="bg-zinc-50 p-5"
+                value_class="text-base font-semibold text-zinc-900"
+                detail_class="text-xs"
+              >
                 {format_date_short(@booking.checkin_date, @timezone)} — {format_date_short(
                   @booking.checkout_date,
                   @timezone
-                )}, {Calendar.strftime(@booking.checkout_date, "%Y")} ({BookingDisplay.nights_label(
-                  Date.diff(
-                    @booking.checkout_date,
-                    @booking.checkin_date
-                  )
-                )})
-              </p>
-              <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
-                <span class="text-zinc-600">
-                  {BookingDisplay.guests_label(
-                    @booking.guests_count,
-                    @booking.children_count
+                )}, {Calendar.strftime(@booking.checkout_date, "%Y")}
+                <:detail>
+                  {BookingDisplay.nights_label(
+                    Date.diff(@booking.checkout_date, @booking.checkin_date)
                   )}
-                </span>
-                <%= if @booking.booking_mode == :room && Ecto.assoc_loaded?(@booking.rooms) &&
-                      length(@booking.rooms) > 0 do %>
-                  <span class="text-zinc-400">•</span>
-                  <span class="text-zinc-600">
-                    {Enum.map(@booking.rooms, & &1.name) |> Enum.join(", ")}
-                  </span>
-                <% end %>
-              </div>
+                </:detail>
+              </.labeled_value>
+              <.labeled_value
+                id="checkout-summary-guests"
+                label="Guests"
+                class="bg-zinc-50 p-5"
+                value_class="text-base font-semibold text-zinc-900"
+                detail_class="text-xs"
+              >
+                {BookingDisplay.guests_label(
+                  @booking.guests_count,
+                  @booking.children_count
+                )}
+                <:detail :if={
+                  @booking.booking_mode == :room &&
+                    Ecto.assoc_loaded?(@booking.rooms) &&
+                    length(@booking.rooms) > 0
+                }>
+                  {Enum.map(@booking.rooms, & &1.name) |> Enum.join(", ")}
+                </:detail>
+              </.labeled_value>
             </div>
           </div>
           <.booking_guest_info_form
@@ -437,9 +453,9 @@ defmodule YscWeb.BookingCheckoutLive do
           <!-- Payment Section -->
           <div
             :if={@checkout_step == :payment}
-            class="bg-white rounded-lg border border-zinc-200 p-8 shadow-xs"
+            class="bg-white rounded-xl border border-zinc-200 p-6 sm:p-8"
           >
-            <h2 class="text-xl mb-6 type-subhead">
+            <h2 class="text-lg mb-6 type-subhead">
               <%= if @complimentary_checkout do %>
                 Confirm your booking
               <% else %>
@@ -577,14 +593,14 @@ defmodule YscWeb.BookingCheckoutLive do
           </div>
           <!-- Right Column: Countdown Timer and Price Details -->
         </div>
-        <aside class="space-y-6 lg:sticky lg:top-24">
+        <aside class="lg:col-span-4 space-y-4 lg:sticky lg:top-24">
           <!-- Hold Expiry Countdown -->
           <div
             :if={
               @booking.hold_expires_at && (!assigns[:is_expired] || !@is_expired)
             }
             class={[
-              "border rounded-lg p-4",
+              "border rounded-xl p-4",
               if(remaining_minutes(@booking.hold_expires_at) < 5,
                 do: "bg-rose-50 border-rose-200",
                 else: "bg-blue-50 border-blue-200"
@@ -626,7 +642,10 @@ defmodule YscWeb.BookingCheckoutLive do
             </p>
           </div>
           <!-- Price Details -->
-          <div class="bg-zinc-900 text-white rounded-lg p-6 shadow-xl">
+          <div
+            id="checkout-price-details"
+            class="bg-zinc-50/70 border border-zinc-200 rounded-xl p-6"
+          >
             <%!-- Mobile Collapsible Header --%>
             <button
               type="button"
@@ -636,7 +655,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 if assigns[:show_price_details], do: "true", else: "false"
               }
             >
-              <h3 class="text-sm text-zinc-400 type-eyebrow">
+              <h3 class="text-xs text-zinc-500 type-eyebrow">
                 Price Details
               </h3>
               <.icon
@@ -645,11 +664,11 @@ defmodule YscWeb.BookingCheckoutLive do
                     do: "hero-chevron-up",
                     else: "hero-chevron-down"
                 }
-                class="w-5 h-5 text-zinc-400"
+                class="w-5 h-5 text-zinc-500"
               />
             </button>
             <%!-- Desktop Header --%>
-            <h3 class="hidden lg:block text-sm text-zinc-400 mb-4 type-eyebrow">
+            <h3 class="hidden lg:block text-xs text-zinc-500 mb-4 type-eyebrow">
               Price Details
             </h3>
             <div class={[
@@ -659,16 +678,16 @@ defmodule YscWeb.BookingCheckoutLive do
               <%= if @price_breakdown do %>
                 {render_price_breakdown_sidebar(assigns)}
               <% end %>
-              <div class="pt-4 border-t border-zinc-700 flex justify-between items-baseline">
-                <span class="text-lg font-bold">Total</span>
-                <span class="text-3xl text-blue-400 type-title">
+              <div class="pt-4 border-t border-zinc-200 flex justify-between items-baseline">
+                <span class="font-semibold text-zinc-900">Total</span>
+                <span class="text-lg font-bold text-zinc-900 tabular-nums">
                   {MoneyHelper.format_money!(@total_price)}
                 </span>
               </div>
             </div>
           </div>
           <!-- What Happens Next -->
-          <div class="bg-white rounded-lg border border-zinc-200 p-6">
+          <div class="bg-white rounded-xl border border-zinc-200 p-6">
             <h3
               id="checkout-next-steps-heading"
               class="text-lg text-zinc-900 mb-4 type-subhead"
@@ -2580,9 +2599,9 @@ defmodule YscWeb.BookingCheckoutLive do
         <div
           :if={billable_people > guests_count}
           id="checkout-minimum-pricing-applied"
-          class="mb-2 p-2 bg-amber-900/40 border border-amber-700 rounded-sm"
+          class="mb-2 p-2 bg-amber-50 border border-amber-200 rounded-sm"
         >
-          <p class="text-xs text-amber-100 leading-tight">
+          <p class="text-xs text-amber-800 leading-tight">
             {BookingUserMessages.room_minimum_pricing_applied(billable_people)}
           </p>
         </div>
@@ -2601,7 +2620,7 @@ defmodule YscWeb.BookingCheckoutLive do
                    nil
                  end) %>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-            <div id="checkout-base-price-people" class="text-zinc-400">
+            <div id="checkout-base-price-people" class="text-zinc-500">
               {BookingUserMessages.room_base_price_people_label(
                 billable_people,
                 guests_count
@@ -2612,10 +2631,10 @@ defmodule YscWeb.BookingCheckoutLive do
                 {MoneyHelper.format_money!(adult_price_per_night)}/night
               <% end %>
             </div>
-            <div class="text-zinc-400 text-xs">
+            <div class="text-zinc-500 text-xs">
               × {BookingDisplay.nights_label(nights)}
             </div>
-            <div class="text-right font-medium tabular-nums">
+            <div class="text-right font-medium text-zinc-900 tabular-nums">
               <%= if final_base_total do %>
                 {MoneyHelper.format_money!(final_base_total)}
               <% end %>
@@ -2651,7 +2670,7 @@ defmodule YscWeb.BookingCheckoutLive do
                    nil
                  end) %>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm mt-3">
-            <div class="text-zinc-400">
+            <div class="text-zinc-500">
               {BookingDisplay.children_label(children_count)}
             </div>
             <div class="text-right text-zinc-500 text-xs tabular-nums">
@@ -2659,10 +2678,10 @@ defmodule YscWeb.BookingCheckoutLive do
                 {MoneyHelper.format_money!(calculated_children_price_per_night)}/night
               <% end %>
             </div>
-            <div class="text-zinc-400 text-xs">
+            <div class="text-zinc-500 text-xs">
               × {BookingDisplay.nights_label(nights)}
             </div>
-            <div class="text-right font-medium tabular-nums">
+            <div class="text-right font-medium text-zinc-900 tabular-nums">
               <%= if final_children_total do %>
                 {MoneyHelper.format_money!(final_children_total)}
               <% end %>
@@ -2684,16 +2703,16 @@ defmodule YscWeb.BookingCheckoutLive do
           </div>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
             <%= for segment <- segments do %>
-              <div class="text-zinc-400">
+              <div class="text-zinc-500">
                 {BookingDisplay.season_rate_label(segment.season_name)}
               </div>
               <div class="text-right text-zinc-500 text-xs tabular-nums">
                 {MoneyHelper.format_money!(segment.price_per_guest_per_night)}/guest/night
               </div>
-              <div class="text-zinc-400 text-xs">
+              <div class="text-zinc-500 text-xs">
                 × {BookingDisplay.nights_label(segment.nights)}
               </div>
-              <div class="text-right font-medium tabular-nums">
+              <div class="text-right font-medium text-zinc-900 tabular-nums">
                 {MoneyHelper.format_money!(segment.total)}
               </div>
             <% end %>
@@ -2701,16 +2720,16 @@ defmodule YscWeb.BookingCheckoutLive do
         <% else %>
           <%= if guests_count > 0 && price_per_guest_per_night do %>
             <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
-              <div class="text-zinc-400">
+              <div class="text-zinc-500">
                 {BookingDisplay.people_label(guests_count)}
               </div>
               <div class="text-right text-zinc-500 text-xs tabular-nums">
                 {MoneyHelper.format_money!(price_per_guest_per_night)}/night
               </div>
-              <div class="text-zinc-400 text-xs">
+              <div class="text-zinc-500 text-xs">
                 × {BookingDisplay.nights_label(nights)}
               </div>
-              <div class="text-right font-medium tabular-nums">
+              <div class="text-right font-medium text-zinc-900 tabular-nums">
                 <% {:ok, total} =
                   Money.mult(price_per_guest_per_night, guests_count * nights) %>
                 {MoneyHelper.format_money!(total)}
@@ -2719,10 +2738,10 @@ defmodule YscWeb.BookingCheckoutLive do
           <% else %>
             <!-- Fallback if price_per_guest_per_night not available -->
             <div class="flex justify-between text-sm">
-              <span class="text-zinc-400">
+              <span class="text-zinc-500">
                 {BookingDisplay.nights_label(nights)}
               </span>
-              <span class="font-medium">
+              <span class="font-medium text-zinc-900">
                 {MoneyHelper.format_money!(@total_price)}
               </span>
             </div>
@@ -2738,7 +2757,7 @@ defmodule YscWeb.BookingCheckoutLive do
           </div>
           <div class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
             <%= for segment <- buyout_segments do %>
-              <div class="text-zinc-400">
+              <div class="text-zinc-500">
                 {BookingDisplay.season_rate_label(segment.season_name)}
               </div>
               <div class="text-right text-zinc-500 text-xs tabular-nums">
@@ -2746,10 +2765,10 @@ defmodule YscWeb.BookingCheckoutLive do
                   {MoneyHelper.format_money!(segment.price_per_night)}/night
                 <% end %>
               </div>
-              <div class="text-zinc-400 text-xs">
+              <div class="text-zinc-500 text-xs">
                 × {BookingDisplay.nights_label(segment.nights)}
               </div>
-              <div class="text-right font-medium tabular-nums">
+              <div class="text-right font-medium text-zinc-900 tabular-nums">
                 {MoneyHelper.format_money!(segment.total)}
               </div>
             <% end %>
@@ -2757,10 +2776,10 @@ defmodule YscWeb.BookingCheckoutLive do
         <% else %>
           <%= if @price_breakdown[:nights] do %>
             <div class="flex justify-between text-sm">
-              <span class="text-zinc-400">
+              <span class="text-zinc-500">
                 {BookingDisplay.nights_label(@price_breakdown.nights)}
               </span>
-              <span class="font-medium">
+              <span class="font-medium text-zinc-900">
                 {MoneyHelper.format_money!(
                   if(
                     @price_breakdown[:entitlement_discount] &&
@@ -2777,7 +2796,7 @@ defmodule YscWeb.BookingCheckoutLive do
     <% end %>
     <%= if @price_breakdown[:entitlement_discount] &&
           Money.positive?(@price_breakdown[:entitlement_discount]) do %>
-      <div class="flex justify-between text-sm text-emerald-800 mt-3 pt-3 border-t border-zinc-100">
+      <div class="flex justify-between text-sm text-emerald-800 mt-3 pt-3 border-t border-zinc-200">
         <span>
           {@price_breakdown[:entitlement_summary] || "Member discount"}
         </span>
