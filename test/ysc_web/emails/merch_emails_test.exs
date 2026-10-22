@@ -461,6 +461,48 @@ defmodule YscWeb.Emails.MerchEmailsTest do
       assert html =~ "A replacement for order"
     end
 
+    test "a partial parcel lists that quantity and says the rest ships separately",
+         %{order: order} do
+      [item] = order.items
+      assert item.quantity == 2
+
+      data =
+        MerchOrderShipped.prepare_email_data(
+          order,
+          shipment(%{
+            items: [%{"order_item_id" => item.id, "quantity" => 1}]
+          })
+        )
+
+      assert data.part_of_order
+      assert [%{name: "Club Tee", quantity: 1}] = data.items
+
+      html = MerchOrderShipped.render(data)
+      assert html =~ "In this package"
+      assert html =~ "more than one package"
+      assert html =~ "&times; 1"
+      refute html =~ "&times; 2"
+    end
+
+    test "a replacement of a partial parcel does not say the order is split",
+         %{order: order} do
+      [item] = order.items
+
+      html =
+        order
+        |> MerchOrderShipped.prepare_email_data(
+          shipment(%{
+            items: [%{"order_item_id" => item.id, "quantity" => 1}],
+            reshipment: true
+          })
+        )
+        |> MerchOrderShipped.render()
+
+      assert html =~ "A replacement for order"
+      refute html =~ "In this package"
+      refute html =~ "more than one package"
+    end
+
     test "never links to a non-http tracking URL", %{order: order} do
       html =
         order

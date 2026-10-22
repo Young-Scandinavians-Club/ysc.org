@@ -825,8 +825,62 @@ defmodule YscWeb.HomeLiveTest do
 
       assert html =~ "Mar 5, 2027"
       refute html =~ "Mar 4, 2027"
+      assert html =~ "Auto-renews"
+      refute html =~ "Won't auto-renew"
       refute html =~ "Auto-renewal"
       refute html =~ "club properties"
+    end
+  end
+
+  describe "logged-in user with a subscription scheduled to end" do
+    test "the member pass says it will not auto-renew, with the end date in the browser timezone",
+         %{conn: conn} do
+      # #1668 shortened paid-membership copy to "Auto-renews DATE" vs
+      # "Won't auto-renew. Active until DATE". Showing the renewing sentence
+      # after the member turned renewal off is a billing-facing regression.
+      user = user_fixture(%{state: :active})
+      ends_at = ~U[2027-03-05 06:00:00Z]
+
+      {:ok, subscription} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_home_live_cancel_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          cancel_at_period_end: true,
+          ends_at: ends_at,
+          current_period_end: ends_at
+        })
+
+      {:ok, _item} =
+        Ysc.Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_home_live_cancel_#{System.unique_integer()}",
+          stripe_product_id: "prod_home_live_cancel",
+          stripe_price_id: "price_1QfrfDIZd8GkARoBcwlNchx4",
+          quantity: 1
+        })
+
+      conn =
+        conn
+        |> put_connect_params(%{"timezone" => "America/New_York"})
+        |> log_in_user(user)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_async(view, 5_000)
+
+      assert has_element?(
+               view,
+               "#home-membership-renewal-date",
+               "Mar 5, 2027"
+             )
+
+      # Unique to the scheduled-end short note; "Auto-renews DATE" is the
+      # still-renewing sentence on the same date element.
+      assert has_element?(view, "#home-member-pass", "Active until")
+      refute has_element?(view, "#home-member-pass", "Auto-renews")
+      refute render(view) =~ "Mar 4, 2027"
     end
   end
 
