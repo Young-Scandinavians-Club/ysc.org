@@ -1069,7 +1069,8 @@ defmodule YscWeb.BookingReceiptLive do
                     <%= if @refund_info.applied_rule do %>
                       <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
                         Based on cancellation policy: {RefundPolicyDisplay.applied_rule_summary(
-                          @refund_info.applied_rule
+                          @refund_info.applied_rule,
+                          @refund_info.policy_rules || []
                         )}
                       </p>
                     <% else %>

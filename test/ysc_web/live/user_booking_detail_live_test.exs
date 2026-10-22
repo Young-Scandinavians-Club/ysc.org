@@ -963,6 +963,11 @@ defmodule YscWeb.UserBookingDetailLiveTest do
 
       assert html =~ "Cancellation Policy"
       assert html =~ "will not receive a refund"
+
+      assert html =~ "more than 14 days before check-in"
+      assert html =~ "receive a full refund"
+
+      refute html =~ "or more days"
       assert html =~ "Lake Tahoe Cabin Master"
       assert html =~ ~s(href="mailto:#{Ysc.EmailConfig.tahoe_email()}")
       refute html =~ "cabin volunteer contact"
@@ -1012,7 +1017,10 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
 
       assert html =~ "Cancellation Policy"
-      assert html =~ "eligible for a full refund"
+      assert html =~ "receive a full refund"
+      assert html =~ "21 days or fewer before check-in"
+      refute html =~ "or more days"
+      refute html =~ "eligible for a full refund"
     end
 
     test "shows partial refund policy lines when rule has partial refund percentage",
@@ -1061,6 +1069,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
 
       assert html =~ "Cancellation Policy"
       assert html =~ "50% refund"
+      refute html =~ "or more days"
     end
 
     test "shows generic refund copy when no rule matches yet policy lists rules",
