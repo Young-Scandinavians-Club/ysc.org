@@ -1575,6 +1575,12 @@ defmodule YscWeb.CoreComponents do
     default: nil,
     doc: "optional heroicon name shown before content"
 
+  attr :size, :string,
+    default: "default",
+    values: ~w(default compact),
+    doc:
+      "compact tightens padding and text for sidebars and summary cards (ignored by the banner layout)"
+
   attr :class, :any, default: nil
   attr :rest, :global, include: ~w(role aria-label aria-live)
 
@@ -1591,6 +1597,10 @@ defmodule YscWeb.CoreComponents do
       |> assign(:type_classes, Map.fetch!(@callout_type_classes, type))
       |> assign(:icon_classes, Map.fetch!(@callout_icon_classes, type))
       |> assign(:banner?, layout == "banner")
+      |> assign(
+        :compact?,
+        layout != "banner" and to_string(assigns.size) == "compact"
+      )
       |> assign(:has_title?, assigns.title != [])
       |> assign(:has_actions?, assigns.actions != [])
 
@@ -1598,18 +1608,23 @@ defmodule YscWeb.CoreComponents do
     <div
       id={@id}
       class={[
-        "rounded-lg border text-sm",
+        "rounded-lg border",
+        @compact? && "text-xs",
+        !@compact? && "text-sm",
         @type_classes,
         @banner? &&
           "rounded-xl px-5 py-4 flex flex-wrap items-center justify-between gap-3",
-        !@banner? && "p-4",
+        !@banner? && !@compact? && "p-4",
+        @compact? && "p-3",
         @class
       ]}
       {@rest}
     >
       <div class={[
         @banner? && "flex items-start gap-3 min-w-0",
-        @icon && !@banner? && "flex gap-3"
+        @icon && !@banner? && "flex",
+        @icon && !@banner? && !@compact? && "gap-3",
+        @icon && @compact? && "gap-2"
       ]}>
         <.icon
           :if={@icon}
@@ -1618,7 +1633,8 @@ defmodule YscWeb.CoreComponents do
             "shrink-0",
             @icon_classes,
             @banner? && "w-6 h-6 mt-0.5",
-            !@banner? && "h-5 w-5"
+            !@banner? && !@compact? && "h-5 w-5",
+            @compact? && "h-4 w-4 mt-0.5"
           ]}
         />
         <div class={[@banner? && "min-w-0", @icon && !@banner? && "space-y-1"]}>

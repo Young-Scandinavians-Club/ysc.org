@@ -2023,170 +2023,158 @@ defmodule YscWeb.TahoeBookingLive do
                       Pick your dates on the calendar to see your total.
                     </p>
                   </div>
-                  <!-- Dates -->
-                  <div :if={@checkin_date && @checkout_date} class="space-y-3">
-                    <div class="flex justify-between items-start text-sm">
+                  <%!-- Stay details: dates and guests read as one block --%>
+                  <div
+                    :if={
+                      (@checkin_date && @checkout_date) || @guests_count ||
+                        @children_count
+                    }
+                    id="tahoe-summary-stay"
+                    class="space-y-3"
+                  >
+                    <div
+                      :if={@checkin_date && @checkout_date}
+                      class="flex justify-between items-start text-sm"
+                    >
                       <span class="text-zinc-500 font-medium">Check-in</span>
                       <span class="font-semibold text-zinc-900 text-right">
                         {DateDisplay.format_datetime_display(@checkin_date)}
                       </span>
                     </div>
-                    <div class="flex justify-between items-start text-sm">
+                    <div
+                      :if={@checkin_date && @checkout_date}
+                      class="flex justify-between items-start text-sm"
+                    >
                       <span class="text-zinc-500 font-medium">Check-out</span>
                       <span class="font-semibold text-zinc-900 text-right">
                         {DateDisplay.format_datetime_display(@checkout_date)}
                       </span>
                     </div>
-                    <div class="flex justify-between items-start text-sm">
+                    <div
+                      :if={@checkin_date && @checkout_date}
+                      class="flex justify-between items-start text-sm"
+                    >
                       <span class="text-zinc-500 font-medium">Nights</span>
-                      <span class="font-semibold text-zinc-900">
+                      <span class="font-semibold text-zinc-900 text-right">
                         {BookingDisplay.nights_label(
                           Date.diff(@checkout_date, @checkin_date)
                         )}
                       </span>
                     </div>
-                  </div>
-                  <!-- Guests -->
-                  <div
-                    :if={@guests_count || @children_count}
-                    class="flex justify-between text-sm"
-                  >
-                    <span class="text-zinc-500 font-medium">Guests</span>
-                    <span class="font-semibold text-zinc-900">
-                      {BookingDisplay.guests_label(
-                        @guests_count,
-                        @children_count,
-                        separator: " • "
-                      )}
-                    </span>
-                  </div>
-                  <!-- Family Membership Notice in Summary Card -->
-                  <div
-                    :if={
-                      @selected_booking_mode == :room &&
-                        can_select_multiple_rooms?(assigns) &&
-                        length(@selected_room_ids) < max_rooms_for_user(assigns) &&
-                        parse_guests_count(@guests_count) +
-                          parse_children_count(@children_count) > 1
-                    }
-                    class="p-2 bg-blue-50 border border-blue-200 rounded-sm"
-                  >
-                    <div class="flex items-start gap-2">
-                      <.icon
-                        name="hero-light-bulb-solid"
-                        class="w-4 h-4 text-blue-600 shrink-0"
-                      />
-                      <p class="text-xs text-blue-900 leading-tight">
-                        <strong>Family Membership:</strong>
-                        You can book up to {max_rooms_for_user(assigns)} rooms.
-                      </p>
+                    <div
+                      :if={@guests_count || @children_count}
+                      class="flex justify-between items-start text-sm"
+                    >
+                      <span class="text-zinc-500 font-medium">Guests</span>
+                      <span class="font-semibold text-zinc-900 text-right">
+                        {BookingDisplay.guests_label(
+                          @guests_count,
+                          @children_count,
+                          separator: " • "
+                        )}
+                      </span>
                     </div>
                   </div>
-                  <!-- Room requirements checklist -->
+                  <%!-- Selected rooms, capacity and per-room notices --%>
+                  <% summary_rooms = selected_summary_rooms(assigns) %>
                   <div
-                    :if={
-                      @selected_booking_mode == :room &&
-                        length(@selected_room_ids) > 0 &&
-                        @checkin_date &&
-                        @checkout_date
-                    }
-                    class="mt-4"
-                  >
-                    <p class="text-xs text-zinc-500 mb-2 type-eyebrow">
-                      Room requirements
-                    </p>
-                    <div class="space-y-2">
-                      <%= for room_id <- @selected_room_ids do %>
-                        <% room = Enum.find(@available_rooms, &(&1.id == room_id)) %>
-                        <%= if room do %>
-                          <% guests_count = parse_guests_count(@guests_count) %>
-                          <% children_count =
-                            parse_children_count(@children_count) %>
-                          <% total_people = guests_count + children_count %>
-                          <% min_required = room.min_billable_occupancy || 1 %>
-                          <div
-                            :if={total_people < min_required}
-                            id={"tahoe-room-min-charge-notice-#{room.id}"}
-                            class="p-2 bg-amber-50 border border-amber-200 rounded-sm"
-                          >
-                            <div class="flex items-start gap-2">
-                              <.icon
-                                name="hero-information-circle"
-                                class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"
-                              />
-                              <div class="flex-1">
-                                <p class="text-xs font-semibold text-amber-900">
-                                  {YscWeb.BookingUserMessages.room_below_min_charge_title(
-                                    room.name,
-                                    min_required
-                                  )}
-                                </p>
-                                <p class="text-xs text-amber-800 mt-0.5">
-                                  <% season =
-                                    Season.find_season_for_date(
-                                      @seasons,
-                                      @checkin_date
-                                    ) %>
-                                  <% season_id = if season, do: season.id, else: nil %>
-                                  <% fallback_adult_price =
-                                    get_default_adult_price(@property, season_id) %>
-                                  <% room_adult_price =
-                                    room.adult_price_per_night ||
-                                      fallback_adult_price %>
-                                  <% {:ok, nightly_min} =
-                                    Money.mult(room_adult_price, min_required) %>
-                                  {YscWeb.BookingUserMessages.room_below_min_charge_body(
-                                    min_required,
-                                    MoneyHelper.format_money!(nightly_min)
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div
-                            :if={total_people >= min_required}
-                            class="p-2 bg-green-50 border border-green-200 rounded-sm flex items-center gap-2"
-                          >
-                            <.icon
-                              name="hero-check-circle"
-                              class="w-4 h-4 text-green-600 shrink-0"
-                            />
-                            <p class="text-xs text-green-900">
-                              {room.name}: Enough beds for your group
-                            </p>
-                          </div>
-                        <% end %>
-                      <% end %>
-                    </div>
-                  </div>
-
-                  <hr class="border-zinc-100" />
-                  <!-- Selected Rooms or Buyout -->
-                  <div
-                    :if={
-                      @selected_booking_mode == :room &&
-                        length(@selected_room_ids) > 0
-                    }
-                    class="space-y-2"
+                    :if={@selected_booking_mode == :room && summary_rooms != []}
+                    id="tahoe-summary-rooms"
+                    class="space-y-3 border-t border-zinc-100 pt-4"
                   >
                     <p class="text-xs text-zinc-500 type-eyebrow">
-                      Selected Rooms
+                      Selected rooms
                     </p>
-                    <%= for room_id <- @selected_room_ids do %>
-                      <% room = Enum.find(@available_rooms, &(&1.id == room_id)) %>
+                    <div class="space-y-2">
                       <div
-                        :if={room}
-                        class="flex justify-between items-center text-sm"
+                        :for={room <- summary_rooms}
+                        class="flex justify-between items-center gap-3 text-sm"
                       >
-                        <span class="text-zinc-700">{room.name}</span>
+                        <span class="text-zinc-700">
+                          {room.name}
+                          <span class="text-zinc-500">· sleeps {room.capacity_max}</span>
+                        </span>
                         <button
+                          type="button"
                           phx-click="remove-room"
-                          phx-value-room-id={room_id}
-                          class="text-red-600 hover:text-red-800 text-xs underline"
+                          phx-value-room-id={room.id}
+                          class="text-xs text-red-600 hover:text-red-800 underline"
                         >
                           Remove
                         </button>
                       </div>
+                    </div>
+                    <% party_size =
+                      parse_guests_count(@guests_count) +
+                        parse_children_count(@children_count) %>
+                    <% room_capacity =
+                      Enum.sum(Enum.map(summary_rooms, & &1.capacity_max)) %>
+                    <div
+                      id="tahoe-summary-capacity"
+                      class={[
+                        "flex items-center gap-2 text-xs font-medium",
+                        if(room_capacity >= party_size,
+                          do: "text-green-700",
+                          else: "text-red-600"
+                        )
+                      ]}
+                    >
+                      <.icon
+                        name={
+                          if room_capacity >= party_size,
+                            do: "hero-check-circle",
+                            else: "hero-x-circle"
+                        }
+                        class="w-4 h-4 shrink-0"
+                      />
+                      <span :if={room_capacity >= party_size}>
+                        Sleeps {room_capacity}, enough for your group
+                      </span>
+                      <span :if={room_capacity < party_size}>
+                        Sleeps {room_capacity}, your group has {party_size}
+                      </span>
+                    </div>
+                    <p
+                      :if={
+                        room_capacity < party_size &&
+                          can_select_multiple_rooms?(assigns) &&
+                          length(summary_rooms) < max_rooms_for_user(assigns)
+                      }
+                      id="tahoe-summary-room-limit-hint"
+                      class="text-xs text-zinc-500"
+                    >
+                      Your membership allows up to {max_rooms_for_user(assigns)} rooms.
+                    </p>
+                    <%= if @checkin_date && @checkout_date do %>
+                      <%= for room <- summary_rooms,
+                            party_size < (room.min_billable_occupancy || 1) do %>
+                        <% min_required = room.min_billable_occupancy || 1 %>
+                        <% season =
+                          Season.find_season_for_date(@seasons, @checkin_date) %>
+                        <% season_id = if season, do: season.id, else: nil %>
+                        <% room_adult_price =
+                          room.adult_price_per_night ||
+                            get_default_adult_price(@property, season_id) %>
+                        <% {:ok, nightly_min} =
+                          Money.mult(room_adult_price, min_required) %>
+                        <.callout
+                          id={"tahoe-room-min-charge-notice-#{room.id}"}
+                          type="warning"
+                          size="compact"
+                          icon="hero-information-circle"
+                        >
+                          <:title>
+                            {YscWeb.BookingUserMessages.room_below_min_charge_title(
+                              room.name,
+                              min_required
+                            )}
+                          </:title>
+                          {YscWeb.BookingUserMessages.room_below_min_charge_body(
+                            min_required,
+                            MoneyHelper.format_money!(nightly_min)
+                          )}
+                        </.callout>
+                      <% end %>
                     <% end %>
                   </div>
 
@@ -2195,7 +2183,8 @@ defmodule YscWeb.TahoeBookingLive do
                       @selected_booking_mode == :buyout && @checkin_date &&
                         @checkout_date
                     }
-                    class="space-y-2"
+                    id="tahoe-summary-buyout"
+                    class="space-y-2 border-t border-zinc-100 pt-4"
                   >
                     <p class="text-xs text-zinc-500 type-eyebrow">
                       Booking Type
@@ -2205,11 +2194,14 @@ defmodule YscWeb.TahoeBookingLive do
                     </div>
                   </div>
                   <!-- Price Breakdown -->
-                  <div :if={
-                    @calculated_price && @price_breakdown && @checkin_date &&
-                      @checkout_date
-                  }>
-                    <hr class="border-zinc-100" />
+                  <div
+                    :if={
+                      @calculated_price && @price_breakdown && @checkin_date &&
+                        @checkout_date
+                    }
+                    id="tahoe-summary-price"
+                    class="border-t border-zinc-100 pt-4"
+                  >
                     <div class="space-y-2">
                       <!-- Buyout Price -->
                       <div
@@ -2234,25 +2226,20 @@ defmodule YscWeb.TahoeBookingLive do
                         </span>
                       </div>
                       <div :if={@selected_booking_mode == :room}>
-                        <div
+                        <.callout
                           :if={@price_breakdown[:using_minimum_pricing]}
                           id="tahoe-minimum-pricing-applied"
-                          class="mb-2 p-2 bg-amber-50 border border-amber-200 rounded-sm"
+                          type="warning"
+                          size="compact"
+                          icon="hero-information-circle"
+                          class="mb-2"
                         >
-                          <div class="flex items-start gap-2">
-                            <.icon
-                              name="hero-information-circle"
-                              class="w-3 h-3 text-amber-600 shrink-0 mt-0.5"
-                            />
-                            <p class="text-xs text-amber-800 leading-tight">
-                              {YscWeb.BookingUserMessages.room_minimum_pricing_applied(
-                                @price_breakdown[:billable_people] ||
-                                  @price_breakdown[:guests_count] ||
-                                  0
-                              )}
-                            </p>
-                          </div>
-                        </div>
+                          {YscWeb.BookingUserMessages.room_minimum_pricing_applied(
+                            @price_breakdown[:billable_people] ||
+                              @price_breakdown[:guests_count] ||
+                              0
+                          )}
+                        </.callout>
                         <div class="flex justify-between text-sm">
                           <span id="tahoe-base-price-people" class="text-zinc-600">
                             Base Price
@@ -2277,7 +2264,8 @@ defmodule YscWeb.TahoeBookingLive do
                         <div
                           :if={
                             @price_breakdown[:children] &&
-                              @price_breakdown[:children_per_night]
+                              @price_breakdown[:children_per_night] &&
+                              (@price_breakdown[:children_count] || 0) > 0
                           }
                           class="flex justify-between text-sm"
                         >
@@ -2327,57 +2315,32 @@ defmodule YscWeb.TahoeBookingLive do
                       </div>
                     </div>
                   </div>
-                  <!-- Error Messages -->
-                  <div :if={@price_error || @capacity_error} class="space-y-1">
-                    <p :if={@price_error} class="text-red-600 text-xs">
-                      {@price_error}
-                    </p>
-                    <p :if={@capacity_error} class="text-red-600 text-xs">
-                      {@capacity_error}
-                    </p>
-                  </div>
-                  <!-- Missing Info List (Smart Sidebar) -->
-                  <div
-                    :if={
-                      !can_submit_booking?(assigns) &&
-                        (@checkin_date || @checkout_date)
-                    }
-                    class="border-l-2 border-amber-500 pl-3"
+                  <%!-- Problems with the current selection --%>
+                  <.callout
+                    :if={@price_error || @capacity_error}
+                    id="tahoe-summary-errors"
+                    type="error"
+                    size="compact"
+                    icon="hero-exclamation-circle"
+                    role="alert"
                   >
-                    <p class="text-xs font-semibold text-zinc-900 mb-1">
-                      Missing Information:
-                    </p>
-                    <ul class="text-xs text-zinc-600 space-y-1 list-disc list-inside">
-                      <li :if={!@checkin_date || !@checkout_date}>
-                        Please select check-in and check-out dates
-                      </li>
-                      <li :if={
-                        @checkin_date &&
-                          @checkout_date &&
-                          @selected_booking_mode == :room &&
-                          length(selected_room_ids_list(assigns)) == 0
-                      }>
-                        Please select at least one room
-                      </li>
-                      <li :if={
-                        @checkin_date &&
-                          @checkout_date &&
-                          @selected_booking_mode == :buyout &&
-                          @date_validation_errors[:availability]
-                      }>
-                        Booking the entire cabin isn't available for these dates. Try different dates or book individual rooms.
-                      </li>
-                      <li :if={@form_errors && map_size(@form_errors) > 0}>
-                        Complete the required fields above
-                      </li>
-                      <li :if={
-                        @date_validation_errors &&
-                          map_size(@date_validation_errors) > 0
-                      }>
-                        Review the date messages above
-                      </li>
+                    <p :if={@price_error}>{@price_error}</p>
+                    <p :if={@capacity_error}>{@capacity_error}</p>
+                  </.callout>
+                  <%!-- What's still needed before the booking can be reviewed --%>
+                  <% missing_items = missing_info_items(assigns) %>
+                  <.callout
+                    :if={missing_items != []}
+                    id="tahoe-summary-missing"
+                    type="warning"
+                    size="compact"
+                    icon="hero-exclamation-triangle"
+                  >
+                    <:title>Still needed</:title>
+                    <ul class="list-disc ps-4 space-y-1">
+                      <li :for={item <- missing_items}>{item}</li>
                     </ul>
-                  </div>
+                  </.callout>
                   <!-- Agreement Checkbox -->
                   <div
                     :if={can_submit_booking?(assigns)}
@@ -2420,7 +2383,11 @@ defmodule YscWeb.TahoeBookingLive do
                       class="w-full text-lg py-4"
                     >
                       <span class="flex items-center justify-center gap-2">
-                        <.icon name="hero-check-circle-solid" class="w-5 h-5" />{YscWeb.BookingUserMessages.tahoe_review_booking_button()}
+                        <.icon
+                          :if={can_submit_booking?(assigns)}
+                          name="hero-check-circle-solid"
+                          class="w-5 h-5"
+                        />{YscWeb.BookingUserMessages.tahoe_review_booking_button()}
                       </span>
                     </.button>
                     <p
@@ -6200,6 +6167,45 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   # Always returns a list of selected room IDs (for use with length/1, etc.)
+  defp selected_summary_rooms(assigns) do
+    selected = selected_room_ids_list(assigns)
+
+    Enum.flat_map(selected, fn room_id ->
+      case Enum.find(assigns[:available_rooms] || [], &(&1.id == room_id)) do
+        nil -> []
+        room -> [room]
+      end
+    end)
+  end
+
+  # Items for the "Still needed" callout. Capacity/price problems are reported
+  # separately in the error callout, so an empty list means nothing to show.
+  defp missing_info_items(assigns) do
+    checkin = assigns[:checkin_date]
+    checkout = assigns[:checkout_date]
+    mode = assigns[:selected_booking_mode]
+
+    if can_submit_booking?(assigns) || !(checkin || checkout) do
+      []
+    else
+      dates? = checkin && checkout
+      form_errors = assigns[:form_errors] || %{}
+      date_errors = assigns[:date_validation_errors] || %{}
+
+      [
+        {!dates?, "Select check-in and check-out dates"},
+        {dates? && mode == :room && selected_room_ids_list(assigns) == [],
+         "Select at least one room"},
+        {dates? && mode == :buyout && date_errors[:availability],
+         "Booking the entire cabin isn't available for these dates. Try different dates or book individual rooms."},
+        {map_size(form_errors) > 0, "Complete the required fields above"},
+        {map_size(date_errors) > 0, "Review the date messages above"}
+      ]
+      |> Enum.filter(fn {show?, _message} -> show? end)
+      |> Enum.map(fn {_show?, message} -> message end)
+    end
+  end
+
   defp selected_room_ids_list(assigns) do
     case get_selected_rooms_for_submit(assigns) do
       ids when is_list(ids) -> ids

@@ -324,6 +324,61 @@ defmodule YscWeb.TahoeBookingLiveTest do
              )
     end
 
+    test "summary reports room capacity shortfall once, without a contradictory check or empty list",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      deactivate_all_tahoe_rooms!()
+      room = create_tahoe_room!(capacity_max: 1)
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(70, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id,
+          season_id: nil
+        })
+
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "room",
+        "guests_count" => "1"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 2_000)
+      render_click(view, "room-changed", %{"room-id" => room.id})
+
+      assert has_element?(
+               view,
+               "#tahoe-summary-capacity",
+               "enough for your group"
+             )
+
+      refute has_element?(view, "#tahoe-summary-errors")
+
+      render_change(view, "guests-changed", %{"guests_count" => "3"})
+
+      assert has_element?(
+               view,
+               "#tahoe-summary-capacity",
+               "Sleeps 1, your group has 3"
+             )
+
+      assert has_element?(view, "#tahoe-summary-errors", "only sleep 1")
+      refute render(view) =~ "Enough beds for your group"
+
+      # Nothing is listed under "Still needed" unless there is something to list.
+      refute has_element?(view, "#tahoe-summary-missing ul:empty")
+    end
+
     test "uses book, not rent or reserve, for the entire-cabin option", %{
       conn: conn
     } do

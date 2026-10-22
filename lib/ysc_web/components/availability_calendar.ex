@@ -1197,6 +1197,11 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       Date.compare(day, assigns.min) == :lt ->
         {:boundary, "Past date"}
 
+      # A permanent season rule explains more than a timing limit, so the
+      # winter message wins over "too far ahead" / "not open yet".
+      winter_buyout_blocked?(day, assigns) ->
+        :ok
+
       assigns.max && Date.compare(day, assigns.max) == :gt ->
         {:boundary, "Too far ahead to book"}
 
