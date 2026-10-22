@@ -312,8 +312,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       # Initial render should show loading skeleton
       html = render(view)
-      # The skeleton has animate-pulse class
-      assert html =~ "animate-pulse" or html =~ "Payment Summary"
+      assert html =~ "skeleton-shimmer" or html =~ "Payment Summary"
     end
 
     test "loads payment data asynchronously", %{conn: conn} do

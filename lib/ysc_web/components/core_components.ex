@@ -3863,7 +3863,8 @@ defmodule YscWeb.CoreComponents do
 
   @doc """
   Skeleton placeholder mimicking the payment summary receipt card used on
-  order/booking confirmation pages (subtotal/total rows + payment method line).
+  order/booking confirmation and checkout pages (eyebrow heading, a couple of
+  line items, then the ruled total row).
 
   ## Examples
 
@@ -3880,19 +3881,149 @@ defmodule YscWeb.CoreComponents do
       aria-label={@announce? && "Loading payment summary"}
     >
       <span :if={@announce?} class="sr-only">Loading payment summary…</span>
-      <.skeleton_block class="h-3 w-32 rounded-sm mb-6" />
-      <div class="space-y-4">
-        <div class="flex justify-between">
+      <div class="mb-5 flex h-4 items-center">
+        <.skeleton_block class="h-3 w-32 rounded-sm" />
+      </div>
+      <div class="space-y-3">
+        <div :for={_ <- 1..2} class="flex h-5 items-center justify-between">
           <.skeleton_block class="h-4 w-24 rounded-sm" />
-          <.skeleton_block class="h-4 w-16 rounded-sm" />
-        </div>
-        <div class="border-t border-zinc-200 pt-4 flex justify-between">
           <.skeleton_block class="h-4 w-20 rounded-sm" />
-          <.skeleton_block class="h-6 w-24 rounded-sm" />
         </div>
-        <div class="border-t border-zinc-200 pt-4 space-y-2">
+        <div class="flex items-center justify-between border-t border-zinc-200 pt-4">
+          <.skeleton_block class="h-5 w-24 rounded-sm" />
+          <.skeleton_block class="h-6 w-20 rounded-sm" />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Skeleton for the header block shared by the confirmation pages: status
+  eyebrow with its icon, headline, one-line summary, and the reference number
+  on the right. Mirrors the bordered `mb-10 ... pb-8` header of
+  `OrderConfirmationLive` and `BookingReceiptLive`.
+
+  ## Examples
+
+      <.confirmation_header_skeleton />
+  """
+  attr :class, :any, default: nil
+
+  def confirmation_header_skeleton(assigns) do
+    ~H"""
+    <div class={[
+      "mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-8",
+      @class
+    ]}>
+      <div class="min-w-0 max-w-full">
+        <div class="mb-2 flex h-6 items-center gap-2">
+          <.skeleton_block class="h-6 w-6 rounded-full" />
+          <.skeleton_block class="h-3.5 w-32 rounded-sm" />
+        </div>
+        <div class="flex h-9 items-center md:h-10">
+          <.skeleton_block class="h-7 w-80 max-w-full rounded-sm md:h-8" />
+        </div>
+        <div class="mt-2 flex h-7 items-center">
+          <.skeleton_block class="h-5 w-96 max-w-full rounded-sm" />
+        </div>
+      </div>
+      <div class="text-left md:text-right">
+        <div class="flex h-4 items-center md:justify-end">
           <.skeleton_block class="h-3 w-28 rounded-sm" />
-          <.skeleton_block class="h-3 w-40 rounded-sm" />
+        </div>
+        <div class="flex h-7 items-center md:justify-end">
+          <.skeleton_block class="h-5 w-24 rounded-sm" />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Skeleton for the summary card on confirmation and checkout pages: a cover
+  photo above a hairline-divided strip of labelled stats. Mirrors the markup
+  built from `labeled_value/1` (`gap-px bg-zinc-200` strip, `bg-zinc-50 p-5`
+  cells).
+
+  ## Examples
+
+      <.stat_strip_card_skeleton />
+      <.stat_strip_card_skeleton cover_class="h-40" />
+  """
+  attr :class, :any, default: nil
+  attr :cover_class, :any, default: "h-48", doc: "Height of the cover photo"
+  attr :cells, :integer, default: 3
+
+  def stat_strip_card_skeleton(assigns) do
+    ~H"""
+    <div
+      class={[
+        "bg-white rounded-xl border border-zinc-200 overflow-hidden",
+        @class
+      ]}
+      aria-hidden="true"
+    >
+      <.skeleton_block class={["w-full rounded-none", @cover_class]} />
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-200 border-t border-zinc-200">
+        <div :for={_ <- 1..@cells} class="bg-zinc-50 p-5">
+          <div class="mb-1 flex h-4 items-center">
+            <.skeleton_block class="h-3 w-16 rounded-sm" />
+          </div>
+          <div class="flex h-6 items-center">
+            <.skeleton_block class="h-4 w-28 rounded-sm" />
+          </div>
+          <div class="flex h-5 items-center">
+            <.skeleton_block class="h-3 w-20 rounded-sm" />
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Skeleton placeholder mimicking `YscWeb.Components.Events.EventCard`: padded
+  card, 16:9 cover, date and time chips, two-line title, two-line description,
+  and the ruled location / price footer.
+
+  ## Examples
+
+      <.event_card_skeleton :for={_ <- 1..4} />
+  """
+  attr :class, :any, default: nil
+
+  def event_card_skeleton(assigns) do
+    ~H"""
+    <div
+      class={[
+        "flex flex-col rounded-xl border border-zinc-100 bg-white p-2",
+        @class
+      ]}
+      aria-hidden="true"
+    >
+      <.skeleton_block class="aspect-video w-full rounded-lg" />
+      <div class="flex flex-1 flex-col px-4 pb-4 pt-5">
+        <div class="mb-4 flex items-center gap-2">
+          <.skeleton_block class="h-7 w-28 rounded-sm" />
+          <.skeleton_block class="h-4 w-14 rounded-sm" />
+        </div>
+        <div class="mb-3 min-h-16 space-y-2">
+          <.skeleton_block class="h-6 w-5/6 rounded-sm" />
+          <.skeleton_block class="h-6 w-1/2 rounded-sm" />
+        </div>
+        <div class="mb-6 space-y-2.5">
+          <.skeleton_block class="h-4 w-full rounded-sm" />
+          <.skeleton_block class="h-4 w-4/5 rounded-sm" />
+        </div>
+        <div class="mt-auto space-y-3 border-t border-zinc-100 pt-5">
+          <div class="flex h-5 items-center">
+            <.skeleton_block class="h-4 w-40 rounded-sm" />
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <.skeleton_block class="h-9 w-24 rounded-sm" />
+            <.skeleton_block class="h-5 w-5 rounded-sm" />
+          </div>
         </div>
       </div>
     </div>

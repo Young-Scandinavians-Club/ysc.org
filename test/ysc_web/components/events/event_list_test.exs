@@ -31,7 +31,7 @@ defmodule YscWeb.EventsListLiveTest do
           upcoming: true
         })
 
-      assert html =~ "animate-pulse"
+      assert html =~ "skeleton-shimmer"
     end
 
     test "shows empty state when there are no upcoming events" do

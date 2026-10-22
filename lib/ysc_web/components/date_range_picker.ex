@@ -30,7 +30,11 @@ defmodule YscWeb.Components.DateRangePicker do
       <.input field={@start_date_field} type="hidden" />
       <.input :if={@is_range?} field={@end_date_field} type="hidden" />
       <div
-        class="relative w-full lg:w-80"
+        class={[
+          "relative w-full lg:w-80",
+          @disabled && "skeleton-shimmer cursor-wait rounded-md"
+        ]}
+        aria-busy={to_string(@disabled)}
         phx-click="open-calendar"
         phx-target={@myself}
       >
@@ -45,9 +49,18 @@ defmodule YscWeb.Components.DateRangePicker do
           value={date_range_display(@range_start, @range_end, @is_range?)}
         />
         <.icon
+          :if={!@disabled}
           name="hero-calendar"
           class="absolute top-10 right-3 mt-0.5 flex text-zinc-600"
         />
+        <.icon
+          :if={@disabled}
+          name="hero-arrow-path"
+          class="absolute top-10 right-3 mt-0.5 flex text-zinc-500 animate-spin"
+        />
+        <span :if={@disabled} class="sr-only" role="status">
+          Loading availability…
+        </span>
       </div>
 
       <div

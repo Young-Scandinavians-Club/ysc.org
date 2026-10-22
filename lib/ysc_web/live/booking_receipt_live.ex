@@ -184,18 +184,48 @@ defmodule YscWeb.BookingReceiptLive do
       aria-live="polite"
     >
       <span class="sr-only">Loading booking confirmation…</span>
-      <div class="max-w-xl mx-auto lg:mx-0 space-y-6">
-        <.skeleton_block class="h-9 w-56 rounded-sm" />
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
-          <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
-        </div>
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 flex flex-col gap-3">
-          <.skeleton_block class="h-5 w-40 rounded-sm" />
-          <div :for={_ <- 1..3} class="flex justify-between">
-            <.skeleton_block class="h-4 w-28 rounded-sm" />
-            <.skeleton_block class="h-4 w-20 rounded-sm" />
+      <.confirmation_header_skeleton />
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        <div class="lg:col-span-8 flex flex-col gap-10 min-w-0">
+          <.stat_strip_card_skeleton />
+          <section>
+            <div class="mb-4 flex h-7 items-center">
+              <.skeleton_block class="h-5 w-40 rounded-sm" />
+            </div>
+            <div class="divide-y divide-zinc-200 border border-zinc-200 rounded-xl bg-white overflow-hidden">
+              <div :for={_ <- 1..2} class="flex items-center gap-4 px-5 py-4">
+                <.skeleton_block class="h-8 w-8 shrink-0 rounded-full" />
+                <div class="flex flex-1 items-center justify-between gap-3">
+                  <.skeleton_block class="h-4 w-36 rounded-sm" />
+                  <.skeleton_block class="h-6 w-14 rounded-sm" />
+                </div>
+              </div>
+            </div>
+          </section>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              :for={_ <- 1..2}
+              class="p-6 bg-white border border-zinc-200 rounded-lg"
+            >
+              <div class="mb-3 flex h-6 items-center gap-2">
+                <.skeleton_block class="h-5 w-5 rounded-sm" />
+                <.skeleton_block class="h-4 w-28 rounded-sm" />
+              </div>
+              <div class="mb-4 space-y-2">
+                <.skeleton_block class="h-3.5 w-full rounded-sm" />
+                <.skeleton_block class="h-3.5 w-4/5 rounded-sm" />
+              </div>
+              <.skeleton_block class="h-4 w-32 rounded-sm" />
+            </div>
           </div>
         </div>
+        <aside class="lg:col-span-4 space-y-4">
+          <.payment_summary_skeleton announce?={false} />
+          <div class="space-y-3">
+            <.skeleton_block class="h-12 w-full rounded-lg" />
+          </div>
+        </aside>
       </div>
     </div>
     <div

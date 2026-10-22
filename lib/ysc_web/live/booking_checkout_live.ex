@@ -341,17 +341,11 @@ defmodule YscWeb.BookingCheckoutLive do
       >
         <span class="sr-only">Loading checkout details…</span>
         <div class="lg:col-span-8 space-y-6 min-w-0">
-          <div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-            <.skeleton_block class="h-40 w-full rounded-none" />
-            <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-zinc-200">
-              <div :for={_ <- 1..3} class="space-y-2">
-                <.skeleton_block class="h-3 w-16 rounded-sm" />
-                <.skeleton_block class="h-5 w-24 rounded-sm" />
-              </div>
+          <.stat_strip_card_skeleton cover_class="h-40" />
+          <div class="bg-white rounded-xl border border-zinc-200 p-6 sm:p-8">
+            <div class="mb-6 flex h-6 items-center">
+              <.skeleton_block class="h-5 w-40 rounded-sm" />
             </div>
-          </div>
-          <div class="bg-white rounded-xl border border-zinc-200 p-6 space-y-4">
-            <.skeleton_block class="h-6 w-40 rounded-sm" />
             <.payment_element_loading />
           </div>
         </div>

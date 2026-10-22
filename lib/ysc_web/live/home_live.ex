@@ -619,9 +619,7 @@ defmodule YscWeb.HomeLive do
 
     <%!-- Happening Now Bar --%>
     <div
-      :if={
-        @current_user == nil && @async_data_loaded && length(@upcoming_events) > 0
-      }
+      :if={@current_user == nil && length(@upcoming_events) > 0}
       id="happening-soon-bar"
       class="bg-blue-900 text-white py-4 border-b border-blue-800/30 overflow-hidden"
     >
@@ -656,10 +654,7 @@ defmodule YscWeb.HomeLive do
 
     <%!-- Upcoming Events Section --%>
     <section
-      :if={
-        @current_user == nil &&
-          (@async_data_loaded == false || length(@upcoming_events) > 0)
-      }
+      :if={@current_user == nil && length(@upcoming_events) > 0}
       class="py-16 sm:py-20 lg:py-32 bg-zinc-900 relative overflow-hidden"
     >
       <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6 relative z-10">
@@ -684,28 +679,7 @@ defmodule YscWeb.HomeLive do
           </.link>
         </div>
 
-        <%!-- Loading skeleton for guest events --%>
-        <div
-          :if={!@async_data_loaded}
-          class="flex flex-wrap justify-center gap-6 sm:gap-8 lg:gap-10"
-        >
-          <%= for _i <- 1..3 do %>
-            <div class="flex flex-col bg-white/5 rounded-2xl sm:rounded-[2.5rem] border border-white/10 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)] animate-pulse">
-              <div class="aspect-16/11 bg-zinc-700"></div>
-              <div class="p-8 space-y-4">
-                <div class="h-4 bg-zinc-700 rounded-sm w-1/3"></div>
-                <div class="h-8 bg-zinc-700 rounded-sm w-3/4"></div>
-                <div class="h-4 bg-zinc-700 rounded-sm w-full"></div>
-                <div class="h-4 bg-zinc-700 rounded-sm w-2/3"></div>
-              </div>
-            </div>
-          <% end %>
-        </div>
-
-        <div
-          :if={@async_data_loaded}
-          class="flex flex-wrap justify-center gap-6 sm:gap-8 lg:gap-10"
-        >
+        <div class="flex flex-wrap justify-center gap-6 sm:gap-8 lg:gap-10">
           <%= for event <- @upcoming_events do %>
             <div class="group flex flex-col bg-white/5 rounded-2xl sm:rounded-[2.5rem] border border-white/10 hover:border-blue-700/40 transition duration-500 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)]">
               <.link
@@ -786,10 +760,7 @@ defmodule YscWeb.HomeLive do
 
     <%!-- Latest News Section --%>
     <section
-      :if={
-        @current_user == nil &&
-          (@async_data_loaded == false || length(@latest_news) > 0)
-      }
+      :if={@current_user == nil && length(@latest_news) > 0}
       class="py-16 sm:py-24 lg:py-32 bg-zinc-50 overflow-hidden"
     >
       <div class="max-w-(--breakpoint-xl) mx-auto px-4 sm:px-6">
@@ -807,29 +778,7 @@ defmodule YscWeb.HomeLive do
           </p>
         </div>
 
-        <%!-- Loading skeleton for guest news --%>
-        <div
-          :if={!@async_data_loaded}
-          class="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12 lg:gap-16"
-        >
-          <%= for i <- 0..2 do %>
-            <div class={[
-              "animate-pulse",
-              if(rem(i, 2) == 1, do: "md:mt-20", else: "")
-            ]}>
-              <div class="rounded-2xl sm:rounded-[2.5rem] mb-6 sm:mb-8 aspect-square bg-zinc-200">
-              </div>
-              <div class="h-3 bg-zinc-200 rounded-sm w-1/4 mb-4"></div>
-              <div class="h-6 bg-zinc-200 rounded-sm w-3/4 mb-2"></div>
-              <div class="h-4 bg-zinc-200 rounded-sm w-full"></div>
-            </div>
-          <% end %>
-        </div>
-
-        <div
-          :if={@async_data_loaded}
-          class="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12 lg:gap-16"
-        >
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12 lg:gap-16">
           <%= for {post, index} <- Enum.with_index(@latest_news) do %>
             <.link
               navigate={~p"/posts/#{post.url_name}"}
@@ -1165,8 +1114,15 @@ defmodule YscWeb.HomeLive do
               <div
                 :if={!@async_data_loaded}
                 id="home-reservations-loading"
-                class="h-20 bg-white rounded-lg border border-zinc-200 animate-pulse"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4 px-5 bg-white border border-zinc-200 rounded-lg"
+                aria-hidden="true"
               >
+                <.skeleton_block class="h-4 w-56 max-w-full rounded-sm" />
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <.skeleton_block class="h-4 w-24 rounded-sm" />
+                  <.skeleton_block class="h-4 w-24 rounded-sm" />
+                  <.skeleton_block class="h-4 w-24 rounded-sm" />
+                </div>
               </div>
 
               <div
@@ -1329,21 +1285,14 @@ defmodule YscWeb.HomeLive do
                 </.section_link>
               </div>
 
-              <%!-- Loading skeleton: two cards (~one grid row) balances empty vs loaded CLS --%>
+              <%!-- Loading skeleton: the same card the section loads (up to four) --%>
               <div
                 :if={!@async_data_loaded}
-                class="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-88"
+                id="home-upcoming-events-loading"
+                class="grid grid-cols-1 md:grid-cols-2 gap-6"
+                aria-hidden="true"
               >
-                <%= for _i <- 1..2 do %>
-                  <div class="bg-white rounded-xl shadow-xs border border-zinc-200 overflow-hidden animate-pulse">
-                    <div class="h-48 bg-zinc-200"></div>
-                    <div class="p-6 space-y-3">
-                      <div class="h-4 bg-zinc-200 rounded-sm w-1/4"></div>
-                      <div class="h-6 bg-zinc-200 rounded-sm w-3/4"></div>
-                      <div class="h-4 bg-zinc-200 rounded-sm w-1/2"></div>
-                    </div>
-                  </div>
-                <% end %>
+                <.event_card_skeleton :for={_ <- 1..4} />
               </div>
 
               <div
@@ -1534,17 +1483,18 @@ defmodule YscWeb.HomeLive do
               <%!-- Loading skeleton for news --%>
               <div
                 :if={!@async_data_loaded}
+                id="home-latest-updates-loading"
                 class="space-y-5"
+                aria-hidden="true"
               >
-                <%= for _i <- 1..3 do %>
-                  <div class="flex gap-4 animate-pulse">
-                    <div class="w-20 h-14 rounded-md bg-zinc-200 shrink-0"></div>
-                    <div class="flex-1 space-y-2 pt-1">
-                      <div class="h-3 bg-zinc-200 rounded-sm w-1/4"></div>
-                      <div class="h-4 bg-zinc-200 rounded-sm w-3/4"></div>
-                    </div>
+                <div :for={_ <- 1..3} class="flex gap-4">
+                  <.skeleton_block class="w-20 h-14 rounded-md shrink-0" />
+                  <div class="flex-1 space-y-2">
+                    <.skeleton_block class="h-3 w-16 rounded-sm" />
+                    <.skeleton_block class="h-4 w-full rounded-sm" />
+                    <.skeleton_block class="h-4 w-2/3 rounded-sm" />
                   </div>
-                <% end %>
+                </div>
               </div>
 
               <div
@@ -1582,6 +1532,36 @@ defmodule YscWeb.HomeLive do
             </section>
 
             <%!-- Your Family Section (family/lifetime members with linked users) --%>
+            <section
+              :if={
+                family_section_pending?(
+                  @async_data_loaded,
+                  @current_user,
+                  @current_membership,
+                  @active_membership?
+                )
+              }
+              id="home-family-loading"
+              aria-hidden="true"
+            >
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm text-zinc-500 type-eyebrow">
+                  Your Family
+                </h2>
+                <.skeleton_block class="h-4 w-24 rounded-sm" />
+              </div>
+              <div class="flex flex-wrap gap-x-3 gap-y-4">
+                <div
+                  :for={_ <- 1..2}
+                  class="flex flex-col items-center w-16 text-center"
+                >
+                  <.skeleton_block class="w-12 h-12 rounded-full" />
+                  <.skeleton_block class="mt-2 h-3 w-10 rounded-sm" />
+                  <.skeleton_block class="mt-1 h-2.5 w-12 rounded-sm" />
+                </div>
+              </div>
+            </section>
+
             <section
               :if={@async_data_loaded && @other_family_members != []}
               id="home-family"
@@ -1621,15 +1601,19 @@ defmodule YscWeb.HomeLive do
 
               <div
                 :if={!@async_data_loaded}
-                class="space-y-4 animate-pulse"
+                id="home-notifications-loading"
+                class="space-y-4"
+                aria-hidden="true"
               >
-                <div :for={_i <- 1..2} class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-full bg-zinc-200 shrink-0"></div>
+                <div :for={_ <- 1..2} class="flex items-center gap-3">
+                  <.skeleton_block class="w-9 h-9 rounded-full shrink-0" />
                   <div class="space-y-2 flex-1">
-                    <div class="h-3.5 w-28 bg-zinc-200 rounded-sm"></div>
-                    <div class="h-3 w-36 bg-zinc-100 rounded-sm"></div>
+                    <.skeleton_block class="h-3.5 w-28 rounded-sm" />
+                    <.skeleton_block class="h-3 w-full max-w-56 rounded-sm" />
                   </div>
+                  <.skeleton_block class="h-4 w-16 rounded-sm shrink-0" />
                 </div>
+                <.skeleton_block class="h-4 w-44 rounded-sm" />
               </div>
 
               <div :if={@async_data_loaded} class="space-y-4">
@@ -1703,6 +1687,20 @@ defmodule YscWeb.HomeLive do
   end
 
   # Helper functions
+
+  # The family strip only loads for primary family and lifetime members, which is knowable
+  # before the async user load; reserve its slot so the notifications card
+  # below does not jump when the members arrive.
+  defp family_section_pending?(false, user, membership, true) do
+    not Accounts.sub_account?(user) and
+      YscWeb.UserAuth.get_membership_plan_type(membership) in [
+        :family,
+        :lifetime
+      ]
+  end
+
+  defp family_section_pending?(_loaded?, _user, _membership, _active?),
+    do: false
 
   defp get_membership_description(
          nil,

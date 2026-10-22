@@ -168,17 +168,29 @@ defmodule YscWeb.UserBookingDetailLive do
       aria-live="polite"
     >
       <span class="sr-only">Loading booking details…</span>
-      <div class="max-w-xl mx-auto lg:mx-0 space-y-6">
-        <.skeleton_block class="h-9 w-56 rounded-sm" />
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
-          <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
-        </div>
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 flex flex-col gap-3">
-          <.skeleton_block class="h-5 w-40 rounded-sm" />
-          <div :for={_ <- 1..3} class="flex justify-between">
-            <.skeleton_block class="h-4 w-28 rounded-sm" />
-            <.skeleton_block class="h-4 w-20 rounded-sm" />
+      <div class="max-w-xl mx-auto lg:mx-0">
+        <.page_header eyebrow="Your booking" title="Booking Details" class="mb-6" />
+
+        <div class="space-y-6">
+          <div class="bg-white rounded-lg border border-zinc-200 p-6">
+            <div class="mb-4 flex h-7 items-center">
+              <.skeleton_block class="h-5 w-40 rounded-sm" />
+            </div>
+            <div class="space-y-4">
+              <div :for={
+                value_width <-
+                  ~w(w-28 w-24 w-40 w-36 w-36 w-8 w-32 w-24)
+              }>
+                <div class="mb-0.5 flex h-5 items-center">
+                  <.skeleton_block class="h-3.5 w-20 rounded-sm" />
+                </div>
+                <div class="flex h-6 items-center">
+                  <.skeleton_block class={["h-4 rounded-sm", value_width]} />
+                </div>
+              </div>
+            </div>
           </div>
+          <.booking_payment_summary_skeleton announce?={false} />
         </div>
       </div>
     </div>
@@ -378,24 +390,10 @@ defmodule YscWeb.UserBookingDetailLive do
               <% end %>
             </div>
           </div>
-          <div
+          <.booking_payment_summary_skeleton
             :if={@loading_booking_payment_details}
             id="booking-payment-loading"
-            class="bg-white rounded-lg border border-zinc-200 p-6 flex flex-col gap-3"
-            role="status"
-            aria-live="polite"
-          >
-            <span class="sr-only">Loading payment details…</span>
-            <.skeleton_block class="h-5 w-40 rounded-sm" />
-            <div :for={_ <- 1..3} class="flex justify-between">
-              <.skeleton_block class="h-4 w-28 rounded-sm" />
-              <.skeleton_block class="h-4 w-20 rounded-sm" />
-            </div>
-            <div class="border-t border-zinc-200 pt-3 flex justify-between items-center">
-              <.skeleton_block class="h-5 w-24 rounded-sm" />
-              <.skeleton_block class="h-7 w-28 rounded-sm" />
-            </div>
-          </div>
+          />
           <!-- Payment Summary -->
           <%= if @payment do %>
             <div class="bg-white rounded-lg border border-zinc-200 p-6">
@@ -525,6 +523,35 @@ defmodule YscWeb.UserBookingDetailLive do
   end
 
   ## Helper Functions
+
+  attr :id, :string, default: nil
+  attr :announce?, :boolean, default: true
+
+  defp booking_payment_summary_skeleton(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class="bg-white rounded-lg border border-zinc-200 p-6"
+      role={@announce? && "status"}
+      aria-live={@announce? && "polite"}
+    >
+      <span :if={@announce?} class="sr-only">Loading payment details…</span>
+      <div class="mb-4 flex h-7 items-center">
+        <.skeleton_block class="h-5 w-40 rounded-sm" />
+      </div>
+      <div class="space-y-3">
+        <div :for={_ <- 1..3} class="flex h-5 items-center justify-between">
+          <.skeleton_block class="h-4 w-28 rounded-sm" />
+          <.skeleton_block class="h-4 w-20 rounded-sm" />
+        </div>
+        <div class="flex items-center justify-between border-t border-zinc-200 pt-3">
+          <.skeleton_block class="h-5 w-24 rounded-sm" />
+          <.skeleton_block class="h-7 w-28 rounded-sm" />
+        </div>
+      </div>
+    </div>
+    """
+  end
 
   defp assign_booking_detail_loading_shell(socket, booking_id) do
     timezone = YscWeb.TimeZone.from_connect_params(socket)
