@@ -1901,11 +1901,9 @@ defmodule YscWeb.AdminDashboardLive do
     local = DateTime.shift_zone!(dt, "America/Los_Angeles")
     date_part = Timex.format!(local, "{WDshort} {Mshort} {D}")
 
-    if event.start_time do
-      t = Calendar.strftime(event.start_time, "%-I:%M %p")
-      "#{date_part} · #{t}"
-    else
-      date_part
+    case Events.DateTimeFormatter.format_time(event.start_time) do
+      nil -> date_part
+      t -> "#{date_part} · #{t}"
     end
   end
 

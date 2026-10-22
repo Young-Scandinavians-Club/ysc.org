@@ -198,6 +198,7 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       assert html =~ event.title
+      assert html =~ "6:30 PM"
     end
 
     test "renders upcoming event card with cover image when present", %{

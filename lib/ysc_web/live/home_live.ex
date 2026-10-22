@@ -12,7 +12,7 @@ defmodule YscWeb.HomeLive do
     PublicContentCache
   }
 
-  alias Ysc.Events.EventHelpers
+  alias Ysc.Events.{DateTimeFormatter, EventHelpers}
 
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
   alias Ysc.Bookings.Season
@@ -722,7 +722,7 @@ defmodule YscWeb.HomeLive do
                   <span class="w-1.5 h-1.5 bg-white/20 rounded-full"></span>
                   <%= if event.start_time && event.start_time != "" do %>
                     <span class="text-zinc-300 text-sm type-eyebrow">
-                      {format_event_time(event.start_date, event.start_time)}
+                      {DateTimeFormatter.format_time(event.start_time)}
                     </span>
                   <% end %>
                 </div>
@@ -1947,26 +1947,6 @@ defmodule YscWeb.HomeLive do
          )}
     end
   end
-
-  defp format_event_time(_event_start_date, %Time{} = time) do
-    Calendar.strftime(time, "%-I:%M %p")
-  end
-
-  defp format_event_time(event_start_date, start_time)
-       when is_binary(start_time) do
-    try do
-      # Parse database time format (HH:MM:SS)
-      [h, m, _s] = String.split(start_time, ":")
-      hour = String.to_integer(h)
-      minute = String.to_integer(m)
-      time = Time.new!(hour, minute, 0)
-      format_event_time(event_start_date, time)
-    rescue
-      _ -> start_time
-    end
-  end
-
-  defp format_event_time(_, _), do: ""
 
   defp event_notifications_toggle_toast(true),
     do:

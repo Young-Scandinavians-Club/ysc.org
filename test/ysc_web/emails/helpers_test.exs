@@ -258,6 +258,18 @@ defmodule YscWeb.Emails.HelpersTest do
       refute result =~ " at "
     end
 
+    test "formats wall-clock time strings through DateTimeFormatter" do
+      result =
+        Helpers.format_event_start_datetime(
+          ~U[2026-07-15 00:00:00Z],
+          "17:00:00"
+        )
+
+      assert result =~ "July 15, 2026"
+      assert result =~ "5:00 PM"
+      assert result =~ "PDT"
+    end
+
     test "returns default when start_date is nil" do
       assert Helpers.format_event_start_datetime(nil, ~T[17:00:00]) == nil
 
