@@ -376,7 +376,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       refute render(view) =~ "Enough beds for your group"
 
       # Nothing is listed under "Still needed" unless there is something to list.
-      refute has_element?(view, "#tahoe-summary-missing ul:empty")
+      refute has_element?(view, "#tahoe-summary-missing")
     end
 
     test "uses book, not rent or reserve, for the entire-cabin option", %{

@@ -702,7 +702,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
         }
       ]
 
-      render_for_mode = fn mode ->
+      render_for_mode = fn mode, day ->
         html =
           render_component(AvailabilityCalendar,
             id: "calendar",
@@ -714,14 +714,19 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
             seasons: seasons
           )
 
-        extract_day_cell(html, Date.to_iso8601(far_winter_day))
+        extract_day_cell(html, Date.to_iso8601(day))
       end
 
-      buyout_cell = render_for_mode.(:buyout)
+      buyout_cell = render_for_mode.(:buyout, far_winter_day)
       assert buyout_cell =~ "available in winter"
       refute buyout_cell =~ "Too far ahead to book"
 
-      room_cell = render_for_mode.(:room)
+      # A Saturday in the same window keeps the winter reason too.
+      saturday_cell = render_for_mode.(:buyout, ~D[2026-12-12])
+      assert saturday_cell =~ "available in winter"
+      refute saturday_cell =~ "cannot check in on Saturday"
+
+      room_cell = render_for_mode.(:room, far_winter_day)
       assert room_cell =~ "Too far ahead to book"
       refute room_cell =~ "available in winter"
     end

@@ -1294,25 +1294,34 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   end
 
   defp get_other_reason(day, assigns) do
-    selection_rule_reason(day, assigns) ||
-      cond do
-        winter_buyout_blocked?(day, assigns) ->
-          "The entire cabin isn't available in winter. You can still book individual rooms."
+    cond do
+      winter_buyout_blocked?(day, assigns) ->
+        "The entire cabin isn't available in winter. You can still book individual rooms."
 
-        check_other_rules(
-          day,
-          assigns.checkin_date,
-          assigns.state,
-          assigns[:property],
-          assigns[:availability],
-          assigns[:selected_booking_mode],
-          assigns[:seasons]
-        ) ->
-          "This stay length isn't allowed. Try different dates."
+      reason = selection_rule_reason(day, assigns) ->
+        reason
 
-        true ->
-          "Unavailable"
-      end
+      true ->
+        get_stay_rule_reason(day, assigns)
+    end
+  end
+
+  defp get_stay_rule_reason(day, assigns) do
+    cond do
+      check_other_rules(
+        day,
+        assigns.checkin_date,
+        assigns.state,
+        assigns[:property],
+        assigns[:availability],
+        assigns[:selected_booking_mode],
+        assigns[:seasons]
+      ) ->
+        "This stay length isn't allowed. Try different dates."
+
+      true ->
+        "Unavailable"
+    end
   end
 
   defp winter_buyout_blocked?(day, assigns) do
