@@ -373,13 +373,17 @@ defmodule Ysc.MixProject do
       # have named Ysc.Repo + ecto_psql_extras; pin the patched floor.
       {:phoenix_live_dashboard, "~> 0.9.1"},
       {:phoenix_live_reload, "~> 1.7", only: :dev},
+      # 1.2.13: upload file-reader/chunk-timeout/errored-entry handling;
+      # wait for ancestor locks before auto_upload; hooked <svg> inner
+      # updates; live-link target/download on child clicks; form recovery
+      # completion order; reload-cookie clear; focus retry only if focus
+      # did not move. Socket opts (e.g. max_channels_per_transport) now
+      # forward to Phoenix.Socket. We auto_upload receipts/avatars/media
+      # and nest children in <.link>; we do not set formtarget,
+      # ColocatedCSS, onDocumentPatch, or max_channels_per_transport.
       # 1.2.12: hook disconnected() runs once; JS.push no longer mutates
-      # opts; assign_async validates keys with Enum.any?/2 (falsy keys);
-      # caret restore covers search/url/tel/password; LiveViewTest keyed
-      # move+change patches; portal namespace + clone-on-teleport; nested
-      # LiveView lock handling. 1.2.11: stale diffs on rejoin; cancel
-      # LiveComponent asyncs on removal; HTMLFormatter early-close gate.
-      {:phoenix_live_view, "~> 1.2.12"},
+      # opts; assign_async falsy keys; caret restore for search/url/tel.
+      {:phoenix_live_view, "~> 1.2.13"},
       {:phoenix_test, "~> 0.12", only: :test, runtime: false},
       # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
       # SVG and MathML on to_html/2 so a parse/serialize round-trip cannot
