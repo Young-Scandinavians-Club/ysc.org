@@ -224,6 +224,9 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
     test "invalidates all user sessions after password change", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
+      token = get_session(conn, :user_token)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/security")
 
@@ -245,6 +248,11 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         Accounts.UserToken.by_user_and_contexts_query(user, :all) |> Repo.all()
 
       assert tokens_after == []
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
     end
   end
 

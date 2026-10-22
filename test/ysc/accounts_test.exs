@@ -2159,6 +2159,56 @@ defmodule Ysc.AccountsTest do
 
       refute Repo.get_by(UserToken, user_id: user.id)
     end
+
+    test "disconnects LiveViews for the given user", %{user: user} do
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      {:ok, _} =
+        Accounts.update_user_password(user, valid_user_password(), %{
+          password: "new valid password"
+        })
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+    end
+  end
+
+  describe "replace_user_password/2" do
+    setup do
+      %{user: user_fixture(%{phone_number: "+14159098268"})}
+    end
+
+    test "updates the password without the current password", %{user: user} do
+      {:ok, updated} =
+        Accounts.replace_user_password(user, %{password: "new valid password"})
+
+      assert is_nil(updated.password)
+
+      assert Accounts.get_user_by_email_and_password(
+               user.email,
+               "new valid password"
+             )
+    end
+
+    test "deletes all tokens and disconnects LiveViews", %{user: user} do
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      {:ok, _} =
+        Accounts.replace_user_password(user, %{password: "new valid password"})
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      refute Repo.get_by(UserToken, user_id: user.id)
+    end
   end
 
   describe "generate_user_session_token/1" do
@@ -2478,6 +2528,20 @@ defmodule Ysc.AccountsTest do
         Accounts.reset_user_password(user, %{password: "new valid password"})
 
       refute Repo.get_by(UserToken, user_id: user.id)
+    end
+
+    test "disconnects LiveViews for the given user", %{user: user} do
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      {:ok, _} =
+        Accounts.reset_user_password(user, %{password: "new valid password"})
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
     end
 
     test "sets password_set_at on the user", %{user: user} do
