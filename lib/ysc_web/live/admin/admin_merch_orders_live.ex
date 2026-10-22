@@ -3,6 +3,11 @@ defmodule YscWeb.AdminMerchOrdersLive do
   Merch orders for admins: every member purchase and club-paid order, a
   "needs attention" view of the ones Printful could not take, and a detail
   page where a failed order can be sent again.
+
+  The first HTML is a skeleton. List, detail, and attention-count queries run
+  after the WebSocket connects so the HTTP response is never blocked on those
+  loads, and they run once instead of on both the disconnected and connected
+  mounts.
   """
   use YscWeb, :admin_live_view
 
@@ -36,23 +41,27 @@ defmodule YscWeb.AdminMerchOrdersLive do
      |> assign(:meta, nil)
      |> assign(:orders, [])
      |> assign(:retrying?, false)
-     |> assign_attention_count()}
+     |> assign(:attention_count, 0)}
   end
 
   @impl true
   def handle_params(%{"id" => id}, _uri, socket) do
-    case load_order(id) do
-      nil ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:error, "We couldn't find that order.")
-         |> push_navigate(to: ~p"/admin/merch/orders")}
+    if connected?(socket) do
+      case load_order(id) do
+        nil ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:error, "We couldn't find that order.")
+           |> push_navigate(to: ~p"/admin/merch/orders")}
 
-      order ->
-        {:noreply,
-         socket
-         |> assign(:page_title, "Order #{order.reference_id}")
-         |> assign(:order, order)}
+        order ->
+          {:noreply,
+           socket
+           |> assign(:page_title, "Order #{order.reference_id}")
+           |> assign(:order, order)}
+      end
+    else
+      {:noreply, socket}
     end
   end
 
@@ -60,21 +69,20 @@ defmodule YscWeb.AdminMerchOrdersLive do
     filter = parse_filter(params["filter"])
     search = params |> Map.get("q", "") |> to_string() |> String.trim()
 
-    {orders, meta} =
-      case AdminOrders.paginate_orders(filter, search, params) do
-        {:ok, {orders, meta}} -> {orders, meta}
-        {:error, meta} -> {[], meta}
-      end
+    socket =
+      socket
+      |> assign(:page_title, "Merch orders")
+      |> assign(:order, nil)
+      |> assign(:filter, filter)
+      |> assign(:search, search)
+      |> assign(:list_params, list_params(filter, search))
 
     {:noreply,
-     socket
-     |> assign(:page_title, "Merch orders")
-     |> assign(:order, nil)
-     |> assign(:filter, filter)
-     |> assign(:search, search)
-     |> assign(:list_params, list_params(filter, search))
-     |> assign(:orders, orders)
-     |> assign(:meta, meta)}
+     if connected?(socket) do
+       load_orders(socket, filter, search, params)
+     else
+       socket
+     end}
   end
 
   @impl true
@@ -119,6 +127,19 @@ defmodule YscWeb.AdminMerchOrdersLive do
          )
          |> assign(:order, load_order(order.id))}
     end
+  end
+
+  defp load_orders(socket, filter, search, params) do
+    {orders, meta} =
+      case AdminOrders.paginate_orders(filter, search, params) do
+        {:ok, {orders, meta}} -> {orders, meta}
+        {:error, meta} -> {[], meta}
+      end
+
+    socket
+    |> assign(:orders, orders)
+    |> assign(:meta, meta)
+    |> assign_attention_count()
   end
 
   defp load_order(id) do
@@ -182,6 +203,28 @@ defmodule YscWeb.AdminMerchOrdersLive do
   end
 
   @impl true
+  def render(%{live_action: :show, order: nil} = assigns) do
+    ~H"""
+    <.side_menu
+      active_page={@active_page}
+      user={@current_user}
+      role={@admin_role}
+    >
+      <.admin_page_header subtitle="Loading this order.">
+        Merch
+      </.admin_page_header>
+
+      <div class="w-full pt-4">
+        <.admin_table_skeleton
+          id="admin-merch-order-loading"
+          rows={6}
+          columns={2}
+        />
+      </div>
+    </.side_menu>
+    """
+  end
+
   def render(%{order: nil} = assigns) do
     ~H"""
     <.side_menu
@@ -232,24 +275,32 @@ defmodule YscWeb.AdminMerchOrdersLive do
           </.link>
         </div>
 
-        <p :if={@meta} id="orders-count" class="pb-4 text-sm text-zinc-500">
-          {orders_count_text(@meta.total_count, @search)}
-        </p>
-
-        <.merch_orders_table
-          id="admin_merch_orders_list"
-          orders={@orders}
-          row_navigate={&JS.navigate(~p"/admin/merch/orders/#{&1.id}")}
-          empty_title={empty_title(@filter, @search)}
-          empty_suggestion={empty_suggestion(@filter, @search)}
+        <.admin_table_skeleton
+          :if={is_nil(@meta)}
+          id="admin-merch-orders-loading"
+          rows={8}
+          columns={5}
         />
 
-        <.admin_flop_pagination
-          :if={@meta}
-          meta={@meta}
-          path={~p"/admin/merch/orders?#{@list_params}"}
-          density={:comfortable}
-        />
+        <div :if={@meta}>
+          <p id="orders-count" class="pb-4 text-sm text-zinc-500">
+            {orders_count_text(@meta.total_count, @search)}
+          </p>
+
+          <.merch_orders_table
+            id="admin_merch_orders_list"
+            orders={@orders}
+            row_navigate={&JS.navigate(~p"/admin/merch/orders/#{&1.id}")}
+            empty_title={empty_title(@filter, @search)}
+            empty_suggestion={empty_suggestion(@filter, @search)}
+          />
+
+          <.admin_flop_pagination
+            meta={@meta}
+            path={~p"/admin/merch/orders?#{@list_params}"}
+            density={:comfortable}
+          />
+        </div>
       </div>
     </.side_menu>
     """

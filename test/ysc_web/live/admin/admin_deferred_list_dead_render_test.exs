@@ -7,6 +7,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
   import Ysc.EventsFixtures
+  import Ysc.MerchFixtures
   import Ysc.ScanningFixtures
 
   alias Ysc.Ledgers
@@ -310,6 +311,106 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     refute html =~ ~s(id="booking-modal")
   end
 
+  test "dead render skips merch catalog query and shows loading state", %{
+    conn: conn
+  } do
+    product_fixture(%{name: "Static Render Merch"})
+
+    merch_pattern = ~r/FROM "(merch_products|merch_orders)"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/merch")
+          |> html_response(200)
+        end,
+        pattern: merch_pattern,
+        caller_pids: [self()]
+      )
+
+    assert query_count == 0
+    assert html =~ ~s|id="admin-merch-loading"|
+    refute html =~ "Static Render Merch"
+    refute html =~ ~s|id="merch-empty"|
+  end
+
+  test "dead render skips merch orders list query and shows loading state", %{
+    conn: conn,
+    admin: admin
+  } do
+    admin_order_fixture(admin, %{recipient_name: "Static Render Recipient"})
+
+    orders_pattern = ~r/FROM "merch_orders"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/merch/orders")
+          |> html_response(200)
+        end,
+        pattern: orders_pattern,
+        caller_pids: [self()]
+      )
+
+    assert query_count == 0
+    assert html =~ ~s|id="admin-merch-orders-loading"|
+    refute html =~ "Static Render Recipient"
+    refute html =~ ~s|id="admin_merch_orders_list"|
+  end
+
+  test "dead render skips merch order detail query and shows loading state", %{
+    conn: conn,
+    admin: admin
+  } do
+    order = admin_order_fixture(admin)
+
+    orders_pattern = ~r/FROM "merch_orders"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/merch/orders/#{order.id}")
+          |> html_response(200)
+        end,
+        pattern: orders_pattern,
+        caller_pids: [self()]
+      )
+
+    assert query_count == 0
+    assert html =~ ~s|id="admin-merch-order-loading"|
+    refute html =~ order.reference_id
+    refute html =~ ~s|id="order-detail"|
+  end
+
+  test "dead render skips club-paid order form queries and shows loading state",
+       %{
+         conn: conn
+       } do
+    variant_fixture(nil, %{name: "Static Render Tee"})
+    event_fixture(%{title: "Static Render Merch Event"})
+
+    products_pattern = ~r/FROM "merch_products"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/merch/orders/new")
+          |> html_response(200)
+        end,
+        pattern: products_pattern,
+        caller_pids: [self()]
+      )
+
+    assert query_count == 0
+    assert html =~ ~s|id="admin-merch-order-new-loading"|
+    refute html =~ "Static Render Tee"
+    refute html =~ ~s|id="merch-order-form"|
+  end
+
   describe "connected list loading" do
     test "newsletter editor replaces loading placeholder after connect", %{
       conn: conn,
@@ -388,6 +489,61 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       refute html =~ ~s|id="admin-user-review-modal-loading"|
       assert html =~ "Review Application"
       assert html =~ "Review Connect"
+    end
+
+    test "merch catalog replaces loading placeholder after connect", %{
+      conn: conn
+    } do
+      product_fixture(%{name: "Deferred Load Merch"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/merch")
+      html = render(view)
+
+      refute html =~ ~s|id="admin-merch-loading"|
+      assert html =~ "Deferred Load Merch"
+      assert has_element?(view, "#admin_merch_products_list")
+    end
+
+    test "merch orders list replaces loading placeholder after connect", %{
+      conn: conn,
+      admin: admin
+    } do
+      order =
+        admin_order_fixture(admin, %{recipient_name: "Deferred Load Recipient"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/merch/orders")
+      html = render(view)
+
+      refute html =~ ~s|id="admin-merch-orders-loading"|
+      assert html =~ "Deferred Load Recipient"
+      assert has_element?(view, "#admin_merch_orders_list-row-#{order.id}")
+    end
+
+    test "merch order detail replaces loading placeholder after connect", %{
+      conn: conn,
+      admin: admin
+    } do
+      order = admin_order_fixture(admin)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/merch/orders/#{order.id}")
+      html = render(view)
+
+      refute html =~ ~s|id="admin-merch-order-loading"|
+      assert html =~ order.reference_id
+      assert has_element?(view, "#order-detail")
+    end
+
+    test "club-paid order form replaces loading placeholder after connect", %{
+      conn: conn
+    } do
+      variant_fixture(nil, %{name: "Deferred Load Tee"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/merch/orders/new")
+      html = render(view)
+
+      refute html =~ ~s|id="admin-merch-order-new-loading"|
+      assert html =~ "Deferred Load Tee"
+      assert has_element?(view, "#merch-order-form")
     end
   end
 end

@@ -5,6 +5,10 @@ defmodule YscWeb.AdminMerchLive do
   Products are designed and priced in Printful; this page syncs them into the
   shop, and lets full admins hide a product, reorder it, and write the
   description members see.
+
+  The first HTML is a skeleton. Catalog and attention-count queries run after
+  the WebSocket connects so the HTTP response is never blocked on those loads,
+  and they run once instead of on both the disconnected and connected mounts.
   """
   use YscWeb, :admin_live_view
 
@@ -27,26 +31,38 @@ defmodule YscWeb.AdminMerchLive do
      |> assign(:demo_mode?, Ysc.Printful.demo_mode?())
      |> assign(:editing_product, nil)
      |> assign(:form, nil)
-     |> assign(:attention_count, AdminOrders.needs_attention_count())
-     |> load_products()}
+     |> assign(:attention_count, 0)
+     |> assign(:products, [])
+     |> assign(:last_synced_at, nil)
+     |> assign(:catalog_loaded, false)}
   end
 
   @impl true
   def handle_params(%{"id" => id}, _uri, socket) do
-    case Merch.get_admin_product(id) do
-      nil ->
-        {:noreply, push_patch(socket, to: ~p"/admin/merch")}
+    socket = maybe_load_catalog(socket)
 
-      product ->
-        {:noreply,
-         socket
-         |> assign(:editing_product, product)
-         |> assign(:form, to_form(Merch.change_product(product)))}
+    if connected?(socket) do
+      case Merch.get_admin_product(id) do
+        nil ->
+          {:noreply, push_navigate(socket, to: ~p"/admin/merch")}
+
+        product ->
+          {:noreply,
+           socket
+           |> assign(:editing_product, product)
+           |> assign(:form, to_form(Merch.change_product(product)))}
+      end
+    else
+      {:noreply, socket}
     end
   end
 
   def handle_params(_params, _uri, socket) do
-    {:noreply, socket |> assign(:editing_product, nil) |> assign(:form, nil)}
+    {:noreply,
+     socket
+     |> maybe_load_catalog()
+     |> assign(:editing_product, nil)
+     |> assign(:form, nil)}
   end
 
   @impl true
@@ -363,12 +379,22 @@ defmodule YscWeb.AdminMerchLive do
      |> YscWeb.Flash.put_toast(:error, "Sync failed unexpectedly. Try again.")}
   end
 
+  defp maybe_load_catalog(socket) do
+    if connected?(socket) and not socket.assigns.catalog_loaded do
+      load_products(socket)
+    else
+      socket
+    end
+  end
+
   defp load_products(socket) do
     products = Merch.list_admin_products()
 
     socket
     |> assign(:products, products)
     |> assign(:last_synced_at, last_synced_at(products))
+    |> assign(:attention_count, AdminOrders.needs_attention_count())
+    |> assign(:catalog_loaded, true)
   end
 
   defp last_synced_at([]), do: nil
@@ -497,7 +523,18 @@ defmodule YscWeb.AdminMerchLive do
 
         <.merch_tabs active={:products} attention_count={@attention_count} />
 
-        <p id="merch-last-synced" class="py-4 text-sm text-zinc-500">
+        <.admin_table_skeleton
+          :if={!@catalog_loaded}
+          id="admin-merch-loading"
+          rows={8}
+          columns={6}
+        />
+
+        <p
+          :if={@catalog_loaded}
+          id="merch-last-synced"
+          class="py-4 text-sm text-zinc-500"
+        >
           <%= if @last_synced_at do %>
             Last synced {Calendar.strftime(@last_synced_at, "%b %-d, %Y %H:%M UTC")}
           <% else %>
@@ -506,13 +543,13 @@ defmodule YscWeb.AdminMerchLive do
         </p>
 
         <.admin_list_empty_state
-          :if={@products == []}
+          :if={@catalog_loaded && @products == []}
           id="merch-empty"
           title="No products yet"
           suggestion="Create products in Printful, then press Sync from Printful."
         />
 
-        <div :if={@products != []}>
+        <div :if={@catalog_loaded && @products != []}>
           <%!-- Mobile card view --%>
           <.admin_mobile_list id="admin-merch-mobile">
             <.admin_mobile_list_card
