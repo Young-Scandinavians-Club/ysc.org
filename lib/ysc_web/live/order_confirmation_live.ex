@@ -114,43 +114,36 @@ defmodule YscWeb.OrderConfirmationLive do
       aria-live="polite"
     >
       <span class="sr-only">Loading order confirmation…</span>
-      <!-- Header skeleton -->
-      <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-8">
-        <div class="space-y-3">
-          <.skeleton_block class="h-3 w-32 rounded-sm" />
-          <.skeleton_block class="h-9 w-80 rounded-sm" />
-          <.skeleton_block class="h-4 w-64 rounded-sm" />
-        </div>
-        <div class="space-y-2 md:text-right">
-          <.skeleton_block class="h-3 w-28 rounded-sm md:ml-auto" />
-          <.skeleton_block class="h-5 w-24 rounded-sm md:ml-auto" />
-        </div>
-      </div>
+      <.confirmation_header_skeleton />
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-        <!-- Left Column skeleton -->
         <div class="lg:col-span-8 space-y-10 min-w-0">
-          <div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-            <.skeleton_block class="h-48 w-full rounded-none" />
-            <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-zinc-200">
-              <div :for={_ <- 1..3} class="space-y-2">
-                <.skeleton_block class="h-3 w-16 rounded-sm" />
-                <.skeleton_block class="h-5 w-24 rounded-sm" />
+          <.stat_strip_card_skeleton />
+          <section>
+            <div class="mb-4 flex h-7 items-center justify-between">
+              <.skeleton_block class="h-5 w-32 rounded-sm" />
+              <.skeleton_block class="h-4 w-36 rounded-sm" />
+            </div>
+            <div class="divide-y divide-zinc-200 border border-zinc-200 rounded-xl bg-white overflow-hidden">
+              <div
+                :for={_ <- 1..2}
+                class="flex items-center justify-between gap-4 px-5 py-4"
+              >
+                <div class="space-y-2">
+                  <.skeleton_block class="h-4 w-32 rounded-sm" />
+                  <.skeleton_block class="h-3 w-44 rounded-sm" />
+                </div>
+                <.skeleton_block class="h-5 w-14 rounded-sm" />
               </div>
             </div>
-          </div>
-          <div class="divide-y divide-zinc-200 border border-zinc-200 rounded-xl bg-white overflow-hidden">
-            <div :for={_ <- 1..2} class="px-5 py-4 space-y-2">
-              <.skeleton_block class="h-4 w-32 rounded-sm" />
-              <.skeleton_block class="h-3 w-48 rounded-sm" />
-            </div>
-          </div>
+          </section>
         </div>
-        <!-- Right Column skeleton -->
         <aside class="lg:col-span-4 space-y-4">
           <.payment_summary_skeleton announce?={false} />
-          <.skeleton_block class="h-12 w-full rounded-lg" />
-          <.skeleton_block class="h-12 w-full rounded-lg" />
+          <div class="space-y-3">
+            <.skeleton_block class="h-12 w-full rounded-lg" />
+            <.skeleton_block class="h-12 w-full rounded-lg" />
+          </div>
         </aside>
       </div>
     </div>

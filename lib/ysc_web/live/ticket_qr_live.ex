@@ -108,21 +108,28 @@ defmodule YscWeb.TicketQrLive do
       <div class="flex-1 flex flex-col justify-center py-8 min-h-144">
         <%= cond do %>
           <% @loading -> %>
-            <%!-- Loading skeleton --%>
-            <div class="px-6 flex flex-col items-center gap-6">
-              <div class="w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl shadow-black/60">
-                <div class="h-20 bg-emerald-700/50 animate-pulse rounded-t-3xl">
-                </div>
-                <div class="bg-white/10 px-6 pt-6 pb-4 flex flex-col items-center gap-4">
-                  <div class="w-[230px] h-[230px] bg-white/5 rounded-xl animate-pulse">
+            <%!-- Loading skeleton: same width and section heights as the loaded ticket --%>
+            <div
+              id="ticket-qr-loading"
+              class="flex flex-col items-center gap-6"
+              role="status"
+              aria-live="polite"
+            >
+              <div class="w-full max-w-xl px-6">
+                <div class="shadow-2xl shadow-black/60">
+                  <div class="h-19 bg-emerald-700/50 animate-pulse rounded-t-3xl">
                   </div>
-                  <div class="h-3 w-28 bg-white/10 rounded-sm animate-pulse"></div>
-                  <%!-- Reserved wallet action row (matches loaded ticket) --%>
-                  <div class="h-12 w-40 bg-white/5 rounded-lg animate-pulse mt-2">
+                  <div class="bg-white/10 px-6 pt-6 pb-4 flex flex-col items-center">
+                    <div class="w-[230px] h-[230px] bg-white/5 rounded-xl animate-pulse">
+                    </div>
+                    <div class="h-3 w-28 bg-white/10 rounded-sm animate-pulse mt-5">
+                    </div>
+                    <%!-- Reserved wallet action row (matches loaded ticket) --%>
+                    <div class="min-h-14 mt-4"></div>
                   </div>
+                  <div class="h-8 bg-white/10 animate-pulse"></div>
+                  <div class="h-18 bg-white/10 animate-pulse rounded-b-3xl"></div>
                 </div>
-                <div class="h-8 bg-white/10 animate-pulse"></div>
-                <div class="h-20 bg-white/10 animate-pulse rounded-b-3xl"></div>
               </div>
               <p class="text-sm text-zinc-400 animate-pulse">
                 Loading your tickets…

@@ -1171,10 +1171,16 @@ defmodule YscWeb.HomeLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/")
 
-      assert html =~ "animate-pulse"
+      assert html =~ "home-reservations-loading"
+      assert html =~ "home-upcoming-events-loading"
+      assert html =~ "home-notifications-loading"
 
       render_async(view, 5_000)
-      assert render(view) =~ "Member Dashboard"
+      html = render(view)
+      assert html =~ "Member Dashboard"
+      refute html =~ "home-reservations-loading"
+      refute html =~ "home-upcoming-events-loading"
+      refute html =~ "home-notifications-loading"
     end
 
     test "show_membership_qr is a no-op when user has no active membership", %{
