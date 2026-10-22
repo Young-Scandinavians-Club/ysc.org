@@ -1688,12 +1688,15 @@ defmodule YscWeb.HomeLive do
 
   # Helper functions
 
-  # The family strip only loads for primary family members, which is knowable
+  # The family strip only loads for primary family and lifetime members, which is knowable
   # before the async user load; reserve its slot so the notifications card
   # below does not jump when the members arrive.
   defp family_section_pending?(false, user, membership, true) do
     not Accounts.sub_account?(user) and
-      YscWeb.UserAuth.get_membership_plan_type(membership) == :family
+      YscWeb.UserAuth.get_membership_plan_type(membership) in [
+        :family,
+        :lifetime
+      ]
   end
 
   defp family_section_pending?(_loaded?, _user, _membership, _active?),
