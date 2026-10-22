@@ -113,7 +113,14 @@ defmodule YscWeb.PaymentSuccessLive do
     ~H"""
     <div class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4">
       <div class="text-center">
-        <p class="text-zinc-600">Processing your payment...</p>
+        <.async_section_loader
+          id="payment-processing"
+          label="Processing your payment…"
+          class="py-12"
+        />
+        <p class="text-sm text-zinc-500">
+          This only takes a moment. Please keep this page open.
+        </p>
       </div>
     </div>
     """
