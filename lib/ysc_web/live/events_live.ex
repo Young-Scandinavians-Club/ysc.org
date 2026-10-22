@@ -66,7 +66,7 @@ defmodule YscWeb.EventsLive do
               <p class="text-base text-zinc-600 leading-relaxed mb-4">
                 Read club news, or join the groups where members post informal get-togethers.
               </p>
-              <div class="space-y-3">
+              <div class="flex flex-col items-start">
                 <.link
                   navigate={~p"/news"}
                   class="inline-flex items-center min-h-11 -my-3 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
@@ -79,18 +79,18 @@ defmodule YscWeb.EventsLive do
                     @site_setting_socials_partiful ||
                       (@current_user && @site_setting_socials_whatsapp)
                   }
-                  class="border-t border-zinc-100 pt-3"
+                  class="self-stretch mt-4 border-t border-zinc-100 pt-4"
                 >
-                  <p class="text-sm text-zinc-500 mb-2 type-eyebrow">
+                  <p class="text-sm text-zinc-500 mb-3 type-eyebrow">
                     Events & Community
                   </p>
-                  <div class="flex flex-col gap-2">
+                  <div class="flex flex-col items-start gap-3">
                     <a
                       :if={@site_setting_socials_partiful}
                       href={@site_setting_socials_partiful}
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="inline-flex items-center min-h-11 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                      class="inline-flex items-center min-h-11 -my-3 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -120,7 +120,7 @@ defmodule YscWeb.EventsLive do
                       href={@site_setting_socials_whatsapp}
                       target="_blank"
                       rel="noopener noreferrer"
-                      class="inline-flex items-center min-h-11 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                      class="inline-flex items-center min-h-11 -my-3 text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                     >
                       <.icon name="hero-device-phone-mobile" class="w-4 h-4 mr-2" />
                       Member WhatsApp group
