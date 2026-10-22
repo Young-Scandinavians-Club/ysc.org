@@ -12,8 +12,10 @@ defmodule Ysc.PublicContentCache do
   @cache_name :ysc_cache
   @posts_version_key "public_content:version:posts"
   @events_version_key "public_content:version:events"
+  @post_pages_version_key "public_content:version:post_pages"
   @pubsub_topic "public_content:invalidate"
   @default_ttl 5 * 60 * 1000
+  @post_page_ttl :timer.seconds(30)
 
   @doc """
   Subscribes the current process to public content cache invalidation events.
@@ -50,6 +52,23 @@ defmodule Ysc.PublicContentCache do
   end
 
   @doc """
+  Short-lived cache for a post page load (`PostLive` mount).
+
+  Shares the version-key invalidation of the list slices, so any post write
+  clears it on every node, not only on the node that handled the write.
+  """
+  def fetch_post_page(cache_key, fetch_fun)
+      when is_binary(cache_key) and is_function(fetch_fun, 0) do
+    VersionedCache.fetch(
+      version_key(:post_pages),
+      "public:post_page:" <> cache_key,
+      fetch_fun,
+      cache_name: @cache_name,
+      ttl: @post_page_ttl
+    )
+  end
+
+  @doc """
   Upcoming events list slice for public pages.
   """
   def list_upcoming_events(limit) when is_integer(limit) and limit > 0 do
@@ -66,6 +85,7 @@ defmodule Ysc.PublicContentCache do
   def invalidate do
     if Ysc.ProcessCache.enabled?() do
       bump_version(:posts)
+      bump_version(:post_pages)
       bump_version(:events)
     end
 
@@ -78,6 +98,19 @@ defmodule Ysc.PublicContentCache do
   def invalidate_posts do
     if Ysc.ProcessCache.enabled?() do
       bump_version(:posts)
+      bump_version(:post_pages)
+    end
+
+    :ok
+  end
+
+  @doc """
+  Invalidates cached post pages only (for writes that can't affect the
+  published list slices, such as draft edits).
+  """
+  def invalidate_post_pages do
+    if Ysc.ProcessCache.enabled?() do
+      bump_version(:post_pages)
     end
 
     :ok
@@ -111,10 +144,12 @@ defmodule Ysc.PublicContentCache do
 
   defp bump_version(domain) do
     version_key = version_key(domain)
-    new_version = System.unique_integer([:monotonic, :positive])
+    # Versions are compared by equality across nodes, so they must not repeat
+    # between nodes; `unique_integer/1` is a small per-node counter that can.
+    new_version = System.system_time(:microsecond)
     Ysc.DistributedCache.put(@cache_name, version_key, new_version)
 
-    if Process.whereis(Ysc.PubSub) do
+    if domain != :post_pages and Process.whereis(Ysc.PubSub) do
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
         @pubsub_topic,
@@ -132,4 +167,5 @@ defmodule Ysc.PublicContentCache do
 
   defp version_key(:posts), do: @posts_version_key
   defp version_key(:events), do: @events_version_key
+  defp version_key(:post_pages), do: @post_pages_version_key
 end

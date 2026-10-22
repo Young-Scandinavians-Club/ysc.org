@@ -250,24 +250,11 @@ defmodule YscWeb.PostLive do
     end
   end
 
-  @post_mount_cache_ttl :timer.seconds(30)
-
   defp fetch_post_for_mount(id, viewer, preloads) do
-    cache_key = post_mount_cache_key(id, viewer)
-
-    if Ysc.ProcessCache.enabled?() do
-      case Cachex.get(:ysc_cache, cache_key) do
-        {:ok, %Post{} = post} ->
-          post
-
-        _ ->
-          post = load_post_for_page(id, viewer, preloads)
-          Cachex.put(:ysc_cache, cache_key, post, ttl: @post_mount_cache_ttl)
-          post
-      end
-    else
-      load_post_for_page(id, viewer, preloads)
-    end
+    Ysc.PublicContentCache.fetch_post_page(
+      post_mount_cache_key(id, viewer),
+      fn -> load_post_for_page(id, viewer, preloads) end
+    )
   end
 
   defp load_post_for_page(id, viewer, preloads) do

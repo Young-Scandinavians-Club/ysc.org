@@ -439,6 +439,7 @@ defmodule Ysc.Posts do
   def update_post(post, params, %User{} = current_user, opts \\ []) do
     with :ok <- Policy.authorize(:post_update, current_user, post) do
       params = maybe_set_board_position_at_publish(post, params)
+      was_public? = published_in_db?(post)
 
       result =
         post
@@ -446,7 +447,7 @@ defmodule Ysc.Posts do
         |> Ecto.Changeset.put_change(:updated_by_id, current_user.id)
         |> Repo.update()
 
-      maybe_invalidate_public_post_cache(result, post)
+      maybe_invalidate_public_post_cache(result, was_public?)
       result
     end
   end
@@ -508,13 +509,15 @@ defmodule Ysc.Posts do
   """
   def update_post_editor(post, params, %User{} = current_user, opts \\ []) do
     with :ok <- Policy.authorize(:post_update, current_user, post) do
+      was_public? = published_in_db?(post)
+
       result =
         post
         |> Post.editor_changeset(params, opts)
         |> Ecto.Changeset.put_change(:updated_by_id, current_user.id)
         |> Repo.update()
 
-      maybe_invalidate_public_post_cache(result, post)
+      maybe_invalidate_public_post_cache(result, was_public?)
       result
     end
   end
@@ -780,13 +783,43 @@ defmodule Ysc.Posts do
     "#{String.capitalize(first)} #{String.downcase(last)}"
   end
 
-  defp maybe_invalidate_public_post_cache(result, previous_post \\ nil)
-
-  defp maybe_invalidate_public_post_cache({:ok, %Post{} = post}, previous_post) do
-    was_public = match?(%Post{state: :published}, previous_post)
-
-    if was_public or post.state == :published do
+  @doc """
+  Invalidates cached public post pages and list slices on every node when a
+  post uses `image_id`, e.g. after the image is edited or finishes processing.
+  """
+  def invalidate_caches_for_image(image_id) when is_binary(image_id) do
+    if Repo.exists?(post_using_image_query(image_id)) do
       Ysc.PublicContentCache.invalidate_posts()
+    end
+
+    :ok
+  end
+
+  def invalidate_caches_for_image(_), do: :ok
+
+  # Callers (the admin editor autosave) pass `%Post{id: id}` stubs, so the
+  # struct's `state` can't tell whether the post was live before the update.
+  defp published_in_db?(%Post{id: id}) do
+    is_binary(id) and Repo.exists?(published_post_by_id_query(id))
+  end
+
+  defp post_using_image_query(image_id) do
+    from(p in Post, where: p.image_id == ^image_id)
+  end
+
+  defp published_post_by_id_query(id) do
+    from(p in Post, where: p.id == ^id and p.state == :published)
+  end
+
+  defp maybe_invalidate_public_post_cache(result, was_public? \\ false)
+
+  defp maybe_invalidate_public_post_cache({:ok, %Post{} = post}, was_public?) do
+    # Page caches hold drafts for staff previews, so any write invalidates
+    # them; list slices only ever contain published posts.
+    if was_public? or post.state == :published do
+      Ysc.PublicContentCache.invalidate_posts()
+    else
+      Ysc.PublicContentCache.invalidate_post_pages()
     end
 
     {:ok, post}
@@ -838,5 +871,15 @@ defmodule Ysc.Posts do
       select: struct(p, ^@public_feed_post_fields),
       preload: [author: ^public_post_author_name_query()]
     )
+  end
+
+  @doc false
+  def ci_query_explain_post_using_image_query do
+    post_using_image_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_published_post_by_id_query do
+    published_post_by_id_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end
