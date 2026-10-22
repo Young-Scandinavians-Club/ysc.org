@@ -15,6 +15,7 @@ defmodule YscWeb.Emails.Helpers do
   alias HtmlSanitizeEx
   alias Ysc.Accounts.User
   alias Ysc.Bookings.{Booking, Room}
+  alias Ysc.Events.DateTimeFormatter
   alias Ysc.Events.Event
   alias Ysc.Media.Image
   alias Ysc.Repo
@@ -378,7 +379,8 @@ defmodule YscWeb.Emails.Helpers do
   Formats an event's start date and time for email copy.
 
   Event `start_date` and `start_time` are stored as Pacific-local wall-clock
-  values, not UTC. Do not apply timezone conversion.
+  values, not UTC. Do not apply timezone conversion. `start_time` is formatted
+  with `DateTimeFormatter.format_time/1`.
 
   Returns `default` when `start_date` is nil.
   """
@@ -386,18 +388,18 @@ defmodule YscWeb.Emails.Helpers do
 
   def format_event_start_datetime(nil, _, default), do: default
 
-  def format_event_start_datetime(date, nil, _default) do
-    date
-    |> event_date()
-    |> Calendar.strftime("%B %d, %Y")
-  end
-
-  def format_event_start_datetime(date, %Time{} = time, _default) do
+  def format_event_start_datetime(date, time, _default) do
     date_only = event_date(date)
     date_str = Calendar.strftime(date_only, "%B %d, %Y")
-    time_str = Calendar.strftime(time, "%-I:%M %p")
-    tz_abbr = pacific_tz_abbreviation(date_only)
-    "#{date_str} at #{time_str} #{tz_abbr}"
+
+    case DateTimeFormatter.format_time(time) do
+      nil ->
+        date_str
+
+      time_str ->
+        tz_abbr = pacific_tz_abbreviation(date_only)
+        "#{date_str} at #{time_str} #{tz_abbr}"
+    end
   end
 
   @doc """

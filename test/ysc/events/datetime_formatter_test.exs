@@ -249,6 +249,22 @@ defmodule Ysc.Events.DateTimeFormatterTest do
       assert DateTimeFormatter.format_time(~T[13:30:00]) == "1:30 PM"
     end
 
+    test "matches Calendar.strftime %-I:%M %p for Time structs" do
+      times = [
+        ~T[00:00:00],
+        ~T[01:05:00],
+        ~T[10:00:00],
+        ~T[12:00:00],
+        ~T[13:30:00],
+        ~T[23:59:00]
+      ]
+
+      for time <- times do
+        assert DateTimeFormatter.format_time(time) ==
+                 Calendar.strftime(time, "%-I:%M %p")
+      end
+    end
+
     test "formats DateTime and NaiveDateTime using the wall-clock time" do
       assert DateTimeFormatter.format_time(~N[2024-12-01 19:00:00]) == "7:00 PM"
 

@@ -2,6 +2,7 @@ defmodule YscWeb.BookingDisplayTest do
   use ExUnit.Case, async: true
 
   alias Ysc.Bookings
+  alias Ysc.Events.DateTimeFormatter
   alias YscWeb.BookingDisplay
 
   describe "status_badge_type/1" do
@@ -177,10 +178,10 @@ defmodule YscWeb.BookingDisplayTest do
 
     test "stays in sync with Bookings.checkin_time/0 and checkout_time/0" do
       assert BookingDisplay.checkin_time_label() ==
-               Calendar.strftime(Bookings.checkin_time(), "%-I:%M %p")
+               DateTimeFormatter.format_time(Bookings.checkin_time())
 
       assert BookingDisplay.checkout_time_label() ==
-               Calendar.strftime(Bookings.checkout_time(), "%-I:%M %p")
+               DateTimeFormatter.format_time(Bookings.checkout_time())
     end
   end
 end

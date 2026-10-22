@@ -3,6 +3,7 @@ defmodule Ysc.Events.EventDateTime do
   Utilities for combining event start/end dates and times and comparing them.
   """
 
+  alias Ysc.Events.DateTimeFormatter
   alias Ysc.Events.Event
 
   # Event `start_date`/`end_date` are Pacific calendar days and
@@ -132,13 +133,14 @@ defmodule Ysc.Events.EventDateTime do
   defp calendar_date(_), do: nil
 
   @pass_date_format "%a, %b %-d, %Y"
-  @pass_time_format "%-I:%M %p"
 
   @doc """
   Formats an event start date and optional time for wallet passes
   (e.g. `"Sat, Mar 15, 2024 at 3:30 PM"`).
 
-  Returns `"TBD"` when `start_date` is nil.
+  Returns `"TBD"` when `start_date` is nil. Time uses
+  `DateTimeFormatter.format_time/1` so `%Time{}`, datetime, and wall-clock
+  strings all render the same 12-hour clock as the rest of the app.
   """
   def format_pass_datetime(nil, _start_time), do: "TBD"
 
@@ -151,10 +153,9 @@ defmodule Ysc.Events.EventDateTime do
   def format_pass_datetime(%Date{} = start_date, start_time) do
     date_str = Calendar.strftime(start_date, @pass_date_format)
 
-    if start_time do
-      "#{date_str} at #{Calendar.strftime(start_time, @pass_time_format)}"
-    else
-      date_str
+    case DateTimeFormatter.format_time(start_time) do
+      nil -> date_str
+      time -> "#{date_str} at #{time}"
     end
   end
 end

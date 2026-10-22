@@ -181,5 +181,15 @@ defmodule Ysc.Events.EventDateTimeTest do
       assert EventDateTime.format_pass_datetime(~D[2024-03-15], ~T[15:30:00]) ==
                "Fri, Mar 15, 2024 at 3:30 PM"
     end
+
+    test "formats wall-clock time strings through DateTimeFormatter" do
+      assert EventDateTime.format_pass_datetime(~D[2024-03-15], "15:30:00") ==
+               "Fri, Mar 15, 2024 at 3:30 PM"
+    end
+
+    test "omits unparseable times instead of appending them" do
+      assert EventDateTime.format_pass_datetime(~D[2024-03-15], "not a time") ==
+               "Fri, Mar 15, 2024"
+    end
   end
 end

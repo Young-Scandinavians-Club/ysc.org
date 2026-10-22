@@ -4,12 +4,13 @@ defmodule YscWeb.BookingDisplay do
 
   Status helpers cover booking/payment badges. Count helpers (`nights_label/1`,
   `guests_label/3`, `adults_label/1`) are the shared pluralization used in
-  booking emails and LiveViews. Clock labels (`checkin_time_label/0`,
+  booking emails and LiveViews.   Clock labels (`checkin_time_label/0`,
   `checkout_time_label/0`) format `Ysc.Bookings.checkin_time/0` and
-  `checkout_time/0` for member-facing copy.
+  `checkout_time/0` through `DateTimeFormatter.format_time/1`.
   """
 
   alias Ysc.Bookings
+  alias Ysc.Events.DateTimeFormatter
 
   @doc """
   Badge `type` for booking status on member booking detail pages.
@@ -190,14 +191,16 @@ defmodule YscWeb.BookingDisplay do
   Derived from `Ysc.Bookings.checkin_time/0` so display copy stays in sync
   with eligibility cutoffs.
   """
-  def checkin_time_label, do: format_clock(Bookings.checkin_time())
+  def checkin_time_label,
+    do: DateTimeFormatter.format_time(Bookings.checkin_time())
 
   @doc """
   12-hour clock label for cabin check-out (e.g. `"11:00 AM"`).
 
   Derived from `Ysc.Bookings.checkout_time/0`.
   """
-  def checkout_time_label, do: format_clock(Bookings.checkout_time())
+  def checkout_time_label,
+    do: DateTimeFormatter.format_time(Bookings.checkout_time())
 
   defp maybe_append_adults(parts, adults, true) when adults <= 0, do: parts
 
@@ -208,8 +211,6 @@ defmodule YscWeb.BookingDisplay do
     do: parts ++ [children_label(children)]
 
   defp maybe_append_children(parts, _children), do: parts
-
-  defp format_clock(%Time{} = time), do: Calendar.strftime(time, "%-I:%M %p")
 
   defp to_count(nil), do: 0
   defp to_count(n) when is_integer(n) and n >= 0, do: n
