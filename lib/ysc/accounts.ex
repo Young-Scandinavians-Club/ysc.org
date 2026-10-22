@@ -2394,17 +2394,19 @@ defmodule Ysc.Accounts do
       |> User.password_changeset(attrs)
       |> User.validate_current_password(password)
 
-    Ecto.Multi.new()
-    |> Ecto.Multi.update(:user, changeset)
-    |> Ecto.Multi.delete_all(
-      :tokens,
-      UserToken.by_user_and_contexts_query(user, :all)
-    )
-    |> Repo.transaction()
-    |> case do
-      {:ok, %{user: user}} -> {:ok, user}
-      {:error, :user, changeset, _} -> {:error, changeset}
-    end
+    commit_password_change(user, changeset)
+  end
+
+  @doc """
+  Replaces the user's password after an independent step-up (reauth).
+
+  Unlike `update_user_password/3`, this does not re-check the current password.
+  Deletes every auth token and disconnects LiveViews, matching a password reset
+  (Finding 95).
+  """
+  @dialyzer {:nowarn_function, replace_user_password: 2}
+  def replace_user_password(user, attrs) do
+    commit_password_change(user, User.password_changeset(user, attrs))
   end
 
   ## Session
@@ -2606,15 +2608,64 @@ defmodule Ysc.Accounts do
     user.id
     |> session_tokens_for_live_disconnect_query()
     |> Repo.all()
-    |> Enum.each(fn token ->
+    |> broadcast_live_view_disconnects()
+
+    :ok
+  end
+
+  # Password change/reset must drop HTTP cookies *and* already-open LiveViews.
+  # Finding 95: `UserAuth.mount_current_user/2` only runs on mount, so deleting
+  # `users_tokens` alone left a stolen session's socket able to book, buy, and
+  # change account settings until that process died.
+  defp commit_password_change(user, changeset) do
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:user, changeset)
+    |> put_password_change_session_drop(user)
+    |> Repo.transaction()
+    |> finish_password_change_transaction()
+  end
+
+  defp put_password_change_session_drop(multi, user) do
+    multi
+    |> Ecto.Multi.run(:session_tokens_to_disconnect, fn repo, _changes ->
+      tokens =
+        user.id
+        |> session_tokens_for_live_disconnect_query()
+        |> repo.all()
+
+      {:ok, tokens}
+    end)
+    |> Ecto.Multi.delete_all(
+      :tokens,
+      UserToken.by_user_and_contexts_query(user, :all)
+    )
+  end
+
+  defp finish_password_change_transaction(result) do
+    case result do
+      {:ok, changes} ->
+        broadcast_live_view_disconnects(changes.session_tokens_to_disconnect)
+        {:ok, password_change_result_user(changes)}
+
+      {:error, :user, changeset, _} ->
+        {:error, changeset}
+
+      {:error, :mark_password_set, changeset, _} ->
+        {:error, changeset}
+    end
+  end
+
+  defp password_change_result_user(%{mark_password_set: user}), do: user
+  defp password_change_result_user(%{user: user}), do: user
+
+  defp broadcast_live_view_disconnects(tokens) when is_list(tokens) do
+    Enum.each(tokens, fn token ->
       YscWeb.Endpoint.broadcast(
         "users_sessions:#{Base.url_encode64(token)}",
         "disconnect",
         %{}
       )
     end)
-
-    :ok
   end
 
   defp session_tokens_for_live_disconnect_query(user_id) do
@@ -2861,6 +2912,9 @@ defmodule Ysc.Accounts do
   @doc """
   Resets the user password.
 
+  Deletes every auth token and disconnects LiveViews so a stolen session cannot
+  keep acting after the victim recovers the account (Finding 95).
+
   ## Examples
 
       iex> reset_user_password(user, %{password: "new long password", password_confirmation: "new long password"})
@@ -2879,16 +2933,9 @@ defmodule Ysc.Accounts do
       |> User.password_set_changeset(%{password_set_at: DateTime.utc_now()})
       |> Repo.update()
     end)
-    |> Ecto.Multi.delete_all(
-      :tokens,
-      UserToken.by_user_and_contexts_query(user, :all)
-    )
+    |> put_password_change_session_drop(user)
     |> Repo.transaction()
-    |> case do
-      {:ok, %{mark_password_set: user}} -> {:ok, user}
-      {:error, :user, changeset, _} -> {:error, changeset}
-      {:error, :mark_password_set, changeset, _} -> {:error, changeset}
-    end
+    |> finish_password_change_transaction()
   end
 
   def get_signup_application_submission_date(user_id) do

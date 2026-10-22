@@ -88,6 +88,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 92 (MEDIUM)   Merch checkout quoted Printful shipping from mount-time cart lines, then created the pending order and Stripe PaymentIntent from a freshly loaded cart plus the stale `option.rate`, so a member could underpay shipping by adding items in another tab
   Finding 93 (HIGH)     Account-setup / update_user_phone_and_sms reused User.registration_changeset with validate_email: false, so a client could mass-assign email (keeping email_verified_at), name, and DOB while saving a phone number — planting an account under a victim's unused address without the email-change reauth flow
   Finding 94 (MEDIUM)   Volunteer→member demotion did not disconnect LiveViews. Finding 87 only force-closed sockets when the previous role was `:admin`, so an already-open volunteer scanner / event editor / check-in / posts LiveView kept frozen `admin_role` and `current_user.role` and continued handling staff events after revocation.
+  Finding 95 (HIGH)     Password reset and password change deleted `users_tokens` but never broadcast LiveView `"disconnect"`. Finding 87/94 already showed `mount_current_user/2` only runs on mount, so a stolen session with an already-open bookings/tickets/settings LiveView kept `current_user` and could keep acting after the victim recovered the account.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -6263,6 +6264,114 @@ defmodule YscWeb.SecurityAuditTest do
     MembershipCache.invalidate_user(sub_account.id)
 
     {primary, subscription, sub_account}
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 95 (HIGH): Password reset/change must disconnect LiveViews
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 95: password reset disconnects LiveViews" do
+    test "reset_user_password broadcasts disconnect for every web session" do
+      user = user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, _} =
+               Accounts.reset_user_password(user, %{
+                 password: "new valid password"
+               })
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      refute Repo.get_by(UserToken, user_id: user.id)
+    end
+
+    test "update_user_password broadcasts disconnect for every web session" do
+      user = user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, _} =
+               Accounts.update_user_password(user, valid_user_password(), %{
+                 password: "new valid password"
+               })
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      refute Repo.get_by(UserToken, user_id: user.id)
+    end
+
+    test "replace_user_password broadcasts disconnect for every web session" do
+      user = user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, _} =
+               Accounts.replace_user_password(user, %{
+                 password: "new valid password"
+               })
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      refute Repo.get_by(UserToken, user_id: user.id)
+    end
+
+    test "a failed password change does not disconnect LiveViews" do
+      user = user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:error, %Ecto.Changeset{}} =
+               Accounts.update_user_password(user, "wrong password", %{
+                 password: "new valid password"
+               })
+
+      refute_receive %Phoenix.Socket.Broadcast{
+                       event: "disconnect",
+                       topic: ^live_socket_id
+                     },
+                     100
+
+      assert Accounts.get_user_by_session_token(token).id == user.id
+    end
+
+    test "an already-open member LiveView is force-closed after password reset",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      token = get_session(conn, :user_token)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+
+      {:ok, view, _html} = live(conn, ~p"/users/tickets")
+      assert Process.alive?(view.pid)
+
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, _} =
+               Accounts.reset_user_password(user, %{
+                 password: "new valid password"
+               })
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      refute Accounts.get_user_by_session_token(token)
+    end
   end
 
   defp volunteer_app_conn(conn, volunteer) do

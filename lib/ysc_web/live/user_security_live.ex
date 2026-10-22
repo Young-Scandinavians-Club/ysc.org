@@ -344,21 +344,10 @@ defmodule YscWeb.UserSecurityLive do
     # Use appropriate update function based on whether user has a password
     result =
       if actually_has_password do
-        # User is changing their existing password - no need to validate current password
-        # since we just re-authenticated them
-        changeset = Accounts.User.password_changeset(user, user_params)
-
-        Ecto.Multi.new()
-        |> Ecto.Multi.update(:user, changeset)
-        |> Ecto.Multi.delete_all(
-          :tokens,
-          Accounts.UserToken.by_user_and_contexts_query(user, :all)
-        )
-        |> Ysc.Repo.transaction()
-        |> case do
-          {:ok, %{user: user}} -> {:ok, user}
-          {:error, :user, changeset, _} -> {:error, changeset}
-        end
+        # User is changing their existing password - no need to validate current
+        # password since we just re-authenticated them. replace_user_password/2
+        # also disconnects LiveViews (Finding 95).
+        Accounts.replace_user_password(user, user_params)
       else
         # User is setting password for the first time
         Accounts.set_user_initial_password(user, user_params)
