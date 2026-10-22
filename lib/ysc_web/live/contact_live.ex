@@ -9,7 +9,6 @@ defmodule YscWeb.ContactLive do
     <div class="py-6 lg:py-8 max-w-(--breakpoint-xl) mx-auto px-4">
       <.page_masthead
         id="contact-masthead"
-        size={:compact}
         eyebrow="Contact"
         title="Get in touch"
       />
