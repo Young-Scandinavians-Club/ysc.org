@@ -71,6 +71,16 @@
       <strong>Booking Date:</strong> <%= @booking_date %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
+    <%= if assigns[:kitchen_fund_url] do %>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Support the Tahoe Kitchen Fund</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
+      <div class="green-alert-box">
+        Help us keep the Tahoe cabin kitchen in great shape for every member. <a href="<%= assigns[:kitchen_fund_url] %>" class="email-link">Learn more and donate to the Tahoe Kitchen Fund</a>.
+      </div>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <% end %>
     <!-- Next Steps -->
     <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
       <strong>What's Next?</strong>

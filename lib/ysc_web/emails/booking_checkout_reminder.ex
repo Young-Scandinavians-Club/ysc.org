@@ -54,7 +54,8 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
       cabin_master_name: contact.name,
       cabin_master_email: contact.email,
       cabin_master_phone: contact.phone,
-      booking_url: booking_url(booking.id)
+      booking_url: booking_url(booking.id),
+      kitchen_fund_url: PropertyDisplay.kitchen_fund_url(booking.property)
     }
   end
 end

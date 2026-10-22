@@ -70,7 +70,8 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
       cabin_master_email: contact.email,
       cabin_master_phone: contact.phone,
       booking_url: booking_url(booking.id),
-      clear_lake_info_url: PropertyDisplay.training_videos_url(:clear_lake)
+      clear_lake_info_url: PropertyDisplay.training_videos_url(:clear_lake),
+      kitchen_fund_url: PropertyDisplay.kitchen_fund_url(booking.property)
     }
   end
 end

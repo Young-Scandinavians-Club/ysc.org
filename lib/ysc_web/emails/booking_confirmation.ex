@@ -17,7 +17,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
       format_money: 1
     ]
 
-  alias Ysc.Bookings.BookingModeDisplay
+  alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay}
   alias YscWeb.Emails.BookingHelpers
 
   def get_template_name() do
@@ -45,6 +45,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
     booking
     |> BookingHelpers.member_links()
     |> Map.merge(%{
+      kitchen_fund_url: PropertyDisplay.kitchen_fund_url(booking.property),
       booking:
         booking
         |> BookingHelpers.booking_summary()
