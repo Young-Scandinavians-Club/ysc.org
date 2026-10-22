@@ -110,4 +110,19 @@ defmodule Ysc.Bookings.PropertyDisplayTest do
       assert PropertyDisplay.thumbnail_path(nil) == "/images/ysc_logo.webp"
     end
   end
+
+  describe "kitchen_fund_url/1" do
+    test "returns the Tahoe kitchen fund post for Tahoe" do
+      url =
+        "https://ysc.org/posts/tahoe-winter-20262027-season-open-for-bookings"
+
+      assert PropertyDisplay.kitchen_fund_url(:tahoe) == url
+      assert PropertyDisplay.kitchen_fund_url("tahoe") == url
+    end
+
+    test "returns nil for other properties" do
+      assert PropertyDisplay.kitchen_fund_url(:clear_lake) == nil
+      assert PropertyDisplay.kitchen_fund_url(nil) == nil
+    end
+  end
 end

@@ -6,6 +6,7 @@ defmodule Ysc.Bookings.PropertyDisplay do
   cards, and `full_name/2` for booking details and receipts.
   """
 
+  @tahoe_kitchen_fund_url "https://ysc.org/posts/tahoe-winter-20262027-season-open-for-bookings"
   @clear_lake_training_videos_url "https://www.youtube.com/watch?v=53ARqZXuE0o&list=PLCfwh7uBCuiwoTgkTJDsi5wfD__0EHk3l&index=4&t"
   @tahoe_thumbnail_path "/images/tahoe/tahoe_cabin_main.webp"
   @clear_lake_thumbnail_path "/images/clear_lake/clear_lake_dock.webp"
@@ -93,6 +94,15 @@ defmodule Ysc.Bookings.PropertyDisplay do
   def training_videos_url(:clear_lake), do: @clear_lake_training_videos_url
   def training_videos_url("clear_lake"), do: training_videos_url(:clear_lake)
   def training_videos_url(_), do: nil
+
+  @doc """
+  Public post where members can donate to the Tahoe kitchen fund.
+
+  Returns `nil` for properties without an active fund drive.
+  """
+  def kitchen_fund_url(:tahoe), do: @tahoe_kitchen_fund_url
+  def kitchen_fund_url("tahoe"), do: kitchen_fund_url(:tahoe)
+  def kitchen_fund_url(_), do: nil
 
   @doc """
   Public thumbnail path for a booking property (checkout, receipts, cards).
