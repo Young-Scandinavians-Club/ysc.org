@@ -5422,6 +5422,143 @@ defmodule Ysc.EventsTest do
       refute Events.get_ticket_detail_for_ticket(ticket.id)
     end
 
+    test "create_ticket_details/1 does not insert valid rows when another is invalid",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Batch mixed #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 51, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(5, :USD),
+          quantity: 5,
+          event_id: event.id
+        })
+
+      valid_ticket =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id
+        })
+
+      invalid_ticket =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id
+        })
+
+      assert {:error, %Ecto.Changeset{}} =
+               Events.create_ticket_details([
+                 %{
+                   ticket_id: valid_ticket.id,
+                   first_name: "Ada",
+                   last_name: "Lovelace",
+                   email: "ada@example.com"
+                 },
+                 %{
+                   ticket_id: invalid_ticket.id,
+                   first_name: "A",
+                   last_name: "B",
+                   email: "bad-email"
+                 }
+               ])
+
+      refute Events.get_ticket_detail_for_ticket(valid_ticket.id)
+      refute Events.get_ticket_detail_for_ticket(invalid_ticket.id)
+    end
+
+    test "create_ticket_details/1 upserts many tickets in one INSERT", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Batch insert #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 51, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(5, :USD),
+          quantity: 8,
+          event_id: event.id
+        })
+
+      tickets =
+        Enum.map(1..8, fn _ ->
+          create_ticket_fixture(%{
+            event_id: event.id,
+            user_id: user.id,
+            ticket_tier_id: tier.id
+          })
+        end)
+
+      attrs =
+        Enum.with_index(tickets, fn ticket, index ->
+          %{
+            ticket_id: ticket.id,
+            first_name: "Guest#{index}",
+            last_name: "Attendee",
+            email: "guest#{index}@example.com"
+          }
+        end)
+
+      {{:ok, details}, insert_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.create_ticket_details(attrs) end,
+          pattern: ~r/INSERT/i,
+          caller_pids: [self()]
+        )
+
+      assert length(details) == 8
+      assert Enum.map(details, & &1.ticket_id) == Enum.map(tickets, & &1.id)
+      assert Enum.map(details, & &1.first_name) == Enum.map(0..7, &"Guest#{&1}")
+      assert insert_count == 1
+
+      updated_attrs =
+        Enum.map(attrs, fn row ->
+          Map.put(row, :last_name, "Updated")
+        end)
+
+      {{:ok, upserted}, upsert_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.create_ticket_details(updated_attrs) end,
+          pattern: ~r/INSERT/i,
+          caller_pids: [self()]
+        )
+
+      assert upsert_count == 1
+      assert Enum.map(upserted, & &1.id) == Enum.map(details, & &1.id)
+      assert Enum.all?(upserted, &(&1.last_name == "Updated"))
+    end
+
+    test "create_ticket_details/1 returns an empty list without querying" do
+      {result, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.create_ticket_details([]) end,
+          pattern: ~r/SELECT|INSERT/i,
+          caller_pids: [self()]
+        )
+
+      assert result == {:ok, []}
+      assert query_count == 0
+    end
+
     test "create_ticket_detail/1 returns error for invalid email", %{user: user} do
       {:ok, event} =
         Events.create_event(%{

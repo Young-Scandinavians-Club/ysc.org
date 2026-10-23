@@ -140,6 +140,87 @@ defmodule Ysc.SubscriptionsActivationTest do
       assert MembershipCache.get_active_membership(user)
     end
 
+    test "cancels a mismatched incomplete Family checkout instead of charging it as Single" do
+      user = user_with_default_pm()
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      family_plan = Enum.find(plans, &(&1.id == :family))
+      single_plan = Enum.find(plans, &(&1.id == :single))
+
+      assert family_plan && single_plan,
+             "membership_plans must include family and single"
+
+      stripe_sub_id =
+        "sub_incomplete_family_#{System.unique_integer([:positive])}"
+
+      new_stripe_id = "sub_single_#{System.unique_integer([:positive])}"
+      family_price = family_plan.stripe_price_id
+      single_price = single_plan.stripe_price_id
+
+      {:ok, incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          name: "Incomplete Family",
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete",
+          user_id: user.id,
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: incomplete_sub.id,
+          stripe_price_id: family_price,
+          stripe_product_id: "prod_family",
+          stripe_id: "si_#{System.unique_integer([:positive])}",
+          quantity: 1
+        })
+
+      default_pm = Payments.get_default_payment_method(user)
+
+      expect(Stripe.InvoiceMock, :pay, 0, fn _invoice_id, _params ->
+        flunk(
+          "must not pay the incomplete Family invoice after a Single activation"
+        )
+      end)
+
+      expect(Stripe.SubscriptionMock, :update, 0, fn _id, _params ->
+        flunk(
+          "must not retry the incomplete Family subscription after a Single activation"
+        )
+      end)
+
+      expect(Stripe.SubscriptionMock, :cancel, fn ^stripe_sub_id ->
+        {:ok, %Stripe.Subscription{id: stripe_sub_id, status: "canceled"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :create, fn params, _opts ->
+        assert hd(params.items).price == single_price
+        assert params.default_payment_method == default_pm.provider_id
+
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: new_stripe_id,
+           customer: user.stripe_id,
+           status: "active"
+         )}
+      end)
+
+      assert {:ok, :activated} =
+               Subscriptions.activate_membership_with_saved_payment_method(
+                 user,
+                 membership_type: :single,
+                 return_url: "http://localhost/finalize"
+               )
+
+      abandoned = Subscriptions.get_subscription(incomplete_sub.id)
+      assert abandoned.stripe_status == "cancelled"
+
+      created = Subscriptions.get_subscription_by_stripe_id(new_stripe_id)
+      assert %Subscriptions.Subscription{stripe_status: "active"} = created
+
+      _ = MembershipCache.invalidate_user(user.id)
+      assert MembershipCache.get_active_membership(user)
+    end
+
     test "creates stripe subscription and persists locally" do
       user = user_with_default_pm()
       stripe_sub_id = "sub_new_#{System.unique_integer([:positive])}"
