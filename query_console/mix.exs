@@ -42,6 +42,12 @@ defmodule QueryConsole.MixProject do
       # reconnects after Chrome freeze/resume. 1.8.10: longpoll POST timeout
       # close-and-retry. phx.gen.auth / phx.gen.cert / phx.new unused.
       {:phoenix, "~> 1.8.15"},
+      # 2.2.1: ArgumentError on wrong-typed Plug.Crypto args no longer puts
+      # the secret key base in the stacktrace (EEF-CVE-2026-105963 /
+      # GHSA-ffw9-w85g-f2vh). Public sign/verify/encrypt/decrypt and
+      # secure_compare APIs are unchanged. Phoenix/Plug still list ~> 2.2,
+      # so pin the patched floor.
+      {:plug_crypto, "~> 2.2.1", override: true},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
       # 0.22.4: Escape comments on Postgrex.stream/4 (EEF-CVE-2026-66838).
