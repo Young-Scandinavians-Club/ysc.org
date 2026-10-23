@@ -7,8 +7,7 @@ defmodule YscWeb.UserResetPasswordLive do
 
   def render(assigns) do
     ~H"""
-    <div class="max-w-sm mx-auto py-4 px-4">
-      <.home_logo_link id="reset-password-home-logo" class="py-8" />
+    <.auth_panel logo_id="reset-password-home-logo">
       <.header class="text-center mb-4">
         Reset Your Password
         <:subtitle>
@@ -44,7 +43,7 @@ defmodule YscWeb.UserResetPasswordLive do
       <div class="text-center mt-4">
         <.back navigate={~p"/users/log-in"}>Back to sign in</.back>
       </div>
-    </div>
+    </.auth_panel>
     """
   end
 

@@ -6,8 +6,7 @@ defmodule YscWeb.UserForgotPasswordLive do
 
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-sm py-4 px-4">
-      <.home_logo_link id="forgot-password-home-logo" class="py-8" />
+    <.auth_panel logo_id="forgot-password-home-logo">
       <.header class="text-center">
         Forgot your password?
         <:subtitle>We'll email you a link to reset your password</:subtitle>
@@ -36,7 +35,7 @@ defmodule YscWeb.UserForgotPasswordLive do
       <div class="text-center mt-4">
         <.back navigate={~p"/users/log-in"}>Back to sign in</.back>
       </div>
-    </div>
+    </.auth_panel>
     """
   end
 

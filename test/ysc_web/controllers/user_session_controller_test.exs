@@ -67,6 +67,7 @@ defmodule YscWeb.UserSessionControllerTest do
       html = html_response(conn, 200)
       assert html =~ ~s(id="mobile-handoff-form")
       assert html =~ ~s(id="mobile-handoff-home-logo")
+      assert html =~ "max-w-sm mx-auto py-4 px-4"
       assert html =~ "Open the YSC Admin app"
     end
 

@@ -14,6 +14,7 @@ defmodule YscWeb.UserForgotPasswordLiveTest do
       assert html =~ "Forgot your password?"
       assert html =~ "email you a link to reset your password"
       assert html =~ "Email me a reset link"
+      assert html =~ "max-w-sm mx-auto py-4 px-4"
       assert has_element?(lv, "#forgot-password-home-logo")
     end
 
