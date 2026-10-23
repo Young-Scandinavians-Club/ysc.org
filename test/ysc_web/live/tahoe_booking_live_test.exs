@@ -225,7 +225,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert has_element?(
                view,
                "#tahoe-review-booking-continue",
-               "Continue to payment"
+               "Continue to guest names"
              )
 
       assert has_element?(
