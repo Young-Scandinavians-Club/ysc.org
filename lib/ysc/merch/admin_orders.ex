@@ -14,7 +14,6 @@ defmodule Ysc.Merch.AdminOrders do
 
   alias Ecto.Multi
   alias Ysc.Accounts.User
-  alias Ysc.Events.Event
   alias Ysc.Ledgers.Refund
 
   alias Ysc.Merch.{
@@ -186,17 +185,6 @@ defmodule Ysc.Merch.AdminOrders do
   """
   def orderable_products do
     Ysc.Merch.list_orderable_products()
-  end
-
-  @doc "The most recent events an order can be linked to, newest first."
-  def linkable_events do
-    from(e in Event,
-      where: e.state not in ["deleted"],
-      order_by: [desc: e.start_date],
-      limit: 60,
-      select: %{id: e.id, title: e.title, start_date: e.start_date}
-    )
-    |> Repo.all()
   end
 
   @doc """

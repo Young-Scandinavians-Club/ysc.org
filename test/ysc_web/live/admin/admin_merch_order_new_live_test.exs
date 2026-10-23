@@ -350,6 +350,93 @@ defmodule YscWeb.AdminMerchOrderNewLiveTest do
       assert has_element?(view, "#estimate-total", "$130.00")
     end
 
+    test "offers upcoming events as soon as the page loads", %{
+      conn: conn,
+      event: event
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/merch/orders/new")
+
+      assert has_element?(view, "#merch-order-event-suggestions")
+
+      assert has_element?(
+               view,
+               "#merch-order-event-suggestions button[phx-value-id='#{event.id}']"
+             )
+    end
+
+    test "searching finds an event by a fuzzy title, selecting it links it", %{
+      conn: conn
+    } do
+      gala = Ysc.EventsFixtures.event_fixture(%{title: "Midsummer Gala Dinner"})
+      {:ok, view, _html} = live(conn, ~p"/admin/merch/orders/new")
+
+      view
+      |> element("#merch-order-event-input")
+      |> render_keyup(%{"value" => "midsumer gal"})
+
+      assert has_element?(
+               view,
+               "#merch-order-event [role=listbox] button[phx-value-id='#{gala.id}']"
+             )
+
+      view
+      |> element(
+        "#merch-order-event [role=listbox] button[phx-value-id='#{gala.id}']"
+      )
+      |> render_click()
+
+      assert has_element?(view, "#merch-order-event", "Midsummer Gala Dinner")
+      refute has_element?(view, "#merch-order-event-input")
+
+      assert has_element?(
+               view,
+               "input[name='order[event_id]'][value='#{gala.id}']"
+             )
+    end
+
+    test "clearing the event brings the search back", %{
+      conn: conn,
+      event: event
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/merch/orders/new")
+
+      render_hook(view, "select-event", %{"id" => event.id})
+      refute has_element?(view, "#merch-order-event-input")
+
+      view
+      |> element("#merch-order-event button[phx-click='clear-event']")
+      |> render_click()
+
+      assert has_element?(view, "#merch-order-event-input")
+      assert has_element?(view, "input[name='order[event_id]'][value='']")
+    end
+
+    test "the review names the linked event", %{
+      conn: conn,
+      tee: tee,
+      event: event
+    } do
+      stub_quote()
+      {:ok, view, _html} = live(conn, ~p"/admin/merch/orders/new")
+
+      render_hook(view, "select-event", %{"id" => event.id})
+      review(view, custom_params(tee, %{"event_id" => event.id}))
+
+      assert has_element?(view, "#review-event", event.title)
+    end
+
+    test "the review shows no event line when none is linked", %{
+      conn: conn,
+      tee: tee
+    } do
+      stub_quote()
+      {:ok, view, _html} = live(conn, ~p"/admin/merch/orders/new")
+
+      review(view, custom_params(tee))
+
+      refute has_element?(view, "#review-event")
+    end
+
     test "placing the order sends it, tells the board and opens the order", %{
       conn: conn,
       admin: admin,
@@ -360,6 +447,7 @@ defmodule YscWeb.AdminMerchOrderNewLiveTest do
       stub_printful_accepts()
       {:ok, view, _html} = live(conn, ~p"/admin/merch/orders/new")
 
+      render_hook(view, "select-event", %{"id" => event.id})
       review(view, custom_params(tee, %{"event_id" => event.id}))
       view |> element("#place-order") |> render_click()
 

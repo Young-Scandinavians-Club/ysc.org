@@ -21,6 +21,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
   alias Ysc.Merch.{AdminOrders, ShippingAddress}
   alias Ysc.Repo
   alias YscWeb.Admin.DateTimeDisplay
+  alias YscWeb.AdminEventSearch
   alias YscWeb.AdminUserSearch
 
   @address_fields ~w(name address1 address2 city state_code zip phone email)
@@ -39,7 +40,6 @@ defmodule YscWeb.AdminMerchOrderNewLive do
       |> assign(:step, :details)
       |> assign(:products, [])
       |> assign(:variant_options, [])
-      |> assign(:event_options, [])
       |> assign(:form_options_loaded, false)
       |> assign(:errors, %{})
       |> assign(:lines_error, nil)
@@ -52,6 +52,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
       |> assign(:address, nil)
       |> assign(:order_lines, [])
       |> AdminUserSearch.assign_blank()
+      |> AdminEventSearch.assign_blank()
       |> assign_form(default_params())
 
     {:ok,
@@ -68,7 +69,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
     socket
     |> assign(:products, products)
     |> assign(:variant_options, variant_options(products))
-    |> assign(:event_options, event_options(AdminOrders.linkable_events()))
+    |> AdminEventSearch.assign_suggestions()
     |> assign(:form_options_loaded, true)
   end
 
@@ -132,6 +133,28 @@ defmodule YscWeb.AdminMerchOrderNewLive do
      |> AdminUserSearch.assign_blank()
      |> assign_form(clear_address(socket.assigns.params))
      |> refresh_problems()}
+  end
+
+  def handle_event("search-events", %{"value" => query}, socket) do
+    {:noreply, AdminEventSearch.search(socket, query)}
+  end
+
+  def handle_event("select-event", %{"id" => id}, socket) do
+    socket = AdminEventSearch.select(socket, id)
+    event = socket.assigns.selected_event
+
+    {:noreply,
+     assign_form(
+       socket,
+       Map.put(socket.assigns.params, "event_id", event && event.id)
+     )}
+  end
+
+  def handle_event("clear-event", _params, socket) do
+    {:noreply,
+     socket
+     |> AdminEventSearch.assign_blank()
+     |> assign_form(Map.put(socket.assigns.params, "event_id", ""))}
   end
 
   def handle_event("add_line", _params, socket) do
@@ -554,19 +577,6 @@ defmodule YscWeb.AdminMerchOrderNewLive do
     end
   end
 
-  defp event_options(events) do
-    [{"No event", ""}] ++
-      for e <- events do
-        label =
-          if e.start_date,
-            do:
-              "#{e.title} (#{DateTimeDisplay.format_event_date(e.start_date)})",
-            else: e.title
-
-        {label, e.id}
-      end
-  end
-
   defp line_keys(params) do
     params["lines"]
     |> Map.keys()
@@ -575,12 +585,11 @@ defmodule YscWeb.AdminMerchOrderNewLive do
 
   defp recipient_kinds, do: @recipient_kinds
 
-  defp event_title(params, options) do
-    case Enum.find(options, fn {_label, id} -> id == params["event_id"] end) do
-      {label, id} when id != "" -> label
-      _ -> nil
-    end
-  end
+  defp event_label(nil), do: nil
+
+  defp event_label(event),
+    do:
+      "#{event.title} (#{DateTimeDisplay.format_event_date(event.start_date)})"
 
   defp shipping_options(options),
     do: Enum.map(options, &{shipping_label(&1), &1.id})
@@ -618,10 +627,13 @@ defmodule YscWeb.AdminMerchOrderNewLive do
           recipient_error={@recipient_error}
           summary={@summary}
           variant_options={@variant_options}
-          event_options={@event_options}
           selected_user={@selected_user}
           user_search={@user_search}
           user_search_results={@user_search_results}
+          selected_event={@selected_event}
+          event_search={@event_search}
+          event_search_results={@event_search_results}
+          event_suggestions={@event_suggestions}
         />
 
         <.review_step
@@ -631,7 +643,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
           lines={@order_lines}
           review={@review}
           review_error={@review_error}
-          event_options={@event_options}
+          selected_event={@selected_event}
           placing?={@placing?}
         />
       </div>
@@ -646,10 +658,13 @@ defmodule YscWeb.AdminMerchOrderNewLive do
   attr :recipient_error, :string, default: nil
   attr :summary, :list, default: []
   attr :variant_options, :list, required: true
-  attr :event_options, :list, required: true
   attr :selected_user, :any, default: nil
   attr :user_search, :string, default: ""
   attr :user_search_results, :list, default: []
+  attr :selected_event, :any, default: nil
+  attr :event_search, :string, default: ""
+  attr :event_search_results, :list, default: []
+  attr :event_suggestions, :list, default: []
 
   defp details_step(assigns) do
     ~H"""
@@ -849,11 +864,17 @@ defmodule YscWeb.AdminMerchOrderNewLive do
           rows="2"
           maxlength="500"
         />
-        <.input
-          field={@form[:event_id]}
-          type="select"
+        <.admin_event_autocomplete
+          id="merch-order-event"
           label="Event (optional)"
-          options={@event_options}
+          name="order[event_id]"
+          search_event="search-events"
+          select_event="select-event"
+          clear_event="clear-event"
+          search_value={@event_search}
+          results={@event_search_results}
+          suggestions={@event_suggestions}
+          selected={@selected_event}
         />
         <p class="text-sm text-zinc-500">
           Linking an event adds this order's cost to that event's Statistics tab.
@@ -894,7 +915,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
   attr :lines, :list, required: true
   attr :review, :any, default: nil
   attr :review_error, :string, default: nil
-  attr :event_options, :list, required: true
+  attr :selected_event, :any, default: nil
   attr :placing?, :boolean, default: false
 
   defp review_step(assigns) do
@@ -902,7 +923,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
       assign(
         assigns,
         :event,
-        event_title(assigns.params, assigns.event_options)
+        event_label(assigns.selected_event)
       )
 
     ~H"""

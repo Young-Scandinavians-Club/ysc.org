@@ -18,10 +18,21 @@ const Autocomplete = {
             }
         };
         document.addEventListener("click", this.handleClickOutside);
+
+        // Suggestions are only visible while the field has focus. Safari does
+        // not focus a button on click, so the input would blur on mousedown and
+        // hide the list before the click lands. Keep focus in the input.
+        this.handleListMouseDown = (e) => {
+            if (e.target.closest("[role='listbox']")) {
+                e.preventDefault();
+            }
+        };
+        this.el.addEventListener("mousedown", this.handleListMouseDown);
     },
 
     destroyed() {
         document.removeEventListener("click", this.handleClickOutside);
+        this.el.removeEventListener("mousedown", this.handleListMouseDown);
         if (this.input) {
             this.input.removeEventListener("keydown", this.boundHandleKeydown);
         }
