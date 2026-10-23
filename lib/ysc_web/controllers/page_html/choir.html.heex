@@ -15,11 +15,23 @@
     </p>
   </div>
 
-  <%!-- Photo Placeholder --%>
-  <%!-- Replace this block with an <img> tag once a photo is available --%>
-  <div class="w-full aspect-video rounded-2xl bg-zinc-100 border border-zinc-200 flex flex-col items-center justify-center mb-12 overflow-hidden">
-    <.icon name="hero-musical-note" class="w-16 h-16 text-zinc-300 mb-3" />
-    <p class="text-sm text-zinc-500 font-medium">Photo coming soon</p>
+  <%!-- Choir Photo --%>
+  <div class="w-full aspect-[4/3] sm:aspect-video rounded-2xl bg-zinc-100 border border-zinc-200 mb-12 overflow-hidden">
+    <picture>
+      <source
+        srcset={"#{~p"/images/choir/choir-480.webp"} 480w, #{~p"/images/choir/choir-900.webp"} 900w, #{~p"/images/choir/choir.webp"} 1280w"}
+        sizes="(min-width: 1280px) 1216px, calc(100vw - 2rem)"
+        type="image/webp"
+      />
+      <img
+        id="choir-photo"
+        src={~p"/images/choir/choir.jpg"}
+        sizes="(min-width: 1280px) 1216px, calc(100vw - 2rem)"
+        alt="YSC Choir members singing together around the piano during a rehearsal"
+        class="w-full h-full object-cover object-[center_60%]"
+        decoding="async"
+      />
+    </picture>
   </div>
 
   <%!-- Two Column: Schedule + Contact --%>
