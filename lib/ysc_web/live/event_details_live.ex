@@ -1105,7 +1105,7 @@ defmodule YscWeb.EventDetailsLive do
                             <% @had_membership? -> %>
                               Member tickets require an active paid membership. Your membership has expired — renew to buy tickets.
                             <% true -> %>
-                              Member tickets require an active paid membership. Activate or renew your membership to buy tickets.
+                              Member tickets require an active paid membership. Choose a membership and pay your dues to buy tickets.
                           <% end %>
                         </p>
                         <% {cta_path, cta_label} =
@@ -1223,7 +1223,7 @@ defmodule YscWeb.EventDetailsLive do
                     <% @had_membership? -> %>
                       Member tickets require an active, paid membership. Renew your membership to buy tickets.
                     <% true -> %>
-                      Member tickets require an active, paid membership. Activate or renew your membership to buy tickets.
+                      Member tickets require an active, paid membership. Choose a membership and pay your dues to buy tickets.
                   <% end %>
                 </p>
                 <div class="max-w-(--breakpoint-md) mx-auto flex items-center justify-between gap-6">
@@ -6091,7 +6091,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "You need an active, paid YSC membership to buy these tickets. Click your name in the top-right corner and open Membership to renew or activate, then try again.",
+           "You need an active, paid YSC membership to buy these tickets. Click your name in the top-right corner and open Membership to pay your dues or renew, then try again.",
            title: "Membership"
          )
          |> assign(:show_ticket_modal, false)}
@@ -6131,7 +6131,7 @@ defmodule YscWeb.EventDetailsLive do
         error_message =
           case changeset.errors do
             [user_id: {"active membership required to purchase tickets", _}] ->
-              "You need an active, paid YSC membership to buy these tickets. Click your name in the top-right corner and open Membership to renew or activate, then try again."
+              "You need an active, paid YSC membership to buy these tickets. Click your name in the top-right corner and open Membership to pay your dues or renew, then try again."
 
             _ ->
               "We couldn't finish your ticket purchase. Please try again, or email info@ysc.org with the event name if this keeps happening."
