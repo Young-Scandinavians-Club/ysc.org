@@ -3458,6 +3458,34 @@ defmodule Ysc.TicketsTest do
       assert {:error, :payment_required} =
                Tickets.process_free_ticket_order(order)
     end
+
+    test "process_free_ticket_order/1 cancels an attached PaymentIntent before completing after the tier becomes free",
+         %{user: user, event: event, tier1: tier1} do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      payment_intent_id = "pi_free_complete_cancel_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      refute Money.zero?(order.total_amount)
+
+      {:ok, _tier} =
+        Events.update_ticket_tier(tier1, %{
+          type: :free,
+          price: Money.new(0, :USD)
+        })
+
+      order = Tickets.get_ticket_order(order.id)
+      assert Tickets.pending_order_still_complimentary?(order)
+
+      assert {:ok, completed} = Tickets.process_free_ticket_order(order)
+      assert completed.status == :completed
+      assert is_nil(completed.payment_id)
+      assert completed.payment_intent_id == payment_intent_id
+      assert Enum.all?(completed.tickets, &(&1.status == :confirmed))
+    end
   end
 
   describe "grant_admin_tickets/4" do
