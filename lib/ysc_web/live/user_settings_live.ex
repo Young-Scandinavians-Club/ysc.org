@@ -3642,7 +3642,7 @@ defmodule YscWeb.UserSettingsLive do
                  socket
                  |> YscWeb.Flash.put_toast(
                    :info,
-                   "Membership activated successfully!",
+                   "Membership dues paid. You're all set!",
                    title: "Membership"
                  )
                  |> push_patch(to: ~p"/users/membership")}
@@ -3669,7 +3669,7 @@ defmodule YscWeb.UserSettingsLive do
                  socket
                  |> YscWeb.Flash.put_toast(
                    :info,
-                   "Membership activated successfully!",
+                   "Membership dues paid. You're all set!",
                    title: "Membership"
                  )
                  |> push_patch(to: ~p"/users/membership")}

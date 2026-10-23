@@ -87,7 +87,10 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute intro =~ "Confirm"
 
     assert BookingUserMessages.tahoe_review_modal_continue_button() ==
-             "Continue to payment"
+             "Continue to guest names"
+
+    refute BookingUserMessages.tahoe_review_modal_continue_button() =~
+             "payment"
 
     assert BookingUserMessages.tahoe_review_modal_back_button() == "Go back"
     refute BookingUserMessages.tahoe_review_modal_back_button() == "Cancel"

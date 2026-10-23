@@ -133,6 +133,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       text = html_text(html)
 
       assert text =~ "option to save a payment method"
+      assert text =~ "we'll charge your first year's dues automatically"
+      refute text =~ "activate automatically"
     end
 
     test "payment confirmation tells members they can book a stay at the cabins" do

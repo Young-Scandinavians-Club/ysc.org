@@ -220,7 +220,7 @@ defmodule YscWeb.AccountSetupLive do
                 >
                   <.icon name="hero-credit-card" class="w-4 h-4" />
                   <%= if @user.state == :active do %>
-                    Save payment method &amp; activate
+                    Save payment method &amp; pay dues
                   <% else %>
                     Save payment method &amp; continue
                   <% end %>
