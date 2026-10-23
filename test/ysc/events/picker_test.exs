@@ -86,11 +86,9 @@ defmodule Ysc.Events.PickerTest do
 
       suggestions = Picker.suggestions()
 
-      {upcoming, past} =
-        Enum.split_with(
-          suggestions,
-          &(DateTime.compare(&1.start_date, DateTime.utc_now()) == :gt)
-        )
+      # Split on the picker's own boundary (start of today in California), not
+      # the current instant; the two differ for part of every UTC day.
+      {upcoming, past} = Enum.split_with(suggestions, &Picker.upcoming?/1)
 
       assert length(upcoming) <= 8
       assert length(past) <= 4
