@@ -27,6 +27,7 @@ defmodule YscWeb.UserResetPasswordLiveTest do
       {:ok, lv, html} = live(conn, ~p"/users/reset-password/#{token}")
 
       assert html =~ "Reset Password"
+      assert html =~ "max-w-sm mx-auto py-4 px-4"
       assert has_element?(lv, "#reset-password-home-logo")
     end
 
