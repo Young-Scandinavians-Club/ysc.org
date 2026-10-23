@@ -6968,6 +6968,10 @@ defmodule YscWeb.EventDetailsLive do
   defp free_ticket_confirm_error_message(:order_not_pending),
     do: "This ticket checkout is no longer available."
 
+  defp free_ticket_confirm_error_message(:checkout_payment_in_progress),
+    do:
+      "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation."
+
   defp free_ticket_confirm_error_message(_),
     do:
       "We couldn't confirm your free tickets. Please try again, or email info@ysc.org with the event name if this keeps happening."
