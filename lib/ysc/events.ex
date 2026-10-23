@@ -2903,37 +2903,90 @@ defmodule Ysc.Events do
   Upserts on `ticket_id` so saving attendee info before a redirect payment
   and again on `payment-success` does not insert duplicate rows.
 
+  Validates every row first, then writes them in a single `INSERT ... ON
+  CONFLICT` so checkout and payment-success do not pay N round-trips.
+
   Returns {:ok, list} on success, {:error, reason} on failure.
   """
   def create_ticket_details(ticket_details_list)
       when is_list(ticket_details_list) do
-    Repo.transaction(fn ->
-      ticket_details_list
-      |> Enum.map(&upsert_ticket_detail/1)
-    end)
+    changesets = Enum.map(ticket_details_list, &ticket_detail_changeset/1)
+
+    case Enum.find(changesets, &(not &1.valid?)) do
+      %Ecto.Changeset{} = invalid ->
+        {:error, invalid}
+
+      nil ->
+        insert_ticket_details(changesets)
+    end
   end
 
   # `identity: false` marks tickets whose tier asks questions but not who is
   # attending, so name and email aren't required. See `AttendeeInfo.build_detail/2`.
-  defp upsert_ticket_detail(attrs) do
+  defp ticket_detail_changeset(attrs) do
     {identity?, attrs} = Map.pop(attrs, :identity, true)
     {email?, attrs} = Map.pop(attrs, :require_email, true)
 
-    case %TicketDetail{}
-         |> TicketDetail.changeset(attrs,
-           identity: identity?,
-           require_email: email?
-         )
-         |> Repo.insert(
-           on_conflict:
-             {:replace,
-              [:first_name, :last_name, :email, :answers, :updated_at]},
-           conflict_target: :ticket_id,
-           returning: true
-         ) do
-      {:ok, ticket_detail} -> ticket_detail
-      {:error, changeset} -> Repo.rollback(changeset)
+    TicketDetail.changeset(%TicketDetail{}, attrs,
+      identity: identity?,
+      require_email: email?
+    )
+  end
+
+  defp insert_ticket_details([]) do
+    {:ok, []}
+  end
+
+  defp insert_ticket_details(changesets) do
+    # Last-wins for duplicate ticket_ids in one call, matching sequential upserts
+    # without PostgreSQL rejecting a second ON CONFLICT for the same row.
+    changesets =
+      changesets
+      |> Enum.reverse()
+      |> Enum.uniq_by(&Ecto.Changeset.get_field(&1, :ticket_id))
+      |> Enum.reverse()
+
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    ticket_ids = Enum.map(changesets, &Ecto.Changeset.get_field(&1, :ticket_id))
+    rows = Enum.map(changesets, &ticket_detail_insert_row(&1, now))
+
+    try do
+      {_count, inserted} =
+        Repo.insert_all(TicketDetail, rows,
+          on_conflict:
+            {:replace, [:first_name, :last_name, :email, :answers, :updated_at]},
+          conflict_target: :ticket_id,
+          returning: true
+        )
+
+      by_ticket_id = Map.new(inserted, &{&1.ticket_id, &1})
+      {:ok, Enum.map(ticket_ids, &Map.fetch!(by_ticket_id, &1))}
+    rescue
+      error in [Ecto.ConstraintError, Postgrex.Error] ->
+        {:error, ticket_detail_constraint_changeset(changesets, error)}
     end
+  end
+
+  defp ticket_detail_insert_row(changeset, now) do
+    %{
+      id: Ecto.ULID.generate(),
+      ticket_id: Ecto.Changeset.get_field(changeset, :ticket_id),
+      first_name: Ecto.Changeset.get_field(changeset, :first_name),
+      last_name: Ecto.Changeset.get_field(changeset, :last_name),
+      email: Ecto.Changeset.get_field(changeset, :email),
+      answers: Ecto.Changeset.get_field(changeset, :answers) || %{},
+      inserted_at: now,
+      updated_at: now
+    }
+  end
+
+  defp ticket_detail_constraint_changeset([changeset | _], _error) do
+    changeset
+    |> Map.put(:action, :insert)
+    |> Ecto.Changeset.add_error(:ticket_id, "does not exist",
+      constraint: :foreign,
+      constraint_name: "ticket_details_ticket_id_fkey"
+    )
   end
 
   @doc """
