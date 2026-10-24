@@ -2084,7 +2084,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               Low rates, because members look after the cabin together. Your cabin, not a hotel.
             </:item>
           </.guest_highlights>
-          <div class="mt-6">
+          <.info_sections id="clear-lake-guest-sections" class="mt-8 md:mt-10">
             <.info_section
               id="clear-lake-guest-stay"
               heading_id="clear-lake-guest-stay-heading"
@@ -2138,7 +2138,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                 milestones={@guest_overview.history}
               />
             </.info_section>
-          </div>
+          </.info_sections>
           <.guest_invite
             id="clear-lake-guest-invite"
             accent={:teal}

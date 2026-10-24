@@ -123,40 +123,39 @@ defmodule YscWeb.Components.CabinGuest do
 
   def guest_invite(assigns) do
     ~H"""
-    <section
-      id={@id}
-      class="mt-6 md:mt-10 max-w-2xl mx-auto text-center"
-    >
-      <p class={["text-xs mb-3 type-eyebrow", eyebrow_text(@accent)]}>
-        Members only
-      </p>
-      <h2 class="text-2xl md:text-3xl text-zinc-900 type-title">
-        Ready to book?
-      </h2>
-      <p class="mt-3 text-base text-zinc-600 leading-relaxed">
-        Sign in to check availability and book your dates, or apply to join the club.
-      </p>
-      <div class="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
-        <.button
-          id={"#{@id}-sign-in"}
-          navigate={~p"/users/log-in?#{%{redirect_to: @redirect_to}}"}
-          color={Atom.to_string(@accent)}
-          class="px-8 py-3"
-        >
-          Sign in to book
-        </.button>
-        <.link
-          id={"#{@id}-apply"}
-          navigate={~p"/users/register"}
-          class={[
-            "inline-flex items-center justify-center gap-1 min-h-11 px-4 text-sm font-semibold hover:underline",
-            link_text(@accent)
-          ]}
-        >
-          Apply for membership <.icon name="hero-arrow-right" class="w-4 h-4" />
-        </.link>
-      </div>
-    </section>
+    <div class="border-t border-zinc-200 pt-10 md:pt-14">
+      <section id={@id} class="max-w-2xl mx-auto text-center">
+        <p class={["text-xs mb-3 type-eyebrow", eyebrow_text(@accent)]}>
+          Members only
+        </p>
+        <h2 class="text-2xl md:text-3xl text-zinc-900 type-title">
+          Ready to book?
+        </h2>
+        <p class="mt-3 text-base text-zinc-600 leading-relaxed">
+          Sign in to check availability and book your dates, or apply to join the club.
+        </p>
+        <div class="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+          <.button
+            id={"#{@id}-sign-in"}
+            navigate={~p"/users/log-in?#{%{redirect_to: @redirect_to}}"}
+            color={Atom.to_string(@accent)}
+            class="px-8 py-3"
+          >
+            Sign in to book
+          </.button>
+          <.link
+            id={"#{@id}-apply"}
+            navigate={~p"/users/register"}
+            class={[
+              "inline-flex items-center justify-center gap-1 min-h-11 px-4 text-sm font-semibold hover:underline",
+              link_text(@accent)
+            ]}
+          >
+            Apply for membership <.icon name="hero-arrow-right" class="w-4 h-4" />
+          </.link>
+        </div>
+      </section>
+    </div>
     """
   end
 
@@ -184,7 +183,7 @@ defmodule YscWeb.Components.CabinGuest do
       <li
         :for={option <- @options}
         id={@id && "#{@id}-#{option.mode}"}
-        class="flex flex-col gap-4 rounded-xl bg-zinc-50 p-5 md:p-6"
+        class="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-zinc-50 p-5 md:p-6"
       >
         <div>
           <h3 class="text-lg text-zinc-900 type-subhead">{option.label}</h3>
@@ -241,10 +240,10 @@ defmodule YscWeb.Components.CabinGuest do
   def guest_milestones(assigns) do
     ~H"""
     <div>
-      <ol id={@id} class="space-y-6">
+      <ol id={@id} class="divide-y divide-zinc-200">
         <li
           :for={milestone <- @milestones}
-          class="grid grid-cols-[4rem_1fr] gap-4 md:grid-cols-[5rem_1fr]"
+          class="grid grid-cols-[4rem_1fr] gap-4 py-5 first:pt-0 md:grid-cols-[5rem_1fr]"
         >
           <span class={["text-sm font-semibold tabular-nums", link_text(@accent)]}>
             {milestone.year}
@@ -262,7 +261,7 @@ defmodule YscWeb.Components.CabinGuest do
       <.link
         navigate={~p"/history"}
         class={[
-          "mt-2 inline-flex items-center gap-1 min-h-11 text-sm font-semibold hover:underline",
+          "mt-4 inline-flex items-center gap-1 min-h-11 text-sm font-semibold hover:underline",
           link_text(@accent)
         ]}
       >

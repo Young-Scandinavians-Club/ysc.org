@@ -3276,7 +3276,7 @@ defmodule YscWeb.TahoeBookingLive do
               Low rates, because members look after the cabin together. Your cabin, not a hotel.
             </:item>
           </.guest_highlights>
-          <div class="mt-6">
+          <.info_sections id="tahoe-guest-sections" class="mt-8 md:mt-10">
             <.info_section
               id="tahoe-guest-stay"
               heading_id="tahoe-guest-stay-heading"
@@ -3327,7 +3327,7 @@ defmodule YscWeb.TahoeBookingLive do
                 milestones={@guest_overview.history}
               />
             </.info_section>
-          </div>
+          </.info_sections>
           <.guest_invite
             id="tahoe-guest-invite"
             accent={:blue}
