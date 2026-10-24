@@ -8,6 +8,7 @@ FROM hexpm/elixir:1.20.2-erlang-27.3.4.14-alpine-3.22.5@sha256:6bb74368bbf64a211
 
 # Install build dependencies
 # ffmpeg is required during asset compilation (mix assets.deploy)
+# bash runs mix_deps_get_retry.sh (Alpine /bin/sh is busybox ash)
 RUN apk add --no-cache \
     build-base \
     git \
@@ -15,7 +16,8 @@ RUN apk add --no-cache \
     nodejs \
     npm \
     zstd \
-    ffmpeg
+    ffmpeg \
+    bash
 
 # Set environment variables
 ENV MIX_ENV=prod \
@@ -28,18 +30,22 @@ WORKDIR /app
 
 # Install hex + rebar (Hex 2.5.1-dev until ignore_advisories ships on hex.pm)
 COPY etc/scripts/install_hex.sh etc/scripts/install_hex.sh
-RUN chmod +x etc/scripts/install_hex.sh && \
+COPY etc/scripts/mix_deps_get_retry.sh etc/scripts/mix_deps_get_retry.sh
+RUN chmod +x etc/scripts/install_hex.sh etc/scripts/mix_deps_get_retry.sh && \
     sh etc/scripts/install_hex.sh && \
     mix local.rebar --force
 
-# Install mix dependencies
-# Cache mounts avoid re-downloading deps on every build (host-local cache, not in image)
+# Install mix dependencies.
+# Cache only ~/.hex (package tarballs). Do not cache-mount /root/.mix: that
+# overlay hides the Hex archive from the previous layer, and Mix then
+# auto-installs the latest Hex (2.6.0 on v2.49.1, run 40112796404 /
+# job 120929589166) because locked deps call Mix.Hex.ensure_installed?(true).
+# Retry hex.pm registry 5xx — Mix reports those as "Unknown package in lockfile".
 COPY mix.exs mix.lock ./
 # Path deps (currently vendor/blurhash) must exist before mix deps.get / deps.compile
 COPY vendor vendor
 RUN --mount=type=cache,target=/root/.hex \
-    --mount=type=cache,target=/root/.mix \
-    mix deps.get --only prod
+    bash etc/scripts/mix_deps_get_retry.sh --only prod
 
 # Copy config files and compile deps
 COPY config/config.exs config/prod.exs config/runtime.exs config/

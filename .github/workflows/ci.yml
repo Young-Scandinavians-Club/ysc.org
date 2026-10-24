@@ -229,6 +229,9 @@ jobs:
       - name: flyctl_deploy_retry self-test
         run: ./etc/scripts/flyctl_deploy_retry.sh --self-test
 
+      - name: mix_deps_get_retry self-test
+        run: ./etc/scripts/mix_deps_get_retry.sh --self-test
+
       - name: assert_mix_build_manifests self-test
         run: ./etc/scripts/ci/assert_mix_build_manifests.sh --self-test
 
