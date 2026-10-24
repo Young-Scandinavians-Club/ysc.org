@@ -165,4 +165,17 @@ defmodule Ysc.Events.PickerTest do
       assert Picker.get(Ecto.ULID.generate()) == nil
     end
   end
+
+  describe "upcoming?/2" do
+    test "treats an event without a start date as upcoming" do
+      assert Picker.upcoming?(%{start_date: nil})
+    end
+  end
+
+  describe "query explain shapes" do
+    test "are plain queries that can be explained without running them" do
+      assert %Ecto.Query{} = Picker.ci_query_explain_query()
+      assert %Ecto.Query{} = Picker.ci_query_explain_suggestions_query()
+    end
+  end
 end
