@@ -2036,31 +2036,114 @@ defmodule YscWeb.ExpenseReportLive do
                 </.button>
               </:actions>
             </.page_header>
-            <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-5">
-              <div class="flex gap-3">
-                <.icon
-                  name="hero-information-circle"
-                  class="w-6 h-6 text-blue-600 shrink-0 mt-0.5"
-                />
-                <div class="space-y-2 text-sm text-zinc-700">
-                  <p>
-                    Submit your expenses for reimbursement. Expenses must be submitted
-                    <strong class="font-semibold text-zinc-900">within 30 days</strong>
-                    of the date of purchase. Once submitted, you will receive an email confirmation and the treasurer will review your report and send your reimbursement.
+            <div
+              id="expense-report-requirements"
+              class="bg-white border border-zinc-200 rounded-xl shadow-xs overflow-hidden"
+            >
+              <div class="px-5 pt-5 pb-4">
+                <p class="text-sm text-zinc-700">
+                  Use this form to request reimbursement for money you spent on behalf of the club. Please read the two requirements below before you start; reports that don't meet them can't be reimbursed.
+                </p>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-px bg-zinc-200 border-y border-zinc-200">
+                <div
+                  id="expense-requirement-receipt"
+                  class="bg-red-50 p-5 flex gap-3"
+                >
+                  <.icon
+                    name="hero-receipt-percent"
+                    class="w-6 h-6 text-red-600 shrink-0 mt-0.5"
+                  />
+                  <div class="space-y-1">
+                    <p class="type-subhead text-base text-red-900">
+                      A receipt is required for every expense
+                    </p>
+                    <p class="text-sm text-red-900/80">
+                      Attach a photo or PDF of the itemized receipt to each expense you add. We can't reimburse an expense without one, and you won't be able to submit until every expense has a receipt.
+                    </p>
+                    <p class="text-xs text-red-900/70">
+                      The only exception is mileage, which needs the trip details instead.
+                    </p>
+                  </div>
+                </div>
+                <div
+                  id="expense-requirement-deadline"
+                  class="bg-amber-50 p-5 flex gap-3"
+                >
+                  <.icon
+                    name="hero-clock"
+                    class="w-6 h-6 text-amber-600 shrink-0 mt-0.5"
+                  />
+                  <div class="space-y-1">
+                    <p class="type-subhead text-base text-amber-900">
+                      Submit within 30 days of the expense
+                    </p>
+                    <p class="text-sm text-amber-900/80">
+                      Each expense must be dated no more than 30 days before you submit this report. Don't wait: the date on the receipt starts the clock.
+                    </p>
+                    <p class="text-xs text-amber-900/70">
+                      Need to submit something older? Contact the treasurer first.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="px-5 py-4 bg-zinc-50/60 space-y-4">
+                <div>
+                  <p class="type-eyebrow text-xs text-zinc-500 mb-2">
+                    A good receipt shows
                   </p>
-                  <p :if={@treasurer}>
-                    If you have questions, please contact:
-                    <strong class="font-semibold text-zinc-900">
-                      {@treasurer.first_name} {@treasurer.last_name}
-                    </strong>
-                    (<a
-                      href={"mailto:#{@treasurer.email}"}
-                      class="text-blue-600 hover:underline"
-                    >
-                      {@treasurer.email}
-                    </a>).
+                  <ul class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-zinc-700">
+                    <li class="flex items-start gap-2">
+                      <.icon
+                        name="hero-check-circle"
+                        class="w-4 h-4 text-green-600 shrink-0 mt-0.5"
+                      /> The merchant name
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <.icon
+                        name="hero-check-circle"
+                        class="w-4 h-4 text-green-600 shrink-0 mt-0.5"
+                      /> The date of purchase
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <.icon
+                        name="hero-check-circle"
+                        class="w-4 h-4 text-green-600 shrink-0 mt-0.5"
+                      /> Each item purchased
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <.icon
+                        name="hero-check-circle"
+                        class="w-4 h-4 text-green-600 shrink-0 mt-0.5"
+                      /> The total amount paid
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <.icon
+                        name="hero-check-circle"
+                        class="w-4 h-4 text-green-600 shrink-0 mt-0.5"
+                      />
+                      The payment method used, such as the card's last four digits
+                    </li>
+                  </ul>
+                  <p class="mt-2 text-xs text-zinc-500">
+                    A card statement or bank screenshot on its own is not a receipt. Photos must be legible; PDF, JPG, PNG or WEBP up to 10MB.
                   </p>
                 </div>
+                <p class="text-sm text-zinc-600">
+                  After you submit, you'll get an email confirmation, and the treasurer will review your report and send your reimbursement.
+                </p>
+                <p :if={@treasurer} class="text-sm text-zinc-600">
+                  Questions? Contact
+                  <strong class="font-semibold text-zinc-900">
+                    {@treasurer.first_name} {@treasurer.last_name}
+                  </strong>
+                  at <a
+                    href={"mailto:#{@treasurer.email}"}
+                    class="text-blue-600 hover:underline"
+                  >
+                    {@treasurer.email}
+                  </a>.
+                </p>
               </div>
             </div>
           </div>
@@ -2452,13 +2535,16 @@ defmodule YscWeb.ExpenseReportLive do
 
                         <fieldset class="min-w-0 border-0 p-0 m-0">
                           <legend class="block text-sm font-medium text-zinc-700 mb-2">
-                            Receipt
+                            Receipt <span class="text-red-600">*</span>
+                            <span class="ml-1 text-xs font-normal text-red-600">
+                              Required
+                            </span>
                           </legend>
                           <p
                             id={"receipt-help-#{expense_f.index}"}
                             class="text-xs text-zinc-500 mb-3"
                           >
-                            Upload a photo or PDF of your receipt. Accepted formats: PDF, JPG, JPEG, PNG, WEBP (max 10MB)
+                            A receipt is required for every expense. Upload a photo or PDF of the itemized receipt, dated within 30 days. Accepted formats: PDF, JPG, JPEG, PNG, WEBP (max 10MB)
                           </p>
                           <!-- Show uploaded receipt with inline preview -->
                           <div
