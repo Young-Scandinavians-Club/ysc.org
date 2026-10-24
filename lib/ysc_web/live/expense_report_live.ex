@@ -2117,6 +2117,13 @@ defmodule YscWeb.ExpenseReportLive do
                         class="w-4 h-4 text-green-600 shrink-0 mt-0.5"
                       /> The total amount paid
                     </li>
+                    <li class="flex items-start gap-2">
+                      <.icon
+                        name="hero-check-circle"
+                        class="w-4 h-4 text-green-600 shrink-0 mt-0.5"
+                      />
+                      The payment method used, such as the card's last four digits
+                    </li>
                   </ul>
                   <p class="mt-2 text-xs text-zinc-500">
                     A card statement or bank screenshot on its own is not a receipt. Photos must be legible; PDF, JPG, PNG or WEBP up to 10MB.
