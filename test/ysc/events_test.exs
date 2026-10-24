@@ -5547,6 +5547,85 @@ defmodule Ysc.EventsTest do
       assert Enum.all?(upserted, &(&1.last_name == "Updated"))
     end
 
+    test "create_ticket_details/1 last-wins when the same ticket_id appears twice",
+         %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Batch dup #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 51, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(5, :USD),
+          quantity: 5,
+          event_id: event.id
+        })
+
+      ticket =
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id
+        })
+
+      {{:ok, details}, insert_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Events.create_ticket_details([
+              %{
+                ticket_id: ticket.id,
+                first_name: "Ada",
+                last_name: "First",
+                email: "first@example.com"
+              },
+              %{
+                ticket_id: ticket.id,
+                first_name: "Grace",
+                last_name: "Hopper",
+                email: "hopper@example.com"
+              }
+            ])
+          end,
+          pattern: ~r/INSERT/i,
+          caller_pids: [self()]
+        )
+
+      assert insert_count == 1
+      assert [%{ticket_id: ticket_id} = detail] = details
+      assert ticket_id == ticket.id
+      assert detail.first_name == "Grace"
+      assert detail.last_name == "Hopper"
+      assert detail.email == "hopper@example.com"
+
+      stored = Events.get_ticket_detail_for_ticket(ticket.id)
+      assert stored.id == detail.id
+      assert stored.first_name == "Grace"
+    end
+
+    test "create_ticket_details/1 returns a changeset when ticket_id is missing" do
+      missing_ticket_id = Ecto.ULID.generate()
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Events.create_ticket_details([
+                 %{
+                   ticket_id: missing_ticket_id,
+                   first_name: "Ada",
+                   last_name: "Lovelace",
+                   email: "ada@example.com"
+                 }
+               ])
+
+      assert changeset.errors[:ticket_id]
+      refute Events.get_ticket_detail_for_ticket(missing_ticket_id)
+    end
+
     test "create_ticket_details/1 returns an empty list without querying" do
       {result, query_count} =
         Ysc.QueryCounter.with_query_counter(
