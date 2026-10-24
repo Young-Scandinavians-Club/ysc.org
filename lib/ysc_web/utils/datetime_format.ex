@@ -77,6 +77,7 @@ defmodule Ysc.Events.DateTimeFormatter do
 
     * `:separator` - between date and time (default `" at "`; TV posters use `" · "`)
     * `:default` - label when `start_date` is nil (default `"Date TBD"`)
+    * `:with_year` - include the year in the date label (default `true`)
 
   Accepts an event map with `:start_date` and `:start_time`. `start_time` may be a
   `%Time{}`, `%NaiveDateTime{}`, `%DateTime{}`, or a wall-clock time string.
@@ -87,11 +88,12 @@ defmodule Ysc.Events.DateTimeFormatter do
     start_time = Map.get(event, :start_time) || Map.get(event, "start_time")
     separator = Keyword.get(opts, :separator, " at ")
     default = Keyword.get(opts, :default, "Date TBD")
+    with_year? = Keyword.get(opts, :with_year, true)
 
     date_label =
       DateDisplay.format_event_date_range(event,
         default: default,
-        with_year: true
+        with_year: with_year?
       )
 
     if date_label == default do

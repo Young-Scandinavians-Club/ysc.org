@@ -220,6 +220,17 @@ defmodule Ysc.Events.DateTimeFormatterTest do
       assert result == "Jul 28, 2026 · 7:00 PM"
     end
 
+    test "omits the year with with_year: false" do
+      result =
+        DateTimeFormatter.format_event_start(
+          %{start_date: ~D[2026-07-28], start_time: ~T[19:00:00]},
+          separator: " · ",
+          with_year: false
+        )
+
+      assert result == "Jul 28 · 7:00 PM"
+    end
+
     test "normalizes datetime values for start_time" do
       result =
         DateTimeFormatter.format_event_start(%{

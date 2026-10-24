@@ -193,8 +193,11 @@ defmodule YscWeb.EventsLiveTest do
     test "displays loading skeleton before data loads", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/events")
 
-      # Should have loading skeleton initially
-      assert html =~ "animate-pulse" or html =~ "upcoming_events"
+      # The initial (pre-connect) render should include the loading skeleton
+      assert html
+             |> LazyHTML.from_fragment()
+             |> LazyHTML.query("#past-events-skeleton")
+             |> Enum.count() == 1
     end
   end
 
