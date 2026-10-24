@@ -80,9 +80,7 @@ defmodule YscWeb.Api.AppMembershipsController do
          {:ok, subscription} <-
            Customers.create_subscription(member,
              prices: [%{price: plan.stripe_price_id, quantity: 1}],
-             default_payment_method: payment_method_id,
-             idempotency_key:
-               "app_membership_#{member.id}_#{plan.stripe_price_id}"
+             default_payment_method: payment_method_id
            ) do
       render(conn, :subscription, subscription: subscription)
     end

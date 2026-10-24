@@ -1394,6 +1394,37 @@ defmodule Ysc.SubscriptionsTest do
                })
     end
 
+    test "ignores a caller-provided idempotency key so app/web/onboarding replay" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      price_id = "price_idem_#{System.unique_integer([:positive])}"
+      expected_key = "membership_sub_#{user.id}_#{price_id}"
+
+      expect(Stripe.SubscriptionMock, :create, fn _params, opts ->
+        assert opts[:headers]["Idempotency-Key"] ==
+                 Ysc.Stripe.Idempotency.key(expected_key)
+
+        refute opts[:headers]["Idempotency-Key"] ==
+                 Ysc.Stripe.Idempotency.key(
+                   "app_membership_#{user.id}_#{price_id}"
+                 )
+
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: "sub_idem_#{System.unique_integer([:positive])}",
+           customer: user.stripe_id,
+           status: "active"
+         )}
+      end)
+
+      assert {:ok, %Stripe.Subscription{}} =
+               Subscriptions.create_stripe_subscription(user, %{
+                 prices: [%{price: price_id, quantity: 1}],
+                 idempotency_key: "app_membership_#{user.id}_#{price_id}"
+               })
+    end
+
     test "allows creating subscription when user has expired subscription" do
       user =
         user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
