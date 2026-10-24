@@ -585,21 +585,9 @@ defmodule Ysc.Accounts do
   end
 
   defp check_user_subscriptions(user) do
-    case user.subscriptions do
-      %Ecto.Association.NotLoaded{} ->
-        # If subscriptions aren't loaded, fetch them
-        user_with_subscriptions = get_user!(user.id, [:subscriptions])
-
-        user_with_subscriptions.subscriptions
-        |> Enum.any?(&Ysc.Subscriptions.valid?/1)
-
-      subscriptions when is_list(subscriptions) ->
-        subscriptions
-        |> Enum.any?(&Ysc.Subscriptions.valid?/1)
-
-      _ ->
-        false
-    end
+    user
+    |> loaded_subscriptions_for_membership()
+    |> Enum.any?(&Ysc.Subscriptions.valid?/1)
   end
 
   @doc """

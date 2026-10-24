@@ -81,22 +81,91 @@ defmodule Ysc.GooglePhotos.PosterAlbums do
 
   # The Oban queue only serializes syncs per node, but two syncs racing on the
   # same event would upload it twice and lose track of one copy. A session-level
-  # advisory lock, held on a dedicated checked-out connection for the whole
-  # sync, makes the sync single-flight across nodes. A busy lock just skips this
-  # run; the next event change or hourly run catches up.
+  # advisory lock makes the sync single-flight across nodes. A busy lock just
+  # skips this run; the next event change or hourly run catches up.
+  #
+  # Production holds that lock on a *separate* checked-out connection so Chromic
+  # PNG capture and Google Photos HTTP do not occupy a Repo pool slot (sync can
+  # run for minutes). The SQL sandbox has only the test's connection, so tests
+  # keep the lock on the caller checkout.
   defp with_sync_lock(fun) do
-    Repo.checkout(fn ->
-      if try_sync_lock?() do
+    if sandbox_pool?() do
+      Repo.checkout(fn -> lock_and_run(fun) end)
+    else
+      with_detached_lock(fun)
+    end
+  end
+
+  defp sandbox_pool? do
+    Repo.config()[:pool] == Ecto.Adapters.SQL.Sandbox
+  end
+
+  defp with_detached_lock(fun) do
+    parent = self()
+    token = make_ref()
+
+    {:ok, holder} =
+      Task.start_link(fn ->
+        Repo.checkout(fn ->
+          if try_sync_lock?() do
+            send(parent, {:sync_lock, token, :acquired})
+
+            receive do
+              {:sync_lock, ^token, :release} -> release_sync_lock()
+            end
+          else
+            send(parent, {:sync_lock, token, :busy})
+          end
+        end)
+      end)
+
+    receive do
+      {:sync_lock, ^token, :acquired} ->
         try do
           fun.()
         after
-          release_sync_lock()
+          send(holder, {:sync_lock, token, :release})
+          await_lock_holder(holder)
         end
-      else
-        Ysc.Logging.info("Google Photos poster sync already running; skipping")
-        {:ok, %{published: 0, removed: 0}}
+
+      {:sync_lock, ^token, :busy} ->
+        busy_lock_result()
+    after
+      15_000 ->
+        Process.unlink(holder)
+        Process.exit(holder, :kill)
+        {:error, :lock_timeout}
+    end
+  end
+
+  defp lock_and_run(fun) do
+    if try_sync_lock?() do
+      try do
+        fun.()
+      after
+        release_sync_lock()
       end
-    end)
+    else
+      busy_lock_result()
+    end
+  end
+
+  defp busy_lock_result do
+    Ysc.Logging.info("Google Photos poster sync already running; skipping")
+    {:ok, %{published: 0, removed: 0}}
+  end
+
+  defp await_lock_holder(pid) do
+    ref = Process.monitor(pid)
+
+    receive do
+      {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+    after
+      5_000 ->
+        Process.unlink(pid)
+        Process.exit(pid, :kill)
+        :ok
+    end
   end
 
   defp try_sync_lock? do

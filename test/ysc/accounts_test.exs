@@ -5132,6 +5132,49 @@ defmodule Ysc.AccountsTest do
       assert match?(%Ecto.Association.NotLoaded{}, fresh.subscriptions)
       assert Accounts.has_active_membership?(fresh)
     end
+
+    test "does not re-select the users row when subscriptions are NotLoaded" do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_noload_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      assert {:ok, _} =
+               Subscriptions.create_subscription_item(%{
+                 subscription_id: subscription.id,
+                 stripe_price_id: "price_test_noload",
+                 stripe_product_id: "prod_test_noload",
+                 stripe_id: "si_noload_#{System.unique_integer()}",
+                 quantity: 1
+               })
+
+      fresh = Repo.get!(User, user.id)
+      assert match?(%Ecto.Association.NotLoaded{}, fresh.subscriptions)
+
+      {active?, users_selects} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.has_active_membership?(fresh) end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      {_active?, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.has_active_membership?(fresh) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert active?
+      assert users_selects == 0
+      assert password_cols == 0
+    end
   end
 
   describe "update_default_payment_method/2" do
