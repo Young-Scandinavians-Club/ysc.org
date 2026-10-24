@@ -12,6 +12,7 @@ defmodule YscWeb.AdminComponents do
 
   alias Phoenix.LiveView.JS
   alias Ysc.Accounts.{SignupApplication, UserDisplay}
+  alias YscWeb.Admin.DateTimeDisplay
   alias YscWeb.AdminBookingEntitlementHelpers, as: EntitlementHelpers
   alias YscWeb.FormHelpers
 
@@ -735,6 +736,110 @@ defmodule YscWeb.AdminComponents do
     />
     """
   end
+
+  # ---------------------------------------------------------------------------
+  # admin_event_autocomplete
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Fuzzy event picker for linking a record to an event.
+
+  Focusing the empty field offers the upcoming events (soonest first) and a
+  few recent ones; typing searches titles and reference ids, forgiving typos.
+  Items are the slim maps from `Ysc.Events.Picker` (`id`, `title`,
+  `start_date`, `state`).
+
+  Pass `target={@myself}` from LiveComponents so search/select/clear events
+  stay on the component. Drive the assigns with `YscWeb.AdminEventSearch`.
+
+  ## Examples
+
+      <.admin_event_autocomplete
+        id="merch-order-event"
+        label="Event (optional)"
+        name="order[event_id]"
+        search_event="search-events"
+        select_event="select-event"
+        clear_event="clear-event"
+        search_value={@event_search}
+        results={@event_search_results}
+        suggestions={@event_suggestions}
+        selected={@selected_event}
+      />
+
+      # In the LiveView / LiveComponent:
+      alias YscWeb.AdminEventSearch
+
+      socket |> AdminEventSearch.assign_blank() |> AdminEventSearch.assign_suggestions()
+      {:noreply, AdminEventSearch.search(socket, query)}
+      {:noreply, AdminEventSearch.select(socket, id)}
+      {:noreply, AdminEventSearch.assign_blank(socket)}
+  """
+  attr :id, :string, required: true
+  attr :label, :string, default: "Event"
+  attr :name, :string, required: true
+  attr :search_event, :string, required: true
+  attr :select_event, :string, required: true
+  attr :clear_event, :string, required: true
+  attr :search_value, :string, default: ""
+  attr :results, :list, default: []
+  attr :suggestions, :list, default: []
+  attr :selected, :any, default: nil
+  attr :placeholder, :string, default: "Search events by name..."
+  attr :required, :boolean, default: false
+  attr :errors, :list, default: []
+  attr :class, :string, default: ""
+  attr :debounce, :integer, default: 300
+
+  attr :target, :any,
+    default: nil,
+    doc: "Optional phx-target (typically @myself from LiveComponents)"
+
+  def admin_event_autocomplete(assigns) do
+    ~H"""
+    <.autocomplete
+      id={@id}
+      label={@label}
+      name={@name}
+      search_event={@search_event}
+      select_event={@select_event}
+      clear_event={@clear_event}
+      search_value={@search_value}
+      results={@results}
+      suggestions={@suggestions}
+      suggestion_group_fn={&event_timing/1}
+      selected={@selected}
+      display_fn={& &1.title}
+      detail_fn={&event_date/1}
+      subtitle_fn={&event_state/1}
+      placeholder={@placeholder}
+      required={@required}
+      errors={@errors}
+      class={@class}
+      debounce={@debounce}
+      target={@target}
+    />
+    """
+  end
+
+  defp event_timing(event) do
+    if Ysc.Events.Picker.upcoming?(event), do: "Upcoming", else: "Recent"
+  end
+
+  @doc """
+  Date shown beside an event's name in pickers, so events with the same name
+  can be told apart (e.g. `"Nov 08, 2026"`).
+  """
+  def event_date(event), do: DateTimeDisplay.format_event_date(event.start_date)
+
+  @doc """
+  Secondary line for an event in pickers: its state when it is not published
+  (a draft, say), otherwise nothing.
+  """
+  def event_state(%{state: state}) when state in [nil, :published], do: nil
+
+  def event_state(%{state: state}),
+    do: state |> to_string() |> String.capitalize()
 
   # ---------------------------------------------------------------------------
   # admin_section_heading
