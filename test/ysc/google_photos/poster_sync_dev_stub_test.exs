@@ -42,6 +42,15 @@ defmodule Ysc.GooglePhotos.PosterSyncDevStubTest do
     refute PosterAlbums.has_items?(event.id)
   end
 
+  test "unpublishing an event that already has posters still removes them" do
+    event = event_fixture()
+    assert PosterAlbums.has_items?(event.id)
+
+    assert {:ok, draft} = Events.unpublish_event(event)
+    assert draft.state == :draft
+    refute PosterAlbums.has_items?(event.id)
+  end
+
   test "a failing poster capture is swallowed" do
     original = Application.get_env(:ysc, :tv_poster_image_module)
 
