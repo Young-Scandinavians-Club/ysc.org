@@ -3864,9 +3864,6 @@ defmodule YscWeb.AdminComponents do
                     ]}>
                       Merch
                     </span>
-                    <span id="merch-nav-wip-badge" class="admin-nav-label ms-2">
-                      <.badge type="yellow" class="me-0">WIP</.badge>
-                    </span>
                   </.link>
                 </li>
 
