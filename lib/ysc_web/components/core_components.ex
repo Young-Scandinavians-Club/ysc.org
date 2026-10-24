@@ -3233,8 +3233,9 @@ defmodule YscWeb.CoreComponents do
 
   Sign-in, forgot/reset password, and the admin-app mobile handoff share this
   `max-w-sm` column with the home-linked YSC logo above the form. Keep
-  registration (`max-w-xl` + `p-8` logo), account setup, passkey registration
-  (`py-10`, no logo), and error pages on their own chrome.
+  registration (`max-w-xl` + `p-8` logo), account setup, and passkey
+  registration (`py-10`, no logo) on their own chrome. HTML 404/500 pages use
+  `error_page/1`.
 
   `logo_id` is the existing DOM id on the home logo link — LiveView and
   controller tests assert those ids.
@@ -3265,6 +3266,92 @@ defmodule YscWeb.CoreComponents do
     <div id={@id} class={["max-w-sm mx-auto py-4 px-4", @class]}>
       <.home_logo_link id={@logo_id} class="py-8" />
       {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
+  Photo-hero HTML error page with a top-left home logo and a home action.
+
+  The 404 and 500 templates share this full-viewport layout (background, copy,
+  and illustration differ). Keep the surrounding document chrome on
+  `Layouts.error`, and keep auth screens on `auth_panel/1`.
+
+  `logo_id` is the existing DOM id on the home logo link — controller tests
+  assert those ids.
+
+  ## Examples
+
+      <.error_page
+        logo_id="error-404-home-logo"
+        status={404}
+        title="Page not found"
+        class="bg-[#fcf9ec]"
+        image={~p"/images/lost_tomte.webp"}
+        image_alt="404 Lost Tomte"
+      >
+        The page you're looking for doesn't exist or has been moved.
+      </.error_page>
+  """
+  attr :id, :string,
+    default: nil,
+    doc: "Optional DOM id on the page wrapper"
+
+  attr :logo_id, :string,
+    required: true,
+    doc: "DOM id forwarded to `home_logo_link/1`"
+
+  attr :status, :integer,
+    required: true,
+    doc: "HTTP status shown as the display heading (404 or 500)"
+
+  attr :title, :string, required: true
+
+  attr :class, :any,
+    default: nil,
+    doc: "Background (and any extra) classes on the page wrapper"
+
+  attr :image, :string, required: true
+
+  attr :image_alt, :string, required: true
+
+  slot :inner_block, required: true, doc: "Supporting copy under the title"
+
+  def error_page(assigns) do
+    ~H"""
+    <div id={@id} class={["w-full h-full", @class]}>
+      <div class="absolute top-5 left-5 z-10">
+        <.home_logo_link id={@logo_id} />
+      </div>
+      <div class="min-h-screen flex items-center justify-center px-4">
+        <div class="max-w-5xl w-full flex flex-col md:flex-row items-center gap-7 md:gap-12">
+          <div class="flex-1 text-center md:text-left">
+            <h1 class="text-5xl md:text-6xl text-zinc-900 mb-4 type-display">
+              {@status}
+            </h1>
+            <h2 class="text-2xl md:text-3xl text-zinc-800 mb-3 type-title">
+              {@title}
+            </h2>
+            <p class="text-lg text-zinc-600 mb-6">
+              {render_slot(@inner_block)}
+            </p>
+            <.link
+              navigate={~p"/"}
+              class="inline-block px-6 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition duration-200 ease-in-out font-semibold"
+            >
+              <.icon name="hero-arrow-left-solid" class="w-5 h-5 -mt-0.5 me-2" />
+              Go back home
+            </.link>
+          </div>
+          <div class="flex-1 flex items-center justify-center">
+            <img
+              src={@image}
+              alt={@image_alt}
+              class="w-full max-w-4xl h-auto object-contain"
+            />
+          </div>
+        </div>
+      </div>
     </div>
     """
   end
