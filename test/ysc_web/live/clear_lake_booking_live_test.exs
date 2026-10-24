@@ -2619,6 +2619,15 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert has_element?(view, "#clear-lake-water-operations")
       assert has_element?(view, "#before-you-go", "Four keys")
       assert has_element?(view, "#before-you-go", "Thursday morning sprinklers")
+      assert has_element?(view, "#before-you-go", "safe to drink from")
+
+      assert has_element?(
+               view,
+               "#clear-lake-water-operations",
+               "water operations guide"
+             )
+
+      refute has_element?(view, "#before-you-go", "potable")
 
       assert has_element?(
                view,

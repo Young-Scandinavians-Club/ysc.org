@@ -466,6 +466,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~
                "About 3 days before check-in, we'll email you the door code"
 
+      assert text =~ "starting 48 hours before check-in"
+      assert text =~ "View Booking Details"
       refute text =~ "24 hours before"
       refute text =~ "Room Booking"
       refute text =~ "Day Booking"
@@ -516,6 +518,40 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "Property Location"
       refute text =~ "Guests & Reservations"
       refute text =~ "access the property"
+    end
+
+    test "Clear Lake check-in reminder says drinking water in plain language" do
+      html =
+        BookingCheckinReminder.render(%{
+          first_name: "Jane",
+          door_code: "1234",
+          property: "clear_lake",
+          property_name: "Clear Lake",
+          property_address: "123 Lake Rd, Clearlake Oaks, CA",
+          checkin_date: "December 1, 2026",
+          checkout_date: "December 3, 2026",
+          checkin_time: "3:00 PM",
+          checkout_time: "11:00 AM",
+          days_until_checkin: 2,
+          booking_reference_id: "BK-TEST-123",
+          booking_mode: "Shared cabin stay",
+          room_names: nil,
+          nights: 2,
+          is_buyout: false,
+          guests_count: 2,
+          children_count: 0,
+          cabin_master_name: "Lars Berg",
+          cabin_master_email: "cabinmaster@ysc.org",
+          cabin_master_phone: "4155550199",
+          clear_lake_info_url: "https://example.com/bookings/clear-lake",
+          booking_url: "https://example.com/bookings/preview"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "safe to drink from"
+      assert text =~ "not drinkable"
+      refute text =~ "potable"
     end
 
     test "check-in reminder missing door code tells members what to do next" do

@@ -257,7 +257,15 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_cabin_access_step do
-    "You'll receive cabin access details (door code or key instructions) by email #{door_code_email_timing_phrase()}"
+    "You'll receive cabin access details (door code or key instructions) by email #{door_code_email_timing_phrase()}. The door code also appears on your booking page #{door_code_page_timing_phrase()}"
+  end
+
+  def confirmation_email_door_code_notice do
+    "About 3 days before check-in, we'll email you the door code and check-in information. Please keep an eye out for this email! The same code also appears on your booking page #{door_code_page_timing_phrase()} — use View Booking Details below."
+  end
+
+  def confirmation_email_door_code_next_step do
+    "We'll email the door code #{door_code_email_timing_phrase()}. You can also find it on your booking page #{door_code_page_timing_phrase()}"
   end
 
   def cabin_access_receipt_body do

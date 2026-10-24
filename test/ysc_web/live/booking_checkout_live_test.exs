@@ -101,6 +101,9 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       assert html =~
                "Enter your payment details in the payment section to complete your booking"
+
+      assert html =~ "about 3 days before check-in"
+      assert html =~ "starting 48 hours before check-in"
     end
 
     test "paints booking details before the Stripe PaymentIntent is ready", %{

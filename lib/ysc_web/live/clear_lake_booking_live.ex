@@ -1916,14 +1916,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Left side of the single entry door (across the main grass). Four keys open the cabin, pantry, pool storage, and bathrooms — lock all of those when you leave and return the keys to the lockbox.
                     </:item>
                     <:item icon="hero-beaker" title="Water:">
-                      The spigot by the lawn entry gate is not drinkable (hose and pools). All other spigots are potable — don't waste fresh water. See the
+                      The spigot by the lawn entry gate is not drinkable (hose and pools). All other spigots are safe to drink from — don't waste fresh water. See the
                       <.link
                         id="clear-lake-water-operations"
                         href={~p"/documents/clear_lake_water_operations.pdf"}
                         target="_blank"
                         rel="noopener noreferrer"
                         class="text-teal-700 underline hover:text-teal-900"
-                      >potable water operations guide</.link>
+                      >water operations guide</.link>
                       (PDF) for startup, shutdown, and tank fill.
                     </:item>
                     <:item
