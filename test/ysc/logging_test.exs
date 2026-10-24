@@ -1,6 +1,29 @@
 defmodule Ysc.LoggingTest do
   use ExUnit.Case, async: true
 
+  describe "quiet/1" do
+    test "is only active inside the function and restores afterwards" do
+      refute Ysc.Logging.quiet?()
+      assert Ysc.Logging.quiet(fn -> Ysc.Logging.quiet?() end)
+      refute Ysc.Logging.quiet?()
+    end
+
+    test "nests and returns the function result" do
+      assert :ok =
+               Ysc.Logging.quiet(fn ->
+                 Ysc.Logging.quiet(fn -> :ok end)
+               end)
+    end
+
+    test "restores the flag even when the function raises" do
+      assert_raise RuntimeError, fn ->
+        Ysc.Logging.quiet(fn -> raise "boom" end)
+      end
+
+      refute Ysc.Logging.quiet?()
+    end
+  end
+
   describe "helpers (unit)" do
     test "normalize_opts/1 converts maps to keyword lists" do
       kw = Ysc.Logging.normalize_opts(%{a: 1, b: 2})
