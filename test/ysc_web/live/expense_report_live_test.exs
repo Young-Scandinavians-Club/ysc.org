@@ -27,6 +27,32 @@ defmodule YscWeb.ExpenseReportLiveTest do
            )
   end
 
+  test "form contact shows the treasurer's name with the shared treasurer email",
+       %{conn: conn} do
+    treasurer =
+      Ysc.AccountsFixtures.user_fixture(%{
+        first_name: "Tessa",
+        last_name: "Treasurer",
+        board_position: :treasurer
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/expensereport")
+    shared_email = Ysc.EmailConfig.treasurer_email()
+
+    assert has_element?(
+             view,
+             "#expense-report-form-treasurer-contact",
+             "Tessa Treasurer"
+           )
+
+    assert has_element?(
+             view,
+             "#expense-report-form-treasurer-contact a[href='mailto:#{shared_email}']"
+           )
+
+    refute render(view) =~ treasurer.email
+  end
+
   test "mileage items use trip-purpose copy instead of business jargon", %{
     conn: conn
   } do

@@ -29,6 +29,7 @@ defmodule YscWeb.ExpenseReportLive do
         |> assign(:bank_accounts, [])
         |> assign(:billing_address, nil)
         |> assign(:treasurer, nil)
+        |> assign(:treasurer_email, EmailConfig.treasurer_email())
         |> assign(:events, [])
         |> assign(:loading_expense_form_data, true)
         |> assign(:current_user, user)
@@ -2132,16 +2133,20 @@ defmodule YscWeb.ExpenseReportLive do
                 <p class="text-sm text-zinc-600">
                   After you submit, you'll get an email confirmation, and the treasurer will review your report and send your reimbursement.
                 </p>
-                <p :if={@treasurer} class="text-sm text-zinc-600">
+                <p
+                  :if={@treasurer}
+                  id="expense-report-form-treasurer-contact"
+                  class="text-sm text-zinc-600"
+                >
                   Questions? Contact
                   <strong class="font-semibold text-zinc-900">
                     {@treasurer.first_name} {@treasurer.last_name}
                   </strong>
                   at <a
-                    href={"mailto:#{@treasurer.email}"}
+                    href={"mailto:#{@treasurer_email}"}
                     class="text-blue-600 hover:underline"
                   >
-                    {@treasurer.email}
+                    {@treasurer_email}
                   </a>.
                 </p>
               </div>
