@@ -9,6 +9,12 @@ defmodule YscWeb.ErrorHTMLTest do
     assert html =~ "404"
     assert html =~ "Page not found"
     assert html =~ ~s(id="error-404-home-logo")
+    assert html =~ "bg-[#fcf9ec]"
+    assert html =~ "min-h-screen"
+    assert html =~ "max-w-5xl"
+    assert html =~ "Go back home"
+    assert html =~ ~s(src="/images/lost_tomte.webp")
+    assert html =~ ~s(alt="404 Lost Tomte")
   end
 
   test "renders 500.html" do
@@ -16,6 +22,12 @@ defmodule YscWeb.ErrorHTMLTest do
     assert html =~ "500"
     assert html =~ "Something went wrong"
     assert html =~ ~s(id="error-500-home-logo")
+    assert html =~ "bg-[#f9efdf]"
+    assert html =~ "min-h-screen"
+    assert html =~ "max-w-5xl"
+    assert html =~ "Go back home"
+    assert html =~ ~s(src="/images/404_fika.webp")
+    assert html =~ ~s(alt="500 Fika")
   end
 
   test "404 response includes document title", %{conn: conn} do
