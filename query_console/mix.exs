@@ -69,7 +69,14 @@ defmodule QueryConsole.MixProject do
       {:decimal, "~> 3.2.0", override: true},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.1.0"},
+      # 1.1.33: EEF-CVE-2026-64941 (LOW / GHSA-36m4-rm57-3prf) rejects ASCII
+      # tab, LF, CR, and encoded tab (`/%09`) in LiveView redirect /
+      # push_navigate / push_patch `:to` paths so `/\t/evil.com` cannot
+      # become a scheme-relative open redirect. lotus_web still requires
+      # `< 1.2.0`, so stay on 1.1.x. We only pass compile-time `~p` paths
+      # (`/auth/ysc`, `/workbooks/:id`); we do not forward user input to
+      # `redirect/2`.
+      {:phoenix_live_view, "~> 1.1.33"},
       # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
       # SVG and MathML on to_html/2 (mutation XSS). We use lazy_html only in
       # tests via LiveViewTest; pin the patched floor.
