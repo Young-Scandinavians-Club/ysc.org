@@ -217,6 +217,10 @@ defmodule YscWeb.BookingChangeLiveTest do
        %{
          conn: conn
        } do
+    # Winter's advance-booking limit would otherwise keep the next summer
+    # weekend outside the calendar horizon from late October until May.
+    allow_far_future_booking_dates()
+
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
@@ -1857,6 +1861,9 @@ defmodule YscWeb.BookingChangeLiveTest do
 
   test "submit-modification shows weekend-rule copy for a crafted Saturday check-in",
        %{conn: conn} do
+    # See the Friday-Sunday span test: keep next summer inside the horizon.
+    allow_far_future_booking_dates()
+
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
