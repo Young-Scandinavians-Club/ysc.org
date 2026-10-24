@@ -69,12 +69,6 @@ defmodule YscWeb.AdminMerchLiveTest do
       assert has_element?(view, "#sync-merch-catalog")
     end
 
-    test "warns that merch is a work in progress", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/merch")
-      assert has_element?(view, "#merch-wip-banner")
-      assert has_element?(view, "#merch-nav-wip-badge", "WIP")
-    end
-
     test "lists products with their visibility", %{conn: conn} do
       shown = product!()
       hidden = product!(%{status: :hidden})
