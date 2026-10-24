@@ -24,6 +24,7 @@ defmodule Ysc.MixDepsGetRetryTest do
   use ExUnit.Case, async: true
 
   @dockerfile Path.expand("../../etc/docker/Dockerfile", __DIR__)
+  @dockerignore Path.expand("../../.dockerignore", __DIR__)
   @retry_script Path.expand("../../etc/scripts/mix_deps_get_retry.sh", __DIR__)
   @ci_workflow Path.expand("../../.github/workflows/ci.yml", __DIR__)
 
@@ -36,6 +37,40 @@ defmodule Ysc.MixDepsGetRetryTest do
     assert dockerfile =~ "mix_deps_get_retry.sh"
     assert dockerfile =~ "bash etc/scripts/mix_deps_get_retry.sh --only prod"
     assert dockerfile =~ ~r/^    bash$/m
+  end
+
+  test "prod Docker context includes every etc/ path the Dockerfile copies" do
+    # `.dockerignore` excludes `etc/` and re-includes only named scripts.
+    # #1710 copied mix_deps_get_retry.sh without a matching exception, so
+    # sandbox buildx failed with "/etc/scripts/mix_deps_get_retry.sh": not found
+    # (run 40116980063 / job 120944907022).
+    dockerignore = File.read!(@dockerignore)
+    dockerfile = File.read!(@dockerfile)
+
+    copied_etc_paths =
+      dockerfile
+      |> String.split("\n")
+      |> Enum.filter(&String.starts_with?(&1, "COPY "))
+      |> Enum.reject(&String.contains?(&1, "--from="))
+      |> Enum.map(fn line ->
+        line
+        |> String.split()
+        |> Enum.drop(1)
+        |> Enum.find(&String.starts_with?(&1, "etc/"))
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    assert copied_etc_paths != [],
+           "expected the Dockerfile to COPY files under etc/"
+
+    for path <- copied_etc_paths do
+      assert File.exists?(Path.expand("../../#{path}", __DIR__)),
+             "Dockerfile COPY source #{path} does not exist"
+
+      assert dockerignore =~ "!#{path}",
+             ".dockerignore excludes etc/ but does not re-include #{path}"
+    end
   end
 
   test "CI runs the retry script self-test" do

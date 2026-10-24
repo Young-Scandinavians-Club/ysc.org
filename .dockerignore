@@ -4,8 +4,11 @@ assets/node_modules/
 test/
 .git/
 .gitignore
+# The prod Dockerfile copies named scripts from etc/scripts/. Keep the rest of
+# etc/ out of the image context (compose files, CI helpers, release tooling).
 etc/
 !etc/scripts/install_hex.sh
+!etc/scripts/mix_deps_get_retry.sh
 .dockerignore
 .elixir_ls/
 docs/
