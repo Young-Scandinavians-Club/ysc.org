@@ -1415,13 +1415,13 @@ defmodule Ysc.Subscriptions do
     prices = params[:prices] || params["prices"] || params.prices
     expand = params[:expand] || params["expand"] || []
 
-    # Stable per user+prices when the caller omits a key (web membership
-    # settings / account-setup activation). Mobile already passes one. Without
-    # this, dual-tab creates mint two Stripe subscriptions before either local
-    # row exists for find_blocking_subscription/1.
-    idempotency_key =
-      params[:idempotency_key] || params["idempotency_key"] ||
-        default_membership_create_idempotency_key(user, prices)
+    # Always the same per user+prices, including when a caller passes its own
+    # key. Door-sale used `app_membership_#{id}_#{price}` and WP onboarding
+    # used `wp_onboarding_#{id}_#{plan}` while web omitted a key and got
+    # `membership_sub_#{id}_#{price}`. Same-plan overlapping creates then
+    # minted two Stripe subscriptions (two charges) because the lock releases
+    # before the local row exists for find_blocking_subscription/1.
+    idempotency_key = default_membership_create_idempotency_key(user, prices)
 
     stripe_params = %{
       customer: user.stripe_id,

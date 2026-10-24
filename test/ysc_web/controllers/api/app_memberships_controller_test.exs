@@ -111,7 +111,9 @@ defmodule YscWeb.Api.AppMembershipsControllerTest do
         assert params.default_payment_method == "pm_test_card"
 
         assert opts[:headers]["Idempotency-Key"] ==
-                 "app_membership_#{member.id}_#{stripe_price_id}"
+                 Ysc.Stripe.Idempotency.key(
+                   "membership_sub_#{member.id}_#{stripe_price_id}"
+                 )
 
         {:ok, %Stripe.Subscription{id: "sub_test_123", status: "active"}}
       end)
