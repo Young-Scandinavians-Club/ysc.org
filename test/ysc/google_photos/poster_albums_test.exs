@@ -115,6 +115,45 @@ defmodule Ysc.GooglePhotos.PosterAlbumsTest do
       assert [%{id: id}] = Ysc.Events.list_tv_poster_events()
       assert id == upcoming.id
     end
+
+    test "slims event-body HTML and batch-enriches pricing for every upcoming event" do
+      events =
+        Enum.map(1..3, fn index ->
+          event =
+            event_fixture(%{
+              title: "Poster batch #{index}",
+              raw_details: "<p>must not load poster body #{index}</p>",
+              rendered_details: "<p>must not load poster html #{index}</p>"
+            })
+
+          ticket_tier_fixture(%{event_id: event.id})
+          event
+        end)
+
+      {loaded, body_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ysc.Events.list_tv_poster_events() end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, tier_selects} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Ysc.Events.list_tv_poster_events() end,
+          pattern: ~r/FROM "ticket_tiers"/i,
+          caller_pids: [self()]
+        )
+
+      loaded_ids = MapSet.new(Enum.map(loaded, & &1.id))
+      expected_ids = MapSet.new(Enum.map(events, & &1.id))
+
+      assert MapSet.subset?(expected_ids, loaded_ids)
+      assert Enum.all?(loaded, &is_nil(&1.raw_details))
+      assert Enum.all?(loaded, &is_nil(&1.rendered_details))
+      assert Enum.all?(loaded, &is_map(&1.pricing_info))
+      assert body_cols == 0
+      assert tier_selects == 1
+    end
   end
 
   describe "sync/1" do
