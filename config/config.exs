@@ -139,7 +139,8 @@ config :ysc, Oban,
     # Retained only to drain jobs created before queue prioritization.
     mailers: 2,
     maintenance: 2,
-    # Serialized so poster syncs never upload the same event twice.
+    # One poster sync at a time per node (PosterAlbums.sync also takes a
+    # cluster-wide advisory lock) so an event is never uploaded twice.
     google_photos: 1
   ],
   # Maintain completed jobs for 5 days

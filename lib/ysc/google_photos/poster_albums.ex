@@ -36,6 +36,11 @@ defmodule Ysc.GooglePhotos.PosterAlbums do
 
   @poster_format "png"
 
+  # Namespace for the two-arg pg_advisory_lock that keeps syncs from running on
+  # more than one node at once. Arbitrary; unique among the app's advisory locks.
+  @sync_lock_namespace 8_233_101
+  @sync_lock_key 1
+
   @album_titles %{
     tahoe: "Tahoe Display Album",
     clear_lake: "Clear Lake Display Album",
@@ -65,13 +70,50 @@ defmodule Ysc.GooglePhotos.PosterAlbums do
   def sync(opts \\ []) do
     Ysc.Logging.quiet(fn ->
       try do
-        do_sync(opts)
+        with_sync_lock(fn -> do_sync(opts) end)
       rescue
         error -> {:error, {:exception, Exception.message(error)}}
       catch
         kind, reason -> {:error, {kind, inspect(reason)}}
       end
     end)
+  end
+
+  # The Oban queue only serializes syncs per node, but two syncs racing on the
+  # same event would upload it twice and lose track of one copy. A session-level
+  # advisory lock, held on a dedicated checked-out connection for the whole
+  # sync, makes the sync single-flight across nodes. A busy lock just skips this
+  # run; the next event change or hourly run catches up.
+  defp with_sync_lock(fun) do
+    Repo.checkout(fn ->
+      if try_sync_lock?() do
+        try do
+          fun.()
+        after
+          release_sync_lock()
+        end
+      else
+        Ysc.Logging.info("Google Photos poster sync already running; skipping")
+        {:ok, %{published: 0, removed: 0}}
+      end
+    end)
+  end
+
+  defp try_sync_lock? do
+    %{rows: [[locked?]]} =
+      Repo.query!("SELECT pg_try_advisory_lock($1, $2)", [
+        @sync_lock_namespace,
+        @sync_lock_key
+      ])
+
+    locked?
+  end
+
+  defp release_sync_lock do
+    Repo.query!("SELECT pg_advisory_unlock($1, $2)", [
+      @sync_lock_namespace,
+      @sync_lock_key
+    ])
   end
 
   defp do_sync(opts) do
@@ -297,8 +339,7 @@ defmodule Ysc.GooglePhotos.PosterAlbums do
   defp discard_replaced_media(_access_token, nil, _new_item), do: :ok
 
   defp discard_replaced_media(access_token, %PosterItem{} = old, new_item) do
-    if old.media_item_id != new_item.media_item_id and
-         old.google_album_id == new_item.google_album_id do
+    if old.media_item_id != new_item.media_item_id do
       case Api.remove_media_items(access_token, old.google_album_id, [
              old.media_item_id
            ]) do

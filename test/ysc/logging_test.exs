@@ -2,6 +2,23 @@ defmodule Ysc.LoggingTest do
   use ExUnit.Case, async: true
 
   describe "quiet/1" do
+    test "downgrades error logs to warnings only while active" do
+      require Ysc.Logging
+
+      quiet_log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          Ysc.Logging.quiet(fn -> Ysc.Logging.error("quiet boom") end)
+        end)
+
+      assert quiet_log =~ "[warning]"
+      refute quiet_log =~ "[error]"
+
+      loud_log =
+        ExUnit.CaptureLog.capture_log(fn -> Ysc.Logging.error("loud boom") end)
+
+      assert loud_log =~ "[error]"
+    end
+
     test "is only active inside the function and restores afterwards" do
       refute Ysc.Logging.quiet?()
       assert Ysc.Logging.quiet(fn -> Ysc.Logging.quiet?() end)
