@@ -6328,7 +6328,7 @@ defmodule Ysc.Bookings do
         end
 
         # Send email to treasurer if found
-        if treasurer && treasurer.email do
+        if treasurer do
           send_treasurer_cancellation_email(
             treasurer,
             booking,
@@ -6456,7 +6456,7 @@ defmodule Ysc.Bookings do
       # Schedule email
       result =
         YscWeb.Emails.Notifier.schedule_email(
-          treasurer.email,
+          Ysc.EmailConfig.treasurer_email(),
           idempotency_key,
           YscWeb.Emails.BookingCancellationTreasurerNotification.get_subject(
             requires_review
@@ -6474,7 +6474,7 @@ defmodule Ysc.Bookings do
             "Treasurer cancellation email scheduled successfully",
             booking_id: booking.id,
             treasurer_id: treasurer.id,
-            treasurer_email: treasurer.email,
+            treasurer_email: Ysc.EmailConfig.treasurer_email(),
             job_id: job.id
           )
 
