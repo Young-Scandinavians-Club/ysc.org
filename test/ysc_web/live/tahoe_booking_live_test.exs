@@ -113,6 +113,16 @@ defmodule YscWeb.TahoeBookingLiveTest do
              )
 
       assert has_element?(view, "#tahoe-guest-stay-list")
+      assert has_element?(view, "#tahoe-guest-stay-list", "light chores")
+
+      assert has_element?(
+               view,
+               "#tahoe-guest-stay-list",
+               "Meals and linens are not provided"
+             )
+
+      refute render(view) =~ "dugnad"
+      refute render(view) =~ "self-catering"
 
       assert has_element?(
                view,

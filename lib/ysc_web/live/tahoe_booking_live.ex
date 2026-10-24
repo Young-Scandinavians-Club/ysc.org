@@ -3288,10 +3288,10 @@ defmodule YscWeb.TahoeBookingLive do
                   individual bedrooms, a fully equipped kitchen, a wood-burning fireplace and a Scandinavian sauna.
                 </:item>
                 <:item icon="hero-sparkles" title="Bring your own:">
-                  bed linens, towels and food. Stays are self-catering.
+                  bed linens, towels and food. Meals and linens are not provided.
                 </:item>
                 <:item icon="hero-hand-raised" title="Pitch in:">
-                  members share light chores before they leave, the dugnad spirit that keeps rates low.
+                  members share light chores before they leave, the spirit that keeps rates low.
                 </:item>
                 <:item icon="hero-user-group" title="Bring your people:">
                   include everyone staying with you; non-member guests are welcome.

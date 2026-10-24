@@ -171,7 +171,31 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.checkout_cabin_access_step() =~
              BookingUserMessages.door_code_email_timing_phrase()
 
+    assert BookingUserMessages.checkout_cabin_access_step() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
     refute BookingUserMessages.checkout_cabin_access_step() =~ "24 hours"
+
+    assert BookingUserMessages.confirmation_email_door_code_notice() =~
+             "About 3 days before check-in"
+
+    assert BookingUserMessages.confirmation_email_door_code_notice() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
+    assert BookingUserMessages.confirmation_email_door_code_notice() =~
+             "View Booking Details"
+
+    assert BookingUserMessages.confirmation_email_door_code_next_step() =~
+             BookingUserMessages.door_code_email_timing_phrase()
+
+    assert BookingUserMessages.confirmation_email_door_code_next_step() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
+    refute BookingUserMessages.confirmation_email_door_code_notice() =~
+             "24 hours"
+
+    refute BookingUserMessages.confirmation_email_door_code_next_step() =~
+             "24 hours"
 
     assert BookingUserMessages.cabin_access_receipt_body() =~
              BookingUserMessages.door_code_email_timing_phrase()
