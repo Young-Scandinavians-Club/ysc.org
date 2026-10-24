@@ -35,6 +35,27 @@ defmodule Ysc.Logging do
   # Compile-time check for test environment
   @in_test Mix.env() == :test
 
+  @doc """
+  Runs `fun` with `error/2` downgraded to a warning (no Sentry report).
+
+  For best-effort background work, such as syncing Google Photos albums, whose
+  failures must never page anyone. The flag is per process and restored after.
+  """
+  def quiet(fun) when is_function(fun, 0) do
+    previous = Process.put(:ysc_logging_quiet, true)
+
+    try do
+      fun.()
+    after
+      if previous,
+        do: Process.put(:ysc_logging_quiet, previous),
+        else: Process.delete(:ysc_logging_quiet)
+    end
+  end
+
+  @doc false
+  def quiet?, do: Process.get(:ysc_logging_quiet, false)
+
   @doc false
   def normalize_opts(opts) do
     if is_map(opts), do: Enum.to_list(opts), else: opts
@@ -170,7 +191,12 @@ defmodule Ysc.Logging do
         logger_metadata =
           Ysc.Logging.build_error_metadata(opts, error, stacktrace)
 
-        Logger.error(message, logger_metadata)
+        if Ysc.Logging.quiet?() do
+          Logger.warning(message, logger_metadata)
+        else
+          Logger.error(message, logger_metadata)
+        end
+
         :ok
       end
     else
@@ -188,16 +214,20 @@ defmodule Ysc.Logging do
         logger_metadata =
           Ysc.Logging.build_error_metadata(opts, error, stacktrace)
 
-        Logger.error(message, logger_metadata)
+        if Ysc.Logging.quiet?() do
+          Logger.warning(message, logger_metadata)
+        else
+          Logger.error(message, logger_metadata)
 
-        Ysc.Logging.capture_sentry(
-          error,
-          stacktrace,
-          sentry_extra,
-          sentry_tags,
-          message,
-          opts
-        )
+          Ysc.Logging.capture_sentry(
+            error,
+            stacktrace,
+            sentry_extra,
+            sentry_tags,
+            message,
+            opts
+          )
+        end
 
         :ok
       end

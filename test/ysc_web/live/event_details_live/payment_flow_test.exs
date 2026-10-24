@@ -1117,6 +1117,79 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
     end
   end
 
+  describe "free-ticket confirm with in-flight PaymentIntent (#1691)" do
+    test "confirm-free-tickets shows processing toast when an attached PaymentIntent is in flight",
+         %{
+           conn: conn,
+           user: user
+         } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        event = event_with_tickets(tier_count: 0, state: :upcoming, user: user)
+
+        {:ok, tier} =
+          Events.create_ticket_tier(%{
+            name: "Complimentary GA",
+            type: :free,
+            price: Money.new(0, :USD),
+            quantity: 50,
+            event_id: event.id
+          })
+
+        order =
+          ticket_order_fixture(%{
+            user: user,
+            event: event,
+            tier: tier,
+            status: :pending
+          })
+          |> stabilize_pending_ticket_order!()
+
+        payment_intent_id = "pi_free_confirm_in_progress_#{order.id}"
+
+        assert {:ok, order} =
+                 Tickets.update_payment_intent(order, payment_intent_id)
+
+        stub(Ysc.StripeMock, :cancel_payment_intent, fn _id, _opts ->
+          {:error,
+           %Stripe.Error{
+             source: :stripe,
+             code: :payment_intent_unexpected_state,
+             message: "cannot cancel",
+             extra: %{}
+           }}
+        end)
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+          {:ok,
+           build_payment_intent(%{
+             id: id,
+             status: "processing"
+           })}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
+          )
+
+        view = wait_for_async(view)
+
+        assert has_element?(view, "#free-ticket-confirmation-modal")
+
+        render_click(view, "confirm-free-tickets")
+
+        flash = :sys.get_state(view.pid).socket.assigns.flash
+        error = Phoenix.Flash.get(flash, :error)
+
+        assert error =~ "Your payment is still processing"
+        assert error =~ "If you were charged"
+        refute has_element?(view, "#free-ticket-confirmation-modal")
+        assert Tickets.get_ticket_order(order.id).status == :pending
+      end)
+    end
+  end
+
   describe "payment intent refresh on checkout restore (#610)" do
     test "re-syncs payment intent when tier price changes during open checkout",
          %{

@@ -15,6 +15,7 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
   alias Ysc.Tickets
   alias Ysc.Tickets.BookingLocker
   alias Ysc.Tickets.CheckoutCancel
+  alias Ysc.Tickets.StripeService
   alias Ysc.Tickets.TicketOrder
 
   setup :verify_on_exit!
@@ -1153,5 +1154,179 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
         assert Ysc.Repo.get!(TicketOrder, order.id).status == :completed
       end)
     end
+  end
+
+  describe "process_free_ticket_order/1 Stripe reconcile" do
+    test "cancels an attached PaymentIntent before completing a complimentary cart" do
+      order = complimentary_pending_order()
+      payment_intent_id = "pi_free_complete_cancel_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok, payment_intent("canceled", payment_intent_id)}
+      end)
+
+      deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+
+      assert {:ok, completed} = Tickets.process_free_ticket_order(order)
+      assert completed.status == :completed
+      assert is_nil(completed.payment_id)
+      assert completed.payment_intent_id == payment_intent_id
+      assert Enum.all?(completed.tickets, &(&1.status == :confirmed))
+    end
+
+    test "refuses free completion while the attached PaymentIntent is processing" do
+      order = complimentary_pending_order()
+      payment_intent_id = "pi_free_complete_processing_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("processing", payment_intent_id)}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.process_free_ticket_order(order)
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :pending
+      assert reloaded.payment_intent_id == payment_intent_id
+      assert Enum.all?(reloaded.tickets, &(&1.status == :pending))
+    end
+
+    test "refuses free completion when the attached PaymentIntent already succeeded" do
+      order = complimentary_pending_order()
+      payment_intent_id = "pi_free_complete_succeeded_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("succeeded", payment_intent_id)}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.process_free_ticket_order(order)
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :pending
+      assert is_nil(reloaded.payment_id)
+    end
+
+    test "webhook refunds a succeeded paid Intent after free-complete refuses" do
+      order = complimentary_pending_order()
+      payment_intent_id = "pi_free_complete_succeeded_refund_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      succeeded_payment_intent =
+        struct(Stripe.PaymentIntent, %{
+          id: payment_intent_id,
+          status: "succeeded",
+          amount: 2500,
+          latest_charge: "ch_free_complete_succeeded_#{order.id}",
+          metadata: %{
+            "ticket_order_id" => order.id,
+            "user_id" => order.user_id
+          }
+        })
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, succeeded_payment_intent}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.process_free_ticket_order(order)
+
+      pending = Tickets.get_ticket_order(order.id)
+      assert pending.status == :pending
+      assert is_nil(pending.payment_id)
+      assert Enum.all?(pending.tickets, &(&1.status == :pending))
+
+      # Recovery path: webhook / TimeoutWorker must refund the captured paid
+      # Intent against the $0 cart. Completing complimentary first would skip
+      # this refund (`maybe_refund_unfulfilled_ticket_payment/3` ignores
+      # `:completed`).
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          opts ->
+        assert opts == %{expand: ["latest_charge"]}
+        {:ok, succeeded_payment_intent}
+      end)
+
+      assert {:error, :amount_mismatch} =
+               StripeService.process_successful_payment(
+                 succeeded_payment_intent
+               )
+
+      released = Tickets.get_ticket_order(order.id)
+      assert released.status == :cancelled
+      assert released.cancellation_reason == "Payment amount mismatch"
+      assert Enum.all?(released.tickets, &(&1.status == :cancelled))
+      refute Enum.any?(released.tickets, &(&1.status == :confirmed))
+      assert is_nil(released.payment_id)
+    end
+
+    test "refuses free completion when Stripe cancel cannot be reconciled" do
+      order = complimentary_pending_order()
+      payment_intent_id = "pi_free_complete_stripe_error_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, :timeout}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.process_free_ticket_order(order)
+
+      assert Tickets.get_ticket_order(order.id).status == :pending
+    end
+  end
+
+  defp complimentary_pending_order do
+    event = event_fixture()
+
+    {:ok, free_tier} =
+      Ysc.Events.create_ticket_tier(%{
+        name: "Complimentary GA",
+        type: :free,
+        price: Money.new(0, :USD),
+        quantity: 50,
+        event_id: event.id
+      })
+
+    order =
+      ticket_order_fixture(%{
+        event: event,
+        tier: free_tier,
+        status: :pending
+      })
+
+    Tickets.get_ticket_order(order.id)
   end
 end

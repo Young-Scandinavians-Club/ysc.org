@@ -6,8 +6,7 @@ defmodule YscWeb.EventTvPosterController do
   use YscWeb, :controller
 
   alias Ysc.Events
-  alias Ysc.Events.{EventHelpers, TvPosterImage}
-  alias YscWeb.Emails.Helpers
+  alias Ysc.Events.TvPosterImage
 
   def show(conn, %{"id" => id}) do
     with_event_poster(conn, id, fn conn, assigns ->
@@ -27,7 +26,7 @@ defmodule YscWeb.EventTvPosterController do
     with_event_poster(conn, id, fn conn, assigns ->
       case TvPosterImage.capture(assigns, format: format) do
         {:ok, binary} ->
-          filename = poster_filename(assigns.event, format)
+          filename = TvPosterImage.filename(assigns.event, format)
 
           conn
           |> put_resp_content_type(TvPosterImage.mime_type(format))
@@ -58,31 +57,7 @@ defmodule YscWeb.EventTvPosterController do
         |> render(:"404")
 
       event ->
-        fun.(conn, poster_assigns(event))
+        fun.(conn, TvPosterImage.assigns_for_event(event))
     end
-  end
-
-  defp poster_assigns(event) do
-    %{
-      event: event,
-      event_url: Helpers.event_url(event.id),
-      asset_base_url: Helpers.origin() <> "/",
-      sold_out: EventHelpers.event_sold_out?(event),
-      selling_fast: Map.get(event, :selling_fast, false)
-    }
-  end
-
-  defp poster_filename(event, format) do
-    slug =
-      event.title
-      |> String.downcase()
-      |> String.replace(~r/[^a-z0-9]+/u, "-")
-      |> String.trim("-")
-      |> case do
-        "" -> "event"
-        s -> s
-      end
-
-    "#{slug}-tv-poster.#{format}"
   end
 end

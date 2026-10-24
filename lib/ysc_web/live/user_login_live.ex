@@ -4,8 +4,7 @@ defmodule YscWeb.UserLoginLive do
 
   def render(assigns) do
     ~H"""
-    <div class="max-w-sm mx-auto py-4 px-4">
-      <.home_logo_link id="login-home-logo" class="py-8" />
+    <.auth_panel logo_id="login-home-logo">
       <.header class="text-center">
         Sign in to your YSC account
         <:subtitle>
@@ -273,7 +272,7 @@ defmodule YscWeb.UserLoginLive do
           </div>
         </div>
       </.simple_form>
-    </div>
+    </.auth_panel>
     """
   end
 

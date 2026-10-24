@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.48.2",
+      version: "2.49.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -411,6 +411,12 @@ defmodule Ysc.MixProject do
       {:phoenix, "~> 1.8.16"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
       {:plug, "~> 1.20.2", override: true},
+      # 2.2.1: ArgumentError on wrong-typed Plug.Crypto args no longer puts
+      # the secret key base in the stacktrace (EEF-CVE-2026-105963 /
+      # GHSA-ffw9-w85g-f2vh). Public sign/verify/encrypt/decrypt and
+      # secure_compare APIs are unchanged. Phoenix/Plug still list ~> 2.2,
+      # so pin the patched floor.
+      {:plug_crypto, "~> 2.2.1", override: true},
       {:plug_cowboy, "~> 2.9"},
       {:postgrex, "~> 0.22"},
       {:prom_ex, "~> 1.12"},

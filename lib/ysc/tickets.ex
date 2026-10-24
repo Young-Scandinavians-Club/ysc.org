@@ -2456,6 +2456,11 @@ defmodule Ysc.Tickets do
 
   @doc """
   Processes a free ticket order (no payment required).
+
+  Any attached Stripe PaymentIntent is cancelled first. Completing as
+  complimentary while a paid Intent can still capture leaves a succeeded
+  charge that `maybe_refund_unfulfilled_ticket_payment/3` will not refund
+  (`:completed` is outside that helper's pending/expired guard).
   """
   def process_free_ticket_order(%TicketOrder{} = ticket_order) do
     cond do
@@ -2469,27 +2474,77 @@ defmodule Ysc.Tickets do
         {:error, :payment_required}
 
       true ->
-        case complete_ticket_order_if_pending(ticket_order, nil,
-               from_statuses: [:pending]
-             ) do
-          {:ok, completed_order, :newly_completed} ->
-            with :ok <- confirm_tickets(completed_order) do
-              reloaded_order = get_ticket_order(completed_order.id)
-              send_ticket_confirmation_email(reloaded_order)
-              broadcast_ticket_availability_update(ticket_order.event_id)
-              {:ok, reloaded_order}
-            end
-
-          {:ok, completed_order, :already_completed} ->
-            {:ok, completed_order}
-
-          {:error, _} = error ->
-            error
-        end
+        complete_free_ticket_order_after_stripe_reconcile(ticket_order)
     end
   end
 
   def process_free_ticket_order(_ticket_order), do: {:error, :order_not_pending}
+
+  # Same Stripe-first abandon as `cancel_ticket_order/3` / TimeoutWorker:
+  # cancel the Intent, then complete. `already_succeeded` / in-flight / Stripe
+  # errors refuse free-complete so the pending cart stays available for
+  # webhook / TimeoutWorker fulfill-or-refund. Completing first would skip
+  # that refund (`maybe_refund_unfulfilled_ticket_payment/3` ignores
+  # `:completed`).
+  defp complete_free_ticket_order_after_stripe_reconcile(ticket_order) do
+    require Ysc.Logging
+
+    case CheckoutCancel.cancel_payment_intent_for_abandoned_checkout(
+           ticket_order,
+           "process_free_ticket_order"
+         ) do
+      {:cancel, _payment_intent} ->
+        do_complete_free_ticket_order(ticket_order)
+
+      {:already_succeeded, _payment_intent} ->
+        Ysc.Logging.info(
+          "Skipped free ticket completion because checkout payment already succeeded",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: ticket_order.payment_intent_id
+        )
+
+        {:error, :checkout_payment_in_progress}
+
+      {:in_progress, _payment_intent} ->
+        Ysc.Logging.info(
+          "Skipped free ticket completion while checkout payment is in flight",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: ticket_order.payment_intent_id
+        )
+
+        {:error, :checkout_payment_in_progress}
+
+      {:error, stripe_error} ->
+        Ysc.Logging.warning(
+          "Could not reconcile checkout payment with Stripe, not completing free ticket order",
+          ticket_order_id: ticket_order.id,
+          payment_intent_id: ticket_order.payment_intent_id,
+          error: inspect(stripe_error)
+        )
+
+        {:error, :checkout_payment_in_progress}
+    end
+  end
+
+  defp do_complete_free_ticket_order(ticket_order) do
+    case complete_ticket_order_if_pending(ticket_order, nil,
+           from_statuses: [:pending]
+         ) do
+      {:ok, completed_order, :newly_completed} ->
+        with :ok <- confirm_tickets(completed_order) do
+          reloaded_order = get_ticket_order(completed_order.id)
+          send_ticket_confirmation_email(reloaded_order)
+          broadcast_ticket_availability_update(ticket_order.event_id)
+          {:ok, reloaded_order}
+        end
+
+      {:ok, completed_order, :already_completed} ->
+        {:ok, completed_order}
+
+      {:error, _} = error ->
+        error
+    end
+  end
 
   defp do_ticket_selections_from_order(%TicketOrder{tickets: []}), do: %{}
 

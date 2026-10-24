@@ -34,6 +34,39 @@ defmodule Ysc.GooglePhotos.Api do
     end
   end
 
+  @doc """
+  Lists the albums this app created (the Library API only exposes app-created
+  albums), following pagination. Returns `{:ok, [%{"id" => _, "title" => _}]}`.
+  """
+  def list_albums(access_token) do
+    if use_dev_stub?() do
+      Ysc.GooglePhotos.Api.DevStub.list_albums(access_token)
+    else
+      list_albums_http(access_token, nil, [])
+    end
+  end
+
+  @doc """
+  Removes media items from an app-created album.
+
+  This only detaches the items from the album; the Library API cannot delete
+  them from the account, and only items this app added can be removed.
+  """
+  def remove_media_items(_access_token, _album_id, []), do: :ok
+
+  def remove_media_items(access_token, album_id, media_item_ids)
+      when is_list(media_item_ids) do
+    if use_dev_stub?() do
+      Ysc.GooglePhotos.Api.DevStub.remove_media_items(
+        access_token,
+        album_id,
+        media_item_ids
+      )
+    else
+      remove_media_items_http(access_token, album_id, media_item_ids)
+    end
+  end
+
   @doc "Uploads raw bytes and returns an upload token."
   def upload_bytes(access_token, bytes, filename, event_id \\ nil)
       when is_binary(bytes) do
@@ -138,6 +171,55 @@ defmodule Ysc.GooglePhotos.Api do
       GooglePhotos.get_connection() == nil
     else
       false
+    end
+  end
+
+  defp list_albums_http(access_token, page_token, acc) do
+    params =
+      [pageSize: 50, excludeNonAppCreatedData: true] ++
+        if(page_token, do: [pageToken: page_token], else: [])
+
+    case req_get("#{@photos_api_base}/albums",
+           params: params,
+           headers: auth_headers(access_token),
+           receive_timeout: 30_000
+         ) do
+      {:ok, %{status: status, body: body}} when status in 200..299 ->
+        albums = acc ++ List.wrap(body["albums"])
+
+        case body["nextPageToken"] do
+          token when is_binary(token) and token != "" ->
+            list_albums_http(access_token, token, albums)
+
+          _ ->
+            {:ok, albums}
+        end
+
+      {:ok, %{status: status, body: body}} ->
+        log_api_error("list_albums", status, body)
+        {:error, {:api_error, status}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp remove_media_items_http(access_token, album_id, media_item_ids) do
+    case req_post(
+           "#{@photos_api_base}/albums/#{URI.encode(album_id, &URI.char_unreserved?/1)}:batchRemoveMediaItems",
+           json: %{"mediaItemIds" => media_item_ids},
+           headers: auth_headers(access_token),
+           receive_timeout: 30_000
+         ) do
+      {:ok, %{status: status}} when status in 200..299 ->
+        :ok
+
+      {:ok, %{status: status, body: body}} ->
+        log_api_error("batchRemoveMediaItems", status, body)
+        {:error, {:api_error, status}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -248,6 +330,10 @@ defmodule Ysc.GooglePhotos.Api do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp req_get(url, opts) do
+    Req.get(url, Keyword.merge(req_opts(), opts))
   end
 
   defp req_post(url, opts) do

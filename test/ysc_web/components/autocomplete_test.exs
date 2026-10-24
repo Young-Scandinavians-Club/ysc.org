@@ -97,5 +97,108 @@ defmodule YscWeb.Components.AutocompleteTest do
 
       assert html =~ "Select a member"
     end
+
+    test "offers suggestions under a label while the query is empty" do
+      assigns = %{
+        suggestions: [
+          %{id: "a", first_name: "Ada", last_name: "Lovelace"},
+          %{id: "b", first_name: "Grace", last_name: "Hopper"}
+        ]
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.autocomplete
+          id="user-autocomplete"
+          name="booking[user_id]"
+          search_event="search-users"
+          select_event="select-user"
+          clear_event="clear-user"
+          suggestions={@suggestions}
+          suggestions_label="Frequent"
+          display_fn={fn user -> "#{user.first_name} #{user.last_name}" end}
+        />
+        """)
+
+      assert html =~ ~s(id="user-autocomplete-suggestions")
+      assert html =~ "Frequent"
+      assert html =~ "Ada Lovelace"
+      assert html =~ ~s(phx-value-id="b")
+      # Only visible while the field has focus.
+      assert html =~ "group-focus-within/autocomplete:visible"
+    end
+
+    test "groups suggestions under the heading each item maps to" do
+      assigns = %{
+        suggestions: [
+          %{
+            id: "a",
+            first_name: "Ada",
+            last_name: "Lovelace",
+            kind: "Upcoming"
+          },
+          %{
+            id: "b",
+            first_name: "Grace",
+            last_name: "Hopper",
+            kind: "Upcoming"
+          },
+          %{id: "c", first_name: "Alan", last_name: "Turing", kind: "Recent"}
+        ]
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.autocomplete
+          id="user-autocomplete"
+          name="booking[user_id]"
+          search_event="search-users"
+          select_event="select-user"
+          clear_event="clear-user"
+          suggestions={@suggestions}
+          suggestion_group_fn={& &1.kind}
+          display_fn={fn user -> user.first_name end}
+        />
+        """)
+
+      assert length(String.split(html, "Upcoming")) == 2
+      assert length(String.split(html, "Recent")) == 2
+      assert html =~ ~r/Upcoming.*Ada.*Grace.*Recent.*Alan/s
+    end
+
+    test "hides suggestions once there is a query or a selection" do
+      assigns = %{suggestions: [%{id: "a", name: "Ada"}]}
+
+      typing =
+        rendered_to_string(~H"""
+        <.autocomplete
+          id="user-autocomplete"
+          name="booking[user_id]"
+          search_event="search-users"
+          select_event="select-user"
+          clear_event="clear-user"
+          search_value="Ad"
+          suggestions={@suggestions}
+          display_fn={& &1.name}
+        />
+        """)
+
+      selected =
+        rendered_to_string(~H"""
+        <.autocomplete
+          id="user-autocomplete"
+          name="booking[user_id]"
+          search_event="search-users"
+          select_event="select-user"
+          clear_event="clear-user"
+          selected={%{id: "a", name: "Ada"}}
+          suggestions={@suggestions}
+          display_fn={& &1.name}
+        />
+        """)
+
+      refute typing =~ "user-autocomplete-suggestions"
+      refute selected =~ "user-autocomplete-suggestions"
+    end
   end
 end
