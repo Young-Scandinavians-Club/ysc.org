@@ -105,6 +105,31 @@ defmodule YscWeb.PageControllerTest do
   end
 
   describe "GET /choir" do
+    test "renders choir photo with WebP sources and JPG fallback", %{
+      conn: conn
+    } do
+      html = conn |> get(~p"/choir") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      assert Enum.count(
+               LazyHTML.query(
+                 document,
+                 "picture source[type='image/webp'][srcset*='choir-480.webp']"
+               )
+             ) == 1
+
+      assert Enum.count(
+               LazyHTML.query(
+                 document,
+                 "picture img#choir-photo[src*='choir.jpg']"
+               )
+             ) == 1
+
+      assert Enum.empty?(
+               LazyHTML.query(document, "img#choir-photo[srcset*='.webp']")
+             )
+    end
+
     test "renders choir leader by name when no matching user exists", %{
       conn: conn
     } do

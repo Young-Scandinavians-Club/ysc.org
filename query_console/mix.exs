@@ -33,15 +33,26 @@ defmodule QueryConsole.MixProject do
 
   defp deps do
     [
-      # 1.8.15: phoenix.js replaceTransport noops old conn handlers before
-      # close so an async transport close cannot tear down the replacement
-      # (#6852). 1.8.14: LongPoll fetch timers are cleared after success or
-      # abort (#6811); VerifiedRoutes :router must be a compile-time module;
-      # local path validation is shared. We enable longpoll on the LiveView
-      # socket (app.js longPollFallbackMs: 2500). 1.8.13: phoenix.js
-      # reconnects after Chrome freeze/resume. 1.8.10: longpoll POST timeout
-      # close-and-retry. phx.gen.auth / phx.gen.cert / phx.new unused.
-      {:phoenix, "~> 1.8.15"},
+      # 1.8.16: phoenix.js connection-handling races (#6867) and WebSocket
+      # close code 1000 is no longer special-cased (#6880). Endpoint.socket/3
+      # accepts max_channels_per_transport (default 100). We mount LiveView
+      # with websocket + longpoll (app.js longPollFallbackMs: 2500) and keep
+      # the default channel cap. Requires phoenix_pubsub ~> 2.4 (lock 2.4.1);
+      # we only start {Phoenix.PubSub, name: QueryConsole.PubSub} and do not
+      # call subscribe/broadcast ourselves. 1.8.15 replaceTransport
+      # detach-before-close is superseded by the Connection class. 1.8.14:
+      # LongPoll fetch timers are cleared after success or abort (#6811);
+      # VerifiedRoutes :router must be a compile-time module; local path
+      # validation is shared. 1.8.13: phoenix.js reconnects after Chrome
+      # freeze/resume. 1.8.10: longpoll POST timeout close-and-retry.
+      # phx.gen.auth / phx.gen.cert / phx.new unused (Tailwind stays 4.1.7).
+      {:phoenix, "~> 1.8.16"},
+      # 2.2.1: ArgumentError on wrong-typed Plug.Crypto args no longer puts
+      # the secret key base in the stacktrace (EEF-CVE-2026-105963 /
+      # GHSA-ffw9-w85g-f2vh). Public sign/verify/encrypt/decrypt and
+      # secure_compare APIs are unchanged. Phoenix/Plug still list ~> 2.2,
+      # so pin the patched floor.
+      {:plug_crypto, "~> 2.2.1", override: true},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
       # 0.22.4: Escape comments on Postgrex.stream/4 (EEF-CVE-2026-66838).
@@ -58,7 +69,14 @@ defmodule QueryConsole.MixProject do
       {:decimal, "~> 3.2.0", override: true},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.1.0"},
+      # 1.1.33: EEF-CVE-2026-64941 (LOW / GHSA-36m4-rm57-3prf) rejects ASCII
+      # tab, LF, CR, and encoded tab (`/%09`) in LiveView redirect /
+      # push_navigate / push_patch `:to` paths so `/\t/evil.com` cannot
+      # become a scheme-relative open redirect. lotus_web still requires
+      # `< 1.2.0`, so stay on 1.1.x. We only pass compile-time `~p` paths
+      # (`/auth/ysc`, `/workbooks/:id`); we do not forward user input to
+      # `redirect/2`.
+      {:phoenix_live_view, "~> 1.1.33"},
       # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
       # SVG and MathML on to_html/2 (mutation XSS). We use lazy_html only in
       # tests via LiveViewTest; pin the patched floor.

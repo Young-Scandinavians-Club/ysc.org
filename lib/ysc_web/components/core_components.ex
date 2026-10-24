@@ -3229,6 +3229,47 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Narrow centered column for unauthenticated auth screens.
+
+  Sign-in, forgot/reset password, and the admin-app mobile handoff share this
+  `max-w-sm` column with the home-linked YSC logo above the form. Keep
+  registration (`max-w-xl` + `p-8` logo), account setup, passkey registration
+  (`py-10`, no logo), and error pages on their own chrome.
+
+  `logo_id` is the existing DOM id on the home logo link — LiveView and
+  controller tests assert those ids.
+
+  ## Examples
+
+      <.auth_panel logo_id="login-home-logo">
+        <.header class="text-center">Sign in to your YSC account</.header>
+        ...
+      </.auth_panel>
+  """
+  attr :id, :string,
+    default: nil,
+    doc: "Optional DOM id on the column wrapper"
+
+  attr :logo_id, :string,
+    required: true,
+    doc: "DOM id forwarded to `home_logo_link/1`"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the column"
+
+  slot :inner_block, required: true
+
+  def auth_panel(assigns) do
+    ~H"""
+    <div id={@id} class={["max-w-sm mx-auto py-4 px-4", @class]}>
+      <.home_logo_link id={@logo_id} class="py-8" />
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
   Centered public page for unsubscribing from an email list via a token link.
 
   Shared by the newsletter and event-notification unsubscribe LiveViews.

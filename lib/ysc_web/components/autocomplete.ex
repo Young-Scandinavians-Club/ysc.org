@@ -63,6 +63,13 @@ defmodule YscWeb.Components.Autocomplete do
         required
       />
 
+  ## Suggestions
+
+  Pass `suggestions` to offer picks before anyone types (for example the
+  upcoming events). They show while the field is focused and empty, and give
+  way to `results` once there is a query. Give `suggestion_group_fn` to split
+  them under headings: consecutive items that return the same label share one.
+
   From a LiveComponent, pass `target={@myself}` so search, select, and
   clear events stay on the component instead of bubbling to the parent
   LiveView.
@@ -82,9 +89,26 @@ defmodule YscWeb.Components.Autocomplete do
   attr :clear_event, :string, required: true
   attr :search_value, :string, default: ""
   attr :results, :list, default: []
+
+  attr :suggestions, :list,
+    default: [],
+    doc: "Shown while the field is focused and empty"
+
+  attr :suggestions_label, :string, default: "Suggestions"
+
+  attr :suggestion_group_fn, :any,
+    default: nil,
+    doc: "item -> heading; when nil all suggestions share suggestions_label"
+
   attr :selected, :any, default: nil
   attr :display_fn, :any, required: true
   attr :subtitle_fn, :any, default: nil
+
+  attr :detail_fn, :any,
+    default: nil,
+    doc:
+      "item -> short text shown beside the name (e.g. a date), so look-alike names can be told apart"
+
   attr :value_fn, :any, default: nil
   attr :placeholder, :string, default: "Search..."
   attr :required, :boolean, default: false
@@ -109,7 +133,11 @@ defmodule YscWeb.Components.Autocomplete do
       end
 
     ~H"""
-    <div class={["relative", @class]} id={@id} phx-hook="Autocomplete">
+    <div
+      class={["group/autocomplete relative", @class]}
+      id={@id}
+      phx-hook="Autocomplete"
+    >
       <label
         :if={@label != ""}
         class="block text-sm font-semibold leading-6 text-zinc-800"
@@ -128,12 +156,13 @@ defmodule YscWeb.Components.Autocomplete do
       <div :if={@selected} class="mt-2">
         <div class="flex items-center justify-between px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium text-zinc-900 truncate">
-              {@display_fn.(@selected)}
-            </div>
-            <div :if={@subtitle_fn} class="text-xs text-zinc-500 truncate">
-              {@subtitle_fn.(@selected)}
-            </div>
+            <.item_label
+              item={@selected}
+              display_fn={@display_fn}
+              subtitle_fn={@subtitle_fn}
+              detail_fn={@detail_fn}
+              truncate
+            />
           </div>
           <button
             type="button"
@@ -202,14 +231,53 @@ defmodule YscWeb.Components.Autocomplete do
                 phx-value-id={@value_fn.(result)}
                 class="w-full px-3 py-2 text-left hover:bg-zinc-100 focus:bg-zinc-100 focus:outline-hidden transition-colors duration-75 cursor-pointer"
               >
-                <div class="text-sm font-medium text-zinc-900">
-                  {@display_fn.(result)}
-                </div>
-                <div :if={@subtitle_fn} class="text-xs text-zinc-500">
-                  {@subtitle_fn.(result)}
-                </div>
+                <.item_label
+                  item={result}
+                  display_fn={@display_fn}
+                  subtitle_fn={@subtitle_fn}
+                  detail_fn={@detail_fn}
+                />
               </button>
             </li>
+          </ul>
+        </div>
+
+        <%!-- Suggestions, shown while focused with nothing typed --%>
+        <div
+          :if={@search_value == "" && @suggestions != []}
+          id={"#{@id}-suggestions"}
+          role="listbox"
+          class={[
+            "absolute z-50 w-full mt-1 bg-white border border-zinc-200 rounded-md shadow-lg max-h-72 overflow-auto",
+            "invisible opacity-0 transition duration-150 ease-out origin-top",
+            "group-focus-within/autocomplete:visible group-focus-within/autocomplete:opacity-100"
+          ]}
+        >
+          <ul class="py-1" role="list">
+            <%= for group <- suggestion_groups(@suggestions, @suggestion_group_fn, @suggestions_label) do %>
+              <li
+                role="presentation"
+                class="px-3 pt-2 pb-1 text-xs text-zinc-500 type-eyebrow"
+              >
+                {group.label}
+              </li>
+              <li :for={result <- group.items} role="option">
+                <button
+                  type="button"
+                  phx-click={@select_event}
+                  phx-target={@target}
+                  phx-value-id={@value_fn.(result)}
+                  class="w-full px-3 py-2 text-left hover:bg-zinc-100 focus:bg-zinc-100 focus:outline-hidden transition-colors duration-75 cursor-pointer"
+                >
+                  <.item_label
+                    item={result}
+                    display_fn={@display_fn}
+                    subtitle_fn={@subtitle_fn}
+                    detail_fn={@detail_fn}
+                  />
+                </button>
+              </li>
+            <% end %>
           </ul>
         </div>
 
@@ -250,5 +318,47 @@ defmodule YscWeb.Components.Autocomplete do
       </p>
     </div>
     """
+  end
+
+  attr :item, :any, required: true
+  attr :display_fn, :any, required: true
+  attr :subtitle_fn, :any, default: nil
+  attr :detail_fn, :any, default: nil
+  attr :truncate, :boolean, default: false
+
+  defp item_label(assigns) do
+    ~H"""
+    <div class="flex items-baseline justify-between gap-3">
+      <span class={[
+        "text-sm font-medium text-zinc-900",
+        @truncate && "truncate"
+      ]}>
+        {@display_fn.(@item)}
+      </span>
+      <span
+        :if={@detail_fn}
+        class="shrink-0 text-xs font-medium tabular-nums text-zinc-600"
+      >
+        {@detail_fn.(@item)}
+      </span>
+    </div>
+    <div
+      :if={@subtitle_fn}
+      class={["text-xs text-zinc-500", @truncate && "truncate"]}
+    >
+      {@subtitle_fn.(@item)}
+    </div>
+    """
+  end
+
+  defp suggestion_groups(suggestions, nil, label),
+    do: [%{label: label, items: suggestions}]
+
+  defp suggestion_groups(suggestions, group_fn, _label) do
+    suggestions
+    |> Enum.chunk_by(group_fn)
+    |> Enum.map(fn [first | _] = items ->
+      %{label: group_fn.(first), items: items}
+    end)
   end
 end

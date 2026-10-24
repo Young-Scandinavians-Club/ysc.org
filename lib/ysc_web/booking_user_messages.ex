@@ -80,7 +80,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def tahoe_review_modal_continue_button do
-    "Continue to payment"
+    "Continue to guest names"
   end
 
   def tahoe_review_modal_back_button do

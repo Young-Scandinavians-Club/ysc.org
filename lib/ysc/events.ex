@@ -260,6 +260,22 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Published events that have not ended yet, enriched for TV poster rendering.
+
+  "Ended" follows the same rule as the public Upcoming list, so a poster leaves
+  the cabin TV albums exactly when the event leaves that list.
+  """
+  def list_tv_poster_events do
+    from(e in Event,
+      where: e.state == :published,
+      where: ^event_upcoming_dynamic(),
+      order_by: [asc: e.start_date, asc: e.start_time]
+    )
+    |> Repo.all()
+    |> Enum.map(&Ysc.Events.EventPricingCache.enrich_event/1)
+  end
+
+  @doc """
   List all events, optionally with filters.
   """
   def list_events(filters \\ %{}) do
@@ -4144,9 +4160,28 @@ defmodule Ysc.Events do
     |> Repo.update()
   end
 
-  defp broadcast(event) do
-    Phoenix.PubSub.broadcast(Ysc.PubSub, topic(), {__MODULE__, event})
+  defp broadcast(message) do
+    result =
+      Phoenix.PubSub.broadcast(Ysc.PubSub, topic(), {__MODULE__, message})
+
+    maybe_sync_tv_poster_albums(message)
+    result
   end
+
+  # Event create/update/publish/cancel/delete all land here, so this is the one
+  # place that keeps the Google Photos poster albums in step with events. It is
+  # best-effort: `enqueue_for_event/1` never raises or exits, so it can't
+  # affect saving an event.
+  defp maybe_sync_tv_poster_albums(%msg{event: %Event{} = event})
+       when msg in [
+              Ysc.MessagePassingEvents.EventAdded,
+              Ysc.MessagePassingEvents.EventUpdated,
+              Ysc.MessagePassingEvents.EventDeleted
+            ] do
+    Ysc.GooglePhotos.PosterSyncWorker.enqueue_for_event(event)
+  end
+
+  defp maybe_sync_tv_poster_albums(_message), do: :ok
 
   defp reservation_event_id(ticket_tier_id) do
     TicketTier

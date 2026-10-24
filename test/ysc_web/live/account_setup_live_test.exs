@@ -1325,6 +1325,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       assert html =~ "Pay your membership dues"
       refute html =~ "Activate Your Membership"
+      refute html =~ "Save payment method &amp; activate"
       assert html =~ "Add or confirm a payment method"
 
       assert html =~
@@ -1334,8 +1335,11 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert has_element?(view, "ol li", "Payment")
       refute has_element?(view, "ol li", "Save payment method")
 
-      assert has_element?(view, "#setup-payment-form") or
-               has_element?(view, "[phx-click=\"retry_payment_setup\"]")
+      if has_element?(view, "#setup-payment-form") do
+        assert html =~ "Save payment method &amp; pay dues"
+      else
+        assert has_element?(view, "[phx-click=\"retry_payment_setup\"]")
+      end
     end
 
     test "mid-flow approval without payment method routes to payment step", %{

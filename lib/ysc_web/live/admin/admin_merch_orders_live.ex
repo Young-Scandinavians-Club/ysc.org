@@ -242,8 +242,6 @@ defmodule YscWeb.AdminMerchOrdersLive do
       </.admin_page_header>
 
       <div class="w-full pt-4">
-        <.wip_banner />
-
         <.merch_tabs active={:orders} attention_count={@attention_count} />
 
         <.admin_search_bar

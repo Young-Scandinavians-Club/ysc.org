@@ -818,6 +818,143 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_event_autocomplete/1" do
+    defp picker_event(id, title, days, state \\ :published) do
+      %{
+        id: id,
+        title: title,
+        start_date: DateTime.add(DateTime.utc_now(), days, :day),
+        state: state
+      }
+    end
+
+    test "renders the search field with the event placeholder" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_autocomplete
+          id="order-event"
+          name="order[event_id]"
+          search_event="search-events"
+          select_event="select-event"
+          clear_event="clear-event"
+        />
+        """)
+
+      assert html =~ ~s(id="order-event-input")
+      assert html =~ ~s(name="order[event_id]")
+      assert html =~ "Search events by name"
+      refute html =~ "order-event-suggestions"
+    end
+
+    test "splits suggestions into upcoming and recent" do
+      assigns = %{
+        suggestions: [
+          picker_event("e1", "Gala Night", 3),
+          picker_event("e2", "Spring Mixer", -9)
+        ]
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_autocomplete
+          id="order-event"
+          name="order[event_id]"
+          search_event="search-events"
+          select_event="select-event"
+          clear_event="clear-event"
+          suggestions={@suggestions}
+        />
+        """)
+
+      assert html =~ ~r/Upcoming.*Gala Night.*Recent.*Spring Mixer/s
+      assert html =~ ~s(phx-value-id="e1")
+    end
+
+    test "counts an event happening today as upcoming" do
+      today = Ysc.Events.Picker.today_start()
+
+      assigns = %{
+        suggestions: [%{picker_event("e1", "Tonight", 0) | start_date: today}]
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_autocomplete
+          id="order-event"
+          name="order[event_id]"
+          search_event="search-events"
+          select_event="select-event"
+          clear_event="clear-event"
+          suggestions={@suggestions}
+        />
+        """)
+
+      assert html =~ "Upcoming"
+      refute html =~ "Recent"
+    end
+
+    test "shows the selected event with its date" do
+      assigns = %{selected: picker_event("e1", "Gala Night", 3)}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_autocomplete
+          id="order-event"
+          name="order[event_id]"
+          search_event="search-events"
+          select_event="select-event"
+          clear_event="clear-event"
+          selected={@selected}
+        />
+        """)
+
+      assert html =~ "Gala Night"
+      assert html =~ ~s(value="e1")
+      refute html =~ "order-event-input"
+    end
+
+    test "shows each event's date beside its name, in suggestions and when selected" do
+      first = picker_event("e1", "Happy Hour", 3)
+      second = picker_event("e2", "Happy Hour", 10)
+      assigns = %{suggestions: [first, second], selected: first}
+
+      suggestions =
+        rendered_to_string(~H"""
+        <.admin_event_autocomplete
+          id="order-event"
+          name="order[event_id]"
+          search_event="search-events"
+          select_event="select-event"
+          clear_event="clear-event"
+          suggestions={@suggestions}
+        />
+        """)
+
+      selected =
+        rendered_to_string(~H"""
+        <.admin_event_autocomplete
+          id="order-event"
+          name="order[event_id]"
+          search_event="search-events"
+          select_event="select-event"
+          clear_event="clear-event"
+          selected={@selected}
+        />
+        """)
+
+      assert suggestions =~ event_date(first)
+      assert suggestions =~ event_date(second)
+      assert selected =~ event_date(first)
+    end
+
+    test "event_state/1 only flags events that are not published" do
+      assert event_state(picker_event("e1", "A", 3)) == nil
+      assert event_state(picker_event("e2", "B", 3, :draft)) == "Draft"
+    end
+  end
+
   describe "admin_user_autocomplete/1" do
     test "renders the search input when no user is selected" do
       assigns = %{}
