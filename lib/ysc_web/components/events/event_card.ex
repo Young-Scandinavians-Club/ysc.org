@@ -11,8 +11,9 @@ defmodule YscWeb.Components.Events.EventCard do
     router: YscWeb.Router,
     statics: YscWeb.static_paths()
 
-  alias Ysc.Events.DateTimeFormatter
-  alias YscWeb.{DateDisplay, EventBadgeHelpers, PlainText}
+  import YscWeb.Components.Events.EventDatePill
+
+  alias YscWeb.{EventBadgeHelpers, PlainText}
 
   attr :event, :any, required: true
   attr :class, :string, default: nil
@@ -85,24 +86,7 @@ defmodule YscWeb.Components.Events.EventCard do
 
       <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
         <div class="flex items-center gap-2 mb-4">
-          <span class={[
-            "text-sm px-2.5 py-1 rounded-sm type-eyebrow",
-            if(@variant == "dark",
-              do: "text-zinc-300 bg-zinc-800",
-              else: "text-zinc-900 bg-zinc-100"
-            )
-          ]}>
-            {format_event_date(@event)}
-          </span>
-          <span
-            :if={@event.start_time && @event.start_time != ""}
-            class={[
-              "text-sm type-eyebrow",
-              if(@variant == "dark", do: "text-zinc-500", else: "text-zinc-600")
-            ]}
-          >
-            {DateTimeFormatter.format_time(@event.start_time)}
-          </span>
+          <.event_date_pill event={@event} variant={@variant} />
         </div>
         <.link
           navigate={~p"/events/#{@event.id}"}
@@ -162,10 +146,6 @@ defmodule YscWeb.Components.Events.EventCard do
       </div>
     </div>
     """
-  end
-
-  defp format_event_date(event) do
-    DateDisplay.format_event_date_range(event)
   end
 
   defp get_event_badges_for_card(event, sold_out, selling_fast) do

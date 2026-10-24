@@ -1,8 +1,10 @@
 defmodule YscWeb.EventsListLive do
   use YscWeb, :live_component
 
+  import YscWeb.Components.Events.EventDatePill
+
   alias Ysc.Events
-  alias Ysc.Events.{DateTimeFormatter, EventHelpers}
+  alias Ysc.Events.EventHelpers
   alias Ysc.Media.Image
   alias Money
   alias YscWeb.DateDisplay
@@ -138,11 +140,9 @@ defmodule YscWeb.EventsListLive do
                     <% end %>
                   </div>
 
-                  <%!-- Date/time pill — mobile only, matches event_card --%>
+                  <%!-- Date/time pill — mobile only, same component as event_card --%>
                   <div class="flex items-center gap-2 mb-4 sm:hidden">
-                    <span class="text-sm px-2.5 py-1 rounded-sm bg-zinc-100 text-zinc-900 type-eyebrow">
-                      {DateTimeFormatter.format_event_start(@hero_event)}
-                    </span>
+                    <.event_date_pill event={@hero_event} with_year />
                   </div>
 
                   <h2 class="text-3xl text-zinc-900 sm:text-zinc-50 sm:text-4xl lg:text-5xl xl:text-6xl mb-3 transition-colors duration-300 hero-title-shadow type-display">
@@ -150,14 +150,12 @@ defmodule YscWeb.EventsListLive do
                   </h2>
 
                   <%!-- Date + location inline row — desktop overlay only --%>
-                  <div class="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-white/80">
-                    <span class="text-sm type-eyebrow">
-                      {DateTimeFormatter.format_event_start(@hero_event)}
-                    </span>
-                    <span
-                      :if={@hero_event.location_name}
-                      class="h-3 w-px bg-white/40"
-                    ></span>
+                  <div class="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-2 mb-4 text-white/80">
+                    <.event_date_pill
+                      event={@hero_event}
+                      with_year
+                      variant="overlay"
+                    />
                     <span
                       :if={@hero_event.location_name}
                       class="text-sm flex items-center gap-1 type-eyebrow"
