@@ -554,8 +554,13 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     } do
       edition = edition_fixture(admin, %{"title" => "Live update row"})
 
-      {view, html} = live_newsletters(conn)
-      refute html =~ "is editing"
+      {view, _html} = live_newsletters(conn)
+
+      refute has_element?(
+               view,
+               "#admin-newsletter-card-#{edition.id}",
+               "is editing"
+             )
 
       other_admin = user_fixture(%{role: "admin", first_name: "Taylor"})
 
@@ -578,7 +583,12 @@ defmodule YscWeb.AdminNewslettersLiveTest do
 
       html = render(view)
       assert html =~ "Taylor"
-      assert html =~ "is editing"
+
+      assert has_element?(
+               view,
+               "#admin-newsletter-card-#{edition.id}",
+               "is editing"
+             )
     end
   end
 
