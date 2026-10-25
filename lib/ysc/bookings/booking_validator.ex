@@ -52,6 +52,23 @@ defmodule Ysc.Bookings.BookingValidator do
   end
 
   @doc """
+  Copy when a Single (or other non-family) membership already has an active stay.
+
+  "Complete the existing booking" sounds like unfinished checkout. The stay is
+  already confirmed — they can book again after checkout, or if it is cancelled.
+  """
+  def one_active_booking_message do
+    "You can only have one active booking at a time. You can book again after you check out of your current stay, or if that booking is cancelled."
+  end
+
+  @doc """
+  Copy when a Family/Lifetime membership already has two overlapping stays.
+  """
+  def family_two_active_bookings_message do
+    "Your family can only have 2 cabin bookings at the same time. You already have 2 stays during these dates. You can book again after checkout, or if one of those bookings is cancelled."
+  end
+
+  @doc """
   Validates a booking changeset according to all business rules.
 
   ## Options
@@ -709,9 +726,9 @@ defmodule Ysc.Bookings.BookingValidator do
 
   defp build_overlapping_booking_error_message(membership_type) do
     if membership_type in [:family, :lifetime] do
-      "Your family can only have 2 cabin bookings at the same time. You already have 2 bookings during these dates — cancel or complete one before booking again."
+      family_two_active_bookings_message()
     else
-      "You can only have one active booking at a time. Please complete your existing booking first."
+      one_active_booking_message()
     end
   end
 

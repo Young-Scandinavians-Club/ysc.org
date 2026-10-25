@@ -850,6 +850,8 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       {message, _} = Keyword.fetch!(changeset.errors, :user_id)
       assert message =~ "one active booking at a time"
+      assert message =~ "check out of your current stay"
+      refute message =~ "complete your existing booking"
     end
 
     test "Family member: allows up to 2 overlapping bookings", %{
@@ -958,6 +960,8 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       {message, _} = Keyword.fetch!(changeset.errors, :checkin_date)
       assert message =~ "2 cabin bookings at the same time"
+      assert message =~ "after checkout"
+      refute message =~ "complete one"
     end
 
     test "allows new booking after previous one is cancelled", %{
@@ -1332,6 +1336,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       {message, _} = Keyword.fetch!(changeset.errors, :user_id)
       assert message =~ "one active booking at a time"
+      refute message =~ "complete your existing booking"
     end
 
     test "family membership: rejects overlapping booking when family already has two",
@@ -1371,6 +1376,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       {message, _} = Keyword.fetch!(changeset.errors, :checkin_date)
       assert message =~ "2 cabin bookings at the same time"
+      refute message =~ "complete one"
     end
 
     test "buyout exclusivity: sub-account cannot book room while primary has active buyout",

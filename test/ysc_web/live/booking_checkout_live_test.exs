@@ -1006,6 +1006,14 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       refute has_element?(view, "#stripe-payment-container")
       refute html =~ "Failed to initialize payment"
 
+      assert has_element?(
+               view,
+               "#hold-countdown-next-step",
+               "Confirm your booking before the timer runs out"
+             )
+
+      refute has_element?(view, "#hold-countdown-next-step", "Pay now")
+
       # Complimentary flow must not hit Stripe; deny replaces the module setup stub for this MFA.
       deny(StripeMock, :create_payment_intent, 2)
 
@@ -1773,6 +1781,14 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "held temporarily"
       assert html =~ "not confirmed yet"
       assert html =~ "go back on the calendar"
+
+      assert has_element?(
+               view,
+               "#hold-countdown-next-step",
+               "Finish adding guest names, then continue to payment"
+             )
+
+      refute has_element?(view, "#hold-countdown-next-step", "Pay now")
     end
 
     test "lists slim-loaded household names in the guest picker", %{

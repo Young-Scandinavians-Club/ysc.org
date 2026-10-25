@@ -45,7 +45,7 @@ defmodule YscWeb.BookingUserMessages do
 
   def leave_unpaid_checkout_confirm do
     trim("""
-    Cancel this unfinished booking? These dates will go back on the calendar. Your stay is not booked until you finish payment.
+    Cancel this unfinished booking? These dates will go back on the calendar. Your stay is not booked yet.
     """)
   end
 
@@ -103,6 +103,32 @@ defmodule YscWeb.BookingUserMessages do
 
   def checkout_guest_info_step_continue_complimentary do
     "Continue to confirm your booking — these dates are held temporarily, not confirmed yet. Finish checkout soon or they'll go back on the calendar."
+  end
+
+  def checkout_hold_timer_intro do
+    "These dates are held for"
+  end
+
+  @doc """
+  Next-step sentence beside the hold countdown.
+
+  "Pay now" is only true on the paid payment step. Guest-name and complimentary
+  checkout still have the timer, but payment is not the next action.
+  """
+  def checkout_hold_timer_next_step(:guest_info, true) do
+    "— not confirmed yet. Finish adding guest names, then confirm your booking. If the timer runs out, the dates go back on the calendar and you'll need to book again."
+  end
+
+  def checkout_hold_timer_next_step(:guest_info, false) do
+    "— not confirmed yet. Finish adding guest names, then continue to payment. If the timer runs out, the dates go back on the calendar and you'll need to book again."
+  end
+
+  def checkout_hold_timer_next_step(_payment_step, true) do
+    "— not confirmed yet. Confirm your booking before the timer runs out. If the timer runs out, the dates go back on the calendar and you'll need to book again."
+  end
+
+  def checkout_hold_timer_next_step(_payment_step, _complimentary) do
+    "— not confirmed yet. Pay now to complete your booking. If the timer runs out, the dates go back on the calendar and you'll need to book again."
   end
 
   def insufficient_capacity_error(opts \\ []) do
