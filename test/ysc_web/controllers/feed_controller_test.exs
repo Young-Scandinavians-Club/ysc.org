@@ -95,6 +95,28 @@ defmodule YscWeb.FeedControllerTest do
       assert body =~ title
       assert body =~ marker
     end
+
+    test "scrubs stored script tags from event body HTML", %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+      marker = "atom-scrub-#{System.unique_integer([:positive])}"
+      title = "Feed Scrub Event #{System.unique_integer([:positive])}"
+      event = event_fixture(%{organizer_id: admin.id, title: title})
+
+      event
+      |> Ecto.Changeset.change(%{
+        rendered_details:
+          "<p>#{marker}</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+      })
+      |> Ysc.Repo.update!()
+
+      body = get(conn, ~p"/feeds/events.atom") |> response(200)
+
+      assert body =~ title
+      assert body =~ marker
+      # Atomex entity-encodes HTML content; feed readers decode then render.
+      refute body =~ "&lt;script"
+      refute body =~ "onerror="
+    end
   end
 
   describe "HTML feed discovery" do

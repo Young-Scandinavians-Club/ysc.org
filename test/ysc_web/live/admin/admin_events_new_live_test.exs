@@ -1283,6 +1283,70 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert reloaded_event.max_attendees == 150
     end
 
+    test "validate-capacity ignores client-supplied rendered_details", %{
+      conn: conn,
+      admin: admin
+    } do
+      original_html = "<p>Original overview</p>"
+
+      event =
+        event_fixture(%{
+          title: "Capacity Mass Assignment",
+          organizer_id: admin.id,
+          max_attendees: 100,
+          raw_details: original_html,
+          rendered_details: original_html
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      render_change(view, "validate-capacity", %{
+        "event" => %{
+          "max_attendees" => "150",
+          "title" => "Hacked Title",
+          "rendered_details" =>
+            "<p>Injected</p><script>document.cookie</script>"
+        }
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 150
+      assert reloaded.title == "Capacity Mass Assignment"
+      assert reloaded.rendered_details == original_html
+    end
+
+    test "save-capacity ignores client-supplied rendered_details", %{
+      conn: conn,
+      admin: admin
+    } do
+      original_html = "<p>Original overview</p>"
+
+      event =
+        event_fixture(%{
+          title: "Save Capacity Mass Assignment",
+          organizer_id: admin.id,
+          max_attendees: 50,
+          raw_details: original_html,
+          rendered_details: original_html
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      render_submit(view, "save-capacity", %{
+        "event" => %{
+          "max_attendees" => "75",
+          "title" => "Hacked Title",
+          "rendered_details" =>
+            "<p>Injected</p><script>document.cookie</script>"
+        }
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 75
+      assert reloaded.title == "Save Capacity Mass Assignment"
+      assert reloaded.rendered_details == original_html
+    end
+
     test "handles save-capacity with concurrent updates", %{
       conn: conn,
       admin: admin
