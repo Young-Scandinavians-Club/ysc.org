@@ -2661,15 +2661,7 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("validate-capacity", params, socket) do
     # Reload event to ensure we have the latest lock_version
     current_event = Events.get_event!(socket.assigns[:event].id)
-
-    # Handle both expected and unexpected parameter formats
-    capacity_params =
-      case params do
-        %{"event" => event_params} -> event_params
-        # Handle target-only events
-        %{"_target" => _} -> %{}
-        other -> other
-      end
+    capacity_params = capacity_attrs(params)
 
     changeset =
       Event.changeset(current_event, capacity_params)
@@ -2704,15 +2696,7 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("save-capacity", params, socket) do
     # Reload event to ensure we have the latest lock_version
     current_event = Events.get_event!(socket.assigns[:event].id)
-
-    # Handle both expected and unexpected parameter formats
-    capacity_params =
-      case params do
-        %{"event" => event_params} -> event_params
-        # Handle target-only events
-        %{"_target" => _} -> %{}
-        other -> other
-      end
+    capacity_params = capacity_attrs(params)
 
     case Events.update_event_editor(current_event, capacity_params,
            updated_by_id: socket.assigns.current_user.id
@@ -3766,4 +3750,23 @@ defmodule YscWeb.AdminEventsNewLive do
   defp event_help_topic(:tickets), do: "events/tickets"
   defp event_help_topic(:updates), do: "events/updates"
   defp event_help_topic(_), do: "events/create"
+
+  # Finding 96: `validate-capacity` / `save-capacity` used to forward the full
+  # event param map into `Events.update_event_editor/3`, which casts every
+  # `@editor_fields` value — including `rendered_details` without TrixScrubber.
+  # LiveView events can include keys that are not in `#capacity_form`.
+  @capacity_fields ~w(max_attendees unlimited_capacity)a
+
+  defp capacity_attrs(%{"event" => event_params}) when is_map(event_params) do
+    take_capacity_fields(event_params)
+  end
+
+  defp capacity_attrs(%{"_target" => _}), do: %{}
+
+  defp capacity_attrs(params) when is_map(params),
+    do: take_capacity_fields(params)
+
+  defp take_capacity_fields(params) do
+    Map.take(params, ~w(max_attendees unlimited_capacity) ++ @capacity_fields)
+  end
 end

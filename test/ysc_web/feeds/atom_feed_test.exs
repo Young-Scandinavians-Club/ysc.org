@@ -145,5 +145,27 @@ defmodule YscWeb.Feeds.AtomFeedTest do
       assert xml =~ "formatting"
       refute xml =~ "<em>"
     end
+
+    test "scrubs script tags from rendered_details before emitting HTML content" do
+      marker = "atom-safe-#{System.unique_integer()}"
+
+      event = %{
+        id: Ecto.ULID.generate(),
+        title: "Feed XSS Event",
+        description: "Blurb",
+        rendered_details:
+          "<p>#{marker}</p><script>document.cookie</script><img src=x onerror=alert(1)>",
+        updated_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        published_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        start_date: DateTime.add(DateTime.utc_now(), 7, :day)
+      }
+
+      xml = AtomFeed.events_feed([event])
+
+      assert xml =~ marker
+      # Atomex entity-encodes HTML content; feed readers decode then render.
+      refute xml =~ "&lt;script"
+      refute xml =~ "onerror="
+    end
   end
 end

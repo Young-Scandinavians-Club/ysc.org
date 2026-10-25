@@ -89,6 +89,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 93 (HIGH)     Account-setup / update_user_phone_and_sms reused User.registration_changeset with validate_email: false, so a client could mass-assign email (keeping email_verified_at), name, and DOB while saving a phone number — planting an account under a victim's unused address without the email-change reauth flow
   Finding 94 (MEDIUM)   Volunteer→member demotion did not disconnect LiveViews. Finding 87 only force-closed sockets when the previous role was `:admin`, so an already-open volunteer scanner / event editor / check-in / posts LiveView kept frozen `admin_role` and `current_user.role` and continued handling staff events after revocation.
   Finding 95 (HIGH)     Password reset and password change deleted `users_tokens` but never broadcast LiveView `"disconnect"`. Finding 87/94 already showed `mount_current_user/2` only runs on mount, so a stolen session with an already-open bookings/tickets/settings LiveView kept `current_user` and could keep acting after the victim recovered the account.
+  Finding 96 (MEDIUM)   Event Tickets-tab leftover `validate-capacity`/`save-capacity` forwarded the full event param map into `update_event_editor/3`, persisting client `rendered_details` without TrixScrubber. Public `/feeds/events.atom` emits that HTML unsanitized.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -6371,6 +6372,109 @@ defmodule YscWeb.SecurityAuditTest do
       }
 
       refute Accounts.get_user_by_session_token(token)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 96 (MEDIUM): Capacity leftover must not persist editor HTML
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 96: capacity leftover cannot persist unsanitized event HTML" do
+    import Ysc.EventsFixtures
+
+    alias Ysc.Events
+
+    test "volunteer validate-capacity ignores rendered_details and still updates capacity",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      original_title =
+        "Finding 96 Capacity #{System.unique_integer([:positive])}"
+
+      original_html = "<p>Original overview</p>"
+
+      injected_html =
+        "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: original_title,
+          raw_details: original_html,
+          rendered_details: original_html,
+          max_attendees: 100
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      render_change(view, "validate-capacity", %{
+        "event" => %{
+          "max_attendees" => "150",
+          "title" => "Hacked Emergency Dues",
+          "rendered_details" => injected_html,
+          "raw_details" => injected_html,
+          "partiful_link" => "https://evil.example/phish"
+        }
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 150
+      assert reloaded.title == original_title
+      assert reloaded.rendered_details == original_html
+      assert reloaded.raw_details == original_html
+      assert reloaded.partiful_link in [nil, ""]
+    end
+
+    test "volunteer save-capacity ignores rendered_details and public atom feed stays clean",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+      original_title = "Finding 96 Save #{System.unique_integer([:positive])}"
+      original_html = "<p>Safe overview</p>"
+
+      injected_html =
+        "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: original_title,
+          raw_details: original_html,
+          rendered_details: original_html,
+          max_attendees: 50
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      render_submit(view, "save-capacity", %{
+        "event" => %{
+          "max_attendees" => "75",
+          "title" => "Hacked Emergency Dues",
+          "rendered_details" => injected_html,
+          "raw_details" => injected_html
+        }
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 75
+      assert reloaded.title == original_title
+      assert reloaded.rendered_details == original_html
+      assert reloaded.raw_details == original_html
+
+      feed =
+        build_conn()
+        |> get(~p"/feeds/events.atom")
+        |> response(200)
+
+      assert feed =~ original_title
+      refute feed =~ "document.cookie"
+      refute feed =~ "<script"
+      refute feed =~ "onerror="
     end
   end
 
