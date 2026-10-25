@@ -78,6 +78,15 @@ defmodule YscWeb.AdminMediaLiveTest do
       assert_patched(view, ~p"/admin/media/upload")
     end
 
+    test "upload page renders the shared dropzone empty state", %{conn: conn} do
+      {:ok, view, html} = live(conn, ~p"/admin/media/upload")
+
+      assert has_element?(view, "#upload-form")
+      assert has_element?(view, "#upload-form", "Click to upload")
+      assert html =~ "hero-cloud-arrow-up"
+      refute has_element?(view, "#upload-form button[aria-label='cancel']")
+    end
+
     test "renders page-wide drag and drop upload target", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/media")
 

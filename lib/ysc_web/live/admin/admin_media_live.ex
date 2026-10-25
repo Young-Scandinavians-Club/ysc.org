@@ -260,25 +260,12 @@ defmodule YscWeb.AdminMediaLive do
               <div class="flex flex-row flex-wrap gap-2">
                 <%= for entry <- @uploads.media_uploads.entries do %>
                   <article class="upload-entry">
-                    <figure class="w-28 group relative">
-                      <button
-                        type="button"
-                        phx-click="cancel-upload"
-                        phx-value-ref={entry.ref}
-                        aria-label="cancel"
-                      >
-                        <div class="hidden group-hover:block absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-red-500 z-10">
-                          <.icon name="hero-x-circle" class="w-10 h-10" />
-                        </div>
-                        <.live_img_preview
-                          entry={entry}
-                          class="group-hover:blur-sm h-[120px] w-[120px]"
-                        />
-                        <figcaption class="text-sm truncate overflow-hidden bg-zinc-100 text-zinc-600 w-28 z-8 absolute inset-x-0 bottom-0 py-1">
-                          {entry.client_name}
-                        </figcaption>
-                      </button>
-                    </figure>
+                    <.upload_entry_preview
+                      entry={entry}
+                      cancel="cancel-upload"
+                      preview_class="group-hover:blur-sm h-[120px] w-[120px]"
+                      figure_class="w-28 group relative"
+                    />
 
                     <%= for err <- upload_errors(@uploads.media_uploads, entry) do %>
                       <.upload_error error={err} variant={:admin} alert? />
