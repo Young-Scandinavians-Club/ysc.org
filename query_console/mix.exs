@@ -126,6 +126,15 @@ defmodule QueryConsole.MixProject do
       # EEF-CVE-2026-82672. We reach mint through Finch and Req (SSO token
       # POST). Finch still lists mint ~> 1.8, so pin the patched floor.
       {:mint, "~> 1.11.0", override: true},
+      # 0.24.0: close HTTP/1 connections after request/response errors
+      # before returning them to the pool (stale Mint 1.11 refs after
+      # receive timeouts). Also HTTP QUERY method, pool_timeout wait for
+      # dynamic HTTP/2 pools, async TLS shutdown. We reach Finch only
+      # through Req.post/2 (SSO token exchange); Req starts the Req.Finch
+      # pool. We do not use :query, start_pool/3, or SSLKEYLOGFILE. No
+      # documented 0.23→0.24 breaking changes. Req lists finch ~> 0.21,
+      # so pin the floor as a direct dep like the main app.
+      {:finch, "~> 0.24.0"},
       # 0.7.5: put_aws_sigv4 drops generated Authorization / x-amz-* headers
       # before re-signing a retry; 303 See Other becomes GET except HEAD.
       # We only call Req.post/2 with json: for SSO token exchange — no

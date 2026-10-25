@@ -41,12 +41,12 @@ defmodule QueryConsole.DecimalUpgradeTest do
       assert mix_exs =~ ~s({:decimal, "~> 3.2.0", override: true})
     end
 
-    test "companion lock is 3.2.0 and req/finch stay put" do
+    test "companion lock is 3.2.0 and req stays put" do
       lock = File.read!(@mix_lock)
       assert lock =~ ~s|"decimal": {:hex, :decimal, "3.2.0"|
       refute lock =~ ~s|"decimal": {:hex, :decimal, "3.1.1"|
       assert lock =~ ~s|"req": {:hex, :req, "0.7.5"|
-      assert lock =~ ~s|"finch": {:hex, :finch, "0.23.0"|
+      assert lock =~ ~s|"finch": {:hex, :finch, "0.24.0"|
     end
 
     test "to_string and conversion APIs we use still load" do

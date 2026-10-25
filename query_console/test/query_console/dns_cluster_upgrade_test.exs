@@ -74,11 +74,11 @@ defmodule QueryConsole.DnsClusterUpgradeTest do
       assert mix_exs =~ ~s({:dns_cluster, "~> 0.3.1"})
     end
 
-    test "companion lock is 0.3.1 and finch stays 0.23.0" do
+    test "companion lock is 0.3.1 and finch is 0.24.0" do
       lock = File.read!(@mix_lock)
       assert lock =~ ~s|"dns_cluster": {:hex, :dns_cluster, "0.3.1"|
       refute lock =~ ~s|"dns_cluster": {:hex, :dns_cluster, "0.3.0"|
-      assert lock =~ ~s|"finch": {:hex, :finch, "0.23.0"|
+      assert lock =~ ~s|"finch": {:hex, :finch, "0.24.0"|
       assert lock =~ ~s|"telemetry_metrics": {:hex, :telemetry_metrics, "1.2.0"|
     end
 
