@@ -2545,7 +2545,7 @@ defmodule YscWeb.TahoeBookingLive do
               </p>
               <p>
                 <strong>Active stays:</strong>
-                Only one active booking is allowed per membership. You may book your next stay once your current one is completed.
+                Only one active booking is allowed per membership. You may book your next stay after you check out of your current one.
               </p>
               <p>
                 <strong>
@@ -3137,7 +3137,7 @@ defmodule YscWeb.TahoeBookingLive do
                       {BookingValidator.saturday_weekend_policy_message()}
                     </:row>
                     <:row label="Active bookings">
-                      One active booking per membership. When your current stay is completed, you can book another.
+                      One active booking per membership. After you check out of your current stay, you can book another.
                     </:row>
                     <:row label="Seasons">
                       <p :for={
@@ -5709,7 +5709,7 @@ defmodule YscWeb.TahoeBookingLive do
           Map.put(
             errors,
             :active_booking,
-            "Your family group can only have one active booking at a time. Please complete the existing booking first."
+            BookingValidator.one_active_booking_message()
           )
         else
           errors

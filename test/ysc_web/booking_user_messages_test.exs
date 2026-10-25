@@ -52,6 +52,12 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.leave_unpaid_checkout_confirm() =~
              "unfinished booking"
 
+    assert BookingUserMessages.leave_unpaid_checkout_confirm() =~
+             "not booked yet"
+
+    refute BookingUserMessages.leave_unpaid_checkout_confirm() =~
+             "finish payment"
+
     refute BookingUserMessages.leave_unpaid_checkout_confirm() =~
              "release these dates"
 
@@ -100,6 +106,34 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert toast =~ "Add guest names and pay"
     assert toast =~ "confirm your booking"
     refute toast =~ "Booking created"
+  end
+
+  test "checkout hold timer says pay now only on the paid payment step" do
+    assert BookingUserMessages.checkout_hold_timer_intro() ==
+             "These dates are held for"
+
+    guest_paid =
+      BookingUserMessages.checkout_hold_timer_next_step(:guest_info, false)
+
+    assert guest_paid =~ "Finish adding guest names, then continue to payment"
+    refute guest_paid =~ "Pay now"
+
+    guest_free =
+      BookingUserMessages.checkout_hold_timer_next_step(:guest_info, true)
+
+    assert guest_free =~ "Finish adding guest names, then confirm your booking"
+    refute guest_free =~ "Pay now"
+
+    payment_free =
+      BookingUserMessages.checkout_hold_timer_next_step(:payment, true)
+
+    assert payment_free =~ "Confirm your booking before the timer runs out"
+    refute payment_free =~ "Pay now"
+
+    payment_paid =
+      BookingUserMessages.checkout_hold_timer_next_step(:payment, false)
+
+    assert payment_paid =~ "Pay now to complete your booking"
   end
 
   test "Tahoe room minimum charge copy is about price, not a guest requirement" do
