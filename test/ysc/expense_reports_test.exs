@@ -1633,7 +1633,15 @@ defmodule Ysc.ExpenseReportsTest do
          %{
            user: user
          } do
-      _treasurer = user_fixture(%{board_position: :treasurer, state: :active})
+      treasurer =
+        user_fixture(%{
+          board_position: :treasurer,
+          state: :active,
+          email: "personal-treasurer-#{Ecto.UUID.generate()}@example.com"
+        })
+
+      shared_email = Ysc.EmailConfig.treasurer_email()
+      refute treasurer.email == shared_email
 
       {:ok, bank_account} =
         ExpenseReports.create_bank_account(
@@ -1675,10 +1683,18 @@ defmodule Ysc.ExpenseReportsTest do
           worker: YscWeb.Workers.EmailNotifier,
           args: %{
             "template" => "expense_report_treasurer_notification",
+            "recipient" => shared_email,
             "idempotency_key" =>
               "expense_report_treasurer_notification_#{report.id}"
           }
         )
+
+        refute Enum.any?(
+                 all_enqueued(worker: YscWeb.Workers.EmailNotifier),
+                 &(get_in(&1.args, ["template"]) ==
+                     "expense_report_treasurer_notification" and
+                     get_in(&1.args, ["recipient"]) == treasurer.email)
+               )
       end)
     end
 

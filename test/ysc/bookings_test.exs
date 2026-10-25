@@ -6449,7 +6449,17 @@ defmodule Ysc.BookingsTest do
 
       guest = user_fixture()
       _cabin_master = assign_board!(user_fixture(), :tahoe_cabin_master)
-      _treasurer = assign_board!(user_fixture(), :treasurer)
+
+      treasurer =
+        assign_board!(
+          user_fixture(%{
+            email: "personal-treasurer-#{Ecto.UUID.generate()}@example.com"
+          }),
+          :treasurer
+        )
+
+      shared_email = Ysc.EmailConfig.treasurer_email()
+      refute treasurer.email == shared_email
 
       checkin = Date.utc_today() |> Date.add(100) |> first_monday_on_or_after()
       checkout = Date.add(checkin, 3)
@@ -6479,8 +6489,18 @@ defmodule Ysc.BookingsTest do
 
         assert_enqueued(
           worker: YscWeb.Workers.EmailNotifier,
-          args: %{"template" => "booking_cancellation_treasurer_notification"}
+          args: %{
+            "template" => "booking_cancellation_treasurer_notification",
+            "recipient" => shared_email
+          }
         )
+
+        refute Enum.any?(
+                 all_enqueued(worker: YscWeb.Workers.EmailNotifier),
+                 &(get_in(&1.args, ["template"]) ==
+                     "booking_cancellation_treasurer_notification" and
+                     get_in(&1.args, ["recipient"]) == treasurer.email)
+               )
       end)
     end
 
@@ -6538,7 +6558,17 @@ defmodule Ysc.BookingsTest do
       deactivate_tahoe_buyout_refund_policies()
 
       guest = user_fixture()
-      _treasurer = assign_board!(user_fixture(), :treasurer)
+
+      treasurer =
+        assign_board!(
+          user_fixture(%{
+            email: "personal-treasurer-#{Ecto.UUID.generate()}@example.com"
+          }),
+          :treasurer
+        )
+
+      shared_email = Ysc.EmailConfig.treasurer_email()
+      refute treasurer.email == shared_email
 
       checkin = Date.utc_today() |> Date.add(100) |> first_monday_on_or_after()
       checkout = Date.add(checkin, 3)
@@ -6556,7 +6586,10 @@ defmodule Ysc.BookingsTest do
 
         assert_enqueued(
           worker: YscWeb.Workers.EmailNotifier,
-          args: %{"template" => "booking_cancellation_treasurer_notification"}
+          args: %{
+            "template" => "booking_cancellation_treasurer_notification",
+            "recipient" => shared_email
+          }
         )
 
         refute_enqueued(
@@ -6565,6 +6598,11 @@ defmodule Ysc.BookingsTest do
             "template" => "booking_cancellation_cabin_master_notification"
           }
         )
+
+        refute Enum.any?(
+                 all_enqueued(worker: YscWeb.Workers.EmailNotifier),
+                 &(get_in(&1.args, ["recipient"]) == treasurer.email)
+               )
       end)
     end
 
