@@ -29,6 +29,14 @@ defmodule YscWeb.MediaPickerComponentTest do
     image
   end
 
+  # Valid 1×1 PNG so LiveView accepts the upload entry.
+  defp tiny_png do
+    <<137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
+      0, 0, 0, 1, 8, 2, 0, 0, 0, 144, 119, 83, 222, 0, 0, 0, 12, 73, 68, 65, 84,
+      8, 215, 99, 248, 207, 192, 0, 0, 3, 1, 1, 0, 24, 221, 141, 176, 0, 0, 0,
+      0, 73, 69, 78, 68, 174, 66, 96, 130>>
+  end
+
   describe "MediaPickerComponent in newsletter editor" do
     setup [:create_admin]
 
@@ -82,6 +90,38 @@ defmodule YscWeb.MediaPickerComponentTest do
       |> render_click()
 
       assert has_element?(view, "input[name='search']")
+    end
+
+    test "in-progress upload shows a cancel overlay without a filename caption",
+         %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/new")
+
+      upload =
+        file_input(view, "#newsletter_cover-upload-form", :media_picker_file, [
+          %{name: "cover.png", content: tiny_png(), type: "image/png"}
+        ])
+
+      html = render_upload(upload, "cover.png", 50)
+
+      assert html =~ "upload-entry__cancel"
+      assert html =~ ~s(aria-label="cancel")
+      assert html =~ "hero-x-circle"
+      assert html =~ "Phoenix.LiveImgPreview"
+      refute html =~ "<figcaption"
+
+      assert has_element?(
+               view,
+               "#newsletter_cover-upload-form button[aria-label='cancel']"
+             )
+
+      view
+      |> element("#newsletter_cover-upload-form button[aria-label='cancel']")
+      |> render_click()
+
+      refute has_element?(
+               view,
+               "#newsletter_cover-upload-form button[aria-label='cancel']"
+             )
     end
 
     test "selecting an image from the modal sends it to the parent", %{

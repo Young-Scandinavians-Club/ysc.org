@@ -130,30 +130,20 @@ defmodule YscWeb.MediaPickerComponent do
               <div class="flex flex-row flex-wrap gap-2">
                 <%= for entry <- @uploads.media_picker_file.entries do %>
                   <article class="upload-entry">
-                    <figure class="group relative">
-                      <button
-                        type="button"
-                        aria-label="cancel"
-                        phx-click="cancel-upload"
-                        phx-target={@myself}
-                        phx-value-ref={entry.ref}
-                        class="upload-entry__cancel w-full"
-                      >
-                        <div class="hidden group-hover:block absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-red-500 z-10">
-                          <.icon name="hero-x-circle" class="w-10 h-10" />
-                        </div>
-                        <.live_img_preview
-                          entry={entry}
-                          class={[
-                            "group-hover:blur-sm rounded-lg",
-                            if(@multiple,
-                              do: "size-28 object-cover",
-                              else: "h-60 w-full"
-                            )
-                          ]}
-                        />
-                      </button>
-                    </figure>
+                    <.upload_entry_preview
+                      entry={entry}
+                      cancel="cancel-upload"
+                      caption?={false}
+                      preview_class={[
+                        "group-hover:blur-sm rounded-lg",
+                        if(@multiple,
+                          do: "size-28 object-cover",
+                          else: "h-60 w-full"
+                        )
+                      ]}
+                      button_class="upload-entry__cancel w-full"
+                      phx-target={@myself}
+                    />
 
                     <%= for err <- upload_errors(@uploads.media_picker_file, entry) do %>
                       <.upload_error error={err} />

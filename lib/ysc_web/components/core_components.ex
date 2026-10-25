@@ -1919,6 +1919,92 @@ defmodule YscWeb.CoreComponents do
     do: ["text-sm text-red-600 font-semibold mt-1", extra]
 
   @doc """
+  Cancel overlay + LiveView image preview for one upload drop-zone entry.
+
+  Pair with `upload_dropzone_empty_state/1` and `upload_error/1`. Keep the
+  `<article class="upload-entry">` wrapper and per-entry `upload_errors/2`
+  loop at the call site so error variants can differ.
+
+  Do not use this for event-photo upload tiles (video placeholder, progress
+  bar, corner remove button) — that layout is not drop-in.
+
+  ## Examples
+
+      <.upload_entry_preview
+        entry={entry}
+        cancel="cancel-upload"
+        preview_class="group-hover:blur-sm h-[120px] w-[120px]"
+        figure_class="w-28 group relative"
+      />
+
+      <.upload_entry_preview
+        entry={entry}
+        cancel="cancel"
+        preview_class="group-hover:blur-sm h-80 w-full"
+        button_class="upload-entry__cancel w-full"
+        phx-target={@myself}
+      />
+
+      <.upload_entry_preview
+        entry={entry}
+        cancel="cancel-upload"
+        caption?={false}
+        preview_class={["group-hover:blur-sm rounded-lg", "h-60 w-full"]}
+        button_class="upload-entry__cancel w-full"
+        phx-target={@myself}
+      />
+  """
+  attr :entry, Phoenix.LiveView.UploadEntry, required: true
+
+  attr :cancel, :string,
+    required: true,
+    doc: "LiveView event that cancels this entry (`phx-click`)"
+
+  attr :preview_class, :any,
+    required: true,
+    doc: "Classes on `live_img_preview/1` (include `group-hover:blur-sm`)"
+
+  attr :figure_class, :any,
+    default: "group relative",
+    doc: "Classes on the wrapping `<figure>`"
+
+  attr :button_class, :any,
+    default: nil,
+    doc: "Classes on the cancel button (e.g. `upload-entry__cancel w-full`)"
+
+  attr :caption?, :boolean,
+    default: true,
+    doc: "When true, shows `entry.client_name` as a figcaption overlay"
+
+  attr :rest, :global, include: ~w(phx-target)
+
+  def upload_entry_preview(assigns) do
+    ~H"""
+    <figure class={@figure_class}>
+      <button
+        type="button"
+        phx-click={@cancel}
+        phx-value-ref={@entry.ref}
+        aria-label="cancel"
+        class={@button_class}
+        {@rest}
+      >
+        <div class="hidden group-hover:block absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-red-500 z-10">
+          <.icon name="hero-x-circle" class="w-10 h-10" />
+        </div>
+        <.live_img_preview entry={@entry} class={@preview_class} />
+        <figcaption
+          :if={@caption?}
+          class="text-sm truncate overflow-hidden bg-zinc-100 text-zinc-600 w-28 z-8 absolute inset-x-0 bottom-0 py-1"
+        >
+          {@entry.client_name}
+        </figcaption>
+      </button>
+    </figure>
+    """
+  end
+
+  @doc """
   Renders a back navigation link.
 
   ## Examples
