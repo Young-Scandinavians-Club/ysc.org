@@ -202,7 +202,6 @@ defmodule Ysc.Bookings.PricingRule do
         booking_mode,
         price_unit
       ) do
-    alias Ysc.Bookings.PricingRule
     require Ysc.Logging
 
     base_query = build_base_query(property, booking_mode, price_unit)
@@ -223,38 +222,33 @@ defmodule Ysc.Bookings.PricingRule do
     else
       Ysc.Logging.debug(
         "[PricingRule] No pricing rule found matching criteria. " <>
-          "Checking if any rules exist for property #{property}..."
-      )
-
-      # Check if any pricing rules exist at all for this property
-      count_query =
-        from pr in PricingRule,
-          where: pr.property == ^property or is_nil(pr.property),
-          select: count(pr.id)
-
-      total_count = Ysc.Repo.one(count_query)
-
-      Ysc.Logging.debug(
-        "[PricingRule] Total pricing rules for property #{property}: #{total_count}"
-      )
-
-      # Check rules matching booking_mode and price_unit
-      matching_count_query =
-        from pr in PricingRule,
-          where: pr.booking_mode == ^booking_mode,
-          where: pr.price_unit == ^price_unit,
-          where: pr.property == ^property or is_nil(pr.property),
-          select: count(pr.id)
-
-      matching_count = Ysc.Repo.one(matching_count_query)
-
-      Ysc.Logging.debug(
-        "[PricingRule] Pricing rules matching booking_mode=#{booking_mode}, " <>
-          "price_unit=#{price_unit}, property=#{property}: #{matching_count}"
+          "Property: #{property}, Season ID: #{inspect(season_id)}, " <>
+          "Room ID: #{inspect(room_id)}, Room Category ID: #{inspect(room_category_id)}, " <>
+          "Booking Mode: #{booking_mode}, Price Unit: #{price_unit}"
       )
     end
 
     result
+  end
+
+  @doc """
+  Property-level pricing rules (no room or category) for `property`.
+
+  Used by the signed-out cabin overview to resolve stay types, children rates,
+  and the public "from" rate in memory after a single query.
+  """
+  def list_property_level_rules_db(property) do
+    property
+    |> list_property_level_rules_query()
+    |> Ysc.Repo.all()
+  end
+
+  @doc false
+  def list_property_level_rules_query(property) do
+    from(pr in __MODULE__,
+      where: pr.property == ^property or is_nil(pr.property),
+      where: is_nil(pr.room_id) and is_nil(pr.room_category_id)
+    )
   end
 
   @doc """
@@ -450,5 +444,10 @@ defmodule Ysc.Bookings.PricingRule do
     |> apply_season_filter(season_id)
     |> apply_room_category_filters(nil, nil)
     |> apply_ordering()
+  end
+
+  @doc false
+  def ci_query_explain_property_level_rules_query do
+    list_property_level_rules_query(:tahoe)
   end
 end

@@ -57,6 +57,56 @@ defmodule Ysc.Bookings.PricingRuleTest do
     %{season: season, category: category, room: room}
   end
 
+  describe "list_property_level_rules_db/1" do
+    test "returns property-level rules and ignores room and category rows", %{
+      season: season,
+      category: category,
+      room: room
+    } do
+      Repo.delete_all(PricingRule)
+
+      {:ok, property_rule} =
+        %PricingRule{}
+        |> PricingRule.changeset(%{
+          amount: Money.new(45, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: season.id
+        })
+        |> Repo.insert()
+
+      {:ok, _} =
+        %PricingRule{}
+        |> PricingRule.changeset(%{
+          amount: Money.new(10, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id
+        })
+        |> Repo.insert()
+
+      {:ok, _} =
+        %PricingRule{}
+        |> PricingRule.changeset(%{
+          amount: Money.new(20, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_category_id: category.id
+        })
+        |> Repo.insert()
+
+      ids =
+        :tahoe
+        |> PricingRule.list_property_level_rules_db()
+        |> Enum.map(& &1.id)
+
+      assert ids == [property_rule.id]
+    end
+  end
+
   describe "lowest_property_rate_db/1" do
     test "returns the lowest property-level rate and ignores category-specific rules",
          %{season: season, category: category} do
@@ -1117,19 +1167,27 @@ defmodule Ysc.Bookings.PricingRuleTest do
       assert found.children_amount == Money.new(:USD, 90)
     end
 
-    test "find_most_specific_db runs diagnostic counts when no rule matches", %{
+    test "find_most_specific_db returns nil without extra count queries", %{
       season: season
     } do
-      assert is_nil(
-               PricingRule.find_most_specific_db(
-                 :tahoe,
-                 season.id,
-                 nil,
-                 nil,
-                 :buyout,
-                 :buyout_fixed
-               )
-             )
+      {result, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            PricingRule.find_most_specific_db(
+              :tahoe,
+              season.id,
+              nil,
+              nil,
+              :buyout,
+              :buyout_fixed
+            )
+          end,
+          pattern: ~r/FROM "pricing_rules"/i,
+          caller_pids: [self()]
+        )
+
+      assert is_nil(result)
+      assert query_count == 1
     end
 
     test "find_children_pricing_rule_db returns category-level rule when room_id is nil",
@@ -1162,7 +1220,7 @@ defmodule Ysc.Bookings.PricingRuleTest do
       assert found.room_category_id == category.id
     end
 
-    test "find_most_specific_db returns row when rule matches (no diagnostic branch)",
+    test "find_most_specific_db returns row when rule matches",
          %{
            season: season,
            room: room

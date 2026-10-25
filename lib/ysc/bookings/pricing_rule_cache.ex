@@ -100,6 +100,21 @@ defmodule Ysc.Bookings.PricingRuleCache do
   end
 
   @doc """
+  Cached property-level pricing rules (no room or category) for `property`.
+
+  CabinOverview resolves stay types from this list so guest first paint is one
+  query instead of one lookup per season and stay type.
+  """
+  def list_property_level_rules(property) do
+    VersionedCache.fetch(
+      @cache_version_key,
+      "#{@cache_prefix}property_level_rules:#{property}",
+      fn -> PricingRule.list_property_level_rules_db(property) end,
+      cache_name: @cache_name
+    )
+  end
+
+  @doc """
   Cached lowest property-level guest rate for public "from $X" displays.
 
   Returns a `Money` struct, or `nil` when no rate is configured.

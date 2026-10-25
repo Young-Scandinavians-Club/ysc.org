@@ -11,6 +11,8 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
   import Ysc.BookingsFixtures
   import Ysc.TestDataFactory
 
+  alias Ysc.Bookings
+
   describe "deferred availability and pricing" do
     test "dead render skips availability queries when dates are in the URL", %{
       conn: conn
@@ -175,6 +177,31 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
         :sys.get_state(view.pid).socket.assigns.availability_cache_version
 
       assert version_after == version_before
+    end
+  end
+
+  describe "guest overview first paint" do
+    test "dead render loads pricing rules once and still shows stay rates", %{
+      conn: conn
+    } do
+      seed_canonical_seasons!()
+      ensure_clear_lake_pricing_rules!()
+      Bookings.PricingRuleCache.invalidate()
+
+      {html, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/bookings/clear-lake")
+            |> html_response(200)
+          end,
+          pattern: ~r/FROM "pricing_rules"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 1
+      assert html =~ ~s(id="clear-lake-guest-stay-options-day")
+      assert html =~ "Shared cabin"
     end
   end
 

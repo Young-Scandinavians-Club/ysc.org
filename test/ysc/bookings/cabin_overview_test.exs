@@ -10,7 +10,14 @@ defmodule Ysc.Bookings.CabinOverviewTest do
 
   import Ysc.BookingsFixtures
 
-  alias Ysc.Bookings.{CabinOverview, PricingRule, PricingRuleCache, Season}
+  alias Ysc.Bookings.{
+    CabinOverview,
+    PricingRule,
+    PricingRuleCache,
+    Room,
+    Season
+  }
+
   alias Ysc.Repo
 
   setup do
@@ -100,6 +107,31 @@ defmodule Ysc.Bookings.CabinOverviewTest do
       assert option(overview, :room).rate == Money.new(60, :USD)
     end
 
+    test "ignores cheaper room-specific rules for the public from rate" do
+      tahoe_rules()
+
+      {:ok, room} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Overlook",
+          property: :tahoe,
+          capacity_max: 2,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      create_rule(%{
+        property: :tahoe,
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        amount: Money.new(10, :USD),
+        room_id: room.id
+      })
+
+      overview = CabinOverview.for_property(:tahoe, seasons(:tahoe))
+      assert option(overview, :room).rate == Money.new(45, :USD)
+    end
+
     test "omits a stay type with no pricing rule" do
       create_rule(%{
         property: :tahoe,
@@ -168,6 +200,63 @@ defmodule Ysc.Bookings.CabinOverviewTest do
                %{name: "Summer", span: "May–October"},
                %{name: "Winter", span: "November–April"}
              ] = overview.seasons
+    end
+  end
+
+  describe "query load" do
+    @pricing_rules_query ~r/FROM "pricing_rules"/i
+
+    test "cold overview loads property-level rules in one query" do
+      tahoe_rules()
+      PricingRuleCache.invalidate()
+      property_seasons = seasons(:tahoe)
+
+      {overview, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> CabinOverview.for_property(:tahoe, property_seasons) end,
+          pattern: @pricing_rules_query,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 1
+      assert option(overview, :room).rate == Money.new(45, :USD)
+      assert option(overview, :buyout).rate == Money.new(425, :USD)
+    end
+
+    test "warm overview does not query pricing_rules" do
+      tahoe_rules()
+      property_seasons = seasons(:tahoe)
+      CabinOverview.for_property(:tahoe, property_seasons)
+
+      {_overview, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> CabinOverview.for_property(:tahoe, property_seasons) end,
+          pattern: @pricing_rules_query,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 0
+    end
+
+    test "without process caches still uses one query per overview" do
+      tahoe_rules()
+      property_seasons = seasons(:tahoe)
+      previous = Application.get_env(:ysc, :process_caches_enabled)
+
+      Application.put_env(:ysc, :process_caches_enabled, false)
+
+      try do
+        {_overview, query_count} =
+          Ysc.QueryCounter.with_query_counter(
+            fn -> CabinOverview.for_property(:tahoe, property_seasons) end,
+            pattern: @pricing_rules_query,
+            caller_pids: [self()]
+          )
+
+        assert query_count == 1
+      after
+        Application.put_env(:ysc, :process_caches_enabled, previous)
+      end
     end
   end
 
