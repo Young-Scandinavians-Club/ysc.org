@@ -13,10 +13,14 @@ defmodule Ysc.Subscriptions do
   alias Ysc.Subscriptions.{Subscription, SubscriptionItem}
   alias Ysc.Stripe.SubscriptionHelpers
 
-  # Serialize find_blocking → Stripe.Subscription.create per user. Without this,
-  # two LiveView/API callers that both see no local row both mint Stripe
-  # subscriptions (two invoices / PaymentIntents). Matches merch/ticket checkout
-  # advisory locks; Stripe idempotency is belt-and-suspenders for the same price.
+  # Serialize find_blocking → Stripe.Subscription.create → local persist per
+  # user. Without the lock, two LiveView/API callers that both see no local row
+  # both mint Stripe subscriptions (two invoices / PaymentIntents). Persist
+  # must happen before the transaction commits: door-sale does not persist in
+  # the request (webhook only), and price-scoped idempotency does not replay a
+  # Single vs Family overlap. Matches merch/ticket checkout advisory locks;
+  # Stripe idempotency is belt-and-suspenders for the same price. Cash
+  # paid-out-of-band takes the same lock.
   @membership_checkout_advisory_lock_namespace 8_233_204
 
   @doc """
@@ -1419,8 +1423,9 @@ defmodule Ysc.Subscriptions do
     # key. Door-sale used `app_membership_#{id}_#{price}` and WP onboarding
     # used `wp_onboarding_#{id}_#{plan}` while web omitted a key and got
     # `membership_sub_#{id}_#{price}`. Same-plan overlapping creates then
-    # minted two Stripe subscriptions (two charges) because the lock releases
-    # before the local row exists for find_blocking_subscription/1.
+    # minted two Stripe subscriptions (two charges). Persist the local row
+    # before this transaction commits so a different-plan follow-up cannot
+    # mint a second subscription while the webhook is still in flight.
     idempotency_key = default_membership_create_idempotency_key(user, prices)
 
     stripe_params = %{
@@ -1461,7 +1466,9 @@ defmodule Ysc.Subscriptions do
       end)
 
     case result do
-      {:ok, _} = ok ->
+      {:ok, stripe_subscription} = ok ->
+        persist_created_membership_subscription(user, stripe_subscription)
+
         if BoardVolunteerBilling.household_on_board?(user) do
           BoardVolunteerBilling.sync_for_user(user)
         end
@@ -1470,6 +1477,41 @@ defmodule Ysc.Subscriptions do
 
       error ->
         error
+    end
+  end
+
+  # Best-effort: Stripe already created the subscription. A persist failure
+  # must not fail the caller (activation treats Stripe success as activated
+  # and lets the webhook repair). The advisory lock is still held, so a
+  # successful insert is visible to the next create_stripe_subscription/2
+  # or paid-out-of-band create before this transaction commits.
+  defp persist_created_membership_subscription(user, stripe_subscription) do
+    try do
+      case create_subscription_from_stripe(user, stripe_subscription) do
+        {:ok, _} ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.error(
+            "Failed to persist Stripe membership subscription locally after create",
+            user_id: user.id,
+            stripe_subscription_id: stripe_subscription.id,
+            extra: %{error: inspect(reason)}
+          )
+
+          :ok
+      end
+    rescue
+      error ->
+        Ysc.Logging.error(
+          "Failed to persist Stripe membership subscription locally after create",
+          user_id: user.id,
+          stripe_subscription_id: stripe_subscription.id,
+          error: error,
+          stacktrace: __STACKTRACE__
+        )
+
+        :ok
     end
   end
 
@@ -1760,7 +1802,7 @@ defmodule Ysc.Subscriptions do
           if is_nil(user.stripe_id) do
             {:error, :could_not_create_stripe_customer}
           else
-            do_create_subscription_paid_out_of_band(user, plan, opts)
+            create_paid_out_of_band_under_lock(user, plan, opts)
           end
       end
     end
@@ -1768,6 +1810,48 @@ defmodule Ysc.Subscriptions do
 
   def create_subscription_paid_out_of_band(_user, _plan_id, _opts),
     do: {:error, :invalid_plan}
+
+  # Cash/check create used a separate Stripe idempotency key and skipped the
+  # membership advisory lock, so it could overlap a card door-sale or web
+  # checkout and mint a second paid subscription. Share the lock, and abandon
+  # an unpaid incomplete checkout rather than charging both.
+  defp create_paid_out_of_band_under_lock(user, plan, opts) do
+    case Repo.transaction(
+           fn ->
+             lock_membership_stripe_create!(user.id)
+
+             case find_blocking_subscription(user) do
+               nil ->
+                 paid_out_of_band_create_or_rollback(user, plan, opts)
+
+               %Subscription{stripe_status: "incomplete"} = incomplete_sub ->
+                 case abandon_incomplete_subscription_for_plan_change(
+                        incomplete_sub
+                      ) do
+                   :ok ->
+                     paid_out_of_band_create_or_rollback(user, plan, opts)
+
+                   {:error, reason} ->
+                     Repo.rollback(reason)
+                 end
+
+               %Subscription{} ->
+                 Repo.rollback(:user_already_has_active_subscription)
+             end
+           end,
+           timeout: :infinity
+         ) do
+      {:ok, subscription} -> {:ok, subscription}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp paid_out_of_band_create_or_rollback(user, plan, opts) do
+    case do_create_subscription_paid_out_of_band(user, plan, opts) do
+      {:ok, subscription} -> subscription
+      {:error, reason} -> Repo.rollback(reason)
+    end
+  end
 
   @dialyzer {:nowarn_function, ensure_user_has_stripe_id: 1}
   defp ensure_user_has_stripe_id(%{stripe_id: nil} = user) do
@@ -2068,9 +2152,15 @@ defmodule Ysc.Subscriptions do
       case subscription do
         {:ok, subscription} ->
           # Create subscription items
+          stripe_items =
+            case stripe_subscription do
+              %{items: %{data: data}} when is_list(data) -> data
+              _ -> []
+            end
+
           subscription_items =
             subscription_item_structs_from_stripe_items(
-              stripe_subscription.items.data,
+              stripe_items,
               subscription
             )
 

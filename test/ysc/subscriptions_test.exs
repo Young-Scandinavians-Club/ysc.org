@@ -586,6 +586,104 @@ defmodule Ysc.SubscriptionsTest do
                {:error, :user_already_has_active_subscription}
     end
 
+    test "refuses cash create after a card membership was persisted in create_stripe_subscription" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_cash_#{System.unique_integer()}"})
+
+      price_id = "price_card_#{System.unique_integer([:positive])}"
+      stripe_id = "sub_card_#{System.unique_integer([:positive])}"
+
+      expect(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_id,
+           customer: user.stripe_id,
+           status: "active",
+           price_id: price_id,
+           subscription_item_id: "si_card_#{System.unique_integer([:positive])}"
+         )}
+      end)
+
+      assert {:ok, %Stripe.Subscription{}} =
+               Subscriptions.create_stripe_subscription(user, %{
+                 prices: [%{price: price_id, quantity: 1}]
+               })
+
+      callback = fn _user, _plan ->
+        flunk("cash create must not mint a second Stripe subscription")
+      end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :create_subscription_paid_out_of_band_stripe_callback,
+          callback
+        )
+
+        assert Subscriptions.create_subscription_paid_out_of_band(user, :single) ==
+                 {:error, :user_already_has_active_subscription}
+      after
+        Application.delete_env(
+          :ysc,
+          :create_subscription_paid_out_of_band_stripe_callback
+        )
+      end
+    end
+
+    test "abandons an incomplete card checkout before recording cash membership" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_cash_inc_#{System.unique_integer()}"
+        })
+
+      incomplete_id = "sub_incomplete_#{System.unique_integer([:positive])}"
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      assert single_plan != nil
+
+      {:ok, incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: incomplete_id,
+          stripe_status: "incomplete",
+          name: "Incomplete Checkout Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.SubscriptionMock, :cancel, fn ^incomplete_id ->
+        {:ok, %Stripe.Subscription{id: incomplete_id, status: "canceled"}}
+      end)
+
+      now_unix = System.system_time(:second)
+      fake_stripe_sub = build_fake_stripe_subscription(single_plan, now_unix)
+      callback = fn _user, _plan -> {:ok, fake_stripe_sub} end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :create_subscription_paid_out_of_band_stripe_callback,
+          callback
+        )
+
+        assert {:ok, %Subscription{} = cash_sub} =
+                 Subscriptions.create_subscription_paid_out_of_band(
+                   user,
+                   :single
+                 )
+
+        assert cash_sub.stripe_id == fake_stripe_sub.id
+        assert cash_sub.stripe_status == "active"
+
+        reloaded = Subscriptions.get_subscription(incomplete_sub.id)
+        assert reloaded.stripe_status == "cancelled"
+      after
+        Application.delete_env(
+          :ysc,
+          :create_subscription_paid_out_of_band_stripe_callback
+        )
+      end
+    end
+
     test "creates subscription and returns {:ok, subscription} when callback returns fake Stripe subscription" do
       user = user_fixture_unique()
       membership_plans = Application.get_env(:ysc, :membership_plans, [])
@@ -1423,6 +1521,47 @@ defmodule Ysc.SubscriptionsTest do
                  prices: [%{price: price_id, quantity: 1}],
                  idempotency_key: "app_membership_#{user.id}_#{price_id}"
                })
+    end
+
+    test "persists a local row so a different-plan follow-up cannot mint a second Stripe subscription" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      single_price = "price_single_#{System.unique_integer([:positive])}"
+      family_price = "price_family_#{System.unique_integer([:positive])}"
+      stripe_id = "sub_persist_#{System.unique_integer([:positive])}"
+
+      expect(Stripe.SubscriptionMock, :create, fn params, _opts ->
+        assert hd(params.items).price == single_price
+
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_id,
+           customer: user.stripe_id,
+           status: "active",
+           price_id: single_price,
+           subscription_item_id:
+             "si_persist_#{System.unique_integer([:positive])}"
+         )}
+      end)
+
+      assert {:ok, %Stripe.Subscription{id: ^stripe_id}} =
+               Subscriptions.create_stripe_subscription(user, %{
+                 prices: [%{price: single_price, quantity: 1}]
+               })
+
+      assert %Subscription{stripe_id: ^stripe_id} =
+               Subscriptions.get_subscription_by_stripe_id(stripe_id)
+
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params, _opts ->
+        flunk(
+          "different-plan follow-up must not mint a second Stripe subscription"
+        )
+      end)
+
+      assert Subscriptions.create_stripe_subscription(user, %{
+               prices: [%{price: family_price, quantity: 1}]
+             }) == {:error, :user_already_has_active_subscription}
     end
 
     test "allows creating subscription when user has expired subscription" do
