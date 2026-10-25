@@ -12,6 +12,8 @@ defmodule YscWeb.TahoeBookingDeferredTest do
   import Ysc.TestDataFactory
 
   alias Ysc.Bookings
+  alias Ysc.Bookings.PricingRule
+  alias Ysc.Repo
 
   describe "deferred room availability" do
     test "dead render skips room inventory queries when dates are in the URL",
@@ -98,6 +100,51 @@ defmodule YscWeb.TahoeBookingDeferredTest do
 
       assert query_count == 0
       assert :sys.get_state(view.pid).socket.assigns.info_tab == :rules
+    end
+  end
+
+  describe "guest overview first paint" do
+    test "dead render loads pricing rules once and still shows stay rates", %{
+      conn: conn
+    } do
+      seed_canonical_seasons!()
+      Repo.delete_all(PricingRule)
+
+      for attrs <- [
+            %{
+              booking_mode: :room,
+              price_unit: :per_person_per_night,
+              amount: Money.new(45, :USD),
+              children_amount: Money.new(25, :USD)
+            },
+            %{
+              booking_mode: :buyout,
+              price_unit: :buyout_fixed,
+              amount: Money.new(425, :USD)
+            }
+          ] do
+        %PricingRule{}
+        |> PricingRule.changeset(Map.put(attrs, :property, :tahoe))
+        |> Repo.insert!()
+      end
+
+      Bookings.PricingRuleCache.invalidate()
+
+      {html, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/bookings/tahoe")
+            |> html_response(200)
+          end,
+          pattern: ~r/FROM "pricing_rules"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 1
+      assert html =~ ~s(id="tahoe-guest-stay-options-room")
+      assert html =~ "$45"
+      assert html =~ "Individual room(s)"
     end
   end
 

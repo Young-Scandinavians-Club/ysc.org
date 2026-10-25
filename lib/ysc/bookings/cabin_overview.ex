@@ -15,7 +15,6 @@ defmodule Ysc.Bookings.CabinOverview do
   """
 
   alias Ysc.Bookings.BookingModeDisplay
-  alias Ysc.Bookings.PricingRule
   alias Ysc.Bookings.PricingRuleCache
   alias Ysc.Bookings.Season
   alias Ysc.History.Timeline
@@ -110,6 +109,7 @@ defmodule Ysc.Bookings.CabinOverview do
   def for_property(property, seasons)
       when property in [:tahoe, :clear_lake] and is_list(seasons) do
     history = history(property)
+    rules = PricingRuleCache.list_property_level_rules(property)
 
     %{
       property: property,
@@ -120,7 +120,7 @@ defmodule Ysc.Bookings.CabinOverview do
         property
         |> stay_modes()
         |> Enum.map(fn {mode, unit} ->
-          stay_option(property, mode, unit, seasons)
+          stay_option(property, mode, unit, seasons, rules)
         end)
         |> Enum.reject(&is_nil/1)
     }
@@ -188,11 +188,11 @@ defmodule Ysc.Bookings.CabinOverview do
   # Stay options (booking types, rates and availability)
   # ---------------------------------------------------------------------------
 
-  defp stay_option(property, mode, unit, seasons) do
+  defp stay_option(property, mode, unit, seasons, rules) do
     scopes = if seasons == [], do: [nil], else: sorted_seasons(seasons)
 
     available =
-      Enum.filter(scopes, &offered?(property, mode, unit, &1))
+      Enum.filter(scopes, &offered?(property, mode, unit, &1, rules))
 
     case available do
       [] ->
@@ -207,8 +207,8 @@ defmodule Ysc.Bookings.CabinOverview do
         %{
           mode: mode,
           label: BookingModeDisplay.stay_type_label(mode),
-          rate: rate(property, mode, unit, available),
-          children_rate: children_rate(property, mode, unit, available),
+          rate: rate(property, mode, unit, available, rules),
+          children_rate: children_rate(property, mode, unit, available, rules),
           seasons: windows,
           year_round?: length(available) == length(scopes),
           min_nights: Enum.min(nights),
@@ -220,8 +220,8 @@ defmodule Ysc.Bookings.CabinOverview do
   # A stay type is offered in a season when a pricing rule covers it there. At
   # Tahoe the entire cabin is also never offered in the winter season (rooms
   # only), mirroring `Season.buyout_allowed_on_date?/2`.
-  defp offered?(property, mode, unit, season) do
-    pricing_rule(property, mode, unit, season) != nil and
+  defp offered?(property, mode, unit, season, rules) do
+    most_specific_rule(rules, mode, unit, season_id(season)) != nil and
       buyout_allowed?(property, mode, season)
   end
 
@@ -230,27 +230,17 @@ defmodule Ysc.Bookings.CabinOverview do
 
   defp buyout_allowed?(_property, _mode, _season), do: true
 
-  defp pricing_rule(property, mode, unit, season) do
-    PricingRule.find_most_specific(
-      property,
-      season_id(season),
-      nil,
-      nil,
-      mode,
-      unit
-    )
-  end
-
   # Per-person stays use the same "from" rate as the public home page; the
   # entire cabin is a fixed nightly price, so its "from" is the cheapest season.
-  defp rate(property, mode, _unit, _available) when mode in [:room, :day] do
-    PricingRuleCache.lowest_property_rate(property)
+  defp rate(property, mode, _unit, _available, rules)
+       when mode in [:room, :day] do
+    lowest_guest_rate(property, rules)
   end
 
-  defp rate(property, mode, unit, available) do
+  defp rate(_property, mode, unit, available, rules) do
     available
     |> Enum.flat_map(fn season ->
-      case pricing_rule(property, mode, unit, season) do
+      case most_specific_rule(rules, mode, unit, season_id(season)) do
         %{amount: %Money{} = amount} -> [amount]
         _ -> []
       end
@@ -258,17 +248,10 @@ defmodule Ysc.Bookings.CabinOverview do
     |> min_money()
   end
 
-  defp children_rate(property, :room, unit, available) do
+  defp children_rate(_property, :room, unit, available, rules) do
     available
     |> Enum.flat_map(fn season ->
-      case PricingRule.find_children_pricing_rule(
-             property,
-             season_id(season),
-             nil,
-             nil,
-             :room,
-             unit
-           ) do
+      case most_specific_children_rule(rules, :room, unit, season_id(season)) do
         %{children_amount: %Money{} = amount} -> [amount]
         _ -> []
       end
@@ -276,7 +259,56 @@ defmodule Ysc.Bookings.CabinOverview do
     |> min_money()
   end
 
-  defp children_rate(_property, _mode, _unit, _available), do: nil
+  defp children_rate(_property, _mode, _unit, _available, _rules), do: nil
+
+  # Same filters as `PricingRule.lowest_property_rate_db/1`: property-owned
+  # room/day rules only, so a cheaper room-specific rule cannot become "from".
+  defp lowest_guest_rate(property, rules) do
+    rules
+    |> Enum.filter(fn rule ->
+      rule.property == property and
+        rule.booking_mode in [:room, :day] and
+        rule.price_unit in [:per_person_per_night, :per_guest_per_day] and
+        match?(%Money{}, rule.amount)
+    end)
+    |> Enum.map(& &1.amount)
+    |> min_money()
+  end
+
+  defp most_specific_rule(rules, mode, unit, season_id) do
+    rules
+    |> Enum.filter(&rule_matches?(&1, mode, unit, season_id))
+    |> pick_most_specific()
+  end
+
+  defp most_specific_children_rule(rules, mode, unit, season_id) do
+    rules
+    |> Enum.filter(fn rule ->
+      rule_matches?(rule, mode, unit, season_id) and
+        match?(%Money{}, rule.children_amount)
+    end)
+    |> pick_most_specific()
+  end
+
+  defp rule_matches?(rule, mode, unit, season_id) do
+    rule.booking_mode == mode and rule.price_unit == unit and
+      season_matches?(rule.season_id, season_id)
+  end
+
+  defp season_matches?(rule_season_id, nil), do: is_nil(rule_season_id)
+
+  defp season_matches?(rule_season_id, season_id),
+    do: is_nil(rule_season_id) or rule_season_id == season_id
+
+  # Mirrors `PricingRule.apply_ordering/1` for property-level rules: a
+  # season-specific row beats a year-round (nil season) row.
+  defp pick_most_specific([]), do: nil
+
+  defp pick_most_specific(rules),
+    do: Enum.max_by(rules, &season_specificity/1)
+
+  defp season_specificity(%{season_id: nil}), do: 0
+  defp season_specificity(_rule), do: 1
 
   defp min_money([]), do: nil
 
