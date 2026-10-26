@@ -296,9 +296,9 @@ defmodule Ysc.BookingsFixtures do
   seasons enforce a limit (and when another test temporarily changes season settings).
 
   When no Monday–Thursday buyout stay remains in that window (late summer:
-  winter nights are rooms-only), `enumerate_buyout_monday_stays/0` widens
-  advance booking and continues into next summer rather than returning a
-  winter stay that `booking_fixture/1` would silently convert to `:room`.
+  winter nights are rooms-only), `enumerate_buyout_monday_stays/0` continues
+  into next summer rather than returning a winter stay that
+  `booking_fixture/1` would silently convert to `:room`.
   """
   def tahoe_booking_dates(offset_days \\ 7) do
     today = Date.utc_today()
@@ -370,16 +370,15 @@ defmodule Ysc.BookingsFixtures do
 
       [] ->
         # Late summer / winter: Tahoe buyout is summer-only (May 1–Oct 31),
-        # so Monday–Thursday stays can vanish from the current bookable
-        # window once winter's 45-day cap takes over. Widen advance
-        # booking (sandbox-scoped) and search through next summer so
-        # fixtures and locker tests still get isolated buyout dates.
-        allow_far_future_booking_dates()
-
-        buyout_monday_stays_until(
-          today,
-          SeasonHelpers.calculate_max_booking_date(:tahoe, today)
-        )
+        # so Monday–Thursday stays vanish from the current bookable window
+        # once winter's 45-day cap takes over. Search next summer without
+        # updating seed season rows — `allow_far_future_booking_dates/0`
+        # uses UPDATE on those rows and deadlocks async SQL sandbox tests.
+        # `booking_fixture/1` skip_validation can persist these dates as-is.
+        # Validated `create_booking` tests that need them inside the
+        # advance window should call `allow_far_future_booking_dates/0`
+        # from an `async: false` setup.
+        buyout_monday_stays_until(today, Date.add(today, 800))
     end
   end
 

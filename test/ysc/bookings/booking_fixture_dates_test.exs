@@ -46,4 +46,16 @@ defmodule Ysc.Bookings.BookingFixtureDatesTest do
              booking.checkout_date
            )
   end
+
+  test "booking_fixture does not UPDATE shared season rows" do
+    before =
+      Repo.all(from s in Season, select: {s.id, s.advance_booking_days})
+
+    _booking = booking_fixture()
+
+    after_call =
+      Repo.all(from s in Season, select: {s.id, s.advance_booking_days})
+
+    assert after_call == before
+  end
 end
