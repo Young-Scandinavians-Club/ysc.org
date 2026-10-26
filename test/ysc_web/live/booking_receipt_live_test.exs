@@ -161,6 +161,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ booking.reference_id
       assert html =~ "Lake Tahoe Cabin"
       assert has_element?(view, ~s(#booking-receipt))
+      assert has_element?(view, "#booking-receipt-header")
+      assert has_element?(view, "#booking-receipt-header", "Booking Reference")
     end
 
     test "displays cancelled booking with appropriate styling", %{conn: conn} do
@@ -169,11 +171,12 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       booking = booking_fixture(%{user_id: user.id, status: :canceled})
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert html =~ "Booking Cancelled"
       assert html =~ "Booking Cancelled"
       assert html =~ booking.reference_id
+      assert has_element?(view, "#booking-receipt-header", "Booking Cancelled")
     end
 
     test "displays guest information when booking guests exist", %{conn: conn} do

@@ -235,87 +235,72 @@ defmodule YscWeb.BookingReceiptLive do
       data-show-confetti={if @show_confetti, do: "true", else: "false"}
       class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4"
     >
-      <!-- Header -->
-      <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-8">
-        <div>
-          <%= if @booking.status == :canceled do %>
-            <div class="flex items-center gap-2 text-red-600 mb-2">
-              <.icon name="hero-x-circle" class="w-6 h-6" />
-              <span class="text-sm type-eyebrow">
-                Booking Cancelled
-              </span>
-            </div>
-            <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
-              Booking Cancelled
-            </h1>
-            <p class="text-zinc-500 mt-2 text-lg">
-              Your booking at
-              <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
-              has been cancelled.
-              <%= if @refund_data && @refund_data.total_refunded do %>
-                <%= if @refund_data.has_pending_refund do %>
-                  A refund of
-                  <strong>
-                    {MoneyHelper.format_money!(@refund_data.total_refunded)}
-                  </strong>
-                  is being reviewed. You will get an email when it is approved.
-                <% else %>
-                  A refund of
-                  <strong>
-                    {MoneyHelper.format_money!(@refund_data.total_refunded)}
-                  </strong>
-                  is on the way.
-                <% end %>
-              <% else %>
-                No refund is available based on the cancellation policy.
-              <% end %>
-            </p>
+      <.confirmation_header
+        id="booking-receipt-header"
+        variant={if(@booking.status == :canceled, do: :cancelled, else: :success)}
+        eyebrow={
+          cond do
+            @booking.status == :canceled -> "Booking Cancelled"
+            @show_reservation_updated -> "Booking Updated"
+            true -> "Booking Confirmed"
+          end
+        }
+        title={
+          cond do
+            @booking.status == :canceled ->
+              "Booking Cancelled"
+
+            @show_reservation_updated ->
+              "Your booking has been updated, #{@user_first_name}!"
+
+            @booking_in_past ->
+              "What a stay, #{@user_first_name}!"
+
+            true ->
+              "See you at the Cabin, #{@user_first_name}!"
+          end
+        }
+        reference_label="Booking Reference"
+        reference={@booking.reference_id}
+      >
+        <%= if @booking.status == :canceled do %>
+          Your booking at
+          <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
+          has been cancelled.
+          <%= if @refund_data && @refund_data.total_refunded do %>
+            <%= if @refund_data.has_pending_refund do %>
+              A refund of
+              <strong>
+                {MoneyHelper.format_money!(@refund_data.total_refunded)}
+              </strong>
+              is being reviewed. You will get an email when it is approved.
+            <% else %>
+              A refund of
+              <strong>
+                {MoneyHelper.format_money!(@refund_data.total_refunded)}
+              </strong>
+              is on the way.
+            <% end %>
           <% else %>
-            <div class="flex items-center gap-2 text-green-600 mb-2">
-              <.icon name="hero-check-circle-solid" class="w-6 h-6" />
-              <span class="text-sm type-eyebrow">
-                {if @show_reservation_updated,
-                  do: "Booking Updated",
-                  else: "Booking Confirmed"}
-              </span>
-            </div>
-            <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
-              <%= cond do %>
-                <% @show_reservation_updated -> %>
-                  Your booking has been updated, {@user_first_name}!
-                <% @booking_in_past -> %>
-                  What a stay, {@user_first_name}!
-                <% true -> %>
-                  See you at the Cabin, {@user_first_name}!
-              <% end %>
-            </h1>
-            <p class="text-zinc-500 mt-2 text-lg">
-              <%= cond do %>
-                <% @show_reservation_updated -> %>
-                  Your updated stay at
-                  <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
-                  is confirmed. We've sent an email with your new booking details.
-                <% @booking_in_past -> %>
-                  Hope you had an amazing time at <strong>{PropertyDisplay.full_name(@booking.property)}</strong>.
-                  See you next time!
-                <% true -> %>
-                  Your stay at
-                  <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
-                  is all set.
-                  We've sent a copy of these details to your email.
-              <% end %>
-            </p>
+            No refund is available based on the cancellation policy.
           <% end %>
-        </div>
-        <div class="text-left md:text-right">
-          <p class="text-xs text-zinc-500 type-eyebrow">
-            Booking Reference
-          </p>
-          <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
-            {@booking.reference_id}
-          </p>
-        </div>
-      </div>
+        <% else %>
+          <%= cond do %>
+            <% @show_reservation_updated -> %>
+              Your updated stay at
+              <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
+              is confirmed. We've sent an email with your new booking details.
+            <% @booking_in_past -> %>
+              Hope you had an amazing time at <strong>{PropertyDisplay.full_name(@booking.property)}</strong>.
+              See you next time!
+            <% true -> %>
+              Your stay at
+              <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
+              is all set.
+              We've sent a copy of these details to your email.
+          <% end %>
+        <% end %>
+      </.confirmation_header>
       <!-- Door Code Banner (if applicable) -->
       <%= if @show_door_code && @door_code do %>
         <div class={[
