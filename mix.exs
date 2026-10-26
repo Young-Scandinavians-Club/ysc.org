@@ -200,8 +200,14 @@ defmodule Ysc.MixProject do
       # stays in goaway_received so new requests return
       # {error, goaway_received}. hackney cancel_stream/send_trailers
       # after a peer GOAWAY used to get {error, unknown_request}.
+      # 0.12.5: optional connection_window_size (65535..2147483647,
+      # default still 65535) raises the connection receive window via
+      # a stream-0 WINDOW_UPDATE after SETTINGS. We do not start h2
+      # servers; hackney start_link/4 still passes #{}, so the default
+      # 64 KB window stays in effect. Invalid values return
+      # {error, {invalid_option, {connection_window_size, V}}}.
       {:hackney, "~> 4.7", override: true},
-      {:h2, "~> 0.12.4", override: true},
+      {:h2, "~> 0.12.5", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},
