@@ -4129,10 +4129,99 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Skeleton for the header block shared by the confirmation pages: status
-  eyebrow with its icon, headline, one-line summary, and the reference number
-  on the right. Mirrors the bordered `mb-10 ... pb-8` header of
-  `OrderConfirmationLive` and `BookingReceiptLive`.
+  Status header shared by ticket order confirmation and cabin booking receipt.
+
+  Success uses a green check; cancelled uses a red X. The inner block is the
+  supporting copy under the title. Pair with `confirmation_header_skeleton/1`
+  for the loading state.
+
+  ## Examples
+
+      <.confirmation_header
+        id="order-confirmation-header"
+        variant={:success}
+        eyebrow="Order Confirmed"
+        title="See you at the event, Astrid!"
+        reference_label="Order number"
+        reference={@ticket_order.reference_id}
+      >
+        Your tickets for <strong>{@event.title}</strong> are confirmed.
+      </.confirmation_header>
+
+      <.confirmation_header
+        variant={:cancelled}
+        eyebrow="Booking Cancelled"
+        title="Booking Cancelled"
+        reference_label="Booking Reference"
+        reference={@booking.reference_id}
+      >
+        Your booking at <strong>Lake Tahoe Cabin</strong>
+        has been cancelled.
+      </.confirmation_header>
+  """
+  attr :id, :string, default: nil
+
+  attr :variant, :atom,
+    default: :success,
+    values: [:success, :cancelled]
+
+  attr :eyebrow, :string, required: true
+  attr :title, :string, required: true
+  attr :reference_label, :string, required: true
+  attr :reference, :any, required: true
+  attr :class, :any, default: nil
+  slot :inner_block, required: true
+
+  def confirmation_header(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-8",
+        @class
+      ]}
+    >
+      <div>
+        <div class={[
+          "flex items-center gap-2 mb-2",
+          @variant == :cancelled && "text-red-600",
+          @variant == :success && "text-green-600"
+        ]}>
+          <.icon
+            name={
+              if(@variant == :cancelled,
+                do: "hero-x-circle",
+                else: "hero-check-circle-solid"
+              )
+            }
+            class="w-6 h-6"
+          />
+          <span class="text-sm type-eyebrow">
+            {@eyebrow}
+          </span>
+        </div>
+        <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
+          {@title}
+        </h1>
+        <p class="text-zinc-500 mt-2 text-lg">
+          {render_slot(@inner_block)}
+        </p>
+      </div>
+      <div class="text-left md:text-right">
+        <p class="text-xs text-zinc-500 type-eyebrow">
+          {@reference_label}
+        </p>
+        <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
+          {@reference}
+        </p>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Skeleton for `confirmation_header/1`: status eyebrow with its icon, headline,
+  one-line summary, and the reference number on the right.
 
   ## Examples
 

@@ -107,6 +107,73 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "confirmation_header/1" do
+    test "renders success eyebrow, title, copy, and reference" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.confirmation_header
+          id="order-confirmation-header"
+          variant={:success}
+          eyebrow="Order Confirmed"
+          title="See you at the event, Astrid!"
+          reference_label="Order number"
+          reference="YSC-ORD-1"
+        >
+          Your tickets for <strong>Midsummer</strong> are confirmed.
+        </.confirmation_header>
+        """)
+
+      assert html =~ ~s(id="order-confirmation-header")
+      assert html =~ "hero-check-circle-solid"
+      assert html =~ "text-green-600"
+      assert html =~ "type-eyebrow"
+      assert html =~ "type-display"
+      assert html =~ "Order Confirmed"
+      assert html =~ "See you at the event, Astrid!"
+      assert html =~ "Your tickets for"
+      assert html =~ "Midsummer"
+      assert html =~ "are confirmed."
+      assert html =~ "Order number"
+      assert html =~ "YSC-ORD-1"
+      assert html =~ "font-mono"
+      refute html =~ "hero-x-circle"
+      refute html =~ "text-red-600"
+    end
+
+    test "renders cancelled variant with red status icon" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.confirmation_header
+          id="booking-receipt-header"
+          variant={:cancelled}
+          eyebrow="Booking Cancelled"
+          title="Booking Cancelled"
+          reference_label="Booking Reference"
+          reference="YSC-BK-9"
+          class="custom-header"
+        >
+          Your booking at <strong>Lake Tahoe</strong> has been cancelled.
+        </.confirmation_header>
+        """)
+
+      assert html =~ ~s(id="booking-receipt-header")
+      assert html =~ "custom-header"
+      assert html =~ "hero-x-circle"
+      assert html =~ "text-red-600"
+      assert html =~ "Booking Cancelled"
+      assert html =~ "Lake Tahoe"
+      assert html =~ "has been cancelled."
+      assert html =~ "Booking Reference"
+      assert html =~ "YSC-BK-9"
+      refute html =~ "hero-check-circle-solid"
+      refute html =~ "text-green-600"
+    end
+  end
+
   describe "upload_entry_preview/1" do
     defp upload_preview_entry(attrs \\ []) do
       struct!(
