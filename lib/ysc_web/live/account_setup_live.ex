@@ -1262,7 +1262,11 @@ defmodule YscWeb.AccountSetupLive do
 
       {:noreply, socket}
     else
-      case Accounts.set_user_initial_password(socket.assigns.user, user_params) do
+      case Accounts.set_user_initial_password(
+             socket.assigns.user,
+             user_params,
+             keep_session_token: current_session_token(socket)
+           ) do
         {:ok, updated_user} ->
           updated_user =
             Accounts.get_user!(updated_user.id, [:registration_form])
@@ -1899,6 +1903,21 @@ defmodule YscWeb.AccountSetupLive do
     do: true
 
   defp setup_owner?(_), do: false
+
+  # Raw session token so set_user_initial_password can drop every other session
+  # without logging this setup LiveView out (Finding 95).
+  defp current_session_token(socket) do
+    case socket.assigns[:current_session_id] do
+      id when is_binary(id) ->
+        case Base.decode64(id) do
+          {:ok, token} -> token
+          :error -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
 
   defp email_verification_authorized?(socket) do
     AccountSetupAccess.email_verification_authorized?(

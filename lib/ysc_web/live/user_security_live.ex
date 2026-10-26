@@ -349,7 +349,8 @@ defmodule YscWeb.UserSecurityLive do
         # also disconnects LiveViews (Finding 95).
         Accounts.replace_user_password(user, user_params)
       else
-        # User is setting password for the first time
+        # User is setting password for the first time. Drops other sessions
+        # and disconnects LiveViews (Finding 95); trigger_submit re-logs this tab.
         Accounts.set_user_initial_password(user, user_params)
       end
 

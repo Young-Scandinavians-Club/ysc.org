@@ -15,6 +15,10 @@ defmodule YscWeb.BookingChangeLiveTest do
   setup do
     Ledgers.ensure_basic_accounts()
 
+    # Same late-summer/winter horizon as TahoeBookingLiveTest: change-form
+    # previews for next-summer fixture dates need the calendar max extended.
+    allow_far_future_booking_dates()
+
     {:ok, _} =
       Bookings.create_pricing_rule(%{
         amount: Money.new(500, :USD),
