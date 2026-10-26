@@ -89,6 +89,65 @@ defmodule YscWeb.Workers.WelcomeEmailWorkerTest do
 
       assert WelcomeEmailWorker.perform(job) == :ok
     end
+
+    test "does not SELECT password hashes or bios for a lifetime member", %{
+      user: user
+    } do
+      user
+      |> Ecto.Changeset.change(%{
+        board_bio: "must not load this bio",
+        lifetime_membership_awarded_at:
+          DateTime.truncate(DateTime.utc_now(), :second)
+      })
+      |> Ysc.Repo.update!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"user_id" => user.id},
+        worker: "YscWeb.Workers.WelcomeEmailWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      {result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> WelcomeEmailWorker.perform(job) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert result == :ok
+      assert password_cols == 0
+      assert_email_sent(subject: YscWeb.Emails.WelcomeEmail.get_subject())
+    end
+
+    test "skips subscription lookup for a lifetime member", %{user: user} do
+      user
+      |> Ecto.Changeset.change(
+        lifetime_membership_awarded_at:
+          DateTime.truncate(DateTime.utc_now(), :second)
+      )
+      |> Ysc.Repo.update!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"user_id" => user.id},
+        worker: "YscWeb.Workers.WelcomeEmailWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      {_result, subscription_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> WelcomeEmailWorker.perform(job) end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert subscription_queries == 0
+    end
   end
 
   describe "schedule_welcome_email/1" do

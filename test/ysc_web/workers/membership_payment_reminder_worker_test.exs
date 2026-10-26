@@ -15,6 +15,10 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorkerTest do
 
   describe "perform/1" do
     test "sends 7-day reminder for user without membership", %{user: user} do
+      user
+      |> Ecto.Changeset.change(%{board_bio: "must not load this bio"})
+      |> Ysc.Repo.update!()
+
       job = %Oban.Job{
         id: 1,
         args: %{"user_id" => user.id, "reminder_type" => "7day"},
@@ -24,8 +28,15 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorkerTest do
         attempt: 1
       }
 
-      result = MembershipPaymentReminderWorker.perform(job)
+      {result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipPaymentReminderWorker.perform(job) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
       assert result == :ok
+      assert password_cols == 0
     end
 
     test "sends 30-day reminder for user without membership", %{user: user} do
@@ -90,6 +101,66 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorkerTest do
 
       result = MembershipPaymentReminderWorker.perform(job)
       assert {:error, _} = result
+    end
+
+    test "does not SELECT password hashes or bios when skipping a member", %{
+      user: user
+    } do
+      user
+      |> Ecto.Changeset.change(%{
+        board_bio: "must not load this bio",
+        lifetime_membership_awarded_at:
+          DateTime.truncate(DateTime.utc_now(), :second)
+      })
+      |> Ysc.Repo.update!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"user_id" => user.id, "reminder_type" => "7day"},
+        worker: "YscWeb.Workers.MembershipPaymentReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      {result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipPaymentReminderWorker.perform(job) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert result == :ok
+      assert password_cols == 0
+    end
+
+    test "skips subscription lookup when lifetime membership is loaded", %{
+      user: user
+    } do
+      user
+      |> Ecto.Changeset.change(
+        lifetime_membership_awarded_at:
+          DateTime.truncate(DateTime.utc_now(), :second)
+      )
+      |> Ysc.Repo.update!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"user_id" => user.id, "reminder_type" => "7day"},
+        worker: "YscWeb.Workers.MembershipPaymentReminderWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      {_result, subscription_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipPaymentReminderWorker.perform(job) end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert subscription_queries == 0
     end
   end
 

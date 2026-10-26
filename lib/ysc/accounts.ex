@@ -243,14 +243,29 @@ defmodule Ysc.Accounts do
     )
   end
 
-  @email_identity_fields [:id, :email, :first_name]
+  @email_identity_fields [
+    :id,
+    :email,
+    :first_name,
+    :post_migration_onboarding_completed_at,
+    :lifetime_membership_awarded_at,
+    :primary_user_id
+  ]
 
   @doc """
-  Loads the columns needed to address and greet a user in email.
+  Loads the columns needed to address, greet, and gate a user in email.
 
-  Used by membership-ended scheduling and deferred NewSignInDetected
-  rendering instead of `get_user/1` / `get_user!/1`, so those paths do
-  not SELECT `hashed_password` / `board_bio`.
+  Used by membership-ended scheduling, deferred NewSignInDetected
+  rendering, the welcome-email worker, and membership payment reminders
+  instead of `get_user/1` / `get_user!/1`, so those paths do not SELECT
+  `hashed_password` / `board_bio`.
+
+  Also loads `post_migration_onboarding_completed_at` (`wp_migrated?/1`),
+  `lifetime_membership_awarded_at`, and `primary_user_id` so
+  `has_active_membership?/1` can short-circuit lifetime members without a
+  fat user row. Subscriptions stay `NotLoaded` and are fetched only when
+  lifetime membership is absent.
+
   Returns `nil` when no row matches.
   """
   def get_user_email_identity(nil), do: nil

@@ -1019,11 +1019,14 @@ defmodule Ysc.AccountsTest do
   end
 
   describe "get_user_email_identity/1" do
-    test "returns id/email/first_name without password hashes" do
+    test "returns greeting and membership-gate columns without password hashes" do
+      awarded_at = DateTime.truncate(DateTime.utc_now(), :second)
+
       user =
         user_fixture()
         |> Ecto.Changeset.change(%{
-          board_bio: "must not load this bio"
+          board_bio: "must not load this bio",
+          lifetime_membership_awarded_at: awarded_at
         })
         |> Repo.update!()
 
@@ -1037,6 +1040,12 @@ defmodule Ysc.AccountsTest do
       assert found.id == user.id
       assert found.email == user.email
       assert found.first_name == user.first_name
+      assert found.lifetime_membership_awarded_at == awarded_at
+
+      assert found.post_migration_onboarding_completed_at ==
+               user.post_migration_onboarding_completed_at
+
+      assert is_nil(found.primary_user_id)
       assert is_nil(found.hashed_password)
       assert is_nil(found.board_bio)
       assert password_cols == 0
