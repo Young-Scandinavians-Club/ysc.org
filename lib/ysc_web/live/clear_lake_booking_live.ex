@@ -593,7 +593,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               icon="hero-moon"
               title="Sleeping"
             >
-              Lawn camp or bring your own setup
+              Camp on the lawn (bring a tent) or sleep indoors with your own bedding
             </:item>
             <:item icon="hero-no-symbol" title="House rules">
               No pets or smoking
@@ -2099,7 +2099,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   a cedar hall with a wood-burning fireplace and dance floor, plus a group kitchen.
                 </:item>
                 <:item icon="hero-moon" title="Sleeping, by season:">
-                  summer ({season_span(@guest_overview, "Summer")}) is lawn camping or your own setup; winter ({season_span(
+                  summer ({season_span(@guest_overview, "Summer")}) is lawn camping (bring a tent) or sleeping indoors with your own bedding; winter ({season_span(
                     @guest_overview,
                     "Winter"
                   )}) has beds in three rooms. Bring your own linens.

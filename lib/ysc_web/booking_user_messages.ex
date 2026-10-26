@@ -471,6 +471,14 @@ defmodule YscWeb.BookingUserMessages do
     "your booking reference (shown on your receipt as Booking Reference)"
   end
 
+  def cabin_rules_receipt_reminder(:tahoe) do
+    "Bring your own sheets, pillowcases, towels, and sleeping bags. None are provided. Leave the kitchen clean before you go."
+  end
+
+  def cabin_rules_receipt_reminder(:clear_lake) do
+    "Pack linens or camping gear: sheets or a sleeping bag, and a tent if you're camping on the lawn in summer. Leave the kitchen clean before you go."
+  end
+
   defp modification_after_payment_recovery_body do
     "Open this booking from My Bookings & Payments (click your name in the top-right corner) and check whether the dates updated. If they didn't, email info@ysc.org with #{booking_reference_support_phrase()}."
   end

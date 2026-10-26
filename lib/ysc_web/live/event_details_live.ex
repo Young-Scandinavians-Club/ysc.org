@@ -2180,13 +2180,27 @@ defmodule YscWeb.EventDetailsLive do
           </div>
         <% true -> %>
           <!-- Normal Payment Flow -->
-        <!-- Sticky Timer Banner at Top -->
+          <% tickets_requiring_registration =
+            AttendeeInfo.tickets_needing_info(@ticket_order.tickets || []) %>
+          <% attendee_state = %{
+            tickets_for_me: @tickets_for_me,
+            selected_family_members: @selected_family_members,
+            family_members: @family_members,
+            ticket_details_form: @ticket_details_form,
+            current_user: @current_user
+          } %>
+          <% all_registrations_complete =
+            AttendeeInfo.all_complete?(
+              tickets_requiring_registration,
+              attendee_state
+            ) %>
+          <!-- Sticky Timer Banner at Top -->
           <div class="sticky top-0 z-10 bg-blue-50 border-b border-blue-200 -mx-6 -mt-2 px-6 pt-3 pb-3 mb-6">
             <div class="flex flex-col items-center gap-1">
               <div class="flex items-center justify-center space-x-2">
                 <.icon name="hero-clock" class="w-5 h-5 text-blue-600" />
                 <span class="text-sm font-medium text-blue-800">
-                  Time remaining to complete purchase:
+                  {AttendeeInfoCards.checkout_timer_intro()}
                 </span>
                 <div
                   id="checkout-timer"
@@ -2200,8 +2214,14 @@ defmodule YscWeb.EventDetailsLive do
                 >
                 </div>
               </div>
-              <p class="text-xs text-blue-700 text-center max-w-md">
-                Complete payment before the timer expires. If time runs out, your tickets go back on sale so others can buy them.
+              <p
+                id="checkout-timer-next-step"
+                class="text-xs text-blue-700 text-center max-w-md"
+              >
+                {AttendeeInfoCards.checkout_timer_next_step(
+                  tickets_requiring_registration,
+                  all_registrations_complete
+                )}
               </p>
             </div>
           </div>
@@ -2216,21 +2236,6 @@ defmodule YscWeb.EventDetailsLive do
                 </p>
               </div>
 
-              <%!-- Attendee info: who's going and any per-ticket questions --%>
-              <% tickets_requiring_registration =
-                AttendeeInfo.tickets_needing_info(@ticket_order.tickets || []) %>
-              <% attendee_state = %{
-                tickets_for_me: @tickets_for_me,
-                selected_family_members: @selected_family_members,
-                family_members: @family_members,
-                ticket_details_form: @ticket_details_form,
-                current_user: @current_user
-              } %>
-              <% all_registrations_complete =
-                AttendeeInfo.all_complete?(
-                  tickets_requiring_registration,
-                  attendee_state
-                ) %>
               <%= if tickets_requiring_registration != [] do %>
                 <div
                   id="attendee-info-step"

@@ -574,8 +574,10 @@ defmodule YscWeb.BookingReceiptLive do
                 <h3 class="text-zinc-900 mb-3 flex items-center gap-2 type-subhead">
                   <.icon name="hero-document-check" class="w-5 h-5" /> Cabin Rules
                 </h3>
-                <p class="text-sm text-zinc-600 mb-4">
-                  Reminder: Bring your own bed sheets and comforters and ensure the kitchen is cleaned before departure.
+                <p id="cabin-rules-reminder" class="text-sm text-zinc-600 mb-4">
+                  Reminder: {YscWeb.BookingUserMessages.cabin_rules_receipt_reminder(
+                    @booking.property
+                  )}
                 </p>
                 <a
                   href={get_cabin_rules_url(@booking.property)}
