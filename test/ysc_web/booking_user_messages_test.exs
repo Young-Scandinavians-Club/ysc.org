@@ -108,6 +108,24 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute toast =~ "Booking created"
   end
 
+  test "receipt cabin rules reminder is property-specific packing, not Tahoe-only sheets" do
+    tahoe = BookingUserMessages.cabin_rules_receipt_reminder(:tahoe)
+    clear_lake = BookingUserMessages.cabin_rules_receipt_reminder(:clear_lake)
+
+    assert tahoe =~ "sheets, pillowcases, towels, and sleeping bags"
+    assert tahoe =~ "None are provided"
+    refute tahoe =~ "comforters"
+    refute tahoe =~ "tent"
+
+    assert clear_lake =~ "linens or camping gear"
+    assert clear_lake =~ "tent if you're camping on the lawn in summer"
+    refute clear_lake =~ "bed sheets and comforters"
+    refute clear_lake =~ "None are provided"
+
+    assert tahoe =~ "Leave the kitchen clean before you go"
+    assert clear_lake =~ "Leave the kitchen clean before you go"
+  end
+
   test "checkout hold timer says pay now only on the paid payment step" do
     assert BookingUserMessages.checkout_hold_timer_intro() ==
              "These dates are held for"

@@ -2525,6 +2525,14 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
              )
 
       assert has_element?(view, "#sleeping-at-the-cabin", "Lawn camp")
+
+      assert has_element?(
+               view,
+               "#sleeping-alert",
+               "Camp on the lawn (bring a tent) or sleep indoors with your own bedding"
+             )
+
+      refute has_element?(view, "#sleeping-alert", "your own setup")
       assert has_element?(view, "#winter-sleeping-photos")
       assert has_element?(view, "#winter-sleeping-photo-0 img")
       assert has_element?(view, "#winter-sleeping-photo-3")
@@ -3113,6 +3121,18 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
              )
 
       assert has_element?(view, "#clear-lake-guest-stay-list")
+
+      assert has_element?(
+               view,
+               "#clear-lake-guest-stay-list",
+               "lawn camping (bring a tent) or sleeping indoors with your own bedding"
+             )
+
+      refute has_element?(
+               view,
+               "#clear-lake-guest-stay-list",
+               "your own setup"
+             )
 
       assert has_element?(
                view,

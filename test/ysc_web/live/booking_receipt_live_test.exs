@@ -238,6 +238,14 @@ defmodule YscWeb.BookingReceiptLiveTest do
                ~s(a[href="/bookings/tahoe?tab=information&info_tab=manual#house-manual"]),
                "Read Cabin Rules"
              )
+
+      assert has_element?(
+               view,
+               "#cabin-rules-reminder",
+               "sheets, pillowcases, towels, and sleeping bags"
+             )
+
+      refute has_element?(view, "#cabin-rules-reminder", "tent")
     end
 
     test "clear lake receipt links cabin access to the door-code-access section",
@@ -264,6 +272,18 @@ defmodule YscWeb.BookingReceiptLiveTest do
                view,
                ~s(a[href="/bookings/clear-lake?tab=information&info_tab=manual#house-manual"]),
                "Read Cabin Rules"
+             )
+
+      assert has_element?(
+               view,
+               "#cabin-rules-reminder",
+               "tent if you're camping on the lawn in summer"
+             )
+
+      refute has_element?(
+               view,
+               "#cabin-rules-reminder",
+               "bed sheets and comforters"
              )
     end
 
