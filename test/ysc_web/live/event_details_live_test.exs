@@ -1789,6 +1789,42 @@ defmodule YscWeb.EventDetailsLiveTest do
                "#checkout-whos-going",
                "ticket that requires registration"
              )
+
+      # One identity ticket is pre-filled as the buyer, so payment is the next step.
+      assert has_element?(
+               view,
+               "#checkout-timer-next-step",
+               "Complete payment before the timer expires"
+             )
+    end
+
+    test "paid checkout timer does not say complete payment while a second ticket still needs a name",
+         %{
+           conn: conn,
+           event: event,
+           tier: tier
+         } do
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
+
+      assert has_element?(view, "#payment-modal")
+      assert has_element?(view, "#checkout-whos-going", "Who's going?")
+
+      assert has_element?(
+               view,
+               "#checkout-timer-next-step",
+               "Finish adding who's going before the timer runs out"
+             )
+
+      refute has_element?(
+               view,
+               "#checkout-timer-next-step",
+               "Complete payment"
+             )
     end
   end
 
