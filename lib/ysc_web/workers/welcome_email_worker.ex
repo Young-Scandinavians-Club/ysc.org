@@ -19,7 +19,7 @@ defmodule YscWeb.Workers.WelcomeEmailWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"user_id" => user_id}}) do
-    case Accounts.get_user(user_id) do
+    case Accounts.get_user_email_identity(user_id) do
       nil ->
         Ysc.Logging.warning("User not found for welcome email",
           user_id: user_id
