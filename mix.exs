@@ -332,8 +332,14 @@ defmodule Ysc.MixProject do
       {:image, "~> 0.72"},
       {:iso, "~> 1.4"},
       {:jason, "~> 1.4"},
-      # Pin exact version: jose is pulled by joken (~> 1.11.12) and goth (~> 1.11).
-      {:jose, "1.11.12", override: true},
+      # 1.11.13: EEF-CVE-2026-65625..65632 (AES-GCM tag length, RSA PKCS1
+      # unwrap, JWE zip bomb, shared_secret recursion, weak PKCS#8 PBKDF2,
+      # X25519 timing, RSA JWK factoring DoS, ECDSA length). crypto_fallback
+      # default is now false. We sign Google Wallet JWTs with Joken RS256 PEM
+      # maps (native OTP crypto); we do not decrypt JWE, derive ECDH secrets,
+      # or export encrypted PKCS#8. joken lists ~> 1.11.12 and goth ~> 1.11,
+      # so pin the patched floor.
+      {:jose, "~> 1.11.13", override: true},
       # 2.7.0: Elixir 1.16 / OTP 26 floor (we are 1.20 / OTP 27). Signer.create
       # accepts a JOSE.JWK; peek returns {:error, :token_malformed} for invalid
       # tokens. We sign Google Wallet JWTs with Signer.create("RS256", %{"pem"
