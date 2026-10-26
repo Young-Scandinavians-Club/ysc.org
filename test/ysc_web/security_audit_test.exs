@@ -88,7 +88,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 92 (MEDIUM)   Merch checkout quoted Printful shipping from mount-time cart lines, then created the pending order and Stripe PaymentIntent from a freshly loaded cart plus the stale `option.rate`, so a member could underpay shipping by adding items in another tab
   Finding 93 (HIGH)     Account-setup / update_user_phone_and_sms reused User.registration_changeset with validate_email: false, so a client could mass-assign email (keeping email_verified_at), name, and DOB while saving a phone number — planting an account under a victim's unused address without the email-change reauth flow
   Finding 94 (MEDIUM)   Volunteer→member demotion did not disconnect LiveViews. Finding 87 only force-closed sockets when the previous role was `:admin`, so an already-open volunteer scanner / event editor / check-in / posts LiveView kept frozen `admin_role` and `current_user.role` and continued handling staff events after revocation.
-  Finding 95 (HIGH)     Password reset and password change deleted `users_tokens` but never broadcast LiveView `"disconnect"`. Finding 87/94 already showed `mount_current_user/2` only runs on mount, so a stolen session with an already-open bookings/tickets/settings LiveView kept `current_user` and could keep acting after the victim recovered the account.
+  Finding 95 (HIGH)     Password reset and password change deleted `users_tokens` but never broadcast LiveView `"disconnect"`. Finding 87/94 already showed `mount_current_user/2` only runs on mount, so a stolen session with an already-open bookings/tickets/settings LiveView kept `current_user` and could keep acting after the victim recovered the account. First-password set (`set_user_initial_password/2`) was the leftover: OAuth / family-invite / WP-migration users who added a password left other sessions valid.
   Finding 96 (MEDIUM)   Event Tickets-tab leftover `validate-capacity`/`save-capacity` forwarded the full event param map into `update_event_editor/3`, persisting client `rendered_details` without TrixScrubber. Public `/feeds/events.atom` emits that HTML unsanitized.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
@@ -6327,6 +6327,76 @@ defmodule YscWeb.SecurityAuditTest do
       }
 
       refute Repo.get_by(UserToken, user_id: user.id)
+    end
+
+    test "set_user_initial_password broadcasts disconnect for every web session" do
+      user = oauth_user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, _} =
+               Accounts.set_user_initial_password(user, %{
+                 password: "new valid password"
+               })
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      refute Repo.get_by(UserToken, user_id: user.id)
+    end
+
+    test "set_user_initial_password keeps the current session when asked" do
+      user = oauth_user_fixture()
+      current = Accounts.generate_user_session_token(user)
+      other = Accounts.generate_user_session_token(user)
+      current_socket_id = "users_sessions:#{Base.url_encode64(current)}"
+      other_socket_id = "users_sessions:#{Base.url_encode64(other)}"
+      YscWeb.Endpoint.subscribe(current_socket_id)
+      YscWeb.Endpoint.subscribe(other_socket_id)
+
+      assert {:ok, _} =
+               Accounts.set_user_initial_password(
+                 user,
+                 %{password: "new valid password"},
+                 keep_session_token: current
+               )
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^other_socket_id
+      }
+
+      refute_receive %Phoenix.Socket.Broadcast{
+                       event: "disconnect",
+                       topic: ^current_socket_id
+                     },
+                     100
+
+      assert Accounts.get_user_by_session_token(current).id == user.id
+      refute Accounts.get_user_by_session_token(other)
+    end
+
+    test "a failed initial password set does not disconnect LiveViews" do
+      user = oauth_user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:error, %Ecto.Changeset{}} =
+               Accounts.set_user_initial_password(user, %{
+                 password: "short"
+               })
+
+      refute_receive %Phoenix.Socket.Broadcast{
+                       event: "disconnect",
+                       topic: ^live_socket_id
+                     },
+                     100
+
+      assert Accounts.get_user_by_session_token(token).id == user.id
     end
 
     test "a failed password change does not disconnect LiveViews" do

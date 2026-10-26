@@ -2357,9 +2357,17 @@ defmodule Ysc.Accounts do
 
   This is used when a user doesn't have a password yet and is setting one for the first time.
   Unlike update_user_password, this doesn't validate a current password.
+
+  Deletes auth tokens and disconnects LiveViews so a stolen or shared-browser
+  session cannot keep acting after the user adds a password (Finding 95).
+  Pass `keep_session_token:` to leave the current web session alive (account
+  setup continues in the same LiveView); other sessions are still dropped.
   """
   @dialyzer {:nowarn_function, set_user_initial_password: 2}
-  def set_user_initial_password(user, attrs) do
+  @dialyzer {:nowarn_function, set_user_initial_password: 3}
+  def set_user_initial_password(user, attrs, opts \\ [])
+
+  def set_user_initial_password(user, attrs, opts) when is_list(opts) do
     changeset = User.password_changeset(user, attrs)
 
     Ecto.Multi.new()
@@ -2367,12 +2375,9 @@ defmodule Ysc.Accounts do
     |> Ecto.Multi.run(:mark_password_set, fn _repo, %{user: updated_user} ->
       mark_password_set(updated_user)
     end)
+    |> put_password_change_session_drop(user, opts)
     |> Repo.transaction()
-    |> case do
-      {:ok, %{user: user}} -> {:ok, user}
-      {:error, :user, changeset, _} -> {:error, changeset}
-      {:error, :mark_password_set, changeset, _} -> {:error, changeset}
-    end
+    |> finish_password_change_transaction()
   end
 
   @dialyzer {:nowarn_function, update_user_password: 3}
@@ -2616,20 +2621,33 @@ defmodule Ysc.Accounts do
     |> finish_password_change_transaction()
   end
 
-  defp put_password_change_session_drop(multi, user) do
+  defp put_password_change_session_drop(multi, user, opts \\ []) do
+    keep_session_token = Keyword.get(opts, :keep_session_token)
+
     multi
     |> Ecto.Multi.run(:session_tokens_to_disconnect, fn repo, _changes ->
       tokens =
         user.id
-        |> session_tokens_for_live_disconnect_query()
+        |> session_tokens_for_live_disconnect_query(keep_session_token)
         |> repo.all()
 
       {:ok, tokens}
     end)
     |> Ecto.Multi.delete_all(
       :tokens,
-      UserToken.by_user_and_contexts_query(user, :all)
+      tokens_to_delete_after_password_change_query(user, keep_session_token)
     )
+  end
+
+  defp tokens_to_delete_after_password_change_query(user, nil) do
+    UserToken.by_user_and_contexts_query(user, :all)
+  end
+
+  defp tokens_to_delete_after_password_change_query(user, token)
+       when is_binary(token) do
+    from t in UserToken,
+      where: t.user_id == ^user.id,
+      where: t.token != ^token or t.context != "session"
   end
 
   defp finish_password_change_transaction(result) do
@@ -2659,10 +2677,22 @@ defmodule Ysc.Accounts do
     end)
   end
 
-  defp session_tokens_for_live_disconnect_query(user_id) do
-    from t in UserToken,
-      where: t.user_id == ^user_id and t.context == "session",
-      select: t.token
+  defp session_tokens_for_live_disconnect_query(
+         user_id,
+         keep_session_token \\ nil
+       ) do
+    query =
+      from t in UserToken,
+        where: t.user_id == ^user_id and t.context == "session"
+
+    query =
+      if is_binary(keep_session_token) do
+        from t in query, where: t.token != ^keep_session_token
+      else
+        query
+      end
+
+    from t in query, select: t.token
   end
 
   @doc """

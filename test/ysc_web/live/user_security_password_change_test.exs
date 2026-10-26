@@ -395,6 +395,35 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
              ) != nil
     end
 
+    test "invalidates other sessions after setting a first password", %{
+      conn: conn,
+      user: user
+    } do
+      conn = log_in_user(conn, user)
+      token = get_session(conn, :user_token)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_submit(view, "request_password_change", %{
+        user: %{
+          password: "my new password 123",
+          password_confirmation: "my new password 123"
+        }
+      })
+
+      click_reauth_passkey(view)
+      simulate_reauth_verified(view)
+
+      refute Accounts.get_user_by_session_token(token)
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+    end
+
     test "marks password_set_at timestamp when setting password", %{
       conn: conn,
       user: user
