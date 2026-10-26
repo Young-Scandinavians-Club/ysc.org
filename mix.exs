@@ -28,7 +28,16 @@ defmodule Ysc.MixProject do
           # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
           # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
           "EEF-CVE-2026-95105",
-          "EEF-CVE-2026-94206"
+          "EEF-CVE-2026-94206",
+          # hackney 4.7.4: patched in 4.8.6+/4.9.1, which also require h2 0.12.5,
+          # webtransport 0.4.8, certifi 2.18, and quic 2.x. App HTTP uses Req;
+          # hackney is transitive (ex_aws, stripity_stripe). Revisit with the
+          # h2 0.12.5 bump. Requires Hex >= 2.5.1-dev.
+          "EEF-CVE-2026-112880",
+          "EEF-CVE-2026-97200",
+          "EEF-CVE-2026-115700",
+          "EEF-CVE-2026-115693",
+          "EEF-CVE-2026-113440"
         ]
       ],
       test_coverage: [
