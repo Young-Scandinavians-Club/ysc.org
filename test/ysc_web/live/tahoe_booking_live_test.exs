@@ -21,6 +21,15 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
   alias Ysc.Repo
 
+  setup do
+    # `tahoe_booking_dates/1` continues into next summer once the current
+    # window has no Monday–Thursday buyout stay. The calendar horizon still
+    # follows winter's 45-day cap, so those dates render disabled unless we
+    # widen advance booking. Safe here: this module is `async: false`.
+    allow_far_future_booking_dates()
+    :ok
+  end
+
   describe "deferred room availability" do
     test "populates room cards after connect when booking dates are in the URL",
          %{
