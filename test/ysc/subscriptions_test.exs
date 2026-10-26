@@ -684,6 +684,129 @@ defmodule Ysc.SubscriptionsTest do
       end
     end
 
+    test "does not mint a cash Stripe subscription when cancelling the incomplete checkout fails" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_cash_cancel_fail_#{System.unique_integer()}"
+        })
+
+      incomplete_id = "sub_incomplete_#{System.unique_integer([:positive])}"
+
+      {:ok, incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: incomplete_id,
+          stripe_status: "incomplete",
+          name: "Incomplete Checkout Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      stripe_error = %Stripe.Error{
+        source: :stripe,
+        code: :rate_limit,
+        message: "Too many requests",
+        request_id: nil,
+        extra: %{},
+        user_message: nil
+      }
+
+      expect(Stripe.SubscriptionMock, :cancel, fn ^incomplete_id ->
+        {:error, stripe_error}
+      end)
+
+      callback = fn _user, _plan ->
+        flunk(
+          "cash create must not mint a Stripe subscription while cancel fails"
+        )
+      end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :create_subscription_paid_out_of_band_stripe_callback,
+          callback
+        )
+
+        assert {:error, ^stripe_error} =
+                 Subscriptions.create_subscription_paid_out_of_band(
+                   user,
+                   :single
+                 )
+
+        reloaded = Subscriptions.get_subscription(incomplete_sub.id)
+        assert reloaded.stripe_status == "incomplete"
+      after
+        Application.delete_env(
+          :ysc,
+          :create_subscription_paid_out_of_band_stripe_callback
+        )
+      end
+    end
+
+    test "records cash membership when Stripe already deleted the incomplete checkout" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_cash_gone_#{System.unique_integer()}"
+        })
+
+      incomplete_id =
+        "sub_incomplete_gone_#{System.unique_integer([:positive])}"
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      assert single_plan != nil
+
+      {:ok, incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: incomplete_id,
+          stripe_status: "incomplete",
+          name: "Incomplete Checkout Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      expect(Stripe.SubscriptionMock, :cancel, fn ^incomplete_id ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :resource_missing,
+           message: "No such subscription",
+           request_id: nil,
+           extra: %{},
+           user_message: nil
+         }}
+      end)
+
+      now_unix = System.system_time(:second)
+      fake_stripe_sub = build_fake_stripe_subscription(single_plan, now_unix)
+      callback = fn _user, _plan -> {:ok, fake_stripe_sub} end
+
+      try do
+        Application.put_env(
+          :ysc,
+          :create_subscription_paid_out_of_band_stripe_callback,
+          callback
+        )
+
+        assert {:ok, %Subscription{} = cash_sub} =
+                 Subscriptions.create_subscription_paid_out_of_band(
+                   user,
+                   :single
+                 )
+
+        assert cash_sub.stripe_id == fake_stripe_sub.id
+        assert cash_sub.stripe_status == "active"
+
+        reloaded = Subscriptions.get_subscription(incomplete_sub.id)
+        assert reloaded.stripe_status == "cancelled"
+      after
+        Application.delete_env(
+          :ysc,
+          :create_subscription_paid_out_of_band_stripe_callback
+        )
+      end
+    end
+
     test "creates subscription and returns {:ok, subscription} when callback returns fake Stripe subscription" do
       user = user_fixture_unique()
       membership_plans = Application.get_env(:ysc, :membership_plans, [])
@@ -1564,6 +1687,31 @@ defmodule Ysc.SubscriptionsTest do
              }) == {:error, :user_already_has_active_subscription}
     end
 
+    test "still returns Stripe success when local persist fails after create" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      stripe_id = "sub_persist_fail_#{System.unique_integer([:positive])}"
+      price_id = "price_#{System.unique_integer([:positive])}"
+
+      expect(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_id,
+           customer: user.stripe_id,
+           status: nil,
+           price_id: price_id
+         )}
+      end)
+
+      assert {:ok, %Stripe.Subscription{id: ^stripe_id}} =
+               Subscriptions.create_stripe_subscription(user, %{
+                 prices: [%{price: price_id, quantity: 1}]
+               })
+
+      assert Subscriptions.get_subscription_by_stripe_id(stripe_id) == nil
+    end
+
     test "allows creating subscription when user has expired subscription" do
       user =
         user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
@@ -2109,6 +2257,31 @@ defmodule Ysc.SubscriptionsTest do
 
       assert returned.id == existing.id
       assert returned.stripe_id == "sub_dup_check"
+    end
+
+    test "creates a local subscription with no items when Stripe items are missing",
+         %{user: user} do
+      now = System.os_time(:second)
+      stripe_id = "sub_no_items_#{System.unique_integer([:positive])}"
+
+      stripe_sub = %Stripe.Subscription{
+        id: stripe_id,
+        object: "subscription",
+        status: "active",
+        customer: user.stripe_id,
+        start_date: now,
+        items: nil
+      }
+
+      assert {:ok, %Subscription{} = sub} =
+               Subscriptions.create_subscription_from_stripe(user, stripe_sub)
+
+      assert sub.stripe_id == stripe_id
+      assert sub.user_id == user.id
+      assert sub.stripe_status == "active"
+
+      items = Ysc.Repo.preload(sub, :subscription_items).subscription_items
+      assert items == []
     end
   end
 
