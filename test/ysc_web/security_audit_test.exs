@@ -2385,10 +2385,10 @@ defmodule YscWeb.SecurityAuditTest do
 
       submit_reauth_password(view, valid_user_password())
 
+      # Exhaust the fixed one-minute bucket directly: 13 slow LiveView submits
+      # can straddle a window rollover on a loaded CI runner and reset the count.
       for _ <- 1..12 do
-        render_submit(view, "verify_phone_code", %{
-          "verification_code" => "111111"
-        })
+        assert Ysc.EmailVerificationRateLimit.check(user.id, :phone) == :ok
       end
 
       render_submit(view, "verify_phone_code", %{
