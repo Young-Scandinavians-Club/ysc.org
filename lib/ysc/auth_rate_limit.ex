@@ -53,25 +53,37 @@ defmodule Ysc.AuthRateLimit do
   identifier; use that only where the caller is already authenticated or the
   identifier is a one-time token.
 
+  ## Options
+
+    * `:scope` - bucket namespace, `"id"` by default (account email). Callers
+      whose identifier is not an account email and is attacker-chosen (passkey
+      `user_id`, one-time tokens) pass their own scope so they can never name,
+      and burn, an account's email bucket.
+
   Returns `:ok` if allowed, or `{:error, :rate_limited, retry_after_seconds}` if over limit.
   """
-  def check_identifier(identifier, ip \\ nil)
+  def check_identifier(identifier, ip \\ nil, opts \\ [])
 
-  def check_identifier(identifier, ip) when is_binary(identifier) do
+  def check_identifier(identifier, ip, opts) when is_binary(identifier) do
     RateLimit.check(
       &hit/3,
-      identifier_key(identifier, ip),
+      identifier_key(identifier, ip, Keyword.get(opts, :scope, "id")),
       @identifier_scale_ms,
       identifier_limit()
     )
   end
 
-  def check_identifier(_, _), do: :ok
+  def check_identifier(_, _, _), do: :ok
 
-  defp identifier_key(identifier, nil), do: "auth:id:#{canonical(identifier)}"
+  defp identifier_key(identifier, nil, scope),
+    do: "auth:#{scope}:#{canonical(identifier)}"
 
-  defp identifier_key(identifier, ip) do
-    "auth:id:#{canonical(identifier)}:ip:#{RateLimit.normalize_ip(ip)}"
+  # Distinct `<scope>_ip` namespace, and the IP is length-prefixed, so no
+  # identifier text (which the requester controls) can produce another bucket's
+  # key, whether global or scoped to a different IP.
+  defp identifier_key(identifier, ip, scope) do
+    ip = RateLimit.normalize_ip(ip)
+    "auth:#{scope}_ip:#{byte_size(ip)}:#{ip}:#{canonical(identifier)}"
   end
 
   defp canonical(identifier) do

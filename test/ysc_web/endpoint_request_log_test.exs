@@ -8,7 +8,10 @@ defmodule YscWeb.EndpointRequestLogTest do
       for path <- [
             "/webhooks/flowroute/secret/sms",
             "/webhooks/flowroute/secret/mms_dlr",
-            "/webhooks/printful/secret"
+            "/webhooks/printful/secret",
+            # percent-encoded provider segment still routes to the webhook
+            "/webhooks/%66lowroute/secret/sms",
+            "/webhooks/%70rintful/secret"
           ] do
         refute YscWeb.Endpoint.request_log_level(conn(:post, path))
       end

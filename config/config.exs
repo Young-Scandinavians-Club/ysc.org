@@ -459,7 +459,9 @@ config :phoenix,
     "password",
     "token",
     "secret",
-    "code_verifier",
+    # Substring match: covers verification_code (email/SMS OTP), code_verifier
+    # and the one-time mobile handoff `code`.
+    "code",
     "client_secret"
   ]
 

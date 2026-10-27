@@ -772,7 +772,9 @@ defmodule YscWeb.Router do
   scope "/webhooks", YscWeb do
     pipe_through [:api]
 
-    post "/quickbooks", QuickbooksWebhookController, :webhook
+    # Unauthenticated until the controller verifies the signature, so keep the
+    # request params out of Phoenix's router log.
+    post "/quickbooks", QuickbooksWebhookController, :webhook, log: false
     post "/ses", SesWebhookController, :webhook
   end
 

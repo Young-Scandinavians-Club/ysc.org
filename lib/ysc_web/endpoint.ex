@@ -129,10 +129,23 @@ defmodule YscWeb.Endpoint do
 
   plug YscWeb.Router
 
+  # `path_info` is still percent-encoded here (the router decodes it later), so
+  # `/webhooks/%66lowroute/<token>/sms` would otherwise dodge the match and have
+  # its token logged.
   @doc false
-  def request_log_level(%Plug.Conn{path_info: ["webhooks", provider | _]})
-      when provider in ["flowroute", "printful"],
-      do: false
+  def request_log_level(%Plug.Conn{path_info: ["webhooks", provider | _]}) do
+    if decode_segment(provider) in ["flowroute", "printful"],
+      do: false,
+      else: :info
+  end
 
   def request_log_level(_conn), do: :info
+
+  # An undecodable segment can't route to a token-bearing webhook, but fail
+  # closed anyway: treat it as sensitive and skip the log line.
+  defp decode_segment(segment) do
+    URI.decode(segment)
+  rescue
+    ArgumentError -> "flowroute"
+  end
 end

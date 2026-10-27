@@ -416,7 +416,9 @@ defmodule YscWeb.UserSessionController do
         )
 
       %{"user_id" => user_id} when is_binary(user_id) and user_id != "" ->
-        case Ysc.AuthRateLimit.check_identifier(user_id) do
+        case Ysc.AuthRateLimit.check_identifier(user_id, nil,
+               scope: "passkey_user"
+             ) do
           :ok ->
             conn
             |> YscWeb.Flash.put_toast(:error, "Invalid login request.",
@@ -524,7 +526,7 @@ defmodule YscWeb.UserSessionController do
     require Ysc.Logging
 
     # Per-identifier rate limit (token is unique per login attempt)
-    case Ysc.AuthRateLimit.check_identifier(token) do
+    case Ysc.AuthRateLimit.check_identifier(token, nil, scope: "login_token") do
       :ok ->
         do_passkey_login_with_token(
           conn,
