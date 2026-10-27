@@ -199,6 +199,27 @@ defmodule YscWeb.ReauthComponentTest do
 
       assert {:redirect, %{to: to}} = updated.redirected
       assert to =~ "reauth_resume"
+
+      query = to |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      return_to = query["return_to"]
+
+      resume_query =
+        return_to |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+
+      assert {:ok, intent} =
+               YscWeb.ReauthResume.verify(
+                 resume_query["reauth_resume"],
+                 user.id
+               )
+
+      assert intent["user_id"] == user.id
+      assert intent["email"] == "new@example.com"
+
+      assert :error =
+               YscWeb.ReauthResume.verify(
+                 resume_query["reauth_resume"],
+                 "01BX5ZZKBKACTAV9WEVGEMMVRZ"
+               )
     end
   end
 

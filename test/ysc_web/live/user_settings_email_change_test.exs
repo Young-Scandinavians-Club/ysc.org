@@ -372,6 +372,7 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       resume_path =
         YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "user_id" => user.id,
           "purpose" => "email_change",
           "email" => new_email
         })
@@ -390,6 +391,36 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
       assert Accounts.get_email_verification_code(user)
     end
 
+    test "ignores another user's resume token even with a valid reauth window",
+         %{
+           conn: conn
+         } do
+      attacker = user_fixture()
+      victim = user_fixture()
+      attacker_email = "cross-user-resume@example.com"
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "user_id" => attacker.id,
+          "purpose" => "email_change",
+          "email" => attacker_email
+        })
+
+      conn =
+        conn
+        |> log_in_user(victim)
+        |> Plug.Conn.put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {:ok, view, _html} = live(conn, resume_path)
+
+      refute has_element?(view, "#email-verification-modal")
+      refute Accounts.get_email_verification_code(victim)
+      assert Repo.reload!(victim).email == victim.email
+    end
+
     test "reopens reauth modal when resume token present but not verified", %{
       conn: conn
     } do
@@ -398,6 +429,7 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       resume_path =
         YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "user_id" => user.id,
           "purpose" => "email_change",
           "email" => new_email
         })
@@ -442,10 +474,14 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
         return_to |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
 
       assert {:ok, intent} =
-               YscWeb.ReauthResume.verify(resume_query["reauth_resume"])
+               YscWeb.ReauthResume.verify(
+                 resume_query["reauth_resume"],
+                 user.id
+               )
 
       assert intent["purpose"] == "email_change"
       assert intent["email"] == "oauth-intent@example.com"
+      assert intent["user_id"] == user.id
     end
   end
 end

@@ -4794,10 +4794,13 @@ defmodule YscWeb.UserSettingsLive do
   defp maybe_resume_oauth_reauth(socket, params) do
     # Only resume on the connected LiveView so we don't send verification codes
     # during the dead render, and only once per OAuth return.
+    user = socket.assigns.current_user
+
     with true <- connected?(socket),
          false <- socket.assigns[:reauth_resume_handled] == true,
+         true <- not is_nil(user),
          token when is_binary(token) <- params["reauth_resume"],
-         {:ok, intent} <- YscWeb.ReauthResume.verify(token) do
+         {:ok, intent} <- YscWeb.ReauthResume.verify(token, user.id) do
       socket =
         socket
         |> assign(:reauth_resume_handled, true)

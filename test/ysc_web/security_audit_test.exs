@@ -90,6 +90,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 94 (MEDIUM)   Volunteer→member demotion did not disconnect LiveViews. Finding 87 only force-closed sockets when the previous role was `:admin`, so an already-open volunteer scanner / event editor / check-in / posts LiveView kept frozen `admin_role` and `current_user.role` and continued handling staff events after revocation.
   Finding 95 (HIGH)     Password reset and password change deleted `users_tokens` but never broadcast LiveView `"disconnect"`. Finding 87/94 already showed `mount_current_user/2` only runs on mount, so a stolen session with an already-open bookings/tickets/settings LiveView kept `current_user` and could keep acting after the victim recovered the account. First-password set (`set_user_initial_password/2`) was the leftover: OAuth / family-invite / WP-migration users who added a password left other sessions valid.
   Finding 96 (MEDIUM)   Event Tickets-tab leftover `validate-capacity`/`save-capacity` forwarded the full event param map into `update_event_editor/3`, persisting client `rendered_details` without TrixScrubber. Public `/feeds/events.atom` emits that HTML unsanitized.
+  Finding 97 (HIGH)     OAuth reauth resume tokens (`reauth_resume`) were encrypted but not bound to the initiating user. `UserAuth.log_in_user/6` always starts a 5-minute `reauth_verified_at` grace window, so a member who minted a token (email/phone/password intent) could send another signed-in member `/users/settings?reauth_resume=…` during that window. Phone changes to non-US/CA numbers skip OTP and persist immediately, including `profile_params` (name/DOB).
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -6640,6 +6641,133 @@ defmodule YscWeb.SecurityAuditTest do
       refute feed =~ "<script"
       refute feed =~ "onerror="
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 97 (HIGH): OAuth reauth resume tokens must be bound to the user
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 97: reauth resume tokens cannot be redeemed cross-user" do
+    test "phone-change resume for another user does not overwrite phone or name",
+         %{conn: conn} do
+      attacker =
+        user_fixture(%{first_name: "Mallory", last_name: "Attacker"})
+
+      victim =
+        user_fixture(%{
+          state: :active,
+          first_name: "Victim",
+          last_name: "Member",
+          phone_number: "+14159098268"
+        })
+
+      attacker_phone = unique_swedish_mobile()
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "user_id" => attacker.id,
+          "purpose" => "phone_change",
+          "phone" => attacker_phone,
+          "profile_params" => %{
+            "first_name" => "Hijacked",
+            "last_name" => "Identity"
+          }
+        })
+
+      conn =
+        conn
+        |> log_in_user(victim)
+        |> Plug.Conn.put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {:ok, view, _html} = live(conn, resume_path)
+
+      refute has_element?(view, "#reauth-modal")
+      refute render(view) =~ "We can&#39;t send a verification text"
+
+      reloaded = Repo.reload!(victim)
+      assert reloaded.phone_number == "+14159098268"
+      assert reloaded.first_name == "Victim"
+      assert reloaded.last_name == "Member"
+    end
+
+    test "same-user phone-change resume still applies a non-US number without OTP",
+         %{conn: conn} do
+      user =
+        user_fixture(%{
+          state: :active,
+          first_name: "Owner",
+          last_name: "Member",
+          phone_number: "+14159098268"
+        })
+
+      new_phone = unique_swedish_mobile()
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "user_id" => user.id,
+          "purpose" => "phone_change",
+          "phone" => new_phone,
+          "profile_params" => %{
+            "first_name" => user.first_name,
+            "last_name" => user.last_name
+          }
+        })
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> Plug.Conn.put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {:ok, view, _html} = live(conn, resume_path)
+
+      refute has_element?(view, "#phone_verification_form")
+      assert render(view) =~ "We can&#39;t send a verification text"
+
+      reloaded = Repo.reload!(user)
+      assert reloaded.phone_number == new_phone
+    end
+
+    test "password-change resume for another user does not skip reauth", %{
+      conn: conn
+    } do
+      attacker = user_fixture()
+      victim = user_fixture()
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings/security", %{
+          "user_id" => attacker.id,
+          "purpose" => "password_change"
+        })
+
+      conn =
+        conn
+        |> log_in_user(victim)
+        |> Plug.Conn.put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {:ok, view, html} = live(conn, resume_path)
+
+      refute html =~ "We&#39;ve confirmed it&#39;s you"
+      refute render(view) =~ "We've confirmed it's you"
+    end
+  end
+
+  defp unique_swedish_mobile do
+    suffix =
+      System.unique_integer([:positive])
+      |> rem(10_000_000)
+      |> Integer.to_string()
+      |> String.pad_leading(7, "0")
+
+    "+4670#{suffix}"
   end
 
   defp volunteer_app_conn(conn, volunteer) do
