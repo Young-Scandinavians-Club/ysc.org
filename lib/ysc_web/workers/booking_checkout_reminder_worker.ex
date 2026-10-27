@@ -7,9 +7,9 @@ defmodule YscWeb.Workers.BookingCheckoutReminderWorker do
   require Ysc.Logging
   use Oban.Worker, queue: :mailers, max_attempts: 3
 
-  alias Ysc.Repo
-  alias Ysc.Bookings.Booking
-  alias YscWeb.Emails.{Notifier, BookingCheckoutReminder, Helpers}
+  alias YscWeb.Emails.BookingCheckoutReminder
+  alias YscWeb.TimeZone
+  alias YscWeb.Workers.BookingReminder
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"booking_id" => booking_id}}) do
@@ -17,83 +17,21 @@ defmodule YscWeb.Workers.BookingCheckoutReminderWorker do
       booking_id: booking_id
     )
 
-    case load_reminder_booking(booking_id) do
-      nil ->
-        Ysc.Logging.warning("Booking not found for checkout reminder",
-          booking_id: booking_id
-        )
-
-        :ok
-
-      booking ->
-        # Only send if booking is still active (not cancelled or refunded)
-        if booking.status in [:complete] do
-          send_checkout_reminder_email(booking)
-        else
-          Ysc.Logging.info("Booking is not active, skipping checkout reminder",
-            booking_id: booking_id,
-            status: booking.status
-          )
-
-          :ok
-        end
-    end
+    BookingReminder.run_if_complete(
+      booking_id,
+      "checkout reminder",
+      &send_checkout_reminder_email/1
+    )
   end
 
   defp send_checkout_reminder_email(booking) do
-    require Ysc.Logging
-
-    try do
-      email_module = BookingCheckoutReminder
-      email_data = email_module.prepare_email_data(booking)
-      subject = email_module.get_subject()
-      template_name = email_module.get_template_name()
-
-      # Generate idempotency key to prevent duplicate emails
-      idempotency_key = "booking_checkout_reminder_#{booking.id}"
-
-      Ysc.Logging.info("Sending booking checkout reminder",
-        booking_id: booking.id,
-        user_id: booking.user_id,
-        checkout_date: booking.checkout_date,
-        property: booking.property
-      )
-
-      case Notifier.schedule_email(
-             booking.user.email,
-             idempotency_key,
-             subject,
-             template_name,
-             email_data,
-             "",
-             booking.user_id,
-             Ysc.EmailConfig.booking_reply_to(booking.property)
-           ) do
-        %Oban.Job{} ->
-          Ysc.Logging.info("Booking checkout reminder scheduled successfully",
-            booking_id: booking.id
-          )
-
-          :ok
-
-        {:error, reason} ->
-          Ysc.Logging.error("Failed to schedule booking checkout reminder",
-            booking_id: booking.id,
-            error: inspect(reason)
-          )
-
-          {:error, reason}
-      end
-    rescue
-      error ->
-        Ysc.Logging.error("Failed to send booking checkout reminder",
-          booking_id: booking.id,
-          error: Exception.message(error),
-          stacktrace: __STACKTRACE__
-        )
-
-        {:error, error}
-    end
+    BookingReminder.schedule_booking_email(
+      booking,
+      BookingCheckoutReminder,
+      "booking_checkout_reminder_#{booking.id}",
+      label: "booking checkout reminder",
+      log: [checkout_date: booking.checkout_date]
+    )
   end
 
   @doc """
@@ -103,81 +41,43 @@ defmodule YscWeb.Workers.BookingCheckoutReminderWorker do
   If checkout is less than 1 day away, the email is sent immediately.
   """
   def schedule_reminder(booking_id, checkout_date) do
-    require Ysc.Logging
-
-    # Calculate 1 day before checkout date
     reminder_date = Date.add(checkout_date, -1)
+    reminder_datetime_pst = TimeZone.at(reminder_date, ~T[18:00:00])
+    reminder_datetime_utc = TimeZone.at_utc(reminder_date, ~T[18:00:00])
 
-    # Create datetime at 6:00 PM PST (America/Los_Angeles) - evening time
-    reminder_datetime_pst =
-      reminder_date
-      |> DateTime.new!(~T[18:00:00], "America/Los_Angeles")
+    case BookingReminder.enqueue_or_run(
+           __MODULE__,
+           %{"booking_id" => booking_id},
+           reminder_datetime_utc,
+           fn -> send_immediate(booking_id, checkout_date) end
+         ) do
+      :scheduled ->
+        Ysc.Logging.info("Scheduled checkout reminder email",
+          booking_id: booking_id,
+          checkout_date: checkout_date,
+          reminder_date: reminder_date,
+          scheduled_at_pst: reminder_datetime_pst,
+          scheduled_at_utc: reminder_datetime_utc
+        )
 
-    # Convert to UTC for Oban scheduling
-    reminder_datetime_utc =
-      DateTime.shift_zone!(reminder_datetime_pst, "Etc/UTC")
+        :ok
 
-    now = DateTime.utc_now()
-
-    # Check if the scheduled time is in the future
-    if DateTime.compare(reminder_datetime_utc, now) == :gt do
-      # Schedule for 1 day before checkout at 6:00 PM PST
-      %{
-        "booking_id" => booking_id
-      }
-      |> new(scheduled_at: reminder_datetime_utc)
-      |> Oban.insert()
-
-      Ysc.Logging.info("Scheduled checkout reminder email",
-        booking_id: booking_id,
-        checkout_date: checkout_date,
-        reminder_date: reminder_date,
-        scheduled_at_pst: reminder_datetime_pst,
-        scheduled_at_utc: reminder_datetime_utc
-      )
-    else
-      # If checkout is less than 1 day away, send immediately
-      Ysc.Logging.info(
-        "Checkout is less than 1 day away, sending reminder immediately",
-        booking_id: booking_id,
-        checkout_date: checkout_date
-      )
-
-      # Load booking and send email immediately. Associations are slim-loaded
-      # via `ensure_booking/2` (identity columns and room names).
-      case load_reminder_booking(booking_id) do
-        nil ->
-          Ysc.Logging.warning(
-            "Booking not found for immediate checkout reminder",
-            booking_id: booking_id
-          )
-
-          :ok
-
-        booking ->
-          # Only send if booking is still active
-          if booking.status == :complete do
-            send_checkout_reminder_email(booking)
-          else
-            Ysc.Logging.info(
-              "Booking is not active, skipping immediate checkout reminder",
-              booking_id: booking_id,
-              status: booking.status
-            )
-
-            :ok
-          end
-      end
+      other ->
+        other
     end
   end
 
-  defp load_reminder_booking(booking_id) do
-    case Repo.get(Booking, booking_id) do
-      nil ->
-        nil
+  defp send_immediate(booking_id, checkout_date) do
+    Ysc.Logging.info(
+      "Checkout is less than 1 day away, sending reminder immediately",
+      booking_id: booking_id,
+      checkout_date: checkout_date
+    )
 
-      booking ->
-        Helpers.ensure_booking(booking, [:user, :rooms])
-    end
+    BookingReminder.run_if_complete(
+      booking_id,
+      "immediate checkout reminder",
+      &send_checkout_reminder_email/1
+    )
   end
 end

@@ -367,8 +367,7 @@ defmodule YscWeb.DateDisplay do
     now = now || TimeZone.now()
     today = DateTime.to_date(now)
 
-    checkin_at =
-      DateTime.new!(checkin_date, Bookings.checkin_time(), TimeZone.default())
+    checkin_at = TimeZone.at(checkin_date, Bookings.checkin_time())
 
     cond do
       Date.compare(today, checkin_date) == :gt ->

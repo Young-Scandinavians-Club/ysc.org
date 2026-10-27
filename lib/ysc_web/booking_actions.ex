@@ -5,6 +5,7 @@ defmodule YscWeb.BookingActions do
 
   alias Ysc.Bookings
   alias Ysc.Bookings.Booking
+  alias YscWeb.TimeZone
 
   @doc """
   Returns true when a member may cancel or change a booking.
@@ -32,15 +33,13 @@ defmodule YscWeb.BookingActions do
     do: not is_nil(booking.refund_forfeited_at)
 
   def get_today_pst do
-    DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+    TimeZone.today()
   end
 
   defp before_checkin_time_today? do
-    now_pst = DateTime.now!("America/Los_Angeles")
+    now_pst = TimeZone.now()
     today_pst = DateTime.to_date(now_pst)
-
-    checkin_datetime_today =
-      DateTime.new!(today_pst, Bookings.checkin_time(), "America/Los_Angeles")
+    checkin_datetime_today = TimeZone.at(today_pst, Bookings.checkin_time())
 
     DateTime.compare(now_pst, checkin_datetime_today) == :lt
   end

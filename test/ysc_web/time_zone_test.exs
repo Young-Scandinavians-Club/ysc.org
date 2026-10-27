@@ -29,6 +29,50 @@ defmodule YscWeb.TimeZoneTest do
     end
   end
 
+  describe "at/3" do
+    test "builds a Pacific wall-clock instant" do
+      dt = TimeZone.at(~D[2024-06-15], ~T[13:00:00])
+
+      assert dt.time_zone == "America/Los_Angeles"
+      assert DateTime.to_date(dt) == ~D[2024-06-15]
+      assert DateTime.to_time(dt) == ~T[13:00:00]
+    end
+
+    test "accepts an explicit timezone" do
+      dt = TimeZone.at(~D[2024-06-15], ~T[13:00:00], "America/New_York")
+
+      assert dt.time_zone == "America/New_York"
+      assert DateTime.to_time(dt) == ~T[13:00:00]
+    end
+  end
+
+  describe "at_utc/3" do
+    test "converts Pacific daylight time to UTC" do
+      # June is PDT (UTC-7)
+      assert TimeZone.at_utc(~D[2024-06-15], ~T[13:00:00]) ==
+               ~U[2024-06-15 20:00:00Z]
+    end
+
+    test "converts Pacific standard time to UTC" do
+      # January is PST (UTC-8)
+      assert TimeZone.at_utc(~D[2024-01-15], ~T[13:00:00]) ==
+               ~U[2024-01-15 21:00:00Z]
+    end
+
+    test "matches check-in and check-out reminder wall-clock times" do
+      assert TimeZone.at_utc(~D[2024-06-15], ~T[08:00:00]) ==
+               ~U[2024-06-15 15:00:00Z]
+
+      assert TimeZone.at_utc(~D[2024-06-15], ~T[18:00:00]) ==
+               ~U[2024-06-16 01:00:00Z]
+    end
+
+    test "accepts an explicit timezone" do
+      assert TimeZone.at_utc(~D[2024-06-15], ~T[13:00:00], "America/New_York") ==
+               ~U[2024-06-15 17:00:00Z]
+    end
+  end
+
   describe "shift/2" do
     test "shifts a UTC instant into the given zone" do
       shifted = TimeZone.shift(~U[2024-12-01 06:00:00Z], "America/New_York")
