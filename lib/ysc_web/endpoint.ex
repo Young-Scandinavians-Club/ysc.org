@@ -88,7 +88,11 @@ defmodule YscWeb.Endpoint do
     cookie_key: "request_logger"
 
   plug Plug.RequestId
-  plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
+  # Printful/Flowroute can't sign webhooks, so their secret is in the URL path;
+  # keep those request lines out of the logs (see request_log_level/1).
+  plug Plug.Telemetry,
+    event_prefix: [:phoenix, :endpoint],
+    log: {__MODULE__, :request_log_level, []}
 
   plug Stripe.WebhookPlug,
     at: "/webhooks/stripe",
@@ -124,4 +128,11 @@ defmodule YscWeb.Endpoint do
   plug YscWeb.Plugs.TrailingSlashRedirect
 
   plug YscWeb.Router
+
+  @doc false
+  def request_log_level(%Plug.Conn{path_info: ["webhooks", provider | _]})
+      when provider in ["flowroute", "printful"],
+      do: false
+
+  def request_log_level(_conn), do: :info
 end

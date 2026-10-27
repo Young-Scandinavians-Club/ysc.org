@@ -8,6 +8,7 @@ defmodule Ysc.AuthRateLimit do
   """
   use Hammer, backend: :ets
 
+  alias Ysc.Accounts.Email
   alias Ysc.RateLimit
 
   # Per IP: 20 auth attempts per minute (login, OAuth, passkey, forgot password)
@@ -40,16 +41,42 @@ defmodule Ysc.AuthRateLimit do
   Checks rate limit by identifier (email or username). Call when you have the
   identifier from the request (e.g. login form email, forgot password email).
 
+  The identifier is canonicalized the same way account lookup is
+  (`Ysc.Accounts.Email.normalize/1`), so Gmail dot / `+tag` / `googlemail.com`
+  variants of one mailbox share a bucket instead of each getting a fresh budget
+  against the same account.
+
+  Pass the client `ip` for unauthenticated flows (login, forgot password).
+  The bucket is then per identifier *and* IP, so someone hammering a victim's
+  email only exhausts their own budget and cannot lock the victim out of
+  sign-in or password recovery. Without `ip` the bucket is global to the
+  identifier; use that only where the caller is already authenticated or the
+  identifier is a one-time token.
+
   Returns `:ok` if allowed, or `{:error, :rate_limited, retry_after_seconds}` if over limit.
   """
-  def check_identifier(identifier) when is_binary(identifier) do
+  def check_identifier(identifier, ip \\ nil)
+
+  def check_identifier(identifier, ip) when is_binary(identifier) do
     RateLimit.check(
       &hit/3,
-      "auth:id:#{RateLimit.normalize_identifier(identifier)}",
+      identifier_key(identifier, ip),
       @identifier_scale_ms,
       identifier_limit()
     )
   end
 
-  def check_identifier(_), do: :ok
+  def check_identifier(_, _), do: :ok
+
+  defp identifier_key(identifier, nil), do: "auth:id:#{canonical(identifier)}"
+
+  defp identifier_key(identifier, ip) do
+    "auth:id:#{canonical(identifier)}:ip:#{RateLimit.normalize_ip(ip)}"
+  end
+
+  defp canonical(identifier) do
+    identifier
+    |> RateLimit.normalize_identifier()
+    |> Email.normalize()
+  end
 end

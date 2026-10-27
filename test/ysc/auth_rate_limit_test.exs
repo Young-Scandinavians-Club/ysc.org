@@ -110,6 +110,40 @@ defmodule Ysc.AuthRateLimitTest do
       assert {:error, :rate_limited, _} = AuthRateLimit.check_identifier(e2)
     end
 
+    test "Gmail dot, plus-tag and googlemail variants share one bucket" do
+      n = System.unique_integer([:positive])
+      base = "victim#{n}"
+
+      assert :ok = AuthRateLimit.check_identifier("#{base}@gmail.com")
+
+      assert :ok =
+               AuthRateLimit.check_identifier("v.ictim#{n}+tag@googlemail.com")
+
+      assert {:error, :rate_limited, _} =
+               AuthRateLimit.check_identifier("#{base}+other@gmail.com")
+    end
+
+    test "non-Gmail local parts are not folded together" do
+      n = System.unique_integer([:positive])
+      assert :ok = AuthRateLimit.check_identifier("a.b#{n}@example.com")
+      assert :ok = AuthRateLimit.check_identifier("a.b#{n}@example.com")
+      assert :ok = AuthRateLimit.check_identifier("ab#{n}@example.com")
+    end
+
+    test "IP-scoped buckets keep an attacker from exhausting the owner's" do
+      email = "scoped_#{System.unique_integer([:positive])}@example.com"
+      attacker = unique_test_ip()
+      owner = unique_test_ip()
+
+      assert :ok = AuthRateLimit.check_identifier(email, attacker)
+      assert :ok = AuthRateLimit.check_identifier(email, attacker)
+
+      assert {:error, :rate_limited, _} =
+               AuthRateLimit.check_identifier(email, attacker)
+
+      assert :ok = AuthRateLimit.check_identifier(email, owner)
+    end
+
     test "returns :ok for nil identifier" do
       assert :ok = AuthRateLimit.check_identifier(nil)
     end

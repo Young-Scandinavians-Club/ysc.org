@@ -726,9 +726,16 @@ defmodule YscWeb.UserRegistrationLive do
          )}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        # No account was created, so this submit doesn't count toward the limit.
-        RegistrationRateLimit.release_application(reservation)
         email_taken? = email_already_taken_error?(changeset)
+
+        # No account was created, so a plain validation failure (typo, weak
+        # password) doesn't count toward the limit. An "email already
+        # registered" failure keeps its slot: that message reveals whether an
+        # address has an account, so those probes must be rate limited.
+        unless email_taken? do
+          RegistrationRateLimit.release_application(reservation)
+        end
+
         step_with_error = step_with_first_error(changeset)
         show_family = show_family_input_from_changeset?(changeset)
 

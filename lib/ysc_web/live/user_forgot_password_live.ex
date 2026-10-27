@@ -67,7 +67,7 @@ defmodule YscWeb.UserForgotPasswordLive do
          )
          |> redirect(to: ~p"/users/reset-password")}
 
-      rate_limited_identifier?(email) ->
+      rate_limited_identifier?(email, ip) ->
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(
@@ -105,12 +105,14 @@ defmodule YscWeb.UserForgotPasswordLive do
     end
   end
 
-  defp rate_limited_identifier?(email) when is_binary(email) do
-    case Ysc.AuthRateLimit.check_identifier(email) do
+  # Scoped to the requester's IP so a third party spamming a victim's email
+  # can't block the victim from requesting their own reset link.
+  defp rate_limited_identifier?(email, ip) when is_binary(email) do
+    case Ysc.AuthRateLimit.check_identifier(email, ip) do
       :ok -> false
       {:error, :rate_limited, _} -> true
     end
   end
 
-  defp rate_limited_identifier?(_), do: false
+  defp rate_limited_identifier?(_, _), do: false
 end
