@@ -957,6 +957,76 @@ defmodule YscWeb.BookingReceiptLiveTest do
       refute html =~ "Your Door Code"
     end
 
+    test "does not show door code for unpaid hold bookings in the access window",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      today = YscWeb.BookingActions.get_today_pst()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :hold,
+          property: :tahoe,
+          checkin_date: today,
+          checkout_date: Date.add(today, 2)
+        })
+
+      suffix =
+        System.unique_integer([:positive])
+        |> Integer.to_string()
+        |> String.slice(-2, 2)
+
+      {:ok, door_code} =
+        Bookings.create_door_code(%{
+          property: :tahoe,
+          code: "H#{suffix}9"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view, @async_timeout_ms)
+
+      html = render(view)
+      refute html =~ "Your Door Code"
+      refute html =~ door_code.code
+    end
+
+    test "does not show door code for refunded bookings in the access window",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      today = YscWeb.BookingActions.get_today_pst()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :refunded,
+          property: :tahoe,
+          checkin_date: today,
+          checkout_date: Date.add(today, 2)
+        })
+
+      suffix =
+        System.unique_integer([:positive])
+        |> Integer.to_string()
+        |> String.slice(-2, 2)
+
+      {:ok, door_code} =
+        Bookings.create_door_code(%{
+          property: :tahoe,
+          code: "R#{suffix}9"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view, @async_timeout_ms)
+
+      html = render(view)
+      refute html =~ "Your Door Code"
+      refute html =~ door_code.code
+    end
+
     test "cabin access card points to the banner when the door code is visible",
          %{
            conn: conn

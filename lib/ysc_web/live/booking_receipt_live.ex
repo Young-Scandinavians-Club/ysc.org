@@ -1878,12 +1878,15 @@ defmodule YscWeb.BookingReceiptLive do
     refund_info =
       get_refund_info_with_payment(booking, payment, payment_summary.total_paid)
 
-    # Get door code if booking is within 48 hours of check-in or currently active
+    # Door code is cabin access — only confirmed (:complete) stays may see it.
+    # Unpaid :hold / :draft and post-refund :refunded must not (same gate as
+    # BookingCheckinReminderWorker). Timing still limits complete bookings to
+    # the 48h-before-check-in / in-stay window inside get_door_code_for_booking/1.
     {door_code, show_door_code} =
-      if booking.status == :canceled do
-        {nil, false}
-      else
+      if booking.status == :complete do
         get_door_code_for_booking(booking)
+      else
+        {nil, false}
       end
 
     # Get refund data for cancelled bookings
