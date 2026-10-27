@@ -548,6 +548,20 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
       render_async(view, 2_000)
 
+      render(view)
+
+      assert has_element?(
+               view,
+               "#tahoe-date-rules",
+               "arrive Friday or earlier, leave Sunday or later"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-date-rules",
+               "Saturday stays run Fri"
+             )
+
       html = render_click(view, "switch-info-tab", %{"tab" => "rules"})
 
       assert html =~ "Saturday nights"
@@ -558,6 +572,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       refute html =~ "Weekend Policy"
       refute html =~ "Any Saturday stay must run Friday through Sunday"
       refute html =~ "If you arrive Saturday, stay only one night"
+      refute html =~ "Saturday stays run Fri–Sun"
 
       assert has_element?(
                view,
@@ -782,6 +797,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
              )
 
       assert html =~ "maximum of 2 rooms"
+      assert html =~ "after checkout"
+      refute html =~ "stay is complete"
 
       socket = :sys.get_state(view.pid).socket
       refute socket.assigns.can_book

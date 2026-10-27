@@ -2732,6 +2732,27 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       refute has_element?(view, "#cabin-rules")
     end
 
+    test "rules tab guest copy matches the under-5 guest count rule", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?tab=information&info_tab=rules"
+        )
+
+      assert has_element?(
+               view,
+               "#cabin-rules",
+               "Count everyone age 6 and up"
+             )
+
+      refute has_element?(view, "#cabin-rules", "Include every guest")
+    end
+
     test "rules tab shows configured cancellation policy percentages", %{
       conn: conn
     } do
@@ -3132,6 +3153,18 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
                view,
                "#clear-lake-guest-stay-list",
                "your own setup"
+             )
+
+      assert has_element?(
+               view,
+               "#clear-lake-guest-stay-list",
+               "Count everyone age 6 and up"
+             )
+
+      refute has_element?(
+               view,
+               "#clear-lake-guest-stay-list",
+               "include every guest"
              )
 
       assert has_element?(

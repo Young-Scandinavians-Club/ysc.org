@@ -611,6 +611,19 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute policy =~ "Any Saturday stay"
     end
 
+    test "buyout exclusivity copy tells members to check out, not finish checkout" do
+      buyout = BookingValidator.buyout_with_active_stay_message()
+      rooms = BookingValidator.rooms_while_buyout_active_message()
+
+      assert buyout =~ "after you check out"
+      refute buyout =~ "complete or cancel"
+      refute buyout =~ "Finish or cancel"
+
+      assert rooms =~ "after you check out of that stay"
+      refute rooms =~ "Finish or cancel"
+      refute rooms =~ "complete or cancel"
+    end
+
     test "accepts weekday bookings without Saturday", %{
       user: user,
       rooms: rooms
@@ -1185,6 +1198,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       refute changeset.valid?
       assert Keyword.has_key?(changeset.errors, :booking_mode)
+
+      {message, _} = Keyword.fetch!(changeset.errors, :booking_mode)
+      assert message == BookingValidator.buyout_with_active_stay_message()
     end
 
     test "allows buyout if no active bookings exist", %{user: user} do
@@ -1254,8 +1270,8 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute changeset.valid?
       assert Keyword.has_key?(changeset.errors, :booking_mode)
 
-      assert {"You cannot book rooms while you already have the entire cabin booked. Finish or cancel that booking first.",
-              _} = Keyword.get(changeset.errors, :booking_mode)
+      {message, _} = Keyword.fetch!(changeset.errors, :booking_mode)
+      assert message == BookingValidator.rooms_while_buyout_active_message()
     end
 
     test "allows room booking if buyout checkout is in the past", %{
