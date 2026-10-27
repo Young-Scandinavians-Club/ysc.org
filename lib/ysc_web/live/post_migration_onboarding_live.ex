@@ -2089,18 +2089,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     if is_nil(price_id) do
       {:error, :no_price_id_for_plan}
     else
-      # Stable idempotency key scoped to this user + plan so Stripe deduplicates
-      # any duplicate requests within its 24-hour idempotency window.
-      idempotency_key = "wp_onboarding_#{user.id}_#{plan}"
-
       case Customers.create_subscription(
              user,
              return_url:
                "#{YscWeb.Endpoint.url()}/billing/user/#{user.id}/finalize",
              prices: [%{price: price_id, quantity: 1}],
              default_payment_method: default_pm.provider_id,
-             expand: ["latest_invoice"],
-             idempotency_key: idempotency_key
+             expand: ["latest_invoice"]
            ) do
         {:ok, stripe_subscription} ->
           Subscriptions.adopt_stripe_subscription_replacing_migrated(

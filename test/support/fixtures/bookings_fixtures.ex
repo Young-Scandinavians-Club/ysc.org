@@ -294,6 +294,11 @@ defmodule Ysc.BookingsFixtures do
 
   Dates are clamped to the property's advance-booking window so tests stay valid when
   seasons enforce a limit (and when another test temporarily changes season settings).
+
+  When no Monday–Thursday buyout stay remains in that window (late summer:
+  winter nights are rooms-only), `enumerate_buyout_monday_stays/0` continues
+  into next summer rather than returning a winter stay that
+  `booking_fixture/1` would silently convert to `:room`.
   """
   def tahoe_booking_dates(offset_days \\ 7) do
     today = Date.utc_today()
@@ -357,24 +362,49 @@ defmodule Ysc.BookingsFixtures do
   defp enumerate_buyout_monday_stays do
     today = Date.utc_today()
     max_booking_date = SeasonHelpers.calculate_max_booking_date(:tahoe, today)
+    stays = buyout_monday_stays_until(today, max_booking_date)
+
+    case stays do
+      [_ | _] ->
+        stays
+
+      [] ->
+        # Late summer / winter: Tahoe buyout is summer-only (May 1–Oct 31),
+        # so Monday–Thursday stays vanish from the current bookable window
+        # once winter's 45-day cap takes over. Search next summer without
+        # updating seed season rows — `allow_far_future_booking_dates/0`
+        # uses UPDATE on those rows and deadlocks async SQL sandbox tests.
+        # `booking_fixture/1` skip_validation can persist these dates as-is.
+        # Validated `create_booking` tests that need them inside the
+        # advance window should call `allow_far_future_booking_dates/0`
+        # from an `async: false` setup.
+        buyout_monday_stays_until(today, Date.add(today, 800))
+    end
+  end
+
+  defp buyout_monday_stays_until(today, max_booking_date) do
     earliest_checkin = Date.add(today, 1)
     latest_checkin = Date.add(max_booking_date, -3)
 
-    earliest_checkin
-    |> first_monday_on_or_after()
-    |> Stream.iterate(&Date.add(&1, 7))
-    |> Stream.take_while(&(Date.compare(&1, latest_checkin) != :gt))
-    |> Enum.reduce([], fn checkin, acc ->
-      checkout = Date.add(checkin, 3)
+    if Date.compare(earliest_checkin, latest_checkin) == :gt do
+      []
+    else
+      earliest_checkin
+      |> first_monday_on_or_after()
+      |> Stream.iterate(&Date.add(&1, 7))
+      |> Stream.take_while(&(Date.compare(&1, latest_checkin) != :gt))
+      |> Enum.reduce([], fn checkin, acc ->
+        checkout = Date.add(checkin, 3)
 
-      if Date.compare(checkout, max_booking_date) != :gt and
-           Season.buyout_allowed_for_stay?(:tahoe, checkin, checkout) do
-        [{checkin, checkout} | acc]
-      else
-        acc
-      end
-    end)
-    |> Enum.reverse()
+        if Date.compare(checkout, max_booking_date) != :gt and
+             Season.buyout_allowed_for_stay?(:tahoe, checkin, checkout) do
+          [{checkin, checkout} | acc]
+        else
+          acc
+        end
+      end)
+      |> Enum.reverse()
+    end
   end
 
   defp next_buyout_allowed_monday_stay(

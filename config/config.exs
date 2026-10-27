@@ -138,7 +138,10 @@ config :ysc, Oban,
     sms: 3,
     # Retained only to drain jobs created before queue prioritization.
     mailers: 2,
-    maintenance: 2
+    maintenance: 2,
+    # One poster sync at a time per node (PosterAlbums.sync also takes a
+    # cluster-wide advisory lock) so an event is never uploaded twice.
+    google_photos: 1
   ],
   # Maintain completed jobs for 5 days
   pruner: [max_age: {5, :days}],
@@ -160,6 +163,8 @@ config :ysc, Oban,
       {"*/5 * * * *", Ysc.Tickets.TimeoutWorker},
       {"*/5 * * * *", Ysc.Tickets.TicketReservationExpiryWorker},
       {"*/5 * * * *", Ysc.Events.EventPublishWorker},
+      # Removes ended-event posters from the cabin TV albums and refreshes changed ones.
+      {"10 * * * *", Ysc.GooglePhotos.PosterSyncWorker},
       {"*/15 * * * *", Ysc.Merch.StaleOrderWorker},
       {"*/30 * * * *", Ysc.Merch.StatusSyncWorker},
       {"*/5 * * * *", YscWeb.Workers.NewsletterScheduleChecker},

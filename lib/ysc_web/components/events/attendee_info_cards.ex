@@ -45,6 +45,30 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
     end
   end
 
+  def checkout_timer_intro do
+    "Time remaining to complete purchase:"
+  end
+
+  @doc """
+  Next-step sentence under the paid-checkout hold countdown.
+
+  "Complete payment" is only true once who's going / ticket details are done
+  (or never asked). Until then the Pay button is greyed out.
+  """
+  def checkout_timer_next_step(tickets, complete?)
+      when is_list(tickets) and is_boolean(complete?) do
+    cond do
+      tickets == [] or complete? ->
+        "Complete payment before the timer expires. If time runs out, your tickets go back on sale so others can buy them."
+
+      Enum.any?(tickets, &AttendeeInfo.ticket_collects_identity?/1) ->
+        "Finish adding who's going before the timer runs out. If time runs out, your tickets go back on sale so others can buy them."
+
+      true ->
+        "Finish the ticket details before the timer runs out. If time runs out, your tickets go back on sale so others can buy them."
+    end
+  end
+
   attr :tickets, :list, required: true, doc: "tickets whose tier asks for info"
 
   attr :state, :map,

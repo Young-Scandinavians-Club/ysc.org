@@ -161,6 +161,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ booking.reference_id
       assert html =~ "Lake Tahoe Cabin"
       assert has_element?(view, ~s(#booking-receipt))
+      assert has_element?(view, "#booking-receipt-header")
+      assert has_element?(view, "#booking-receipt-header", "Booking Reference")
     end
 
     test "displays cancelled booking with appropriate styling", %{conn: conn} do
@@ -169,11 +171,12 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       booking = booking_fixture(%{user_id: user.id, status: :canceled})
 
-      {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert html =~ "Booking Cancelled"
       assert html =~ "Booking Cancelled"
       assert html =~ booking.reference_id
+      assert has_element?(view, "#booking-receipt-header", "Booking Cancelled")
     end
 
     test "displays guest information when booking guests exist", %{conn: conn} do
@@ -238,6 +241,14 @@ defmodule YscWeb.BookingReceiptLiveTest do
                ~s(a[href="/bookings/tahoe?tab=information&info_tab=manual#house-manual"]),
                "Read Cabin Rules"
              )
+
+      assert has_element?(
+               view,
+               "#cabin-rules-reminder",
+               "sheets, pillowcases, towels, and sleeping bags"
+             )
+
+      refute has_element?(view, "#cabin-rules-reminder", "tent")
     end
 
     test "clear lake receipt links cabin access to the door-code-access section",
@@ -264,6 +275,18 @@ defmodule YscWeb.BookingReceiptLiveTest do
                view,
                ~s(a[href="/bookings/clear-lake?tab=information&info_tab=manual#house-manual"]),
                "Read Cabin Rules"
+             )
+
+      assert has_element?(
+               view,
+               "#cabin-rules-reminder",
+               "tent if you're camping on the lawn in summer"
+             )
+
+      refute has_element?(
+               view,
+               "#cabin-rules-reminder",
+               "bed sheets and comforters"
              )
     end
 
@@ -932,6 +955,76 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       html = render(view)
       refute html =~ "Your Door Code"
+    end
+
+    test "does not show door code for unpaid hold bookings in the access window",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      today = YscWeb.BookingActions.get_today_pst()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :hold,
+          property: :tahoe,
+          checkin_date: today,
+          checkout_date: Date.add(today, 2)
+        })
+
+      suffix =
+        System.unique_integer([:positive])
+        |> Integer.to_string()
+        |> String.slice(-2, 2)
+
+      {:ok, door_code} =
+        Bookings.create_door_code(%{
+          property: :tahoe,
+          code: "H#{suffix}9"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view, @async_timeout_ms)
+
+      html = render(view)
+      refute html =~ "Your Door Code"
+      refute html =~ door_code.code
+    end
+
+    test "does not show door code for refunded bookings in the access window",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      today = YscWeb.BookingActions.get_today_pst()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :refunded,
+          property: :tahoe,
+          checkin_date: today,
+          checkout_date: Date.add(today, 2)
+        })
+
+      suffix =
+        System.unique_integer([:positive])
+        |> Integer.to_string()
+        |> String.slice(-2, 2)
+
+      {:ok, door_code} =
+        Bookings.create_door_code(%{
+          property: :tahoe,
+          code: "R#{suffix}9"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view, @async_timeout_ms)
+
+      html = render(view)
+      refute html =~ "Your Door Code"
+      refute html =~ door_code.code
     end
 
     test "cabin access card points to the banner when the door code is visible",

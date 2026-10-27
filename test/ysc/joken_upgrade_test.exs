@@ -26,8 +26,8 @@ defmodule Ysc.JokenUpgradeTest do
       assert to_string(Application.spec(:joken, :vsn)) == "2.7.0"
     end
 
-    test "jose stays on the 1.11.12 override" do
-      assert to_string(Application.spec(:jose, :vsn)) == "1.11.12"
+    test "jose stays on the 1.11.13 override" do
+      assert to_string(Application.spec(:jose, :vsn)) == "1.11.13"
     end
 
     test "Signer.create and generate_and_sign still exist" do

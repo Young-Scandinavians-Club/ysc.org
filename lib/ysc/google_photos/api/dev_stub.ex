@@ -12,7 +12,21 @@ defmodule Ysc.GooglePhotos.Api.DevStub do
       event_id: event_id
     )
 
-    {:ok, "dev-album-#{event_id}"}
+    {:ok, "dev-album-#{event_id || :erlang.phash2(title)}"}
+  end
+
+  def list_albums(_access_token) do
+    Ysc.Logging.info("Google Photos DevStub: list_albums")
+    {:ok, []}
+  end
+
+  def remove_media_items(_access_token, album_id, media_item_ids) do
+    Ysc.Logging.info("Google Photos DevStub: remove_media_items",
+      album_id: album_id,
+      media_item_ids: media_item_ids
+    )
+
+    :ok
   end
 
   def upload_file(_access_token, file_path, filename, event_id, size) do

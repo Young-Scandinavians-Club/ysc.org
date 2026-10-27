@@ -2719,6 +2719,93 @@ defmodule Ysc.TicketsTest do
       assert Repo.get!(Ticket, ticket.id).status == :cancelled
       assert Tickets.get_ticket_order(order.id).status == :cancelled
     end
+
+    test "cancels many tickets with one UPDATE", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 8})
+
+      tickets = tickets_for_order(order.id)
+      ticket_ids = Enum.map(tickets, & &1.id)
+
+      {{:ok, refund_info}, update_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.refund_tickets(order, ticket_ids, "batch") end,
+          pattern: ~r/UPDATE "tickets"/i,
+          caller_pids: [self()]
+        )
+
+      assert length(refund_info.refunded_tickets) == 8
+      assert update_count == 1
+      assert Enum.all?(tickets_for_order(order.id), &(&1.status == :cancelled))
+      assert Tickets.get_ticket_order(order.id).status == :cancelled
+      assert Money.equal?(refund_info.refund_amount, Money.new(400, :USD))
+    end
+
+    test "partial refund of many tickets still uses one ticket UPDATE", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 6})
+
+      tickets = tickets_for_order(order.id)
+      refund_ids = tickets |> Enum.take(4) |> Enum.map(& &1.id)
+      keep_ids = tickets |> Enum.drop(4) |> Enum.map(& &1.id)
+
+      {{:ok, refund_info}, update_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.refund_tickets(order, refund_ids, "partial batch") end,
+          pattern: ~r/UPDATE "tickets"/i,
+          caller_pids: [self()]
+        )
+
+      assert length(refund_info.refunded_tickets) == 4
+      assert update_count == 1
+      assert Tickets.get_ticket_order(order.id).status == :pending
+
+      cancelled =
+        tickets_for_order(order.id) |> Enum.filter(&(&1.status == :cancelled))
+
+      pending =
+        tickets_for_order(order.id) |> Enum.filter(&(&1.status == :pending))
+
+      assert MapSet.new(Enum.map(cancelled, & &1.id)) == MapSet.new(refund_ids)
+      assert MapSet.new(Enum.map(pending, & &1.id)) == MapSet.new(keep_ids)
+    end
+
+    test "refunds only still-refundable tickets from a mixed id list", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      [first, second] = tickets_for_order(order.id)
+
+      first
+      |> Ticket.status_changeset(%{status: :expired})
+      |> Repo.update!()
+
+      assert {:ok, refund_info} =
+               Tickets.refund_tickets(
+                 order,
+                 [first.id, second.id],
+                 "mixed"
+               )
+
+      assert Enum.map(refund_info.refunded_tickets, & &1.id) == [second.id]
+      assert Repo.get!(Ticket, first.id).status == :expired
+      assert Repo.get!(Ticket, second.id).status == :cancelled
+      # Expired leftovers are not refundable, so cancelling the last live
+      # ticket closes the order.
+      assert Tickets.get_ticket_order(order.id).status == :cancelled
+    end
   end
 
   describe "reassign_ticket/2" do

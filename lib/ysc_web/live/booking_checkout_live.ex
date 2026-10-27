@@ -625,14 +625,19 @@ defmodule YscWeb.BookingCheckoutLive do
                 else: "text-blue-700"
               )
             ]}>
-              These dates are held for
+              {BookingUserMessages.checkout_hold_timer_intro()}
               <span
                 class="font-bold tabular-nums"
                 id="hold-countdown"
               >
                 {calculate_remaining_time(@booking.hold_expires_at)}
               </span>
-              — not confirmed yet. Pay now to complete your booking. If the timer runs out, the dates go back on the calendar and you'll need to book again.
+              <span id="hold-countdown-next-step">
+                {BookingUserMessages.checkout_hold_timer_next_step(
+                  @checkout_step,
+                  @complimentary_checkout
+                )}
+              </span>
             </p>
           </div>
           <!-- Price Details -->

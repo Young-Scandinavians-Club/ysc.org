@@ -51,11 +51,11 @@ defmodule QueryConsole.ReqUpgradeTest do
       assert mix_exs =~ ~s({:req, "~> 0.7.5"})
     end
 
-    test "companion lock is 0.7.5 and finch stays 0.23.0" do
+    test "companion lock is 0.7.5 and finch is 0.24.0" do
       lock = File.read!(@mix_lock)
       assert lock =~ ~s|"req": {:hex, :req, "0.7.5"|
       refute lock =~ ~s|"req": {:hex, :req, "0.7.4"|
-      assert lock =~ ~s|"finch": {:hex, :finch, "0.23.0"|
+      assert lock =~ ~s|"finch": {:hex, :finch, "0.24.0"|
     end
 
     test "get, post, head, request, and Test modules we use still load" do

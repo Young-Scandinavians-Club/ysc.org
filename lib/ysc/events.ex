@@ -251,12 +251,46 @@ defmodule Ysc.Events do
 
   @doc """
   Loads an event with pricing, ticket tiers, and cover image for TV/Roku poster rendering.
+
+  Selects `Event.summary_fields/0` so poster capture never TOASTs
+  `raw_details` / `rendered_details`.
   """
   def get_event_for_tv_poster(id) do
-    case Repo.get(Event, id) do
+    case id |> event_for_tv_poster_query() |> Repo.one() do
       nil -> nil
       %Event{} = event -> Ysc.Events.EventPricingCache.enrich_event(event)
     end
+  end
+
+  @doc """
+  Published events that have not ended yet, enriched for TV poster rendering.
+
+  "Ended" follows the same rule as the public Upcoming list, so a poster leaves
+  the cabin TV albums exactly when the event leaves that list.
+
+  Pricing, tiers, counts, and cover images are batch-enriched in one pass
+  (not per-event), and the event SELECT omits body HTML.
+  """
+  def list_tv_poster_events do
+    tv_poster_events_query()
+    |> Repo.all()
+    |> Ysc.Events.EventPricingCache.enrich_events()
+  end
+
+  defp event_for_tv_poster_query(id) do
+    from(e in Event,
+      where: e.id == ^id,
+      select: struct(e, ^Event.summary_fields())
+    )
+  end
+
+  defp tv_poster_events_query do
+    from(e in Event,
+      where: e.state == :published,
+      where: ^event_upcoming_dynamic(),
+      order_by: [asc: e.start_date, asc: e.start_time],
+      select: struct(e, ^Event.summary_fields())
+    )
   end
 
   @doc """
@@ -4144,9 +4178,28 @@ defmodule Ysc.Events do
     |> Repo.update()
   end
 
-  defp broadcast(event) do
-    Phoenix.PubSub.broadcast(Ysc.PubSub, topic(), {__MODULE__, event})
+  defp broadcast(message) do
+    result =
+      Phoenix.PubSub.broadcast(Ysc.PubSub, topic(), {__MODULE__, message})
+
+    maybe_sync_tv_poster_albums(message)
+    result
   end
+
+  # Event create/update/publish/cancel/delete all land here, so this is the one
+  # place that keeps the Google Photos poster albums in step with events. It is
+  # best-effort: `enqueue_for_event/1` never raises or exits, so it can't
+  # affect saving an event.
+  defp maybe_sync_tv_poster_albums(%msg{event: %Event{} = event})
+       when msg in [
+              Ysc.MessagePassingEvents.EventAdded,
+              Ysc.MessagePassingEvents.EventUpdated,
+              Ysc.MessagePassingEvents.EventDeleted
+            ] do
+    Ysc.GooglePhotos.PosterSyncWorker.enqueue_for_event(event)
+  end
+
+  defp maybe_sync_tv_poster_albums(_message), do: :ok
 
   defp reservation_event_id(ticket_tier_id) do
     TicketTier
@@ -4227,6 +4280,14 @@ defmodule Ysc.Events do
   def ci_query_explain_event_for_check_in_query do
     event_for_check_in_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
+
+  @doc false
+  def ci_query_explain_event_for_tv_poster_query do
+    event_for_tv_poster_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_tv_poster_events_query, do: tv_poster_events_query()
 
   @doc false
   def ci_query_explain_list_events_paginated_query do

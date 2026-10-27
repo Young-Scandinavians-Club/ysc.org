@@ -25,6 +25,8 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias YscWeb.DateDisplay
   alias YscWeb.BookingDisplay
   import YscWeb.Components.CabinInfo
+  import YscWeb.Components.CabinGuest
+  alias Ysc.Bookings.CabinOverview
 
   @impl true
   def mount(params, _session, socket) do
@@ -152,6 +154,10 @@ defmodule YscWeb.ClearLakeBookingLive do
         property: :clear_lake,
         timezone: timezone,
         user: user_with_subs,
+        guest_overview:
+          if(is_nil(user_with_subs),
+            do: CabinOverview.for_property(:clear_lake, seasons)
+          ),
         checkin_date: checkin_date,
         checkout_date: checkout_date,
         today: today,
@@ -587,7 +593,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               icon="hero-moon"
               title="Sleeping"
             >
-              Lawn camp or bring your own setup
+              Camp on the lawn (bring a tent) or sleep indoors with your own bedding
             </:item>
             <:item icon="hero-no-symbol" title="House rules">
               No pets or smoking
@@ -1910,14 +1916,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Left side of the single entry door (across the main grass). Four keys open the cabin, pantry, pool storage, and bathrooms — lock all of those when you leave and return the keys to the lockbox.
                     </:item>
                     <:item icon="hero-beaker" title="Water:">
-                      The spigot by the lawn entry gate is not drinkable (hose and pools). All other spigots are potable — don't waste fresh water. See the
+                      The spigot by the lawn entry gate is not drinkable (hose and pools). All other spigots are safe to drink from — don't waste fresh water. See the
                       <.link
                         id="clear-lake-water-operations"
                         href={~p"/documents/clear_lake_water_operations.pdf"}
                         target="_blank"
                         rel="noopener noreferrer"
                         class="text-teal-700 underline hover:text-teal-900"
-                      >potable water operations guide</.link>
+                      >water operations guide</.link>
                       (PDF) for startup, shutdown, and tank fill.
                     </:item>
                     <:item
@@ -2042,101 +2048,102 @@ defmodule YscWeb.ClearLakeBookingLive do
         </div>
       </section>
       <%!-- Hero Section with Carousel (For non-logged-in users) --%>
-      <section
+      <.guest_hero
         :if={!@user}
-        id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh] bg-white"
+        eyebrow="YSC Member Cabin"
+        title="Clear Lake Cabin"
+        subtitle="Owned and run by our community since 1963, on the shore of one of North America's oldest lakes."
+        redirect_to={~p"/bookings/clear-lake"}
       >
-        <YscWeb.Components.ImageCarousel.image_carousel_hero_background
-          wrapper_id="clear-lake-carousel-wrapper-nonuser"
-          carousel_id="about-the-clear-lake-cabin-carousel"
-          images={clear_lake_hero_carousel_images()}
-          flag_grid_id="clear-lake-hero-flag-grid-guest"
-        />
-        <%!-- Title Text Section --%>
-        <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-20 pointer-events-none">
-          <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
-            <p class="text-sm text-blue-400 mb-3 md:mb-4 drop-shadow-md type-eyebrow">
-              A Legacy for All Seasons
-            </p>
-            <h1 class="text-4xl md:text-7xl text-white drop-shadow-lg mb-4 type-display">
-              Clear Lake Cabin
-            </h1>
-            <p class="text-base md:text-xl text-zinc-100 max-w-2xl font-normal drop-shadow-md">
-              Owned and operated by our community since 1963. A year-round gateway to California's oldest natural lake.
-            </p>
-          </div>
-        </div>
-      </section>
-      <%!-- Main Content for Non-Logged-In Users --%>
+        <:media>
+          <YscWeb.Components.ImageCarousel.image_carousel_hero_background
+            wrapper_id="clear-lake-carousel-wrapper-nonuser"
+            carousel_id="about-the-clear-lake-cabin-carousel"
+            images={clear_lake_hero_carousel_images()}
+            flag_grid_id="clear-lake-hero-flag-grid-guest"
+          />
+        </:media>
+      </.guest_hero>
+      <%!-- Main Content for Non-Logged-In Users: a short overview and a way in --%>
       <section :if={!@user} class="bg-white py-6 md:py-12">
-        <%!-- Section Header --%>
         <div class="max-w-(--breakpoint-xl) mx-auto px-4">
           <.page_masthead
             eyebrow="Since 1963"
             title="Experience Clear Lake"
+            size={:compact}
             heading_tag={:h2}
           />
-        </div>
-        <%!-- Feature Grid --%>
-        <div class="max-w-(--breakpoint-xl) mx-auto px-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
-            <%!-- Private Dock --%>
-            <.feature_card title="Private Dock Access">
-              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                Swim, boat, and unwind at our private dock. Perfect for mooring your boat, enjoying morning coffee over the water, or taking a refreshing dip in California's largest natural lake.
-              </p>
-            </.feature_card>
-            <%!-- Year-Round Access --%>
-            <div id="clear-lake-year-round-access">
-              <.feature_card title="Year-Round Access">
-                <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                  <strong class="text-zinc-900">
-                    Summer ({@summer_season_window}):
-                  </strong>
-                  Legendary dock parties and sleeping under the stars on our lawn. Beds are not set up — lawn camp or bring your own sleeping setup.<br />
-                  <strong class="text-zinc-900">
-                    Winter ({@winter_season_window}):
-                  </strong>
-                  Cozy indoor beds in three rooms (queens and fulls), each with heaters, lamps, and storage. Bring your own linens.
-                </p>
-              </.feature_card>
-            </div>
-            <%!-- Community Treasure --%>
-            <.feature_card title="A Community Treasure">
-              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                Owned and operated by our members since 1963. <strong class="text-zinc-900">Your cabin, your getaway</strong>. Low rates and authentic experiences made possible through our cooperative spirit.
-              </p>
-            </.feature_card>
-            <%!-- California's Oldest Lake --%>
-            <.feature_card title="California's Oldest Lake">
-              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                Clear Lake is
-                <strong class="text-zinc-900">2.5 million years old</strong>
-                — the oldest natural lake in North America. Experience a unique ecosystem perfect for bird watching, fishing, and connecting with nature year-round.
-              </p>
-            </.feature_card>
-          </div>
-          <%!-- CTA Card --%>
-          <div class="mt-12 md:mt-16 max-w-2xl mx-auto">
-            <.feature_card
-              title="Ready to Book?"
-              title_tone={:accent}
-              class="p-8 md:p-12 text-center flex flex-col items-center"
+          <.guest_highlights id="clear-lake-guest-highlights" accent={:teal}>
+            <:item icon="hero-lifebuoy" title="Private dock">
+              Swim, moor a boat and unwind right on the water.
+            </:item>
+            <:item icon="hero-sun" title="Year-round">
+              Dock days in summer, cozy weekends by the fireplace in winter.
+            </:item>
+            <:item icon="hero-hand-raised" title="Run by members">
+              Low rates, because members look after the cabin together. Your cabin, not a hotel.
+            </:item>
+          </.guest_highlights>
+          <.info_sections id="clear-lake-guest-sections" class="mt-8 md:mt-10">
+            <.info_section
+              id="clear-lake-guest-stay"
+              heading_id="clear-lake-guest-stay-heading"
+              title="What a stay is like"
+              description="A shared, member-run cabin on the water, where summers are for the dock."
             >
-              <p class="text-base text-zinc-700 leading-relaxed mb-6">
-                Sign in to view the cabin calendar, check availability, and book your dates.
-              </p>
-              <.link
-                navigate={
-                  ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
-                }
-                class="px-8 py-3 bg-blue-600 text-white text-sm font-bold rounded-sm hover:bg-blue-700 transition-colors duration-150"
-              >
-                Sign In to Book
-              </.link>
-            </.feature_card>
-          </div>
+              <.icon_list id="clear-lake-guest-stay-list">
+                <:item icon="hero-lifebuoy" title="On the water:">
+                  a 100-foot private dock for swimming and sunbathing. Bring your boat; mooring is free.
+                </:item>
+                <:item icon="hero-musical-note" title="The Social Hall:">
+                  a cedar hall with a wood-burning fireplace and dance floor, plus a group kitchen.
+                </:item>
+                <:item icon="hero-moon" title="Sleeping, by season:">
+                  summer ({season_span(@guest_overview, "Summer")}) is lawn camping (bring a tent) or sleeping indoors with your own bedding; winter ({season_span(
+                    @guest_overview,
+                    "Winter"
+                  )}) has beds in three rooms. Bring your own linens.
+                </:item>
+                <:item icon="hero-hand-raised" title="Pitch in:">
+                  members share light chores before they leave, the spirit that keeps rates low.
+                </:item>
+                <:item icon="hero-user-group" title="Bring your people:">
+                  include every guest in your booking; non-member guests are welcome.
+                </:item>
+              </.icon_list>
+            </.info_section>
+            <.info_section
+              id="clear-lake-guest-ways"
+              heading_id="clear-lake-guest-ways-heading"
+              title="Ways to stay"
+              description="Shared stays are priced per guest, per night. The entire cabin is one flat nightly price."
+            >
+              <.guest_stay_options
+                id="clear-lake-guest-stay-options"
+                property={:clear_lake}
+                accent={:teal}
+                options={@guest_overview.stay_options}
+              />
+            </.info_section>
+            <.info_section
+              :if={@guest_overview.history != []}
+              id="clear-lake-guest-history"
+              heading_id="clear-lake-guest-history-heading"
+              title="A short history"
+              description={owned_for_label(@guest_overview)}
+            >
+              <.guest_milestones
+                id="clear-lake-guest-milestones"
+                accent={:teal}
+                milestones={@guest_overview.history}
+              />
+            </.info_section>
+          </.info_sections>
+          <.guest_invite
+            id="clear-lake-guest-invite"
+            accent={:teal}
+            redirect_to={~p"/bookings/clear-lake"}
+          />
         </div>
       </section>
     </div>

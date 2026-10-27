@@ -45,7 +45,7 @@ defmodule YscWeb.BookingUserMessages do
 
   def leave_unpaid_checkout_confirm do
     trim("""
-    Cancel this unfinished booking? These dates will go back on the calendar. Your stay is not booked until you finish payment.
+    Cancel this unfinished booking? These dates will go back on the calendar. Your stay is not booked yet.
     """)
   end
 
@@ -103,6 +103,32 @@ defmodule YscWeb.BookingUserMessages do
 
   def checkout_guest_info_step_continue_complimentary do
     "Continue to confirm your booking — these dates are held temporarily, not confirmed yet. Finish checkout soon or they'll go back on the calendar."
+  end
+
+  def checkout_hold_timer_intro do
+    "These dates are held for"
+  end
+
+  @doc """
+  Next-step sentence beside the hold countdown.
+
+  "Pay now" is only true on the paid payment step. Guest-name and complimentary
+  checkout still have the timer, but payment is not the next action.
+  """
+  def checkout_hold_timer_next_step(:guest_info, true) do
+    "— not confirmed yet. Finish adding guest names, then confirm your booking. If the timer runs out, the dates go back on the calendar and you'll need to book again."
+  end
+
+  def checkout_hold_timer_next_step(:guest_info, false) do
+    "— not confirmed yet. Finish adding guest names, then continue to payment. If the timer runs out, the dates go back on the calendar and you'll need to book again."
+  end
+
+  def checkout_hold_timer_next_step(_payment_step, true) do
+    "— not confirmed yet. Confirm your booking before the timer runs out. If the timer runs out, the dates go back on the calendar and you'll need to book again."
+  end
+
+  def checkout_hold_timer_next_step(_payment_step, _complimentary) do
+    "— not confirmed yet. Pay now to complete your booking. If the timer runs out, the dates go back on the calendar and you'll need to book again."
   end
 
   def insufficient_capacity_error(opts \\ []) do
@@ -257,7 +283,15 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_cabin_access_step do
-    "You'll receive cabin access details (door code or key instructions) by email #{door_code_email_timing_phrase()}"
+    "You'll receive cabin access details (door code or key instructions) by email #{door_code_email_timing_phrase()}. The door code also appears on your booking page #{door_code_page_timing_phrase()}"
+  end
+
+  def confirmation_email_door_code_notice do
+    "About 3 days before check-in, we'll email you the door code and check-in information. Please keep an eye out for this email! The same code also appears on your booking page #{door_code_page_timing_phrase()} — use View Booking Details below."
+  end
+
+  def confirmation_email_door_code_next_step do
+    "We'll email the door code #{door_code_email_timing_phrase()}. You can also find it on your booking page #{door_code_page_timing_phrase()}"
   end
 
   def cabin_access_receipt_body do
@@ -435,6 +469,14 @@ defmodule YscWeb.BookingUserMessages do
 
   def booking_reference_support_phrase do
     "your booking reference (shown on your receipt as Booking Reference)"
+  end
+
+  def cabin_rules_receipt_reminder(:tahoe) do
+    "Bring your own sheets, pillowcases, towels, and sleeping bags. None are provided. Leave the kitchen clean before you go."
+  end
+
+  def cabin_rules_receipt_reminder(:clear_lake) do
+    "Pack linens or camping gear: sheets or a sleeping bag, and a tent if you're camping on the lawn in summer. Leave the kitchen clean before you go."
   end
 
   defp modification_after_payment_recovery_body do

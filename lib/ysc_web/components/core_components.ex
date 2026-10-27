@@ -1919,6 +1919,92 @@ defmodule YscWeb.CoreComponents do
     do: ["text-sm text-red-600 font-semibold mt-1", extra]
 
   @doc """
+  Cancel overlay + LiveView image preview for one upload drop-zone entry.
+
+  Pair with `upload_dropzone_empty_state/1` and `upload_error/1`. Keep the
+  `<article class="upload-entry">` wrapper and per-entry `upload_errors/2`
+  loop at the call site so error variants can differ.
+
+  Do not use this for event-photo upload tiles (video placeholder, progress
+  bar, corner remove button) — that layout is not drop-in.
+
+  ## Examples
+
+      <.upload_entry_preview
+        entry={entry}
+        cancel="cancel-upload"
+        preview_class="group-hover:blur-sm h-[120px] w-[120px]"
+        figure_class="w-28 group relative"
+      />
+
+      <.upload_entry_preview
+        entry={entry}
+        cancel="cancel"
+        preview_class="group-hover:blur-sm h-80 w-full"
+        button_class="upload-entry__cancel w-full"
+        phx-target={@myself}
+      />
+
+      <.upload_entry_preview
+        entry={entry}
+        cancel="cancel-upload"
+        caption?={false}
+        preview_class={["group-hover:blur-sm rounded-lg", "h-60 w-full"]}
+        button_class="upload-entry__cancel w-full"
+        phx-target={@myself}
+      />
+  """
+  attr :entry, Phoenix.LiveView.UploadEntry, required: true
+
+  attr :cancel, :string,
+    required: true,
+    doc: "LiveView event that cancels this entry (`phx-click`)"
+
+  attr :preview_class, :any,
+    required: true,
+    doc: "Classes on `live_img_preview/1` (include `group-hover:blur-sm`)"
+
+  attr :figure_class, :any,
+    default: "group relative",
+    doc: "Classes on the wrapping `<figure>`"
+
+  attr :button_class, :any,
+    default: nil,
+    doc: "Classes on the cancel button (e.g. `upload-entry__cancel w-full`)"
+
+  attr :caption?, :boolean,
+    default: true,
+    doc: "When true, shows `entry.client_name` as a figcaption overlay"
+
+  attr :rest, :global, include: ~w(phx-target)
+
+  def upload_entry_preview(assigns) do
+    ~H"""
+    <figure class={@figure_class}>
+      <button
+        type="button"
+        phx-click={@cancel}
+        phx-value-ref={@entry.ref}
+        aria-label="cancel"
+        class={@button_class}
+        {@rest}
+      >
+        <div class="hidden group-hover:block absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-red-500 z-10">
+          <.icon name="hero-x-circle" class="w-10 h-10" />
+        </div>
+        <.live_img_preview entry={@entry} class={@preview_class} />
+        <figcaption
+          :if={@caption?}
+          class="text-sm truncate overflow-hidden bg-zinc-100 text-zinc-600 w-28 z-8 absolute inset-x-0 bottom-0 py-1"
+        >
+          {@entry.client_name}
+        </figcaption>
+      </button>
+    </figure>
+    """
+  end
+
+  @doc """
   Renders a back navigation link.
 
   ## Examples
@@ -3233,8 +3319,9 @@ defmodule YscWeb.CoreComponents do
 
   Sign-in, forgot/reset password, and the admin-app mobile handoff share this
   `max-w-sm` column with the home-linked YSC logo above the form. Keep
-  registration (`max-w-xl` + `p-8` logo), account setup, passkey registration
-  (`py-10`, no logo), and error pages on their own chrome.
+  registration (`max-w-xl` + `p-8` logo), account setup, and passkey
+  registration (`py-10`, no logo) on their own chrome. HTML 404/500 pages use
+  `error_page/1`.
 
   `logo_id` is the existing DOM id on the home logo link — LiveView and
   controller tests assert those ids.
@@ -3265,6 +3352,92 @@ defmodule YscWeb.CoreComponents do
     <div id={@id} class={["max-w-sm mx-auto py-4 px-4", @class]}>
       <.home_logo_link id={@logo_id} class="py-8" />
       {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
+  Photo-hero HTML error page with a top-left home logo and a home action.
+
+  The 404 and 500 templates share this full-viewport layout (background, copy,
+  and illustration differ). Keep the surrounding document chrome on
+  `Layouts.error`, and keep auth screens on `auth_panel/1`.
+
+  `logo_id` is the existing DOM id on the home logo link — controller tests
+  assert those ids.
+
+  ## Examples
+
+      <.error_page
+        logo_id="error-404-home-logo"
+        status={404}
+        title="Page not found"
+        class="bg-[#fcf9ec]"
+        image={~p"/images/lost_tomte.webp"}
+        image_alt="404 Lost Tomte"
+      >
+        The page you're looking for doesn't exist or has been moved.
+      </.error_page>
+  """
+  attr :id, :string,
+    default: nil,
+    doc: "Optional DOM id on the page wrapper"
+
+  attr :logo_id, :string,
+    required: true,
+    doc: "DOM id forwarded to `home_logo_link/1`"
+
+  attr :status, :integer,
+    required: true,
+    doc: "HTTP status shown as the display heading (404 or 500)"
+
+  attr :title, :string, required: true
+
+  attr :class, :any,
+    default: nil,
+    doc: "Background (and any extra) classes on the page wrapper"
+
+  attr :image, :string, required: true
+
+  attr :image_alt, :string, required: true
+
+  slot :inner_block, required: true, doc: "Supporting copy under the title"
+
+  def error_page(assigns) do
+    ~H"""
+    <div id={@id} class={["w-full h-full", @class]}>
+      <div class="absolute top-5 left-5 z-10">
+        <.home_logo_link id={@logo_id} />
+      </div>
+      <div class="min-h-screen flex items-center justify-center px-4">
+        <div class="max-w-5xl w-full flex flex-col md:flex-row items-center gap-7 md:gap-12">
+          <div class="flex-1 text-center md:text-left">
+            <h1 class="text-5xl md:text-6xl text-zinc-900 mb-4 type-display">
+              {@status}
+            </h1>
+            <h2 class="text-2xl md:text-3xl text-zinc-800 mb-3 type-title">
+              {@title}
+            </h2>
+            <p class="text-lg text-zinc-600 mb-6">
+              {render_slot(@inner_block)}
+            </p>
+            <.link
+              navigate={~p"/"}
+              class="inline-block px-6 py-3 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition duration-200 ease-in-out font-semibold"
+            >
+              <.icon name="hero-arrow-left-solid" class="w-5 h-5 -mt-0.5 me-2" />
+              Go back home
+            </.link>
+          </div>
+          <div class="flex-1 flex items-center justify-center">
+            <img
+              src={@image}
+              alt={@image_alt}
+              class="w-full max-w-4xl h-auto object-contain"
+            />
+          </div>
+        </div>
+      </div>
     </div>
     """
   end
@@ -3956,10 +4129,99 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Skeleton for the header block shared by the confirmation pages: status
-  eyebrow with its icon, headline, one-line summary, and the reference number
-  on the right. Mirrors the bordered `mb-10 ... pb-8` header of
-  `OrderConfirmationLive` and `BookingReceiptLive`.
+  Status header shared by ticket order confirmation and cabin booking receipt.
+
+  Success uses a green check; cancelled uses a red X. The inner block is the
+  supporting copy under the title. Pair with `confirmation_header_skeleton/1`
+  for the loading state.
+
+  ## Examples
+
+      <.confirmation_header
+        id="order-confirmation-header"
+        variant={:success}
+        eyebrow="Order Confirmed"
+        title="See you at the event, Astrid!"
+        reference_label="Order number"
+        reference={@ticket_order.reference_id}
+      >
+        Your tickets for <strong>{@event.title}</strong> are confirmed.
+      </.confirmation_header>
+
+      <.confirmation_header
+        variant={:cancelled}
+        eyebrow="Booking Cancelled"
+        title="Booking Cancelled"
+        reference_label="Booking Reference"
+        reference={@booking.reference_id}
+      >
+        Your booking at <strong>Lake Tahoe Cabin</strong>
+        has been cancelled.
+      </.confirmation_header>
+  """
+  attr :id, :string, default: nil
+
+  attr :variant, :atom,
+    default: :success,
+    values: [:success, :cancelled]
+
+  attr :eyebrow, :string, required: true
+  attr :title, :string, required: true
+  attr :reference_label, :string, required: true
+  attr :reference, :any, required: true
+  attr :class, :any, default: nil
+  slot :inner_block, required: true
+
+  def confirmation_header(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-8",
+        @class
+      ]}
+    >
+      <div>
+        <div class={[
+          "flex items-center gap-2 mb-2",
+          @variant == :cancelled && "text-red-600",
+          @variant == :success && "text-green-600"
+        ]}>
+          <.icon
+            name={
+              if(@variant == :cancelled,
+                do: "hero-x-circle",
+                else: "hero-check-circle-solid"
+              )
+            }
+            class="w-6 h-6"
+          />
+          <span class="text-sm type-eyebrow">
+            {@eyebrow}
+          </span>
+        </div>
+        <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
+          {@title}
+        </h1>
+        <p class="text-zinc-500 mt-2 text-lg">
+          {render_slot(@inner_block)}
+        </p>
+      </div>
+      <div class="text-left md:text-right">
+        <p class="text-xs text-zinc-500 type-eyebrow">
+          {@reference_label}
+        </p>
+        <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
+          {@reference}
+        </p>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Skeleton for `confirmation_header/1`: status eyebrow with its icon, headline,
+  one-line summary, and the reference number on the right.
 
   ## Examples
 

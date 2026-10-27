@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "2.48.3",
+      version: "2.49.1",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -28,7 +28,16 @@ defmodule Ysc.MixProject do
           # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
           # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
           "EEF-CVE-2026-95105",
-          "EEF-CVE-2026-94206"
+          "EEF-CVE-2026-94206",
+          # hackney 4.7.4: patched in 4.8.6+/4.9.1, which also require h2 0.12.5,
+          # webtransport 0.4.8, certifi 2.18, and quic 2.x. App HTTP uses Req;
+          # hackney is transitive (ex_aws, stripity_stripe). Revisit with the
+          # h2 0.12.5 bump. Requires Hex >= 2.5.1-dev.
+          "EEF-CVE-2026-112880",
+          "EEF-CVE-2026-97200",
+          "EEF-CVE-2026-115700",
+          "EEF-CVE-2026-115693",
+          "EEF-CVE-2026-113440"
         ]
       ],
       test_coverage: [
@@ -200,8 +209,14 @@ defmodule Ysc.MixProject do
       # stays in goaway_received so new requests return
       # {error, goaway_received}. hackney cancel_stream/send_trailers
       # after a peer GOAWAY used to get {error, unknown_request}.
+      # 0.12.5: optional connection_window_size (65535..2147483647,
+      # default still 65535) raises the connection receive window via
+      # a stream-0 WINDOW_UPDATE after SETTINGS. We do not start h2
+      # servers; hackney start_link/4 still passes #{}, so the default
+      # 64 KB window stays in effect. Invalid values return
+      # {error, {invalid_option, {connection_window_size, V}}}.
       {:hackney, "~> 4.7", override: true},
-      {:h2, "~> 0.12.4", override: true},
+      {:h2, "~> 0.12.5", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},
@@ -317,8 +332,14 @@ defmodule Ysc.MixProject do
       {:image, "~> 0.72"},
       {:iso, "~> 1.4"},
       {:jason, "~> 1.4"},
-      # Pin exact version: jose is pulled by joken (~> 1.11.12) and goth (~> 1.11).
-      {:jose, "1.11.12", override: true},
+      # 1.11.13: EEF-CVE-2026-65625..65632 (AES-GCM tag length, RSA PKCS1
+      # unwrap, JWE zip bomb, shared_secret recursion, weak PKCS#8 PBKDF2,
+      # X25519 timing, RSA JWK factoring DoS, ECDSA length). crypto_fallback
+      # default is now false. We sign Google Wallet JWTs with Joken RS256 PEM
+      # maps (native OTP crypto); we do not decrypt JWE, derive ECDH secrets,
+      # or export encrypted PKCS#8. joken lists ~> 1.11.12 and goth ~> 1.11,
+      # so pin the patched floor.
+      {:jose, "~> 1.11.13", override: true},
       # 2.7.0: Elixir 1.16 / OTP 26 floor (we are 1.20 / OTP 27). Signer.create
       # accepts a JOSE.JWK; peek returns {:error, :token_malformed} for invalid
       # tokens. We sign Google Wallet JWTs with Signer.create("RS256", %{"pem"

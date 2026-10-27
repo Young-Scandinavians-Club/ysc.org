@@ -1312,7 +1312,6 @@ defmodule Ysc.ExpenseReports do
         "send_expense_report_emails_impl: Treasurer query result",
         expense_report_id: expense_report.id,
         treasurer_found: !is_nil(treasurer),
-        treasurer_email: if(treasurer, do: treasurer.email, else: nil),
         treasurer_id: if(treasurer, do: treasurer.id, else: nil)
       )
 
@@ -1320,7 +1319,7 @@ defmodule Ysc.ExpenseReports do
         Ysc.Logging.info(
           "send_expense_report_emails_impl: Preparing treasurer notification email data",
           expense_report_id: expense_report.id,
-          treasurer_email: treasurer.email
+          treasurer_email: Ysc.EmailConfig.treasurer_email()
         )
 
         email_data =
@@ -1344,7 +1343,7 @@ defmodule Ysc.ExpenseReports do
         Ysc.Logging.info(
           "send_expense_report_emails_impl: Calling Notifier.schedule_email for treasurer",
           expense_report_id: expense_report.id,
-          recipient: treasurer.email,
+          recipient: Ysc.EmailConfig.treasurer_email(),
           subject: subject,
           idempotency_key: idempotency_key,
           template_name: template_name,
@@ -1356,7 +1355,7 @@ defmodule Ysc.ExpenseReports do
 
         result =
           Notifier.schedule_email(
-            treasurer.email,
+            Ysc.EmailConfig.treasurer_email(),
             idempotency_key,
             subject,
             template_name,
@@ -1370,7 +1369,7 @@ defmodule Ysc.ExpenseReports do
             Ysc.Logging.warning(
               "Failed to schedule expense report treasurer notification email",
               expense_report_id: expense_report.id,
-              recipient: treasurer.email,
+              recipient: Ysc.EmailConfig.treasurer_email(),
               result: inspect(result, limit: 100)
             )
 
@@ -1378,7 +1377,7 @@ defmodule Ysc.ExpenseReports do
             Ysc.Logging.debug(
               "Scheduled expense report treasurer notification email",
               expense_report_id: expense_report.id,
-              recipient: treasurer.email
+              recipient: Ysc.EmailConfig.treasurer_email()
             )
         end
       else

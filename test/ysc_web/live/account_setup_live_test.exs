@@ -700,6 +700,40 @@ defmodule YscWeb.AccountSetupLiveTest do
                has_element?(view, "#phone_verification_form")
     end
 
+    test "setting a password drops other sessions but keeps this setup session",
+         %{
+           conn: conn,
+           user: user
+         } do
+      other = Accounts.generate_user_session_token(user)
+      current = get_session(conn, :user_token)
+      other_socket_id = "users_sessions:#{Base.url_encode64(other)}"
+      YscWeb.Endpoint.subscribe(other_socket_id)
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
+
+      view
+      |> form("#password_form", %{
+        "user" => %{
+          "password" => valid_user_password(),
+          "password_confirmation" => valid_user_password()
+        }
+      })
+      |> render_submit()
+
+      assert has_element?(view, "#phone_form") or
+               has_element?(view, "#phone_verification_form")
+
+      assert Accounts.get_user_by_session_token(current).id == user.id
+      refute Accounts.get_user_by_session_token(other)
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^other_socket_id
+      }
+    end
+
     test "unauthenticated user cannot access step 2", %{user: user} do
       {:ok, view, _html} =
         live(build_conn(), account_setup_path(user, %{"step" => "2"}))

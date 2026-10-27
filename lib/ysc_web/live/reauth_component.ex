@@ -312,9 +312,13 @@ defmodule YscWeb.ReauthComponent do
 
   defp oauth_return_to(socket) do
     base = socket.assigns.return_to || "/"
+    user = socket.assigns.user
 
     case socket.assigns[:reauth_intent] do
       intent when is_map(intent) and map_size(intent) > 0 ->
+        # Bind the resume token to this account so another signed-in user
+        # cannot redeem it during their own reauth grace window.
+        intent = Map.put(intent, "user_id", user.id)
         ReauthResume.append_to_path(base, intent)
 
       _ ->

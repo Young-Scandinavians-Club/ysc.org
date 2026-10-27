@@ -21,6 +21,15 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
   alias Ysc.Repo
 
+  setup do
+    # `tahoe_booking_dates/1` continues into next summer once the current
+    # window has no Monday–Thursday buyout stay. The calendar horizon still
+    # follows winter's 45-day cap, so those dates render disabled unless we
+    # widen advance booking. Safe here: this module is `async: false`.
+    allow_far_future_booking_dates()
+    :ok
+  end
+
   describe "deferred room availability" do
     test "populates room cards after connect when booking dates are in the URL",
          %{
@@ -62,6 +71,87 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert html =~ "Tahoe"
       assert html =~ "book your dates"
       refute html =~ "reserve your dates"
+    end
+
+    test "invites guests in with a short overview and no cabin details", %{
+      conn: conn
+    } do
+      seed_canonical_seasons!()
+      Repo.delete_all(Ysc.Bookings.PricingRule)
+
+      for attrs <- [
+            %{
+              booking_mode: :room,
+              price_unit: :per_person_per_night,
+              amount: Money.new(45, :USD),
+              children_amount: Money.new(25, :USD)
+            },
+            %{
+              booking_mode: :buyout,
+              price_unit: :buyout_fixed,
+              amount: Money.new(425, :USD)
+            }
+          ] do
+        %Ysc.Bookings.PricingRule{}
+        |> Ysc.Bookings.PricingRule.changeset(Map.put(attrs, :property, :tahoe))
+        |> Repo.insert!()
+      end
+
+      Ysc.Bookings.PricingRuleCache.invalidate()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      assert has_element?(view, "#hero-section h1", "Tahoe Cabin")
+      assert has_element?(view, "#tahoe-guest-highlights li", "Run by members")
+
+      assert has_element?(
+               view,
+               "#hero-section-sign-in[href*=\"redirect_to=%2Fbookings%2Ftahoe\"]"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-guest-invite-sign-in[href*=\"redirect_to=%2Fbookings%2Ftahoe\"]"
+             )
+
+      assert has_element?(view, "#hero-section-apply[href=\"/users/register\"]")
+
+      assert has_element?(
+               view,
+               "#tahoe-guest-invite-apply[href=\"/users/register\"]"
+             )
+
+      assert has_element?(view, "#tahoe-guest-stay-list")
+      assert has_element?(view, "#tahoe-guest-stay-list", "light chores")
+
+      assert has_element?(
+               view,
+               "#tahoe-guest-stay-list",
+               "Meals and linens are not provided"
+             )
+
+      refute render(view) =~ "dugnad"
+      refute render(view) =~ "self-catering"
+
+      assert has_element?(
+               view,
+               "#tahoe-guest-stay-options-room",
+               "Individual room(s)"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-guest-stay-options-room",
+               "per adult, per night"
+             )
+
+      assert has_element?(view, "#tahoe-guest-milestones li", "1993")
+
+      # Operational details stay behind sign-in.
+      refute has_element?(view, "#tahoe-essentials")
+      refute has_element?(view, "#information-section")
+      refute has_element?(view, "#booking-mode-form")
+      refute render(view) =~ "2685 Cedar Lane"
     end
 
     test "loads page with query parameters", %{conn: conn} do

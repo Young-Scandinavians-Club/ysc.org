@@ -673,6 +673,48 @@ defmodule Ysc.Bookings.PricingRuleCacheTest do
     end
   end
 
+  describe "list_property_level_rules/1" do
+    test "returns property-level rules from the database on cache miss" do
+      rule =
+        create_pricing_rule(%{
+          amount: Money.new(45, :USD),
+          property: :tahoe,
+          booking_mode: :room,
+          price_unit: :per_person_per_night
+        })
+
+      rules = PricingRuleCache.list_property_level_rules(:tahoe)
+
+      assert Enum.map(rules, & &1.id) == [rule.id]
+    end
+
+    test "serves a stale list until invalidate after a direct DB update" do
+      rule =
+        create_pricing_rule(%{
+          amount: Money.new(45, :USD),
+          property: :tahoe,
+          booking_mode: :room,
+          price_unit: :per_person_per_night
+        })
+
+      assert hd(PricingRuleCache.list_property_level_rules(:tahoe)).amount ==
+               Money.new(45, :USD)
+
+      {:ok, _} =
+        rule
+        |> PricingRule.changeset(%{amount: Money.new(99, :USD)})
+        |> Repo.update()
+
+      assert hd(PricingRuleCache.list_property_level_rules(:tahoe)).amount ==
+               Money.new(45, :USD)
+
+      PricingRuleCache.invalidate()
+
+      assert hd(PricingRuleCache.list_property_level_rules(:tahoe)).amount ==
+               Money.new(99, :USD)
+    end
+  end
+
   describe "lowest_property_rate/1" do
     test "returns the lowest property-level rate from the database on cache miss" do
       create_pricing_rule(%{

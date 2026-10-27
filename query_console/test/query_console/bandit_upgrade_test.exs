@@ -1,25 +1,27 @@
 defmodule QueryConsole.BanditUpgradeTest do
   @moduledoc """
-  Guards the bandit 1.12.5 → 1.13.1 upgrade.
+  Guards the bandit 1.13.1 → 1.14.0 upgrade.
 
-  1.13.0/1.13.1 is a minor. It patches:
+  1.14.0 is a minor with no Breaking heading. It patches HTTP/2 inbound
+  flow control (EEF-CVE-2026-108525), HPACK header-list limits
+  (EEF-CVE-2026-109584), SETTINGS quadratic work (EEF-CVE-2026-108529),
+  HPACK encoder table cap (EEF-CVE-2026-110499), stream-error rollback
+  (EEF-CVE-2026-111103), HTTP/2 body-read deadline (EEF-CVE-2026-115269),
+  HTTP/1 tiny-chunk coalescing (EEF-CVE-2026-111101), chunk-extension
+  smuggling (EEF-CVE-2026-114216), content-length/port quadratic parse
+  (EEF-CVE-2026-113436), WebSocket 1-byte continuations
+  (EEF-CVE-2026-114213), and WebSocket frames after close
+  (EEF-CVE-2026-110314).
 
-  * EEF-CVE-2026-105659 (HIGH / GHSA-69m6-wcv4-rwcf) — HTTP/2 sends blocked
-    on a send window are bounded by *progress* (`FlowControl.extend_send_deadline/4`)
-    so a trickle of `WINDOW_UPDATE` (or empty SETTINGS) cannot reset the 15s
-    deadline and pin stream processes indefinitely.
-  * EEF-CVE-2026-105660 (MEDIUM / GHSA-v53v-9hvg-37jf) — HTTP/1 absolute-form
-    and authority-form request-target hosts are validated with the same
-    grammar as the `Host` header (`parse_target_authority!/2`).
+  Defaults change: HTTP/2 `max_concurrent_streams` 500 and
+  `max_header_list_size` 262144 (were unlimited). HTTP/2 `read_body`
+  may return more than `:length` (up to the stream receive window).
+  Pending sends are stored in a `:queue`.
 
-  1.13.1 reverts the 1.13.0 stale-conn check (#668) that broke
-  `Phoenix.Endpoint.RenderErrors` for `Plug.Parsers` errors.
-
-  Requires Thousand Island 1.6 (peername cached at accept). We serve Phoenix
-  through `Bandit.PhoenixAdapter` and use `bandit_pid/1` plus
-  `ThousandIsland.connection_pids/1` for idle shutdown. Public adapter APIs
-  are unchanged. We do not call `ThousandIsland.Socket.peername/1`,
-  `compress_chunked`, or CONNECT.
+  We serve Phoenix through `Bandit.PhoenixAdapter` and use `bandit_pid/1`
+  plus `ThousandIsland.connection_pids/1` for idle shutdown. We do not
+  set `http_2_options` or call `Plug.Conn.read_body` in app code.
+  Public adapter APIs are unchanged.
   """
   use ExUnit.Case, async: false
 
@@ -44,6 +46,15 @@ defmodule QueryConsole.BanditUpgradeTest do
               __DIR__
             )
   @headers_src Path.expand("../../deps/bandit/lib/bandit/headers.ex", __DIR__)
+  @http1_socket_src Path.expand(
+                      "../../deps/bandit/lib/bandit/http1/socket.ex",
+                      __DIR__
+                    )
+  @settings_src Path.expand(
+                  "../../deps/bandit/lib/bandit/http2/settings.ex",
+                  __DIR__
+                )
+  @bandit_src Path.expand("../../deps/bandit/lib/bandit.ex", __DIR__)
   @changelog Path.expand("../../deps/bandit/CHANGELOG.md", __DIR__)
   @ti_changelog Path.expand("../../deps/thousand_island/CHANGELOG.md", __DIR__)
 
@@ -61,27 +72,30 @@ defmodule QueryConsole.BanditUpgradeTest do
     {:module, Bandit.HTTP2.FlowControl} =
       Code.ensure_loaded(Bandit.HTTP2.FlowControl)
 
+    {:module, Bandit.HTTP2.Settings} = Code.ensure_loaded(Bandit.HTTP2.Settings)
     {:module, ThousandIsland} = Code.ensure_loaded(ThousandIsland)
     :ok
   end
 
-  describe "1.13.1 Hex lock and public APIs" do
-    test "locks the Hex package to 1.13.1" do
-      assert to_string(Application.spec(:bandit, :vsn)) == "1.13.1"
+  describe "1.14.0 Hex lock and public APIs" do
+    test "locks the Hex package to 1.14.0" do
+      assert to_string(Application.spec(:bandit, :vsn)) == "1.14.0"
     end
 
-    test "mix.exs pins the 1.13.1 floor" do
+    test "mix.exs pins the 1.14.0 floor" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s({:bandit, "~> 1.13.1"})
+      assert mix_exs =~ ~s({:bandit, "~> 1.14.0"})
     end
 
-    test "companion locks are bandit 1.13.1 and thousand_island 1.6.0" do
+    test "companion locks stay thousand_island 1.6.0 and hpax 1.1.0" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"bandit": {:hex, :bandit, "1.13.1"|
-      refute lock =~ ~s|"bandit": {:hex, :bandit, "1.12.5"|
+      assert lock =~ ~s|"bandit": {:hex, :bandit, "1.14.0"|
+      refute lock =~ ~s|"bandit": {:hex, :bandit, "1.13.1"|
       assert lock =~ ~s|"thousand_island": {:hex, :thousand_island, "1.6.0"|
       refute lock =~ ~s|"thousand_island": {:hex, :thousand_island, "1.5.0"|
       assert lock =~ ~s|"hpax": {:hex, :hpax, "1.1.0"|
+      assert lock =~ ~s|"finch": {:hex, :finch, "0.24.0"|
+      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
     end
 
     test "PhoenixAdapter APIs used for idle shutdown still exist" do
@@ -195,10 +209,17 @@ defmodule QueryConsole.BanditUpgradeTest do
       live =
         {3, <<"rest">>, true, fn reply -> send(test_pid, {:live, reply}) end, now + 60_000}
 
-      connection = %Bandit.HTTP2.Connection{pending_sends: [expired, live]}
+      # 1.14.0 stores pending sends in a :queue and only scans once
+      # pending_sends_expire_at has passed (CVE-2026-108529).
+      connection = %Bandit.HTTP2.Connection{
+        pending_sends: :queue.from_list([expired, live]),
+        pending_sends_expire_at: now - 1
+      }
+
       updated = Bandit.HTTP2.Connection.expire_pending_sends(connection)
 
-      assert updated.pending_sends == [live]
+      assert :queue.to_list(updated.pending_sends) == [live]
+      assert updated.pending_sends_expire_at == now + 60_000
       assert_receive {:expired, {:error, :timeout}}
       refute_received {:live, _}
     end
@@ -276,6 +297,180 @@ defmodule QueryConsole.BanditUpgradeTest do
       refute Bandit.Headers.field_value_valid?("aaa\r\nx-injected: yes")
       refute Bandit.Headers.field_value_valid?("line\nfeed")
       refute Bandit.Headers.field_value_valid?("nul\0value")
+    end
+  end
+
+  describe "1.14.0 changelog" do
+    test "documents the HTTP/2 and HTTP/1 security fixes and has no Breaking heading" do
+      v1140 = changelog_section("1.14.0")
+      assert v1140
+      refute v1140 =~ "Breaking"
+      assert v1140 =~ "CVE-2026-108525"
+      assert v1140 =~ "CVE-2026-109584"
+      assert v1140 =~ "CVE-2026-108529"
+      assert v1140 =~ "CVE-2026-110499"
+      assert v1140 =~ "CVE-2026-111103"
+      assert v1140 =~ "CVE-2026-115269"
+      assert v1140 =~ "CVE-2026-111101"
+      assert v1140 =~ "CVE-2026-114216"
+      assert v1140 =~ "CVE-2026-113436"
+      assert v1140 =~ "CVE-2026-114213"
+      assert v1140 =~ "CVE-2026-110314"
+      assert v1140 =~ "max_concurrent_streams"
+      assert v1140 =~ "262144"
+    end
+  end
+
+  describe "1.14.0 HTTP/2 receive windows and defaults" do
+    test "Settings defaults cap concurrent streams and header list size" do
+      defaults = %Bandit.HTTP2.Settings{}
+      assert defaults.max_concurrent_streams == 500
+      assert defaults.max_header_list_size == 262_144
+      assert defaults.header_table_size == 4_096
+      assert defaults.initial_window_size == 65_535
+
+      settings = File.read!(@settings_src)
+      assert settings =~ "max_concurrent_streams: 500"
+      assert settings =~ "max_header_list_size: 262_144"
+
+      bandit = File.read!(@bandit_src)
+      assert bandit =~ "default_local_settings"
+      assert bandit =~ "max_concurrent_streams"
+      assert bandit =~ "262_144"
+    end
+
+    test "connection source enforces DATA against the receive window including padding" do
+      connection = File.read!(@connection_src)
+      flow = File.read!(@flow_src)
+
+      assert connection =~ "@recv_window_target 16_777_216"
+      assert connection =~ "@max_send_header_table_size 4_096"
+      assert connection =~ "size = byte_size(frame.data) + frame.padding"
+      assert connection =~ "DATA exceeds the connection receive window (RFC9113§6.9)"
+      assert connection =~ "Bandit.HTTP2.Errors.flow_control_error()"
+      assert connection =~ "overrun_stream_recv_window("
+      assert connection =~ "pending_sends: :queue.new()"
+
+      assert flow =~ "@stream_recv_window_target 1_048_576"
+      assert flow =~ "def compute_recv_window(recv_window_size, data_size, target)"
+      assert function_exported?(Bandit.HTTP2.FlowControl, :compute_recv_window, 3)
+      assert function_exported?(Bandit.HTTP2.FlowControl, :stream_recv_window_target, 1)
+      refute function_exported?(Bandit.HTTP2.FlowControl, :compute_recv_window, 2)
+    end
+
+    test "compute_recv_window/3 refills to target once the window falls below half" do
+      target = 16_777_216
+
+      assert Bandit.HTTP2.FlowControl.compute_recv_window(target, 100, target) ==
+               {target - 100, 0}
+
+      {window, increment} =
+        Bandit.HTTP2.FlowControl.compute_recv_window(8_000_000, 100, target)
+
+      assert window == target
+      assert increment == target - 7_999_900
+    end
+
+    test "stream receive window target is at least 1 MiB" do
+      assert Bandit.HTTP2.FlowControl.stream_recv_window_target(65_535) == 1_048_576
+      assert Bandit.HTTP2.FlowControl.stream_recv_window_target(2_000_000) == 2_000_000
+    end
+
+    test "1.13.1 stale-conn revert is still in effect" do
+      pipeline = File.read!(@pipeline_src)
+      adapter = File.read!(Path.expand("../../deps/bandit/lib/bandit/adapter.ex", __DIR__))
+      refute pipeline =~ "stale"
+      refute adapter =~ "stale"
+    end
+  end
+
+  describe "1.14.0 HTTP/1 request-line and chunked-body hardening" do
+    test "HTTP/1 socket requires three request-line words and exact versions" do
+      socket = File.read!(@http1_socket_src)
+      assert socket =~ "Request line does not have exactly three words (RFC9112§3)"
+      assert socket =~ "Invalid HTTP version:"
+      assert socket =~ ~s("HTTP/1.1")
+      assert socket =~ ~s("HTTP/1.0")
+      assert socket =~ "Request target has an ambiguous path (RFC9112§3.2.2)"
+      assert socket =~ "Invalid chunk extension (RFC9112§7.1.1)"
+      assert socket =~ "defp valid_chunk_ext?(<<>>), do: true"
+    end
+
+    test "headers cap content-length and port digit counts" do
+      headers = File.read!(@headers_src)
+      assert headers =~ "@max_port_digits 5"
+      assert headers =~ "@max_content_length_digits 19"
+      assert headers =~ "quadratic time"
+    end
+
+    test "origin-form GET still answers 200" do
+      port = start_echo_listener()
+      response = Req.get!("http://127.0.0.1:#{port}/")
+      assert response.status == 200
+      assert response.body == "bandit-upgrade-ok"
+    end
+
+    test "absolute-form empty path with query is rejected with 400" do
+      port = start_echo_listener()
+
+      response =
+        raw_http(
+          port,
+          "GET http://127.0.0.1:#{port}?a=b HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+        )
+
+      assert response =~ ~r/^HTTP\/1\.[01] 400/
+    end
+
+    test "request line with a fourth word is rejected with 400" do
+      port = start_echo_listener()
+
+      response =
+        raw_http(
+          port,
+          "GET / HTTP/1.1 extra\r\nHost: 127.0.0.1\r\n\r\n"
+        )
+
+      assert response =~ ~r/^HTTP\/1\.[01] 400/
+    end
+
+    test "HTTP/1.1x version is rejected with 400" do
+      port = start_echo_listener()
+
+      response =
+        raw_http(
+          port,
+          "GET / HTTP/1.1x\r\nHost: 127.0.0.1\r\n\r\n"
+        )
+
+      assert response =~ ~r/^HTTP\/1\.[01] 400/
+    end
+
+    test "chunked body with optional whitespace before the extension semicolon is accepted" do
+      port = start_echo_listener()
+
+      response =
+        raw_http(
+          port,
+          "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nTransfer-Encoding: chunked\r\n\r\n" <>
+            "5 ; foo=bar\r\nhello\r\n0\r\n\r\n"
+        )
+
+      assert response =~ ~r/^HTTP\/1\.[01] 200/
+      assert response =~ "hello"
+    end
+
+    test "chunked body with a bare LF in the extension is rejected with 400" do
+      port = start_echo_listener()
+
+      response =
+        raw_http(
+          port,
+          "POST / HTTP/1.1\r\nHost: 127.0.0.1\r\nTransfer-Encoding: chunked\r\n\r\n" <>
+            "5;\nfoo=bar\r\nhello\r\n0\r\n\r\n"
+        )
+
+      assert response =~ ~r/^HTTP\/1\.[01] 400/
     end
   end
 

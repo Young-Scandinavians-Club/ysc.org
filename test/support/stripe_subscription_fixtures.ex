@@ -89,7 +89,12 @@ defmodule Ysc.Stripe.SubscriptionFixtures do
       object: "list",
       data: [
         %Stripe.SubscriptionItem{
-          id: Map.get(attrs, :subscription_item_id, "si_test"),
+          id:
+            Map.get(
+              attrs,
+              :subscription_item_id,
+              "si_test_#{System.unique_integer([:positive])}"
+            ),
           object: "subscription_item",
           current_period_start: period_start,
           current_period_end: period_end,

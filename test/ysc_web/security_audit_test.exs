@@ -89,7 +89,9 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 92 (MEDIUM)   Merch checkout quoted Printful shipping from mount-time cart lines, then created the pending order and Stripe PaymentIntent from a freshly loaded cart plus the stale `option.rate`, so a member could underpay shipping by adding items in another tab
   Finding 93 (HIGH)     Account-setup / update_user_phone_and_sms reused User.registration_changeset with validate_email: false, so a client could mass-assign email (keeping email_verified_at), name, and DOB while saving a phone number — planting an account under a victim's unused address without the email-change reauth flow
   Finding 94 (MEDIUM)   Volunteer→member demotion did not disconnect LiveViews. Finding 87 only force-closed sockets when the previous role was `:admin`, so an already-open volunteer scanner / event editor / check-in / posts LiveView kept frozen `admin_role` and `current_user.role` and continued handling staff events after revocation.
-  Finding 95 (HIGH)     Password reset and password change deleted `users_tokens` but never broadcast LiveView `"disconnect"`. Finding 87/94 already showed `mount_current_user/2` only runs on mount, so a stolen session with an already-open bookings/tickets/settings LiveView kept `current_user` and could keep acting after the victim recovered the account.
+  Finding 95 (HIGH)     Password reset and password change deleted `users_tokens` but never broadcast LiveView `"disconnect"`. Finding 87/94 already showed `mount_current_user/2` only runs on mount, so a stolen session with an already-open bookings/tickets/settings LiveView kept `current_user` and could keep acting after the victim recovered the account. First-password set (`set_user_initial_password/2`) was the leftover: OAuth / family-invite / WP-migration users who added a password left other sessions valid.
+  Finding 96 (MEDIUM)   Event Tickets-tab leftover `validate-capacity`/`save-capacity` forwarded the full event param map into `update_event_editor/3`, persisting client `rendered_details` without TrixScrubber. Public `/feeds/events.atom` emits that HTML unsanitized.
+  Finding 97 (HIGH)     OAuth reauth resume tokens (`reauth_resume`) were encrypted but not bound to the initiating user. `UserAuth.log_in_user/6` always starts a 5-minute `reauth_verified_at` grace window, so a member who minted a token (email/phone/password intent) could send another signed-in member `/users/settings?reauth_resume=…` during that window. Phone changes to non-US/CA numbers skip OTP and persist immediately, including `profile_params` (name/DOB).
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -6378,6 +6380,76 @@ defmodule YscWeb.SecurityAuditTest do
       refute Repo.get_by(UserToken, user_id: user.id)
     end
 
+    test "set_user_initial_password broadcasts disconnect for every web session" do
+      user = oauth_user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:ok, _} =
+               Accounts.set_user_initial_password(user, %{
+                 password: "new valid password"
+               })
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^live_socket_id
+      }
+
+      refute Repo.get_by(UserToken, user_id: user.id)
+    end
+
+    test "set_user_initial_password keeps the current session when asked" do
+      user = oauth_user_fixture()
+      current = Accounts.generate_user_session_token(user)
+      other = Accounts.generate_user_session_token(user)
+      current_socket_id = "users_sessions:#{Base.url_encode64(current)}"
+      other_socket_id = "users_sessions:#{Base.url_encode64(other)}"
+      YscWeb.Endpoint.subscribe(current_socket_id)
+      YscWeb.Endpoint.subscribe(other_socket_id)
+
+      assert {:ok, _} =
+               Accounts.set_user_initial_password(
+                 user,
+                 %{password: "new valid password"},
+                 keep_session_token: current
+               )
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        event: "disconnect",
+        topic: ^other_socket_id
+      }
+
+      refute_receive %Phoenix.Socket.Broadcast{
+                       event: "disconnect",
+                       topic: ^current_socket_id
+                     },
+                     100
+
+      assert Accounts.get_user_by_session_token(current).id == user.id
+      refute Accounts.get_user_by_session_token(other)
+    end
+
+    test "a failed initial password set does not disconnect LiveViews" do
+      user = oauth_user_fixture()
+      token = Accounts.generate_user_session_token(user)
+      live_socket_id = "users_sessions:#{Base.url_encode64(token)}"
+      YscWeb.Endpoint.subscribe(live_socket_id)
+
+      assert {:error, %Ecto.Changeset{}} =
+               Accounts.set_user_initial_password(user, %{
+                 password: "short"
+               })
+
+      refute_receive %Phoenix.Socket.Broadcast{
+                       event: "disconnect",
+                       topic: ^live_socket_id
+                     },
+                     100
+
+      assert Accounts.get_user_by_session_token(token).id == user.id
+    end
+
     test "a failed password change does not disconnect LiveViews" do
       user = user_fixture()
       token = Accounts.generate_user_session_token(user)
@@ -6422,6 +6494,330 @@ defmodule YscWeb.SecurityAuditTest do
 
       refute Accounts.get_user_by_session_token(token)
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 96 (MEDIUM): Capacity leftover must not persist editor HTML
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 96: capacity leftover cannot persist unsanitized event HTML" do
+    import Ysc.EventsFixtures
+
+    alias Ysc.Events
+
+    test "volunteer validate-capacity ignores rendered_details and still updates capacity",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      original_title =
+        "Finding 96 Capacity #{System.unique_integer([:positive])}"
+
+      original_html = "<p>Original overview</p>"
+
+      injected_html =
+        "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: original_title,
+          raw_details: original_html,
+          rendered_details: original_html,
+          max_attendees: 100
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      render_change(view, "validate-capacity", %{
+        "event" => %{
+          "max_attendees" => "150",
+          "title" => "Hacked Emergency Dues",
+          "rendered_details" => injected_html,
+          "raw_details" => injected_html,
+          "partiful_link" => "https://evil.example/phish"
+        }
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 150
+      assert reloaded.title == original_title
+      assert reloaded.rendered_details == original_html
+      assert reloaded.raw_details == original_html
+      assert reloaded.partiful_link in [nil, ""]
+    end
+
+    test "volunteer save-capacity ignores rendered_details and public atom feed stays clean",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+      original_title = "Finding 96 Save #{System.unique_integer([:positive])}"
+      original_html = "<p>Safe overview</p>"
+
+      injected_html =
+        "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: original_title,
+          raw_details: original_html,
+          rendered_details: original_html,
+          max_attendees: 50
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      render_submit(view, "save-capacity", %{
+        "event" => %{
+          "max_attendees" => "75",
+          "title" => "Hacked Emergency Dues",
+          "rendered_details" => injected_html,
+          "raw_details" => injected_html
+        }
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 75
+      assert reloaded.title == original_title
+      assert reloaded.rendered_details == original_html
+      assert reloaded.raw_details == original_html
+
+      feed =
+        build_conn()
+        |> get(~p"/feeds/events.atom")
+        |> response(200)
+
+      assert feed =~ original_title
+      refute feed =~ "document.cookie"
+      refute feed =~ "<script"
+      refute feed =~ "onerror="
+    end
+
+    test "volunteer validate-capacity ignores flat (non-nested) leftover HTML",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      original_title =
+        "Finding 96 Flat #{System.unique_integer([:positive])}"
+
+      original_html = "<p>Original overview</p>"
+
+      injected_html =
+        "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: original_title,
+          raw_details: original_html,
+          rendered_details: original_html,
+          max_attendees: 100
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      # LiveView events can arrive without the `event[...]` nesting used by
+      # `#capacity_form`. The catch-all must still refuse editor fields.
+      render_change(view, "validate-capacity", %{
+        "max_attendees" => "150",
+        "title" => "Hacked Emergency Dues",
+        "rendered_details" => injected_html,
+        "raw_details" => injected_html,
+        "partiful_link" => "https://evil.example/phish"
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 150
+      assert reloaded.title == original_title
+      assert reloaded.rendered_details == original_html
+      assert reloaded.raw_details == original_html
+      assert reloaded.partiful_link in [nil, ""]
+    end
+
+    test "volunteer save-capacity ignores flat leftover HTML and atom feed stays clean",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      original_title =
+        "Finding 96 Flat Save #{System.unique_integer([:positive])}"
+
+      original_html = "<p>Safe overview</p>"
+
+      injected_html =
+        "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: original_title,
+          raw_details: original_html,
+          rendered_details: original_html,
+          max_attendees: 50
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      render_submit(view, "save-capacity", %{
+        "max_attendees" => "75",
+        "title" => "Hacked Emergency Dues",
+        "rendered_details" => injected_html,
+        "raw_details" => injected_html
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 75
+      assert reloaded.title == original_title
+      assert reloaded.rendered_details == original_html
+      assert reloaded.raw_details == original_html
+
+      feed =
+        build_conn()
+        |> get(~p"/feeds/events.atom")
+        |> response(200)
+
+      assert feed =~ original_title
+      refute feed =~ "document.cookie"
+      refute feed =~ "<script"
+      refute feed =~ "onerror="
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 97 (HIGH): OAuth reauth resume tokens must be bound to the user
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 97: reauth resume tokens cannot be redeemed cross-user" do
+    test "phone-change resume for another user does not overwrite phone or name",
+         %{conn: conn} do
+      attacker =
+        user_fixture(%{first_name: "Mallory", last_name: "Attacker"})
+
+      victim =
+        user_fixture(%{
+          state: :active,
+          first_name: "Victim",
+          last_name: "Member",
+          phone_number: "+14159098268"
+        })
+
+      attacker_phone = unique_swedish_mobile()
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "user_id" => attacker.id,
+          "purpose" => "phone_change",
+          "phone" => attacker_phone,
+          "profile_params" => %{
+            "first_name" => "Hijacked",
+            "last_name" => "Identity"
+          }
+        })
+
+      conn =
+        conn
+        |> log_in_user(victim)
+        |> Plug.Conn.put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {:ok, view, _html} = live(conn, resume_path)
+
+      refute has_element?(view, "#reauth-modal")
+      refute render(view) =~ "We can&#39;t send a verification text"
+
+      reloaded = Repo.reload!(victim)
+      assert reloaded.phone_number == "+14159098268"
+      assert reloaded.first_name == "Victim"
+      assert reloaded.last_name == "Member"
+    end
+
+    test "same-user phone-change resume still applies a non-US number without OTP",
+         %{conn: conn} do
+      user =
+        user_fixture(%{
+          state: :active,
+          first_name: "Owner",
+          last_name: "Member",
+          phone_number: "+14159098268"
+        })
+
+      new_phone = unique_swedish_mobile()
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "user_id" => user.id,
+          "purpose" => "phone_change",
+          "phone" => new_phone,
+          "profile_params" => %{
+            "first_name" => user.first_name,
+            "last_name" => user.last_name
+          }
+        })
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> Plug.Conn.put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {:ok, view, _html} = live(conn, resume_path)
+
+      refute has_element?(view, "#phone_verification_form")
+      assert render(view) =~ "We can&#39;t send a verification text"
+
+      reloaded = Repo.reload!(user)
+      assert reloaded.phone_number == new_phone
+    end
+
+    test "password-change resume for another user does not skip reauth", %{
+      conn: conn
+    } do
+      attacker = user_fixture()
+      victim = user_fixture()
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings/security", %{
+          "user_id" => attacker.id,
+          "purpose" => "password_change"
+        })
+
+      conn =
+        conn
+        |> log_in_user(victim)
+        |> Plug.Conn.put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {:ok, view, html} = live(conn, resume_path)
+
+      refute html =~ "We&#39;ve confirmed it&#39;s you"
+      refute render(view) =~ "We've confirmed it's you"
+    end
+  end
+
+  defp unique_swedish_mobile do
+    suffix =
+      System.unique_integer([:positive])
+      |> rem(10_000_000)
+      |> Integer.to_string()
+      |> String.pad_leading(7, "0")
+
+    "+4670#{suffix}"
   end
 
   defp volunteer_app_conn(conn, volunteer) do

@@ -1,20 +1,17 @@
 defmodule Ysc.H2UpgradeTest do
   @moduledoc """
-  Guards the h2 0.12.3 → 0.12.4 upgrade.
+  Guards the h2 0.12.4 → 0.12.5 upgrade.
 
-  0.12.4 keeps existing streams valid after GOAWAY (RFC 9113 §6.8).
-  `goaway_sent` / `goaway_received` used to accept only `send_data`,
-  `send_data_blocking`, and `consume`, so `cancel`, `send_trailers`,
-  `send_response`, and `respond` returned `{error, unknown_request}`.
-  A received GOAWAY also failed to stick: the frame loop put an
-  acked client back in `connected`, so new requests still went out on
-  a closing connection. 0.12.4 shares one per-stream dispatcher and
-  returns `{error, goaway_received}` for new requests.
+  0.12.5 adds optional `connection_window_size` (65535..2147483647,
+  default still 65535) so clients and servers can raise the
+  connection-wide receive window. The default stays 64 KB, so nothing
+  changes unless the option is set. Invalid values return
+  `{error, {invalid_option, {connection_window_size, V}}}` from
+  `h2_connection:start_link/3,4`.
 
-  hackney 4.7.4 calls `h2_connection:cancel_stream/2` and
-  `send_trailers/3` after a peer GOAWAY; that is the path this
-  patch fixes. We do not call h2 APIs in app code. Public client
-  APIs are unchanged besides the new `goaway_received` error.
+  We do not start h2 servers. hackney 4.7.4 still calls
+  `h2_connection:start_link/4` with an empty opts map, so the default
+  64 KB window stays in effect. Public client APIs are unchanged.
   """
   use ExUnit.Case, async: false
 
@@ -46,20 +43,20 @@ defmodule Ysc.H2UpgradeTest do
     :ok
   end
 
-  describe "0.12.4 Hex lock and public APIs" do
-    test "locks the Hex package to 0.12.4" do
-      assert to_string(Application.spec(:h2, :vsn)) == "0.12.4"
+  describe "0.12.5 Hex lock and public APIs" do
+    test "locks the Hex package to 0.12.5" do
+      assert to_string(Application.spec(:h2, :vsn)) == "0.12.5"
     end
 
-    test "companion lock is 0.12.4" do
+    test "companion lock is 0.12.5" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"h2": {:hex, :h2, "0.12.4"|
-      refute lock =~ ~s|"h2": {:hex, :h2, "0.12.3"|
+      assert lock =~ ~s|"h2": {:hex, :h2, "0.12.5"|
+      refute lock =~ ~s|"h2": {:hex, :h2, "0.12.4"|
     end
 
     test "mix.exs override matches hackney and webtransport" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s|{:h2, "~> 0.12.4", override: true}|
+      assert mix_exs =~ ~s|{:h2, "~> 0.12.5", override: true}|
 
       assert File.read!(@hackney_rebar) =~ ~s|{h2, "~>0.12.0"}|
       assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.12"}|
@@ -364,6 +361,122 @@ defmodule Ysc.H2UpgradeTest do
       assert :ok = :h2.cancel(conn, stream_id)
       assert Process.alive?(conn)
       send(handler_pid, :stop)
+    end
+  end
+
+  describe "0.12.5 connection_window_size" do
+    test "changelog documents the optional window and keeps the 64 KB default" do
+      changelog = File.read!(@h2_changelog)
+
+      v0125 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.find(&String.starts_with?(&1, "[0.12.5]"))
+
+      assert v0125
+      assert v0125 =~ "connection_window_size"
+      assert v0125 =~ "Default stays 64 KB"
+      assert v0125 =~ "initial_window_size"
+      refute v0125 =~ "Breaking"
+    end
+
+    test "public types and connect opts forward connection_window_size" do
+      source = File.read!(@h2_src)
+
+      assert source =~ "connection_window_size => 65535..2147483647"
+      assert source =~ "maps:with([settings, connection_window_size], Opts)"
+
+      assert source =~
+               "maps:merge(maps:with([connection_window_size], Opts),"
+    end
+
+    test "connection source validates, grants, and refills the target window" do
+      source = File.read!(@h2_connection_src)
+
+      assert source =~
+               "{error, {invalid_option, {connection_window_size, V}}}"
+
+      assert source =~
+               "recv_conn_window_target = maps:get(connection_window_size, Opts,"
+
+      assert source =~ "grow_conn_window("
+      assert source =~ "h2_frame:window_update(0, Target - Window)"
+
+      assert source =~
+               "maybe_send_conn_window_update(_DataSize, #state{recv_conn_window_size = ConnWindow,"
+    end
+
+    test "hackney and webtransport still omit connection_window_size" do
+      assert File.read!(@hackney_conn) =~
+               ~S|h2_connection:start_link(client, Socket, self(), #{})|
+
+      refute File.read!(@hackney_conn) =~ "connection_window_size"
+      refute File.read!(@webtransport_h2) =~ "connection_window_size"
+    end
+
+    test "invalid connection_window_size values are rejected" do
+      {:module, _} = Code.ensure_loaded(:h2_connection)
+
+      {:ok, lsock} =
+        :gen_tcp.listen(0, [:binary, active: false, ip: {127, 0, 0, 1}])
+
+      try do
+        for v <- [0, 65_534, 2_147_483_648, :big] do
+          assert {:error, {:invalid_option, {:connection_window_size, ^v}}} =
+                   :h2_connection.start_link(:client, lsock, %{
+                     connection_window_size: v
+                   })
+        end
+      after
+        :gen_tcp.close(lsock)
+      end
+    end
+
+    test "a larger connection_window_size still round-trips a small body" do
+      handler = fn conn, stream_id, _method, _path, _headers ->
+        :ok =
+          :h2.send_response(conn, stream_id, 200, [
+            {<<"content-type">>, <<"text/plain">>}
+          ])
+
+        :ok = :h2.send_data(conn, stream_id, "h2-conn-window-ok", true)
+      end
+
+      {server, port} = start_h2c_server(handler)
+
+      assert {:ok, conn} =
+               :h2.connect("127.0.0.1", port, %{
+                 transport: :tcp,
+                 connection_window_size: 131_070,
+                 settings: %{initial_window_size: 131_070}
+               })
+
+      true = Process.unlink(conn)
+
+      on_exit(fn ->
+        if Process.alive?(conn) do
+          try do
+            :h2.close(conn)
+          catch
+            :exit, _ -> :ok
+          end
+        end
+
+        try do
+          :h2.stop_server(server)
+        catch
+          :exit, _ -> :ok
+        end
+      end)
+
+      assert {:ok, stream_id} =
+               :h2.request(conn, "GET", "/", [{<<"host">>, <<"127.0.0.1">>}])
+
+      assert_receive {:h2, ^conn, {:response, ^stream_id, 200, _headers}}, 2_000
+
+      assert_receive {:h2, ^conn,
+                      {:data, ^stream_id, "h2-conn-window-ok", true}},
+                     2_000
     end
   end
 

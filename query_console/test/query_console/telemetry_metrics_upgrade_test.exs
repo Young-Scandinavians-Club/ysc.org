@@ -42,11 +42,11 @@ defmodule QueryConsole.TelemetryMetricsUpgradeTest do
       assert mix_exs =~ ~s({:telemetry_metrics, "~> 1.2"})
     end
 
-    test "companion lock is 1.2.0 and finch/dns_cluster stay put" do
+    test "companion lock is 1.2.0 and dns_cluster stays put" do
       lock = File.read!(@mix_lock)
       assert lock =~ ~s|"telemetry_metrics": {:hex, :telemetry_metrics, "1.2.0"|
       refute lock =~ ~s|"telemetry_metrics": {:hex, :telemetry_metrics, "1.1.0"|
-      assert lock =~ ~s|"finch": {:hex, :finch, "0.23.0"|
+      assert lock =~ ~s|"finch": {:hex, :finch, "0.24.0"|
       assert lock =~ ~s|"dns_cluster": {:hex, :dns_cluster, "0.3.1"|
     end
 

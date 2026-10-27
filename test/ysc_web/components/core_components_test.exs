@@ -107,6 +107,137 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "confirmation_header/1" do
+    test "renders success eyebrow, title, copy, and reference" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.confirmation_header
+          id="order-confirmation-header"
+          variant={:success}
+          eyebrow="Order Confirmed"
+          title="See you at the event, Astrid!"
+          reference_label="Order number"
+          reference="YSC-ORD-1"
+        >
+          Your tickets for <strong>Midsummer</strong> are confirmed.
+        </.confirmation_header>
+        """)
+
+      assert html =~ ~s(id="order-confirmation-header")
+      assert html =~ "hero-check-circle-solid"
+      assert html =~ "text-green-600"
+      assert html =~ "type-eyebrow"
+      assert html =~ "type-display"
+      assert html =~ "Order Confirmed"
+      assert html =~ "See you at the event, Astrid!"
+      assert html =~ "Your tickets for"
+      assert html =~ "Midsummer"
+      assert html =~ "are confirmed."
+      assert html =~ "Order number"
+      assert html =~ "YSC-ORD-1"
+      assert html =~ "font-mono"
+      refute html =~ "hero-x-circle"
+      refute html =~ "text-red-600"
+    end
+
+    test "renders cancelled variant with red status icon" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.confirmation_header
+          id="booking-receipt-header"
+          variant={:cancelled}
+          eyebrow="Booking Cancelled"
+          title="Booking Cancelled"
+          reference_label="Booking Reference"
+          reference="YSC-BK-9"
+          class="custom-header"
+        >
+          Your booking at <strong>Lake Tahoe</strong> has been cancelled.
+        </.confirmation_header>
+        """)
+
+      assert html =~ ~s(id="booking-receipt-header")
+      assert html =~ "custom-header"
+      assert html =~ "hero-x-circle"
+      assert html =~ "text-red-600"
+      assert html =~ "Booking Cancelled"
+      assert html =~ "Lake Tahoe"
+      assert html =~ "has been cancelled."
+      assert html =~ "Booking Reference"
+      assert html =~ "YSC-BK-9"
+      refute html =~ "hero-check-circle-solid"
+      refute html =~ "text-green-600"
+    end
+  end
+
+  describe "upload_entry_preview/1" do
+    defp upload_preview_entry(attrs \\ []) do
+      struct!(
+        %Phoenix.LiveView.UploadEntry{
+          ref: "0",
+          upload_ref: "phx-upload",
+          client_name: "cabin.jpg",
+          client_type: "image/jpeg",
+          valid?: true
+        },
+        attrs
+      )
+    end
+
+    test "renders cancel overlay, live preview, and caption" do
+      assigns = %{entry: upload_preview_entry()}
+
+      html =
+        rendered_to_string(~H"""
+        <.upload_entry_preview
+          entry={@entry}
+          cancel="cancel-upload"
+          preview_class="group-hover:blur-sm h-[120px] w-[120px]"
+          figure_class="w-28 group relative"
+        />
+        """)
+
+      assert html =~ ~s(aria-label="cancel")
+      assert html =~ ~s(phx-click="cancel-upload")
+      assert html =~ ~s(phx-value-ref="0")
+      assert html =~ "hero-x-circle"
+      assert html =~ "group-hover:blur-sm"
+      assert html =~ "h-[120px]"
+      assert html =~ "w-28 group relative"
+      assert html =~ "data-phx-hook=\"Phoenix.LiveImgPreview\""
+      assert html =~ "cabin.jpg"
+      assert html =~ "<figcaption"
+      refute html =~ "upload-entry__cancel"
+    end
+
+    test "omits caption and forwards phx-target plus button class" do
+      assigns = %{entry: upload_preview_entry(client_name: "cover.webp")}
+
+      html =
+        rendered_to_string(~H"""
+        <.upload_entry_preview
+          entry={@entry}
+          cancel="cancel"
+          caption?={false}
+          preview_class="group-hover:blur-sm h-80 w-full"
+          button_class="upload-entry__cancel w-full"
+          phx-target="1"
+        />
+        """)
+
+      refute html =~ "<figcaption"
+      refute html =~ "cover.webp"
+      assert html =~ "upload-entry__cancel"
+      assert html =~ ~s(phx-click="cancel")
+      assert html =~ ~s(phx-target="1")
+      assert html =~ "h-80 w-full"
+    end
+  end
+
   describe "at_glance_grid/1 and at_glance_stat/1" do
     test "renders responsive grid with blue accent stat tiles" do
       assigns = %{}

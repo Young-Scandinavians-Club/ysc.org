@@ -1019,11 +1019,14 @@ defmodule Ysc.AccountsTest do
   end
 
   describe "get_user_email_identity/1" do
-    test "returns id/email/first_name without password hashes" do
+    test "returns greeting and membership-gate columns without password hashes" do
+      awarded_at = DateTime.truncate(DateTime.utc_now(), :second)
+
       user =
         user_fixture()
         |> Ecto.Changeset.change(%{
-          board_bio: "must not load this bio"
+          board_bio: "must not load this bio",
+          lifetime_membership_awarded_at: awarded_at
         })
         |> Repo.update!()
 
@@ -1037,6 +1040,12 @@ defmodule Ysc.AccountsTest do
       assert found.id == user.id
       assert found.email == user.email
       assert found.first_name == user.first_name
+      assert found.lifetime_membership_awarded_at == awarded_at
+
+      assert found.post_migration_onboarding_completed_at ==
+               user.post_migration_onboarding_completed_at
+
+      assert is_nil(found.primary_user_id)
       assert is_nil(found.hashed_password)
       assert is_nil(found.board_bio)
       assert password_cols == 0
@@ -5131,6 +5140,49 @@ defmodule Ysc.AccountsTest do
       fresh = Repo.get!(User, user.id)
       assert match?(%Ecto.Association.NotLoaded{}, fresh.subscriptions)
       assert Accounts.has_active_membership?(fresh)
+    end
+
+    test "does not re-select the users row when subscriptions are NotLoaded" do
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_noload_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      assert {:ok, _} =
+               Subscriptions.create_subscription_item(%{
+                 subscription_id: subscription.id,
+                 stripe_price_id: "price_test_noload",
+                 stripe_product_id: "prod_test_noload",
+                 stripe_id: "si_noload_#{System.unique_integer()}",
+                 quantity: 1
+               })
+
+      fresh = Repo.get!(User, user.id)
+      assert match?(%Ecto.Association.NotLoaded{}, fresh.subscriptions)
+
+      {active?, users_selects} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.has_active_membership?(fresh) end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      {_active?, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.has_active_membership?(fresh) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert active?
+      assert users_selects == 0
+      assert password_cols == 0
     end
   end
 

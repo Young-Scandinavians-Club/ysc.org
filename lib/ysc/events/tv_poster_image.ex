@@ -3,6 +3,7 @@ defmodule Ysc.Events.TvPosterImage do
   Renders TV event poster HTML to a raster image (PNG/JPEG/WebP) for preview and upload.
   """
 
+  alias Ysc.Events.EventHelpers
   alias YscWeb.Emails.Helpers
 
   @poster_width 1920
@@ -24,6 +25,32 @@ defmodule Ysc.Events.TvPosterImage do
 
     html = build_html(assigns)
     impl().capture_html(html, format: format)
+  end
+
+  @doc "Assigns used to render the TV poster for an event loaded for posters."
+  def assigns_for_event(event) do
+    %{
+      event: event,
+      event_url: Helpers.event_url(event.id),
+      asset_base_url: Helpers.origin() <> "/",
+      sold_out: EventHelpers.event_sold_out?(event),
+      selling_fast: Map.get(event, :selling_fast, false)
+    }
+  end
+
+  @doc "Download/upload filename for an event's poster, e.g. `summer-gala-tv-poster.png`."
+  def filename(event, format) do
+    slug =
+      event.title
+      |> String.downcase()
+      |> String.replace(~r/[^a-z0-9]+/u, "-")
+      |> String.trim("-")
+      |> case do
+        "" -> "event"
+        s -> s
+      end
+
+    "#{slug}-tv-poster.#{format}"
   end
 
   @doc "Supported image formats for capture."

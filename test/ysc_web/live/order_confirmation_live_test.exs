@@ -159,9 +159,11 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
       assert html =~ "Order Confirmed"
+      assert has_element?(view, "#order-confirmation-header")
+      assert has_element?(view, "#order-confirmation-header", "Order number")
     end
 
     test "prevents users from viewing other users' orders", %{conn: conn} do
@@ -891,10 +893,11 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
       assert html =~ "Order Cancelled"
       assert html =~ "Winter Gala"
+      assert has_element?(view, "#order-confirmation-header", "Order Cancelled")
     end
 
     test "cancelled order shows x-circle icon", %{conn: conn} do

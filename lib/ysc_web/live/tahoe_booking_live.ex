@@ -45,6 +45,8 @@ defmodule YscWeb.TahoeBookingLive do
   alias YscWeb.DateDisplay
   alias YscWeb.BookingDisplay
   import YscWeb.Components.CabinInfo
+  import YscWeb.Components.CabinGuest
+  alias Ysc.Bookings.CabinOverview
   import YscWeb.Components.RoomPickCard
   require Ysc.Logging
   import Ecto.Query
@@ -220,6 +222,10 @@ defmodule YscWeb.TahoeBookingLive do
         property: :tahoe,
         timezone: timezone,
         user: user_with_subs,
+        guest_overview:
+          if(is_nil(user_with_subs),
+            do: CabinOverview.for_property(:tahoe, seasons)
+          ),
         checkin_date: checkin_date,
         checkout_date: checkout_date,
         today: today,
@@ -1151,54 +1157,44 @@ defmodule YscWeb.TahoeBookingLive do
         </div>
       </section>
       <%!-- Hero Section (For non-logged-in users) --%>
-      <section
+      <.guest_hero
         :if={!@user}
-        id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh] bg-white"
+        eyebrow="YSC Member Cabin"
+        title="Tahoe Cabin"
+        subtitle="Owned and run by our community since 1993, on the quiet west shore of Lake Tahoe."
+        redirect_to={~p"/bookings/tahoe"}
       >
-        <div class="hero-media-stage">
-          <.hero_flag_grid id="tahoe-hero-flag-grid-guest" />
-          <div class="hero-media-stage__bleed" aria-hidden="true">
-            <img
-              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
-              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
-              sizes="100vw"
-              alt=""
-              loading="eager"
-              decoding="async"
-            />
-          </div>
-          <div class="hero-media-stage__inner">
-            <img
-              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
-              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
-              sizes="(max-width: 1920px) 100vw, 1920px"
-              alt="Tahoe Cabin Exterior"
-              fetchpriority="high"
-              loading="eager"
-            />
-            <div
-              class="absolute inset-0 z-5 bg-black/40 pointer-events-none"
-              aria-hidden="true"
-            >
+        <:media>
+          <div class="hero-media-stage">
+            <.hero_flag_grid id="tahoe-hero-flag-grid-guest" />
+            <div class="hero-media-stage__bleed" aria-hidden="true">
+              <img
+                src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+                srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+                sizes="100vw"
+                alt=""
+                loading="eager"
+                decoding="async"
+              />
+            </div>
+            <div class="hero-media-stage__inner">
+              <img
+                src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+                srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+                sizes="(max-width: 1920px) 100vw, 1920px"
+                alt="Tahoe Cabin Exterior"
+                fetchpriority="high"
+                loading="eager"
+              />
+              <div
+                class="absolute inset-0 z-5 bg-black/40 pointer-events-none"
+                aria-hidden="true"
+              >
+              </div>
             </div>
           </div>
-        </div>
-        <%!-- Title Text Section --%>
-        <div class="absolute bottom-0 left-0 right-0 z-10 px-4 py-12 md:py-20 pointer-events-none">
-          <div class="max-w-(--breakpoint-xl) mx-auto pointer-events-auto">
-            <p class="text-sm text-blue-400 mb-3 md:mb-4 drop-shadow-md type-eyebrow">
-              A Year-Round Retreat
-            </p>
-            <h1 class="text-4xl md:text-7xl text-white drop-shadow-lg mb-4 type-display">
-              Tahoe Cabin
-            </h1>
-            <p class="text-base md:text-xl text-zinc-100 max-w-2xl font-normal drop-shadow-md">
-              Owned and operated by our community since 1993. A beautiful cabin on the west shore of Lake Tahoe.
-            </p>
-          </div>
-        </div>
-      </section>
+        </:media>
+      </.guest_hero>
       <!-- Booking Dashboard Section -->
       <section :if={@user} class="py-8">
         <div class="max-w-(--breakpoint-xl) mx-auto px-4 space-y-10">
@@ -2549,7 +2545,7 @@ defmodule YscWeb.TahoeBookingLive do
               </p>
               <p>
                 <strong>Active stays:</strong>
-                Only one active booking is allowed per membership. You may book your next stay once your current one is completed.
+                Only one active booking is allowed per membership. You may book your next stay after you check out of your current one.
               </p>
               <p>
                 <strong>
@@ -3141,7 +3137,7 @@ defmodule YscWeb.TahoeBookingLive do
                       {BookingValidator.saturday_weekend_policy_message()}
                     </:row>
                     <:row label="Active bookings">
-                      One active booking per membership. When your current stay is completed, you can book another.
+                      One active booking per membership. After you check out of your current stay, you can book another.
                     </:row>
                     <:row label="Seasons">
                       <p :for={
@@ -3260,75 +3256,83 @@ defmodule YscWeb.TahoeBookingLive do
           </div>
         </div>
       </section>
-      <%!-- Main Content for Non-Logged-In Users --%>
+      <%!-- Main Content for Non-Logged-In Users: a short overview and a way in --%>
       <section :if={!@user} class="bg-white py-6 md:py-12">
-        <%!-- Section Header --%>
         <div class="max-w-(--breakpoint-xl) mx-auto px-4">
           <.page_masthead
             eyebrow="Since 1993"
             title="Experience Tahoe"
+            size={:compact}
             heading_tag={:h2}
           />
-        </div>
-        <%!-- Feature Grid --%>
-        <div class="max-w-(--breakpoint-xl) mx-auto px-4">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
-            <%!-- Traditional Sauna --%>
-            <.feature_card title="Traditional Sauna">
-              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                Experience the authentic Scandinavian sauna and our wood-fired fireplace. This traditional feature brings the Nordic wellness culture to the mountains, perfect for unwinding after a day on the slopes.
-              </p>
-            </.feature_card>
-            <%!-- Ski Proximity --%>
-            <.feature_card title="Ski Proximity">
-              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                <strong class="text-zinc-900">20 minutes</strong>
-                to Palisades Tahoe (site of the 1960 Winter Olympics) and Alpine Meadows. About
-                <strong class="text-zinc-900">30 minutes</strong>
-                to Northstar. World-class skiing is right at your doorstep.
-              </p>
-            </.feature_card>
-            <%!-- West Shore Magic --%>
-            <.feature_card title="West Shore Magic">
-              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                Escape the tourist traps. Our cabin offers quiet, forested living on Tahoe's pristine west shore. Experience the authentic mountain lifestyle away from the crowds.
-              </p>
-            </.feature_card>
-            <%!-- The Dugnad Spirit --%>
-            <.feature_card title="The Dugnad Spirit">
-              <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
-                <% season_id =
-                  if @checkin_date do
-                    season =
-                      Season.find_season_for_date(@seasons, @checkin_date)
-
-                    if season, do: season.id, else: nil
-                  else
-                    nil
-                  end %>
-                <% default_adult_price =
-                  get_default_adult_price(@property, season_id) %> Low rates (<strong class="text-blue-600">{MoneyHelper.format_money!(default_adult_price)}/adult</strong>) are possible because members steward the cabin together. This is <strong class="text-zinc-900">your cabin — not a hotel</strong>.
-              </p>
-            </.feature_card>
-          </div>
-          <%!-- CTA Card --%>
-          <div class="mt-12 md:mt-16 max-w-2xl mx-auto">
-            <.feature_card
-              title="Ready to Book?"
-              title_tone={:accent}
-              class="p-8 md:p-12 text-center flex flex-col items-center"
+          <.guest_highlights id="tahoe-guest-highlights" accent={:blue}>
+            <:item icon="hero-fire" title="Sauna & fireplace">
+              A traditional Scandinavian sauna and a wood-burning fireplace for winding down.
+            </:item>
+            <:item icon="hero-map-pin" title="West shore">
+              Quiet, forested living on Lake Tahoe, close to the slopes.
+            </:item>
+            <:item icon="hero-hand-raised" title="Run by members">
+              Low rates, because members look after the cabin together. Your cabin, not a hotel.
+            </:item>
+          </.guest_highlights>
+          <.info_sections id="tahoe-guest-sections" class="mt-8 md:mt-10">
+            <.info_section
+              id="tahoe-guest-stay"
+              heading_id="tahoe-guest-stay-heading"
+              title="What a stay is like"
+              description="A shared, member-run cabin where everyone helps out."
             >
-              <p class="text-base text-zinc-700 leading-relaxed mb-6">
-                Sign in to view the cabin calendar, check availability, and book your dates.
-              </p>
-              <.link
-                navigate={~p"/users/log-in?#{%{redirect_to: ~p"/bookings/tahoe"}}"}
-                class="px-8 py-3 bg-blue-600 text-white text-sm font-bold rounded-sm hover:bg-blue-700 transition-colors duration-150"
-              >
-                Sign In to Book
-              </.link>
-            </.feature_card>
-          </div>
+              <.icon_list id="tahoe-guest-stay-list">
+                <:item icon="hero-home-modern" title="Shared and homely:">
+                  individual bedrooms, a fully equipped kitchen, a wood-burning fireplace and a Scandinavian sauna.
+                </:item>
+                <:item icon="hero-sparkles" title="Bring your own:">
+                  bed linens, towels and food. Meals and linens are not provided.
+                </:item>
+                <:item icon="hero-hand-raised" title="Pitch in:">
+                  members share light chores before they leave, the spirit that keeps rates low.
+                </:item>
+                <:item icon="hero-user-group" title="Bring your people:">
+                  include everyone staying with you; non-member guests are welcome.
+                </:item>
+                <:item icon="hero-cloud" title="Winter ready:">
+                  snow is part of the charm. Carry chains, or use a 4WD with snow tires.
+                </:item>
+              </.icon_list>
+            </.info_section>
+            <.info_section
+              id="tahoe-guest-ways"
+              heading_id="tahoe-guest-ways-heading"
+              title="Ways to stay"
+              description="Rooms are priced per person, per night. The entire cabin is one flat nightly price."
+            >
+              <.guest_stay_options
+                id="tahoe-guest-stay-options"
+                property={:tahoe}
+                accent={:blue}
+                options={@guest_overview.stay_options}
+              />
+            </.info_section>
+            <.info_section
+              :if={@guest_overview.history != []}
+              id="tahoe-guest-history"
+              heading_id="tahoe-guest-history-heading"
+              title="A short history"
+              description={owned_for_label(@guest_overview)}
+            >
+              <.guest_milestones
+                id="tahoe-guest-milestones"
+                accent={:blue}
+                milestones={@guest_overview.history}
+              />
+            </.info_section>
+          </.info_sections>
+          <.guest_invite
+            id="tahoe-guest-invite"
+            accent={:blue}
+            redirect_to={~p"/bookings/tahoe"}
+          />
         </div>
       </section>
     </div>
@@ -5705,7 +5709,7 @@ defmodule YscWeb.TahoeBookingLive do
           Map.put(
             errors,
             :active_booking,
-            "Your family group can only have one active booking at a time. Please complete the existing booking first."
+            BookingValidator.one_active_booking_message()
           )
         else
           errors

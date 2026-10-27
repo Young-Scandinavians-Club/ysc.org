@@ -24,7 +24,7 @@ defmodule YscWeb.Workers.MembershipPaymentReminderWorker do
       reminder_type: reminder_type
     )
 
-    case Accounts.get_user(user_id) do
+    case Accounts.get_user_email_identity(user_id) do
       nil ->
         Ysc.Logging.warning("User not found for membership payment reminder",
           user_id: user_id,

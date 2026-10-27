@@ -33,15 +33,20 @@ defmodule QueryConsole.MixProject do
 
   defp deps do
     [
-      # 1.8.15: phoenix.js replaceTransport noops old conn handlers before
-      # close so an async transport close cannot tear down the replacement
-      # (#6852). 1.8.14: LongPoll fetch timers are cleared after success or
-      # abort (#6811); VerifiedRoutes :router must be a compile-time module;
-      # local path validation is shared. We enable longpoll on the LiveView
-      # socket (app.js longPollFallbackMs: 2500). 1.8.13: phoenix.js
-      # reconnects after Chrome freeze/resume. 1.8.10: longpoll POST timeout
-      # close-and-retry. phx.gen.auth / phx.gen.cert / phx.new unused.
-      {:phoenix, "~> 1.8.15"},
+      # 1.8.16: phoenix.js connection-handling races (#6867) and WebSocket
+      # close code 1000 is no longer special-cased (#6880). Endpoint.socket/3
+      # accepts max_channels_per_transport (default 100). We mount LiveView
+      # with websocket + longpoll (app.js longPollFallbackMs: 2500) and keep
+      # the default channel cap. Requires phoenix_pubsub ~> 2.4 (lock 2.4.1);
+      # we only start {Phoenix.PubSub, name: QueryConsole.PubSub} and do not
+      # call subscribe/broadcast ourselves. 1.8.15 replaceTransport
+      # detach-before-close is superseded by the Connection class. 1.8.14:
+      # LongPoll fetch timers are cleared after success or abort (#6811);
+      # VerifiedRoutes :router must be a compile-time module; local path
+      # validation is shared. 1.8.13: phoenix.js reconnects after Chrome
+      # freeze/resume. 1.8.10: longpoll POST timeout close-and-retry.
+      # phx.gen.auth / phx.gen.cert / phx.new unused (Tailwind stays 4.1.7).
+      {:phoenix, "~> 1.8.16"},
       # 2.2.1: ArgumentError on wrong-typed Plug.Crypto args no longer puts
       # the secret key base in the stacktrace (EEF-CVE-2026-105963 /
       # GHSA-ffw9-w85g-f2vh). Public sign/verify/encrypt/decrypt and
@@ -64,7 +69,14 @@ defmodule QueryConsole.MixProject do
       {:decimal, "~> 3.2.0", override: true},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.1.0"},
+      # 1.1.33: EEF-CVE-2026-64941 (LOW / GHSA-36m4-rm57-3prf) rejects ASCII
+      # tab, LF, CR, and encoded tab (`/%09`) in LiveView redirect /
+      # push_navigate / push_patch `:to` paths so `/\t/evil.com` cannot
+      # become a scheme-relative open redirect. lotus_web still requires
+      # `< 1.2.0`, so stay on 1.1.x. We only pass compile-time `~p` paths
+      # (`/auth/ysc`, `/workbooks/:id`); we do not forward user input to
+      # `redirect/2`.
+      {:phoenix_live_view, "~> 1.1.33"},
       # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
       # SVG and MathML on to_html/2 (mutation XSS). We use lazy_html only in
       # tests via LiveViewTest; pin the patched floor.
@@ -104,9 +116,23 @@ defmodule QueryConsole.MixProject do
       # authority-form request-target hosts with the same grammar as Host.
       # 1.13.1 reverts the 1.13.0 stale-conn check that broke Phoenix
       # Plug.Parsers error rendering. Requires Thousand Island 1.6 (peername
-      # at accept). We use Bandit.PhoenixAdapter (bandit_pid/1 for idle
-      # shutdown). Public adapter APIs are unchanged.
-      {:bandit, "~> 1.13.1"},
+      # at accept).
+      # 1.14.0: HTTP/2 receive-window enforcement (EEF-CVE-2026-108525),
+      # cookie/HPACK header-list limits (EEF-CVE-2026-109584), SETTINGS
+      # quadratic work (EEF-CVE-2026-108529), HPACK encoder table cap
+      # (EEF-CVE-2026-110499), stream-error rollback (EEF-CVE-2026-111103),
+      # HTTP/2 body-read deadline (EEF-CVE-2026-115269), HTTP/1 tiny-chunk
+      # coalescing (EEF-CVE-2026-111101), chunk-extension smuggling
+      # (EEF-CVE-2026-114216), content-length/port quadratic parse
+      # (EEF-CVE-2026-113436), WebSocket 1-byte continuations
+      # (EEF-CVE-2026-114213), WebSocket frames after close
+      # (EEF-CVE-2026-110314). Defaults: max_concurrent_streams 500,
+      # max_header_list_size 262144. HTTP/2 read_body may return more
+      # than :length (up to the stream window). We use
+      # Bandit.PhoenixAdapter (bandit_pid/1 for idle shutdown) and do
+      # not set http_2_options or call Plug.Conn.read_body ourselves.
+      # Public adapter APIs are unchanged.
+      {:bandit, "~> 1.14.0"},
       # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
       # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
       # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
@@ -114,6 +140,15 @@ defmodule QueryConsole.MixProject do
       # EEF-CVE-2026-82672. We reach mint through Finch and Req (SSO token
       # POST). Finch still lists mint ~> 1.8, so pin the patched floor.
       {:mint, "~> 1.11.0", override: true},
+      # 0.24.0: close HTTP/1 connections after request/response errors
+      # before returning them to the pool (stale Mint 1.11 refs after
+      # receive timeouts). Also HTTP QUERY method, pool_timeout wait for
+      # dynamic HTTP/2 pools, async TLS shutdown. We reach Finch only
+      # through Req.post/2 (SSO token exchange); Req starts the Req.Finch
+      # pool. We do not use :query, start_pool/3, or SSLKEYLOGFILE. No
+      # documented 0.23→0.24 breaking changes. Req lists finch ~> 0.21,
+      # so pin the floor as a direct dep like the main app.
+      {:finch, "~> 0.24.0"},
       # 0.7.5: put_aws_sigv4 drops generated Authorization / x-amz-* headers
       # before re-signing a retry; 303 See Other becomes GET except HEAD.
       # We only call Req.post/2 with json: for SSO token exchange — no

@@ -52,6 +52,12 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.leave_unpaid_checkout_confirm() =~
              "unfinished booking"
 
+    assert BookingUserMessages.leave_unpaid_checkout_confirm() =~
+             "not booked yet"
+
+    refute BookingUserMessages.leave_unpaid_checkout_confirm() =~
+             "finish payment"
+
     refute BookingUserMessages.leave_unpaid_checkout_confirm() =~
              "release these dates"
 
@@ -100,6 +106,52 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert toast =~ "Add guest names and pay"
     assert toast =~ "confirm your booking"
     refute toast =~ "Booking created"
+  end
+
+  test "receipt cabin rules reminder is property-specific packing, not Tahoe-only sheets" do
+    tahoe = BookingUserMessages.cabin_rules_receipt_reminder(:tahoe)
+    clear_lake = BookingUserMessages.cabin_rules_receipt_reminder(:clear_lake)
+
+    assert tahoe =~ "sheets, pillowcases, towels, and sleeping bags"
+    assert tahoe =~ "None are provided"
+    refute tahoe =~ "comforters"
+    refute tahoe =~ "tent"
+
+    assert clear_lake =~ "linens or camping gear"
+    assert clear_lake =~ "tent if you're camping on the lawn in summer"
+    refute clear_lake =~ "bed sheets and comforters"
+    refute clear_lake =~ "None are provided"
+
+    assert tahoe =~ "Leave the kitchen clean before you go"
+    assert clear_lake =~ "Leave the kitchen clean before you go"
+  end
+
+  test "checkout hold timer says pay now only on the paid payment step" do
+    assert BookingUserMessages.checkout_hold_timer_intro() ==
+             "These dates are held for"
+
+    guest_paid =
+      BookingUserMessages.checkout_hold_timer_next_step(:guest_info, false)
+
+    assert guest_paid =~ "Finish adding guest names, then continue to payment"
+    refute guest_paid =~ "Pay now"
+
+    guest_free =
+      BookingUserMessages.checkout_hold_timer_next_step(:guest_info, true)
+
+    assert guest_free =~ "Finish adding guest names, then confirm your booking"
+    refute guest_free =~ "Pay now"
+
+    payment_free =
+      BookingUserMessages.checkout_hold_timer_next_step(:payment, true)
+
+    assert payment_free =~ "Confirm your booking before the timer runs out"
+    refute payment_free =~ "Pay now"
+
+    payment_paid =
+      BookingUserMessages.checkout_hold_timer_next_step(:payment, false)
+
+    assert payment_paid =~ "Pay now to complete your booking"
   end
 
   test "Tahoe room minimum charge copy is about price, not a guest requirement" do
@@ -171,7 +223,31 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.checkout_cabin_access_step() =~
              BookingUserMessages.door_code_email_timing_phrase()
 
+    assert BookingUserMessages.checkout_cabin_access_step() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
     refute BookingUserMessages.checkout_cabin_access_step() =~ "24 hours"
+
+    assert BookingUserMessages.confirmation_email_door_code_notice() =~
+             "About 3 days before check-in"
+
+    assert BookingUserMessages.confirmation_email_door_code_notice() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
+    assert BookingUserMessages.confirmation_email_door_code_notice() =~
+             "View Booking Details"
+
+    assert BookingUserMessages.confirmation_email_door_code_next_step() =~
+             BookingUserMessages.door_code_email_timing_phrase()
+
+    assert BookingUserMessages.confirmation_email_door_code_next_step() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
+    refute BookingUserMessages.confirmation_email_door_code_notice() =~
+             "24 hours"
+
+    refute BookingUserMessages.confirmation_email_door_code_next_step() =~
+             "24 hours"
 
     assert BookingUserMessages.cabin_access_receipt_body() =~
              BookingUserMessages.door_code_email_timing_phrase()

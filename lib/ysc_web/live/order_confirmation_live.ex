@@ -154,65 +154,48 @@ defmodule YscWeb.OrderConfirmationLive do
       data-show-confetti={if @show_confetti, do: "true", else: "false"}
       class="py-8 lg:py-10 max-w-(--breakpoint-xl) mx-auto px-4"
     >
-      <!-- Header -->
-      <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 pb-8">
-        <div>
-          <%= if @ticket_order.status == :cancelled do %>
-            <div class="flex items-center gap-2 text-red-600 mb-2">
-              <.icon name="hero-x-circle" class="w-6 h-6" />
-              <span class="text-sm type-eyebrow">
-                Order Cancelled
-              </span>
-            </div>
-            <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
-              Order Cancelled
-            </h1>
-            <p class="text-zinc-500 mt-2 text-lg">
-              Your order for <strong>{@event.title}</strong>
-              has been cancelled.
-              <%= if @refund_data && @refund_data.total_refunded do %>
-                A refund of
-                <strong>
-                  {MoneyHelper.format_money!(@refund_data.total_refunded)}
-                </strong>
-                is on the way.
-              <% else %>
-                Refund information is shown in the payment summary on the right.
-              <% end %>
-            </p>
+      <.confirmation_header
+        id="order-confirmation-header"
+        variant={
+          if(@ticket_order.status == :cancelled, do: :cancelled, else: :success)
+        }
+        eyebrow={
+          if(@ticket_order.status == :cancelled,
+            do: "Order Cancelled",
+            else: "Order Confirmed"
+          )
+        }
+        title={
+          cond do
+            @ticket_order.status == :cancelled -> "Order Cancelled"
+            @event_in_past -> "Hope you had a blast, #{@user_first_name}!"
+            true -> "See you at the event, #{@user_first_name}!"
+          end
+        }
+        reference_label="Order number"
+        reference={@ticket_order.reference_id}
+      >
+        <%= if @ticket_order.status == :cancelled do %>
+          Your order for <strong>{@event.title}</strong>
+          has been cancelled.
+          <%= if @refund_data && @refund_data.total_refunded do %>
+            A refund of
+            <strong>
+              {MoneyHelper.format_money!(@refund_data.total_refunded)}
+            </strong>
+            is on the way.
           <% else %>
-            <div class="flex items-center gap-2 text-green-600 mb-2">
-              <.icon name="hero-check-circle-solid" class="w-6 h-6" />
-              <span class="text-sm type-eyebrow">
-                Order Confirmed
-              </span>
-            </div>
-            <h1 class="text-3xl md:text-4xl text-zinc-900 type-display">
-              <%= if @event_in_past do %>
-                Hope you had a blast, {@user_first_name}!
-              <% else %>
-                See you at the event, {@user_first_name}!
-              <% end %>
-            </h1>
-            <p class="text-zinc-500 mt-2 text-lg">
-              <%= if @event_in_past do %>
-                Thanks for coming to <strong>{@event.title}</strong>. See you at the next one!
-              <% else %>
-                Your tickets for <strong>{@event.title}</strong> are confirmed.
-                We've sent a copy of these details to your email.
-              <% end %>
-            </p>
+            Refund information is shown in the payment summary on the right.
           <% end %>
-        </div>
-        <div class="text-left md:text-right">
-          <p class="text-xs text-zinc-500 type-eyebrow">
-            Order number
-          </p>
-          <p class="font-mono text-lg font-semibold text-zinc-900 whitespace-nowrap">
-            {@ticket_order.reference_id}
-          </p>
-        </div>
-      </div>
+        <% else %>
+          <%= if @event_in_past do %>
+            Thanks for coming to <strong>{@event.title}</strong>. See you at the next one!
+          <% else %>
+            Your tickets for <strong>{@event.title}</strong> are confirmed.
+            We've sent a copy of these details to your email.
+          <% end %>
+        <% end %>
+      </.confirmation_header>
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
         <!-- Left Column: Event + Tickets -->

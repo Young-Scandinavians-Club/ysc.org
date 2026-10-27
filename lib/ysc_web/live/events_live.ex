@@ -133,26 +133,27 @@ defmodule YscWeb.EventsLive do
         </div>
       </div>
 
-      <%!-- Loading skeleton for Past Events --%>
+      <%!-- Loading skeleton for Past Events (same spacing as the loaded section so nothing shifts) --%>
       <section
         :if={!@async_data_loaded}
-        class="mt-20 md:mt-32 py-12 md:py-16 border-t border-zinc-100"
+        id="past-events-skeleton"
+        class="mt-8 md:mt-12 pt-8 md:pt-10 border-t border-zinc-100"
+        role="status"
+        aria-label="Loading past events"
       >
         <div class="max-w-(--breakpoint-xl) mx-auto px-4">
-          <div class="h-8 w-48 bg-zinc-200 rounded-sm mb-12 animate-pulse"></div>
+          <.skeleton_block class="h-8 w-48 rounded-sm mb-8" />
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <%= for _i <- 1..4 do %>
-              <div class="aspect-video rounded-xl bg-zinc-200 animate-pulse"></div>
-            <% end %>
+            <.skeleton_block :for={_ <- 1..4} class="aspect-video rounded-xl" />
           </div>
         </div>
       </section>
 
       <%!-- Memory Gallery - Past Events --%>
       <%= if @async_data_loaded && @past_events_exist do %>
-        <section class="mt-20 md:mt-32 py-12 md:py-16 border-t border-zinc-100">
+        <section class="mt-8 md:mt-12 pt-8 md:pt-10 border-t border-zinc-100">
           <div class="max-w-(--breakpoint-xl) mx-auto px-4">
-            <h2 class="text-3xl text-zinc-800 italic mb-12 group relative inline-block type-title">
+            <h2 class="text-3xl text-zinc-800 italic mb-8 group relative inline-block type-title">
               <span class="inline-block transition duration-500 ease-in-out group-hover:-translate-y-full group-hover:opacity-0">
                 {random_past_events_title()}
               </span>

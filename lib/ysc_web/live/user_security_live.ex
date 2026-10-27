@@ -283,11 +283,14 @@ defmodule YscWeb.UserSecurityLive do
   # Password params must not travel in the OAuth return URL. After OAuth, ask the
   # user to submit the password form again — session reauth is still valid.
   defp maybe_resume_oauth_reauth(socket, params) do
+    user = socket.assigns.current_user
+
     with true <- connected?(socket),
          false <- socket.assigns[:reauth_resume_handled] == true,
+         true <- not is_nil(user),
          token when is_binary(token) <- params["reauth_resume"],
          {:ok, %{"purpose" => "password_change"}} <-
-           YscWeb.ReauthResume.verify(token) do
+           YscWeb.ReauthResume.verify(token, user.id) do
       socket = assign(socket, :reauth_resume_handled, true)
 
       if reauth_still_valid?(socket) do
@@ -349,7 +352,8 @@ defmodule YscWeb.UserSecurityLive do
         # also disconnects LiveViews (Finding 95).
         Accounts.replace_user_password(user, user_params)
       else
-        # User is setting password for the first time
+        # User is setting password for the first time. Drops other sessions
+        # and disconnects LiveViews (Finding 95); trigger_submit re-logs this tab.
         Accounts.set_user_initial_password(user, user_params)
       end
 

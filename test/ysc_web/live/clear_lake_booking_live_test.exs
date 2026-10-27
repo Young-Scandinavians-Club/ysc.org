@@ -2525,6 +2525,14 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
              )
 
       assert has_element?(view, "#sleeping-at-the-cabin", "Lawn camp")
+
+      assert has_element?(
+               view,
+               "#sleeping-alert",
+               "Camp on the lawn (bring a tent) or sleep indoors with your own bedding"
+             )
+
+      refute has_element?(view, "#sleeping-alert", "your own setup")
       assert has_element?(view, "#winter-sleeping-photos")
       assert has_element?(view, "#winter-sleeping-photo-0 img")
       assert has_element?(view, "#winter-sleeping-photo-3")
@@ -2619,6 +2627,15 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert has_element?(view, "#clear-lake-water-operations")
       assert has_element?(view, "#before-you-go", "Four keys")
       assert has_element?(view, "#before-you-go", "Thursday morning sprinklers")
+      assert has_element?(view, "#before-you-go", "safe to drink from")
+
+      assert has_element?(
+               view,
+               "#clear-lake-water-operations",
+               "water operations guide"
+             )
+
+      refute has_element?(view, "#before-you-go", "potable")
 
       assert has_element?(
                view,
@@ -2638,31 +2655,17 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       refute has_element?(view, "#clear-lake-at-a-glance", "12 Guests")
     end
 
-    test "logged-out year-round card uses property season date ranges", %{
+    test "logged-out page keeps seasonal sleeping details behind sign-in", %{
       conn: conn
     } do
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
-      assert has_element?(
-               view,
-               "#clear-lake-year-round-access",
-               "Summer (May 1 – Oct 31)"
-             )
+      refute has_element?(view, "#clear-lake-year-round-access")
+      refute has_element?(view, "#sleeping-at-the-cabin")
 
-      assert has_element?(
-               view,
-               "#clear-lake-year-round-access",
-               "Winter (Nov 1 – Apr 30)"
-             )
-
-      assert has_element?(
-               view,
-               "#clear-lake-year-round-access",
-               "three rooms (queens and fulls)"
-             )
-
-      refute has_element?(view, "#clear-lake-year-round-access", "May–Sept")
-      refute has_element?(view, "#clear-lake-year-round-access", "Oct–April")
+      html = render(view)
+      refute html =~ "Summer (May 1"
+      refute html =~ "three rooms (queens and fulls)"
     end
   end
 
@@ -3081,8 +3084,75 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert :sys.get_state(view.pid).socket.assigns.booking_error_title ==
                "Sign In Required"
 
-      assert has_element?(view, "a", "Sign In to Book")
+      assert has_element?(view, "a", "Sign in to book")
       assert render(view) =~ "book your dates"
+    end
+
+    test "unauthenticated user gets a short overview and no cabin details", %{
+      conn: conn
+    } do
+      ensure_clear_lake_pricing_rules!()
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      assert has_element?(view, "#hero-section h1", "Clear Lake Cabin")
+
+      assert has_element?(
+               view,
+               "#clear-lake-guest-highlights li",
+               "Run by members"
+             )
+
+      assert has_element?(
+               view,
+               "#hero-section-sign-in[href*=\"redirect_to=%2Fbookings%2Fclear-lake\"]"
+             )
+
+      assert has_element?(
+               view,
+               "#clear-lake-guest-invite-sign-in[href*=\"redirect_to=%2Fbookings%2Fclear-lake\"]"
+             )
+
+      assert has_element?(view, "#hero-section-apply[href=\"/users/register\"]")
+
+      assert has_element?(
+               view,
+               "#clear-lake-guest-invite-apply[href=\"/users/register\"]"
+             )
+
+      assert has_element?(view, "#clear-lake-guest-stay-list")
+
+      assert has_element?(
+               view,
+               "#clear-lake-guest-stay-list",
+               "lawn camping (bring a tent) or sleeping indoors with your own bedding"
+             )
+
+      refute has_element?(
+               view,
+               "#clear-lake-guest-stay-list",
+               "your own setup"
+             )
+
+      assert has_element?(
+               view,
+               "#clear-lake-guest-stay-options-day",
+               "Shared cabin"
+             )
+
+      assert has_element?(
+               view,
+               "#clear-lake-guest-stay-options-buyout",
+               "Entire cabin"
+             )
+
+      assert has_element?(view, "#clear-lake-guest-milestones li", "1963")
+
+      # Operational details stay behind sign-in.
+      refute has_element?(view, "#clear-lake-essentials")
+      refute has_element?(view, "#information-section")
+      refute has_element?(view, "#booking-mode-form")
+      refute render(view) =~ "9325 Bass Road"
     end
 
     test "user pending board approval sees application-status CTA", %{

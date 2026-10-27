@@ -120,7 +120,13 @@ defmodule YscWeb.Feeds.AtomFeed do
   defp maybe_entry_html_content(entry, html) when html in [nil, ""], do: entry
 
   defp maybe_entry_html_content(entry, html) do
-    Entry.content(entry, html, type: "html")
+    # Public `/feeds/*.atom` is unauthenticated. Event/post bodies are stored
+    # after TrixScrubber on the editor path, but leftover LiveView events have
+    # previously persisted client HTML (Finding 40/96). Re-scrub on emit.
+    case HtmlSanitizeEx.Scrubber.scrub(html, Ysc.TrixScrubber) do
+      scrubbed when scrubbed in [nil, ""] -> entry
+      scrubbed -> Entry.content(entry, scrubbed, type: "html")
+    end
   end
 
   defp maybe_post_author(entry, post) do
