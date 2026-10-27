@@ -10,6 +10,11 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute BookingUserMessages.reservation_not_found() =~ "reservation"
 
     assert BookingUserMessages.reservation_not_found() =~ "info@ysc.org"
+
+    assert BookingUserMessages.reservation_not_found() =~
+             "already been confirmed"
+
+    refute BookingUserMessages.reservation_not_found() =~ "completed"
   end
 
   test "checkout not found message" do
@@ -20,6 +25,10 @@ defmodule YscWeb.BookingUserMessagesTest do
              "start a new booking from the cabin page"
 
     refute BookingUserMessages.checkout_not_found() =~ "reservation"
+    assert BookingUserMessages.checkout_not_found() =~ "finishing payment"
+    assert BookingUserMessages.checkout_not_found() =~ "already been confirmed"
+    refute BookingUserMessages.checkout_not_found() =~ "checking out"
+    refute BookingUserMessages.checkout_not_found() =~ "completed"
   end
 
   test "modification messages" do

@@ -3,13 +3,13 @@ defmodule YscWeb.BookingUserMessages do
 
   def reservation_not_found do
     trim("""
-    We couldn't find this booking. It may have expired, already been completed, or belong to a different account. Contact info@ysc.org if you need help.
+    We couldn't find this booking. It may have expired, already been confirmed, or belong to a different account. Contact info@ysc.org if you need help.
     """)
   end
 
   def checkout_not_found do
     trim("""
-    We couldn't find this booking. It may have expired, already been completed, or belong to a different account. If you were checking out, start a new booking from the cabin page. Contact info@ysc.org if you need help.
+    We couldn't find this booking. It may have expired, already been confirmed, or belong to a different account. If you were finishing payment, start a new booking from the cabin page. Contact info@ysc.org if you need help.
     """)
   end
 
