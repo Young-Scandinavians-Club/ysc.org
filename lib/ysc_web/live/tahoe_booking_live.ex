@@ -1370,7 +1370,7 @@ defmodule YscWeb.TahoeBookingLive do
                     Max {room_picker_max_nights(@seasons, @checkin_date)} nights
                   </:rule>
                   <:rule icon="hero-calendar-days">
-                    No Saturday check-in — Saturday stays run Fri–Sun
+                    No Saturday check-in — arrive Friday or earlier, leave Sunday or later
                   </:rule>
                   <:rule
                     :if={@selected_booking_mode != :buyout}
@@ -5550,7 +5550,7 @@ defmodule YscWeb.TahoeBookingLive do
           Map.put(
             errors,
             :availability,
-            "You cannot book the entire cabin while you have an active or future booking. Please complete or cancel your existing booking first."
+            BookingValidator.buyout_with_active_stay_message()
           )
         else
           # 2. Check for blackouts
@@ -5859,7 +5859,7 @@ defmodule YscWeb.TahoeBookingLive do
       {
         false,
         "Maximum rooms reached",
-        "Your family group has reached the maximum of 2 rooms for your #{String.capitalize("#{membership_type}")} membership. You can make a new booking once the current stay is complete (after #{formatted_date}) or if the existing booking is cancelled."
+        "Your family group has reached the maximum of 2 rooms for your #{String.capitalize("#{membership_type}")} membership. You can book again after checkout on #{formatted_date}, or if one of those bookings is cancelled."
       }
     else
       {true, nil, nil}

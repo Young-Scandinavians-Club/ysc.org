@@ -2020,7 +2020,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       All bookings must be made and paid in advance on this website.
                     </:row>
                     <:row label="Guests">
-                      Non-member guests are welcome. Include every guest in your booking.
+                      Non-member guests are welcome. Count everyone age 6 and up. Children 5 and under stay free and don't need to be included.
                     </:row>
                   </.spec_list>
                 </.info_section>
@@ -2108,7 +2108,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   members share light chores before they leave, the spirit that keeps rates low.
                 </:item>
                 <:item icon="hero-user-group" title="Bring your people:">
-                  include every guest in your booking; non-member guests are welcome.
+                  non-member guests are welcome. Count everyone age 6 and up; children 5 and under stay free and don't need to be included.
                 </:item>
               </.icon_list>
             </.info_section>

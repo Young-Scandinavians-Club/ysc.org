@@ -110,6 +110,69 @@ defmodule Ysc.AuthRateLimitTest do
       assert {:error, :rate_limited, _} = AuthRateLimit.check_identifier(e2)
     end
 
+    test "Gmail dot, plus-tag and googlemail variants share one bucket" do
+      n = System.unique_integer([:positive])
+      base = "victim#{n}"
+
+      assert :ok = AuthRateLimit.check_identifier("#{base}@gmail.com")
+
+      assert :ok =
+               AuthRateLimit.check_identifier("v.ictim#{n}+tag@googlemail.com")
+
+      assert {:error, :rate_limited, _} =
+               AuthRateLimit.check_identifier("#{base}+other@gmail.com")
+    end
+
+    test "non-Gmail local parts are not folded together" do
+      n = System.unique_integer([:positive])
+      assert :ok = AuthRateLimit.check_identifier("a.b#{n}@example.com")
+      assert :ok = AuthRateLimit.check_identifier("a.b#{n}@example.com")
+      assert :ok = AuthRateLimit.check_identifier("ab#{n}@example.com")
+    end
+
+    test "IP-scoped buckets keep an attacker from exhausting the owner's" do
+      email = "scoped_#{System.unique_integer([:positive])}@example.com"
+      attacker = unique_test_ip()
+      owner = unique_test_ip()
+
+      assert :ok = AuthRateLimit.check_identifier(email, attacker)
+      assert :ok = AuthRateLimit.check_identifier(email, attacker)
+
+      assert {:error, :rate_limited, _} =
+               AuthRateLimit.check_identifier(email, attacker)
+
+      assert :ok = AuthRateLimit.check_identifier(email, owner)
+    end
+
+    test "identifier text can't name another bucket's key" do
+      n = System.unique_integer([:positive])
+      email = "collide#{n}@example.com"
+      victim_ip = unique_test_ip()
+
+      # What a naive "<email>:ip:<ip>" key would look like if an attacker
+      # supplied it as a global identifier (e.g. the passkey `user_id` param).
+      crafted = "#{email}:ip:#{victim_ip}"
+
+      for _ <- 1..3 do
+        AuthRateLimit.check_identifier(crafted, nil, scope: "passkey_user")
+        AuthRateLimit.check_identifier(crafted)
+      end
+
+      assert :ok = AuthRateLimit.check_identifier(email, victim_ip)
+      assert :ok = AuthRateLimit.check_identifier(email)
+    end
+
+    test "scopes keep buckets separate" do
+      id = "scope_#{System.unique_integer([:positive])}"
+      assert :ok = AuthRateLimit.check_identifier(id, nil, scope: "a")
+      assert :ok = AuthRateLimit.check_identifier(id, nil, scope: "a")
+
+      assert {:error, :rate_limited, _} =
+               AuthRateLimit.check_identifier(id, nil, scope: "a")
+
+      assert :ok = AuthRateLimit.check_identifier(id, nil, scope: "b")
+    end
+
     test "returns :ok for nil identifier" do
       assert :ok = AuthRateLimit.check_identifier(nil)
     end

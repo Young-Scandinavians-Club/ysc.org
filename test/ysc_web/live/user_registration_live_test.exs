@@ -1242,5 +1242,26 @@ defmodule YscWeb.UserRegistrationLiveTest do
       assert {:error, :rate_limited, _} =
                Ysc.RegistrationRateLimit.reserve_application(ip)
     end
+
+    test "a submit rejected for an already-registered email keeps its slot", %{
+      conn: conn
+    } do
+      ip = unique_client_ip()
+      reserve_applications!(ip, Ysc.RegistrationRateLimit.ip_limit() - 1)
+      taken_email = "taken#{System.unique_integer()}@example.com"
+      _existing = Ysc.AccountsFixtures.user_fixture(%{email: taken_email})
+
+      {:ok, lv, _html} = live(%{conn | remote_ip: ip}, ~p"/users/register")
+
+      params = Map.put(@valid_params, "email", taken_email)
+      html = render_submit(lv, "save", %{"user" => params})
+
+      assert html =~ "already registered"
+
+      # Unlike a plain validation failure, the probe kept its slot, so the
+      # existence oracle is capped per IP: none is left.
+      assert {:error, :rate_limited, _} =
+               Ysc.RegistrationRateLimit.reserve_application(ip)
+    end
   end
 end

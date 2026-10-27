@@ -45,13 +45,14 @@ defmodule YscWeb.QuickbooksWebhookController do
   """
   @dialyzer {:nowarn_function, webhook: 2}
   def webhook(conn, params) do
-    Ysc.Logging.info("Received QuickBooks webhook",
-      payload: inspect(params, limit: 100)
-    )
-
     # Verify the intuit-signature header
     case verify_signature(conn) do
       :ok ->
+        # Only log the payload once it is known to come from Intuit.
+        Ysc.Logging.info("Received QuickBooks webhook",
+          payload: inspect(params, limit: 100)
+        )
+
         # Create webhook event and queue for background processing
         # We respond quickly and process asynchronously
         case create_webhook_event(params) do
@@ -82,9 +83,10 @@ defmodule YscWeb.QuickbooksWebhookController do
         end
 
       {:error, reason} ->
+        # Don't log request headers: an unauthenticated caller controls them
+        # and they can carry cookies or credentials.
         Ysc.Logging.warning("QuickBooks webhook signature verification failed",
-          reason: reason,
-          headers: inspect(conn.req_headers, limit: 20)
+          reason: reason
         )
 
         send_resp(conn, 401, "Unauthorized")

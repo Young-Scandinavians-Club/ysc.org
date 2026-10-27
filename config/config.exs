@@ -453,6 +453,18 @@ config :ysc, ChromicPDF,
 
 config :ysc, :tv_poster_image_module, Ysc.Events.TvPosterImage.Chromic
 
+# Keep one-time tokens and secrets out of Phoenix's "Parameters:" debug logs.
+config :phoenix,
+  filter_parameters: [
+    "password",
+    "token",
+    "secret",
+    # Substring match: covers verification_code (email/SMS OTP), code_verifier
+    # and the one-time mobile handoff `code`.
+    "code",
+    "client_secret"
+  ]
+
 # Ueberauth configuration
 # Provider credentials are configured at runtime in config/runtime.exs
 config :ueberauth, Ueberauth,

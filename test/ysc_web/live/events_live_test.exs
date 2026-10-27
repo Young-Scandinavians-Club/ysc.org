@@ -311,7 +311,7 @@ defmodule YscWeb.EventsLiveTest do
 
       html_before = render(view)
       count_before = past_event_card_count(html_before)
-      assert count_before == 10
+      assert count_before == 12
 
       render_click(view, "show_more_past_events")
 

@@ -69,6 +69,26 @@ defmodule Ysc.Bookings.BookingValidator do
   end
 
   @doc """
+  Copy when a member tries to book the entire Tahoe cabin while they already
+  have an active or upcoming stay.
+
+  "Finish or cancel" / "complete or cancel" sounds like unpaid checkout. The
+  existing stay is already confirmed — they can buy out after checkout, or if
+  that booking is cancelled.
+  """
+  def buyout_with_active_stay_message do
+    "You cannot book the entire cabin while you already have an active or upcoming stay. You can book the entire cabin after you check out, or if that booking is cancelled."
+  end
+
+  @doc """
+  Copy when a member tries to book Tahoe rooms while they already have the
+  entire cabin booked.
+  """
+  def rooms_while_buyout_active_message do
+    "You cannot book rooms while you already have the entire cabin booked. You can book rooms after you check out of that stay, or if it is cancelled."
+  end
+
+  @doc """
   Validates a booking changeset according to all business rules.
 
   ## Options
@@ -378,7 +398,7 @@ defmodule Ysc.Bookings.BookingValidator do
             Ecto.Changeset.add_error(
               changeset,
               :booking_mode,
-              "You cannot book the entire cabin while you already have an active or upcoming booking. Finish or cancel that booking first."
+              buyout_with_active_stay_message()
             )
           else
             changeset
@@ -389,7 +409,7 @@ defmodule Ysc.Bookings.BookingValidator do
             Ecto.Changeset.add_error(
               changeset,
               :booking_mode,
-              "You cannot book rooms while you already have the entire cabin booked. Finish or cancel that booking first."
+              rooms_while_buyout_active_message()
             )
           else
             changeset

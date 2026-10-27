@@ -61,7 +61,7 @@ defmodule YscWeb.EventsLiveLimitTest do
     assert has_element?(view, "a[href='/events/#{event.id}']", title)
   end
 
-  test "limits maximum past events to 50", %{conn: conn} do
+  test "limits maximum past events to 48", %{conn: conn} do
     organizer = user_fixture_fast()
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
@@ -93,14 +93,14 @@ defmodule YscWeb.EventsLiveLimitTest do
     {:ok, view, _html} = live(conn, ~p"/events")
     render_events_async(view)
 
-    for _ <- 1..4 do
+    for _ <- 1..3 do
       render_click(view, "show_more_past_events")
     end
 
-    assert :sys.get_state(view.pid).socket.assigns.past_events_limit == 50
+    assert :sys.get_state(view.pid).socket.assigns.past_events_limit == 48
 
     render_click(view, "show_more_past_events")
 
-    assert :sys.get_state(view.pid).socket.assigns.past_events_limit == 50
+    assert :sys.get_state(view.pid).socket.assigns.past_events_limit == 48
   end
 end

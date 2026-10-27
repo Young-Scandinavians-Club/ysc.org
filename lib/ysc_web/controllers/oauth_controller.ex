@@ -60,17 +60,20 @@ defmodule YscWeb.OAuthController do
   Works whether or not a YSC session is present (idempotent).
   """
   def logout(conn, params) do
-    case OAuth.validate_logout_request(params) do
-      {:ok, post_logout_redirect_uri} ->
-        user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
-
-        if user do
-          AuthService.log_logout(user, conn)
-        end
+    with :ok <- ensure_top_level_navigation(conn),
+         {:ok, post_logout_redirect_uri} <-
+           OAuth.validate_logout_request(params) do
+      do_logout(conn, post_logout_redirect_uri)
+    else
+      {:error, :subresource_request} ->
+        # <img>, <iframe>, fetch(), etc. from another site must not be able to
+        # sign the user out; only a real navigation (the client app redirecting
+        # the browser here) may. Leave the session alone.
+        Ysc.Logging.info("OAuth logout rejected", reason: :subresource_request)
 
         conn
-        |> UserAuth.drop_user_session()
-        |> redirect(external: post_logout_redirect_uri)
+        |> put_status(:forbidden)
+        |> text("Forbidden")
 
       {:error, reason} ->
         Ysc.Logging.info("OAuth logout rejected", reason: reason)
@@ -79,6 +82,30 @@ defmodule YscWeb.OAuthController do
         |> put_status(:bad_request)
         |> text(logout_error_message(reason))
     end
+  end
+
+  # Browsers send `Sec-Fetch-Dest: document` for top-level navigations and
+  # something else (`image`, `iframe`, `empty`, ...) for subresource loads.
+  # Clients that send no Fetch Metadata header are not browsers we can classify,
+  # so they are allowed.
+  defp ensure_top_level_navigation(conn) do
+    case get_req_header(conn, "sec-fetch-dest") do
+      [] -> :ok
+      ["document"] -> :ok
+      _ -> {:error, :subresource_request}
+    end
+  end
+
+  defp do_logout(conn, post_logout_redirect_uri) do
+    user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
+
+    if user do
+      AuthService.log_logout(user, conn)
+    end
+
+    conn
+    |> UserAuth.drop_user_session()
+    |> redirect(external: post_logout_redirect_uri)
   end
 
   @doc """

@@ -801,6 +801,32 @@ defmodule YscWeb.UserSessionControllerTest do
     end
   end
 
+  describe "POST /users/log-in with malformed params" do
+    test "missing user params redirect instead of crashing", %{conn: conn} do
+      conn = post(conn, ~p"/users/log-in", %{})
+      assert redirected_to(conn) == ~p"/users/log-in"
+    end
+
+    test "non-string email or password redirect instead of crashing", %{
+      conn: conn
+    } do
+      conn =
+        post(conn, ~p"/users/log-in", %{
+          "user" => %{"email" => %{"a" => "b"}, "password" => ["x"]}
+        })
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Invalid"
+    end
+
+    test "missing password redirects", %{conn: conn} do
+      conn =
+        post(conn, ~p"/users/log-in", %{"user" => %{"email" => "a@b.com"}})
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+    end
+  end
+
   describe "GET /users/log-in/reset-attempts" do
     test "clears failed login attempts and redirects to login", %{conn: conn} do
       conn =

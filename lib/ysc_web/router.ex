@@ -772,7 +772,9 @@ defmodule YscWeb.Router do
   scope "/webhooks", YscWeb do
     pipe_through [:api]
 
-    post "/quickbooks", QuickbooksWebhookController, :webhook
+    # Unauthenticated until the controller verifies the signature, so keep the
+    # request params out of Phoenix's router log.
+    post "/quickbooks", QuickbooksWebhookController, :webhook, log: false
     post "/ses", SesWebhookController, :webhook
   end
 
@@ -782,7 +784,7 @@ defmodule YscWeb.Router do
   scope "/webhooks", YscWeb do
     pipe_through [:api, :printful_webhook_rate_limit]
 
-    post "/printful/:token", PrintfulWebhookController, :handle
+    post "/printful/:token", PrintfulWebhookController, :handle, log: false
   end
 
   # FlowRoute callback URLs are configured per-type in the FlowRoute portal
@@ -802,18 +804,22 @@ defmodule YscWeb.Router do
 
     post "/flowroute/:token/sms",
          FlowrouteWebhookController,
-         :handle_inbound_sms
+         :handle_inbound_sms,
+         log: false
 
     post "/flowroute/:token/mms",
          FlowrouteWebhookController,
-         :handle_inbound_sms
+         :handle_inbound_sms,
+         log: false
 
     post "/flowroute/:token/sms_dlr",
          FlowrouteWebhookController,
-         :handle_delivery_receipt
+         :handle_delivery_receipt,
+         log: false
 
     post "/flowroute/:token/mms_dlr",
          FlowrouteWebhookController,
-         :handle_delivery_receipt
+         :handle_delivery_receipt,
+         log: false
   end
 end

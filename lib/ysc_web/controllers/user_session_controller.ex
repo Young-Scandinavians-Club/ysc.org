@@ -91,11 +91,17 @@ defmodule YscWeb.UserSessionController do
   end
 
   # sobelow_skip ["XSS.SendResp"]
-  defp create(conn, %{"user" => user_params} = params, info) do
-    %{"email" => email, "password" => password} = user_params
-
-    # Per-identifier rate limit (credential stuffing: slow down attacks on one account)
-    case Ysc.AuthRateLimit.check_identifier(email) do
+  defp create(
+         conn,
+         %{"user" => %{"email" => email, "password" => password} = user_params} =
+           params,
+         info
+       )
+       when is_binary(email) and is_binary(password) do
+    # Per-identifier rate limit (credential stuffing: slow down attacks on one
+    # account), scoped to this client IP so it can't be used to lock the real
+    # owner out.
+    case Ysc.AuthRateLimit.check_identifier(email, conn.remote_ip) do
       :ok ->
         do_create(conn, params, info, user_params, email, password)
 
@@ -113,6 +119,15 @@ defmodule YscWeb.UserSessionController do
         |> send_resp(429, body)
         |> halt()
     end
+  end
+
+  # Missing or non-string email/password (hand-crafted or malformed form post).
+  defp create(conn, _params, _info) do
+    conn
+    |> YscWeb.Flash.put_toast(:error, "Invalid email or password",
+      title: "Login"
+    )
+    |> redirect(to: ~p"/users/log-in")
   end
 
   defp do_create(conn, params, info, user_params, email, password) do
@@ -401,7 +416,9 @@ defmodule YscWeb.UserSessionController do
         )
 
       %{"user_id" => user_id} when is_binary(user_id) and user_id != "" ->
-        case Ysc.AuthRateLimit.check_identifier(user_id) do
+        case Ysc.AuthRateLimit.check_identifier(user_id, nil,
+               scope: "passkey_user"
+             ) do
           :ok ->
             conn
             |> YscWeb.Flash.put_toast(:error, "Invalid login request.",
@@ -509,7 +526,7 @@ defmodule YscWeb.UserSessionController do
     require Ysc.Logging
 
     # Per-identifier rate limit (token is unique per login attempt)
-    case Ysc.AuthRateLimit.check_identifier(token) do
+    case Ysc.AuthRateLimit.check_identifier(token, nil, scope: "login_token") do
       :ok ->
         do_passkey_login_with_token(
           conn,
