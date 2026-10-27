@@ -63,6 +63,43 @@ defmodule YscWeb.FeedControllerTest do
       refute body =~ "<strong>"
       refute body =~ "<br>"
     end
+
+    test "scrubs stored script tags from post body HTML", %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+      url_name = "feed-scrub-#{System.unique_integer([:positive])}"
+      marker = "atom-post-scrub-#{System.unique_integer([:positive])}"
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Scrub Feed Post",
+            "preview_text" => "Preview line",
+            "raw_body" => "<p>#{marker}</p>",
+            "rendered_body" => "<p>#{marker}</p>",
+            "url_name" => url_name,
+            "state" => "published",
+            "published_on" => DateTime.utc_now() |> DateTime.truncate(:second)
+          },
+          admin
+        )
+
+      # Leftover LiveView events have previously persisted client HTML
+      # (Finding 40/96). Bypass the editor scrubber the same way.
+      post
+      |> Ecto.Changeset.change(%{
+        rendered_body:
+          "<p>#{marker}</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+      })
+      |> Ysc.Repo.update!()
+
+      body = get(conn, ~p"/feeds/posts.atom") |> response(200)
+
+      assert body =~ "Scrub Feed Post"
+      assert body =~ marker
+      # Atomex entity-encodes HTML content; feed readers decode then render.
+      refute body =~ "&lt;script"
+      refute body =~ "onerror="
+    end
   end
 
   describe "GET /feeds/events.atom" do

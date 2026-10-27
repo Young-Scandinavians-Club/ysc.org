@@ -6546,6 +6546,100 @@ defmodule YscWeb.SecurityAuditTest do
       refute feed =~ "<script"
       refute feed =~ "onerror="
     end
+
+    test "volunteer validate-capacity ignores flat (non-nested) leftover HTML",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      original_title =
+        "Finding 96 Flat #{System.unique_integer([:positive])}"
+
+      original_html = "<p>Original overview</p>"
+
+      injected_html =
+        "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: original_title,
+          raw_details: original_html,
+          rendered_details: original_html,
+          max_attendees: 100
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      # LiveView events can arrive without the `event[...]` nesting used by
+      # `#capacity_form`. The catch-all must still refuse editor fields.
+      render_change(view, "validate-capacity", %{
+        "max_attendees" => "150",
+        "title" => "Hacked Emergency Dues",
+        "rendered_details" => injected_html,
+        "raw_details" => injected_html,
+        "partiful_link" => "https://evil.example/phish"
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 150
+      assert reloaded.title == original_title
+      assert reloaded.rendered_details == original_html
+      assert reloaded.raw_details == original_html
+      assert reloaded.partiful_link in [nil, ""]
+    end
+
+    test "volunteer save-capacity ignores flat leftover HTML and atom feed stays clean",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      original_title =
+        "Finding 96 Flat Save #{System.unique_integer([:positive])}"
+
+      original_html = "<p>Safe overview</p>"
+
+      injected_html =
+        "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: original_title,
+          raw_details: original_html,
+          rendered_details: original_html,
+          max_attendees: 50
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      render_submit(view, "save-capacity", %{
+        "max_attendees" => "75",
+        "title" => "Hacked Emergency Dues",
+        "rendered_details" => injected_html,
+        "raw_details" => injected_html
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 75
+      assert reloaded.title == original_title
+      assert reloaded.rendered_details == original_html
+      assert reloaded.raw_details == original_html
+
+      feed =
+        build_conn()
+        |> get(~p"/feeds/events.atom")
+        |> response(200)
+
+      assert feed =~ original_title
+      refute feed =~ "document.cookie"
+      refute feed =~ "<script"
+      refute feed =~ "onerror="
+    end
   end
 
   defp volunteer_app_conn(conn, volunteer) do
