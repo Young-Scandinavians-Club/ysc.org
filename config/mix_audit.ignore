@@ -1,4 +1,4 @@
-# cowlib still has open EEF advisories; no patched Hex release yet. Revisit by 2026-08-28.
+# cowlib still has open EEF advisories; no patched Hex release yet. Revisit by 2026-11-06 (keep in sync with the hex ignore_advisories note in mix.exs).
 EEF-CVE-2026-43966
 EEF-CVE-2026-43969
 CVE-2026-43966

@@ -10,8 +10,10 @@ defmodule Ysc.RegistrationRateLimit do
   `reserve_application/1` takes a slot before the application is saved, and
   `release_application/1` gives it back if the application isn't created.
   So only successful applications count: a person applies once, and submits
-  that fail validation (e.g. a typo or an email already in use) don't use up
-  the limit.
+  that fail validation (e.g. a typo or weak password) don't use up the limit.
+  The exception is a submit rejected because the email already has an account:
+  the form tells the applicant so, which makes it an account-existence oracle,
+  so that failure keeps its slot and probing addresses is capped per IP.
 
   One counter per IP and clock hour holds the number of slots taken. A
   reservation adds one to it with an atomic ETS increment and gets a slot

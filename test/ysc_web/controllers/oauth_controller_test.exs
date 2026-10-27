@@ -141,6 +141,35 @@ defmodule YscWeb.OAuthControllerTest do
       refute get_session(conn, :user_token)
     end
 
+    test "ignores subresource requests so other sites can't force a sign-out",
+         %{conn: conn} do
+      admin = user_fixture(%{role: :admin, state: :active})
+
+      for dest <- ["image", "iframe", "empty", "script"] do
+        conn =
+          conn
+          |> log_in_user(admin)
+          |> put_req_header("sec-fetch-dest", dest)
+          |> get(logout_path())
+
+        assert response(conn, 403)
+        assert get_session(conn, :user_token)
+      end
+    end
+
+    test "accepts a top-level navigation", %{conn: conn} do
+      admin = user_fixture(%{role: :admin, state: :active})
+
+      conn =
+        conn
+        |> log_in_user(admin)
+        |> put_req_header("sec-fetch-dest", "document")
+        |> get(logout_path())
+
+      assert redirected_to(conn, 302) == @post_logout_redirect_uri
+      refute get_session(conn, :user_token)
+    end
+
     test "works when already logged out", %{conn: conn} do
       conn = get(conn, logout_path())
       assert redirected_to(conn, 302) == @post_logout_redirect_uri
