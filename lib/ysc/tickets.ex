@@ -1378,35 +1378,37 @@ defmodule Ysc.Tickets do
         # checks. `Ticket.changeset/2` is for buying tickets; using it here
         # silently left tickets confirmed after a Stripe refund when the event
         # had already started (the #1341 cancel-and-refund modal) or the
-        # purchaser's membership had lapsed. `Repo.update` errors were also
-        # dropped by `Enum.each`, so the transaction still returned `:ok`.
-        Enum.each(tickets_to_refund, fn ticket ->
-          case ticket
-               |> Ticket.status_changeset(%{status: :cancelled})
-               |> Repo.update() do
-            {:ok, _ticket} ->
-              :ok
+        # purchaser's membership had lapsed.
+        #
+        # One `update_all` matches `do_cancel_ticket_order/3`. The WHERE keeps
+        # the status-changeset skip of purchase validations and refuses to
+        # cancel rows that raced into expired/cancelled. A count mismatch
+        # rolls the transaction back instead of returning `:ok` after a
+        # partial cancel (the old `Enum.each` + `Repo.update` path dropped
+        # changeset errors the same way).
+        now = DateTime.utc_now()
+        refund_ids = Enum.map(tickets_to_refund, & &1.id)
 
-            {:error, changeset} ->
-              Repo.rollback(changeset)
-          end
-        end)
+        {count, _} =
+          ticket_order.id
+          |> cancel_refundable_tickets_query(refund_ids)
+          |> Repo.update_all(set: [status: :cancelled, updated_at: now])
 
-        # Check if all tickets in the order are now cancelled
+        if count != length(refund_ids) do
+          Repo.rollback(:ticket_refund_conflict)
+        end
+
         remaining_tickets =
-          from(t in Ticket,
-            where: t.ticket_order_id == ^ticket_order.id,
-            where: t.status in [:confirmed, :pending]
-          )
+          ticket_order.id
+          |> refundable_tickets_on_order_query()
           |> Repo.aggregate(:count, :id)
 
-        # Update ticket order status if all tickets are refunded
         updated_order =
           if remaining_tickets == 0 do
             case ticket_order
                  |> TicketOrder.status_changeset(%{
                    status: :cancelled,
-                   cancelled_at: DateTime.utc_now(),
+                   cancelled_at: now,
                    cancellation_reason: reason
                  })
                  |> Repo.update() do
@@ -1799,6 +1801,21 @@ defmodule Ysc.Tickets do
     from(t in Ticket,
       where: t.ticket_order_id == ^ticket_order_id,
       preload: [:ticket_tier]
+    )
+  end
+
+  defp refundable_tickets_on_order_query(ticket_order_id) do
+    from(t in Ticket,
+      where: t.ticket_order_id == ^ticket_order_id,
+      where: t.status in [:confirmed, :pending]
+    )
+  end
+
+  defp cancel_refundable_tickets_query(ticket_order_id, ticket_ids) do
+    from(t in Ticket,
+      where: t.ticket_order_id == ^ticket_order_id,
+      where: t.status in [:confirmed, :pending],
+      where: t.id in ^ticket_ids
     )
   end
 
@@ -3842,6 +3859,17 @@ defmodule Ysc.Tickets do
   @doc false
   def ci_query_explain_order_tickets_for_refund_query do
     order_tickets_for_refund_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_refundable_tickets_on_order_query do
+    refundable_tickets_on_order_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_cancel_refundable_tickets_query do
+    ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
+    cancel_refundable_tickets_query(ulid, [ulid])
   end
 
   @doc false
