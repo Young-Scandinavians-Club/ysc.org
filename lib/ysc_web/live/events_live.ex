@@ -9,6 +9,10 @@ defmodule YscWeb.EventsLive do
   alias Ysc.Events.EventListCache
   alias YscWeb.DateDisplay
 
+  # Multiples of 12 fill complete rows in both the 2- and 4-column grids.
+  @past_events_page_size 12
+  @past_events_max 48
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -203,7 +207,7 @@ defmodule YscWeb.EventsLive do
               </div>
             </div>
 
-            <%= if @past_events_limit < 50 && @has_more_past_events do %>
+            <%= if @past_events_limit < @past_events_max && @has_more_past_events do %>
               <div class="text-center mt-12">
                 <.button phx-click="show_more_past_events" class="px-8 py-3">
                   Show More Past Events
@@ -229,7 +233,8 @@ defmodule YscWeb.EventsLive do
       )
       |> assign(:total_upcoming_count, 0)
       |> assign(:past_events_exist, false)
-      |> assign(:past_events_limit, 10)
+      |> assign(:past_events_limit, @past_events_page_size)
+      |> assign(:past_events_max, @past_events_max)
       |> assign(:has_more_past_events, false)
       |> assign(:async_data_loaded, false)
       |> assign(:event_list_cache_version, 0)
@@ -412,12 +417,11 @@ defmodule YscWeb.EventsLive do
   @impl true
   def handle_event("show_more_past_events", _params, socket) do
     current_limit = socket.assigns.past_events_limit
-    # Increase by 10, max 50
-    new_limit = min(current_limit + 10, 50)
+    new_limit = min(current_limit + @past_events_page_size, @past_events_max)
     past_events = Events.list_past_events(new_limit)
     # Check if there are more events beyond the new limit
     has_more_past_events =
-      if length(past_events) == new_limit && new_limit < 50 do
+      if length(past_events) == new_limit && new_limit < @past_events_max do
         Events.has_more_past_events?(new_limit)
       else
         false
