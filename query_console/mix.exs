@@ -116,9 +116,23 @@ defmodule QueryConsole.MixProject do
       # authority-form request-target hosts with the same grammar as Host.
       # 1.13.1 reverts the 1.13.0 stale-conn check that broke Phoenix
       # Plug.Parsers error rendering. Requires Thousand Island 1.6 (peername
-      # at accept). We use Bandit.PhoenixAdapter (bandit_pid/1 for idle
-      # shutdown). Public adapter APIs are unchanged.
-      {:bandit, "~> 1.13.1"},
+      # at accept).
+      # 1.14.0: HTTP/2 receive-window enforcement (EEF-CVE-2026-108525),
+      # cookie/HPACK header-list limits (EEF-CVE-2026-109584), SETTINGS
+      # quadratic work (EEF-CVE-2026-108529), HPACK encoder table cap
+      # (EEF-CVE-2026-110499), stream-error rollback (EEF-CVE-2026-111103),
+      # HTTP/2 body-read deadline (EEF-CVE-2026-115269), HTTP/1 tiny-chunk
+      # coalescing (EEF-CVE-2026-111101), chunk-extension smuggling
+      # (EEF-CVE-2026-114216), content-length/port quadratic parse
+      # (EEF-CVE-2026-113436), WebSocket 1-byte continuations
+      # (EEF-CVE-2026-114213), WebSocket frames after close
+      # (EEF-CVE-2026-110314). Defaults: max_concurrent_streams 500,
+      # max_header_list_size 262144. HTTP/2 read_body may return more
+      # than :length (up to the stream window). We use
+      # Bandit.PhoenixAdapter (bandit_pid/1 for idle shutdown) and do
+      # not set http_2_options or call Plug.Conn.read_body ourselves.
+      # Public adapter APIs are unchanged.
+      {:bandit, "~> 1.14.0"},
       # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
       # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
       # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
