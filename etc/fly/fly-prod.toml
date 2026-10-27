@@ -76,6 +76,7 @@ S3_USE_CUSTOM_DOMAIN = 'true'
 STRIPE_FAMILY_PRICE_ID = 'price_1TP6efIZd8GkARoBVD9zY8ux'
 STRIPE_SINGLE_PRICE_ID = 'price_1TP6f0IZd8GkARoByyICLSbm'
 SES_AWS_REGION = 'us-west-1'
+SNS_TOPIC_ARN = 'arn:aws:sns:us-west-1:202235431647:ses-newsletter-events'
 STRIPE_TERMINAL_LOCATION_ID = 'tml_GonQeAKQKx98zu'
 
 [http_service]
