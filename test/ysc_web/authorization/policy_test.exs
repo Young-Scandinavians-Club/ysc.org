@@ -1119,7 +1119,7 @@ defmodule YscWeb.Authorization.PolicyTest do
     end
   end
 
-  describe "event_faq policies" do
+  describe "faq_question policies" do
     setup do
       %{
         admin: user_fixture(%{role: "admin"}),
@@ -1127,25 +1127,25 @@ defmodule YscWeb.Authorization.PolicyTest do
       }
     end
 
-    test "admin can manage event FAQs", %{admin: admin} do
-      assert :ok = Policy.authorize(:event_faq_create, admin)
-      assert :ok = Policy.authorize(:event_faq_update, admin)
-      assert :ok = Policy.authorize(:event_faq_delete, admin)
+    test "admin can manage FAQ questions", %{admin: admin} do
+      assert :ok = Policy.authorize(:faq_question_create, admin)
+      assert :ok = Policy.authorize(:faq_question_update, admin)
+      assert :ok = Policy.authorize(:faq_question_delete, admin)
     end
 
-    test "anyone can read event FAQs", %{member: member} do
-      assert :ok = Policy.authorize(:event_faq_read, member)
+    test "anyone can read FAQ questions", %{member: member} do
+      assert :ok = Policy.authorize(:faq_question_read, member)
     end
 
-    test "member cannot manage event FAQs", %{member: member} do
+    test "member cannot manage FAQ questions", %{member: member} do
       assert {:error, :unauthorized} =
-               Policy.authorize(:event_faq_create, member)
+               Policy.authorize(:faq_question_create, member)
 
       assert {:error, :unauthorized} =
-               Policy.authorize(:event_faq_update, member)
+               Policy.authorize(:faq_question_update, member)
 
       assert {:error, :unauthorized} =
-               Policy.authorize(:event_faq_delete, member)
+               Policy.authorize(:faq_question_delete, member)
     end
   end
 
@@ -1746,8 +1746,28 @@ defmodule YscWeb.Authorization.PolicyTest do
 
     test "nil user can create public resources" do
       assert :ok = Policy.authorize(:user_create, nil)
-      assert :ok = Policy.authorize(:booking_create, nil)
       assert :ok = Policy.authorize(:contact_form_create, nil)
+    end
+
+    test "nil user cannot create records that need an account" do
+      for action <- [
+            :booking_create,
+            :ticket_order_create,
+            :comment_create,
+            :expense_report_create,
+            :payment_method_create,
+            :bank_account_create
+          ] do
+        assert {:error, :unauthorized} = Policy.authorize(action, nil)
+      end
+    end
+
+    test "any signed-in user can create records that need an account" do
+      member = user_fixture(%{role: "member"})
+
+      for action <- [:booking_create, :ticket_order_create, :comment_create] do
+        assert :ok = Policy.authorize(action, member)
+      end
     end
 
     test "nil user cannot perform actions requiring authentication" do
