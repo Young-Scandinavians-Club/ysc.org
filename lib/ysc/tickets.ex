@@ -1381,22 +1381,41 @@ defmodule Ysc.Tickets do
         # purchaser's membership had lapsed.
         #
         # One `update_all` matches `do_cancel_ticket_order/3`. The WHERE keeps
-        # the status-changeset skip of purchase validations and refuses to
-        # cancel rows that raced into expired/cancelled. A count mismatch
-        # rolls the transaction back instead of returning `:ok` after a
-        # partial cancel (the old `Enum.each` + `Repo.update` path dropped
-        # changeset errors the same way).
+        # the status-changeset skip of purchase validations and skips rows that
+        # raced into expired/cancelled. Callers are Stripe-first, so a count
+        # shortfall must **not** roll the transaction back: that would undo
+        # cancels of sibling tickets whose shares were already refunded and
+        # leave them live (#1727). Keep every cancel we applied; ids that
+        # raced away are already non-refundable.
+        # Test-only race injection (process-local; see tickets_test).
+        if hook = Process.get(:ysc_refund_tickets_after_fetch) do
+          hook.(tickets_to_refund)
+        end
+
         now = DateTime.utc_now()
         refund_ids = Enum.map(tickets_to_refund, & &1.id)
 
-        {count, _} =
+        {count, cancelled_ids} =
           ticket_order.id
           |> cancel_refundable_tickets_query(refund_ids)
+          |> select([t], t.id)
           |> Repo.update_all(set: [status: :cancelled, updated_at: now])
 
         if count != length(refund_ids) do
-          Repo.rollback(:ticket_refund_conflict)
+          require Ysc.Logging
+
+          Ysc.Logging.warning(
+            "Ticket refund cancel matched fewer rows than fetched (concurrent cancel)",
+            ticket_order_id: ticket_order.id,
+            fetched: length(refund_ids),
+            cancelled: count
+          )
         end
+
+        cancelled_id_set = MapSet.new(cancelled_ids)
+
+        cancelled_tickets =
+          Enum.filter(tickets_to_refund, &MapSet.member?(cancelled_id_set, &1.id))
 
         remaining_tickets =
           ticket_order.id
@@ -1421,7 +1440,7 @@ defmodule Ysc.Tickets do
 
         %{
           refund_amount: refund_amount,
-          refunded_tickets: tickets_to_refund,
+          refunded_tickets: cancelled_tickets,
           ticket_order: updated_order
         }
       end)
