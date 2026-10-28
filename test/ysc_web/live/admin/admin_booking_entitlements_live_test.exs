@@ -66,6 +66,7 @@ defmodule YscWeb.AdminBookingEntitlementsLiveTest do
 
       refute html =~ "Loading entitlements…"
       assert html =~ "Deferred Member"
+      assert has_element?(view, "#grant-entitlement-card-org")
       assert has_element?(view, "#grant-entitlement-form-org")
     end
 

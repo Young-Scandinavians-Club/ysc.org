@@ -271,6 +271,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, redirect_to)
 
+      assert has_element?(view, "#grant-entitlement-card")
       assert has_element?(view, "#grant-entitlement-form")
 
       assert has_element?(

@@ -142,9 +142,9 @@ defmodule YscWeb.AdminPostEditorLive do
         <span class="sr-only">Loading post…</span>
         <.skeleton_block class="h-9 w-64 rounded-sm" />
         <.skeleton_block class="h-5 w-40 rounded-sm" />
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
+        <.admin_form_card padding={:comfortable} class="space-y-4">
           <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded-sm" />
-        </div>
+        </.admin_form_card>
       </div>
 
       <.form
