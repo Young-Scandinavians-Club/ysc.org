@@ -112,6 +112,33 @@ defmodule Ysc.Tickets.DisplayTest do
     end
   end
 
+  describe "order_item_count_label/1" do
+    test "counts event tickets for a paid order" do
+      tickets = [
+        %{ticket_tier: %{type: :paid, name: "GA"}},
+        %{ticket_tier: %{type: :paid, name: "GA"}}
+      ]
+
+      assert Display.order_item_count_label(tickets) == "2 Tickets"
+    end
+
+    test "labels a donation-only order as donations, not tickets" do
+      tickets = [%{ticket_tier: %{type: :donation, name: "Donation"}}]
+
+      assert Display.order_item_count_label(tickets) == "1 Donation"
+    end
+
+    test "splits mixed ticket and donation orders" do
+      tickets = [
+        %{ticket_tier: %{type: :paid, name: "GA"}},
+        %{ticket_tier: %{type: :paid, name: "GA"}},
+        %{ticket_tier: %{type: :donation, name: "Donation"}}
+      ]
+
+      assert Display.order_item_count_label(tickets) == "2 Tickets · 1 Donation"
+    end
+  end
+
   describe "order_status_label/1" do
     test "matches ticket order vocabulary used on My Tickets" do
       assert Display.order_status_label(:completed) == "Paid"

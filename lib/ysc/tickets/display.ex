@@ -6,6 +6,8 @@ defmodule Ysc.Tickets.Display do
   history, ledger descriptions, and similar summaries.
   """
 
+  alias Ysc.Events.TicketTierHelpers
+
   @default_tier_name "General Admission"
 
   @doc """
@@ -108,6 +110,31 @@ defmodule Ysc.Tickets.Display do
 
   defp cancelled?(%{status: :cancelled}), do: true
   defp cancelled?(_), do: false
+
+  @doc """
+  Short count of event tickets vs donations for the Your Tickets list.
+
+  Donations are not event tickets, so a donation-only order says
+  `"1 Donation"` rather than `"1 Ticket"`.
+  """
+  def order_item_count_label(tickets) when is_list(tickets) do
+    donation_count = Enum.count(tickets, &TicketTierHelpers.donation_ticket?/1)
+    ticket_count = length(tickets) - donation_count
+
+    cond do
+      ticket_count > 0 and donation_count > 0 ->
+        "#{count_noun(ticket_count, "Ticket")} · #{count_noun(donation_count, "Donation")}"
+
+      donation_count > 0 ->
+        count_noun(donation_count, "Donation")
+
+      true ->
+        count_noun(ticket_count, "Ticket")
+    end
+  end
+
+  defp count_noun(1, word), do: "1 #{word}"
+  defp count_noun(count, word), do: "#{count} #{word}s"
 
   @doc """
   Member-facing label for an individual ticket's status.

@@ -4,6 +4,7 @@ defmodule YscWeb.TicketQrLive do
   require Ysc.Logging
 
   alias Ysc.Tickets
+  alias Ysc.Events.TicketTierHelpers
   alias Ysc.Scanning.QrToken
   alias Ysc.AppleWallet
   alias Ysc.GoogleWallet
@@ -420,7 +421,10 @@ defmodule YscWeb.TicketQrLive do
   end
 
   def handle_async(:load_ticket_data, {:ok, :no_confirmed_tickets}, socket) do
-    {:noreply, push_navigate(socket, to: socket.assigns.return_to)}
+    {:noreply,
+     socket
+     |> put_flash(:error, no_check_in_tickets_flash())
+     |> push_navigate(to: socket.assigns.return_to)}
   end
 
   def handle_async(:load_ticket_data, {:ok, data}, socket) do
@@ -526,9 +530,13 @@ defmodule YscWeb.TicketQrLive do
     end
   end
 
+  defp no_check_in_tickets_flash do
+    "This doesn't include tickets for check-in. Donations and unconfirmed tickets can't be used at the door."
+  end
+
   defp tickets_for_qr_display(tickets) do
     tickets
-    |> Enum.reject(&donation_ticket?/1)
+    |> Enum.filter(&TicketTierHelpers.check_in_ticket?/1)
     |> Enum.map(&ticket_to_qr_card/1)
   end
 
@@ -551,12 +559,6 @@ defmodule YscWeb.TicketQrLive do
       qr_token: QrToken.sign_ticket(ticket.id)
     }
   end
-
-  defp donation_ticket?(%{ticket_tier: %{type: type}})
-       when type in [:donation, "donation"],
-       do: true
-
-  defp donation_ticket?(_), do: false
 
   defp safe_return_to(path)
        when is_binary(path) and byte_size(path) > 0 do

@@ -4,6 +4,7 @@ defmodule YscWeb.OrderConfirmationLive do
   require Ysc.Logging
 
   alias Ysc.Events.DateTimeFormatter
+  alias Ysc.Events.TicketTierHelpers
   alias YscWeb.DateDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
@@ -480,7 +481,10 @@ defmodule YscWeb.OrderConfirmationLive do
                 else: "Payment Summary"}
             </h3>
             <div class="space-y-3 text-sm">
-              <div class="flex justify-between">
+              <div
+                :if={active_non_donation_ticket_count(@ticket_order.tickets) > 0}
+                class="flex justify-between"
+              >
                 <span class="text-zinc-500">Tickets</span>
                 <span
                   id="order-confirmation-payment-ticket-count"
@@ -500,6 +504,18 @@ defmodule YscWeb.OrderConfirmationLive do
                       </span>
                     <% end %>
                   <% end %>
+                </span>
+              </div>
+              <div
+                :if={active_donation_count(@ticket_order.tickets) > 0}
+                class="flex justify-between"
+              >
+                <span class="text-zinc-500">Donations</span>
+                <span
+                  id="order-confirmation-payment-donation-count"
+                  class="font-medium text-zinc-900"
+                >
+                  {active_donation_count(@ticket_order.tickets)}
                 </span>
               </div>
               <% total_discount =
@@ -630,7 +646,8 @@ defmodule YscWeb.OrderConfirmationLive do
           </div>
           <!-- Actions: one primary check-in QR, one secondary -->
           <div class="space-y-3">
-            <%= if @ticket_order.status != :cancelled do %>
+            <%= if @ticket_order.status != :cancelled and
+                    TicketTierHelpers.has_check_in_tickets?(@ticket_order.tickets) do %>
               <.button
                 id="order-confirmation-checkin-qr"
                 navigate={~p"/tickets/#{@ticket_order.id}/qr" <> "?return_to=/orders/#{@ticket_order.id}/confirmation"}
@@ -678,6 +695,13 @@ defmodule YscWeb.OrderConfirmationLive do
     |> length()
   end
 
+  defp active_donation_count(tickets) do
+    tickets
+    |> Enum.filter(&donation_ticket?/1)
+    |> Enum.reject(&(&1.status == :cancelled))
+    |> length()
+  end
+
   defp order_items_section_title(tickets) do
     ticket_count = non_donation_ticket_count(tickets)
     donation_count = length(tickets) - ticket_count
@@ -689,10 +713,7 @@ defmodule YscWeb.OrderConfirmationLive do
     end
   end
 
-  defp donation_ticket?(ticket) do
-    ticket.ticket_tier.type == "donation" ||
-      ticket.ticket_tier.type == :donation
-  end
+  defp donation_ticket?(ticket), do: TicketTierHelpers.donation_ticket?(ticket)
 
   defp ticket_discount_percentage(discount, tier_price) do
     if Money.positive?(tier_price) do

@@ -5,7 +5,9 @@ defmodule YscWeb.UserTicketsLive do
   import YscWeb.Live.AsyncHelpers
   import Ysc.MoneyHelper, only: [format_price: 1]
 
+  alias Ysc.Events.TicketTierHelpers
   alias Ysc.Tickets
+  alias Ysc.Tickets.Display
   alias Ysc.Tickets.DonationDisplay
 
   @impl true
@@ -97,14 +99,12 @@ defmodule YscWeb.UserTicketsLive do
                     <.icon name="hero-calendar" class="w-4 h-4 text-teal-600" />
                     {format_date(ticket_order.event.start_date)}
                   </div>
-                  <div class="flex items-center gap-1.5">
+                  <div
+                    id={"order-item-count-#{ticket_order.id}"}
+                    class="flex items-center gap-1.5"
+                  >
                     <.icon name="hero-ticket" class="w-4 h-4 text-teal-600" />
-                    {length(ticket_order.tickets)} Ticket{if length(
-                                                               ticket_order.tickets
-                                                             ) !=
-                                                               1,
-                                                             do: "s",
-                                                             else: ""}
+                    {Display.order_item_count_label(ticket_order.tickets)}
                   </div>
                 </div>
 
@@ -163,7 +163,7 @@ defmodule YscWeb.UserTicketsLive do
                         </p>
                         <div class="mt-3 pt-3 border-t border-zinc-50 flex justify-between items-center">
                           <span class="text-xs text-teal-600 type-eyebrow">
-                            {Ysc.Tickets.Display.ticket_status_label(ticket.status)}
+                            {Display.ticket_status_label(ticket.status)}
                           </span>
                           <span class="text-xs font-bold text-zinc-900">
                             <%= case ticket.ticket_tier.type do %>
@@ -194,11 +194,11 @@ defmodule YscWeb.UserTicketsLive do
                     <div class="flex items-center gap-2">
                       <.link
                         :if={
-                          Enum.any?(
-                            ticket_order.tickets,
-                            &(&1.status == :confirmed)
+                          TicketTierHelpers.has_check_in_tickets?(
+                            ticket_order.tickets
                           )
                         }
+                        id={"show-checkin-tickets-#{ticket_order.id}"}
                         navigate={
                           ~p"/tickets/#{ticket_order.id}/qr?return_to=/users/tickets"
                         }
