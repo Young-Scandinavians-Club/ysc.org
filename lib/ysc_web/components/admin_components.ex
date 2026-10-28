@@ -4550,6 +4550,7 @@ defmodule YscWeb.AdminComponents do
 
   Renders nothing when `show?` is false (e.g. when the result list is empty).
   """
+  attr :id, :string, default: nil
   attr :title, :string, required: true
   attr :show?, :boolean, default: true
 
@@ -4557,7 +4558,7 @@ defmodule YscWeb.AdminComponents do
 
   def admin_magic_search_section(assigns) do
     ~H"""
-    <div :if={@show?} class="p-2">
+    <div :if={@show?} id={@id} class="p-2">
       <div class="px-3 py-2 text-xs text-zinc-500 type-eyebrow">
         {@title}
       </div>

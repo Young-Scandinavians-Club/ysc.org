@@ -33,23 +33,45 @@ defmodule Ysc.Search do
   Each category is a slim `select: struct` load (name/title/reference only).
   Do not JOIN full `users` / `events` / `posts` rows — the dropdown never
   renders password hashes, bios, or body HTML.
-  """
-  def global_search(search_term, limit \\ 5)
 
-  def global_search(search_term, limit)
-      when is_binary(search_term) and search_term != "" do
+  Finding 98: pass `role: :volunteer` so the dashboard typeahead does not
+  return Users or Bookings — those pages are full-admin-only (`ensure_full_admin`),
+  but the dropdown previously rendered member emails, cabin property, and
+  stay dates to volunteers.
+
+  The second argument may be a limit integer (`global_search(term, 5)`) or
+  a keyword list (`global_search(term, limit: 5, role: :volunteer)`).
+  """
+  def global_search(search_term, opts \\ [])
+
+  def global_search(search_term, limit) when is_integer(limit) do
+    global_search(search_term, limit: limit)
+  end
+
+  def global_search(search_term, opts)
+      when is_binary(search_term) and search_term != "" and is_list(opts) do
     search_like = "%#{search_term}%"
+    limit = Keyword.get(opts, :limit, 5)
+    include_full_admin_categories? = Keyword.get(opts, :role) != :volunteer
 
     %{
       events: search_events(search_term, search_like, limit),
       posts: search_posts(search_term, search_like, limit),
       tickets: search_tickets(search_term, search_like, limit),
-      users: search_users(search_term, search_like, limit),
-      bookings: search_bookings(search_term, search_like, limit)
+      users:
+        if(include_full_admin_categories?,
+          do: search_users(search_term, search_like, limit),
+          else: []
+        ),
+      bookings:
+        if(include_full_admin_categories?,
+          do: search_bookings(search_term, search_like, limit),
+          else: []
+        )
     }
   end
 
-  def global_search(_search_term, _limit),
+  def global_search(_search_term, _opts),
     do: %{events: [], posts: [], tickets: [], users: [], bookings: []}
 
   defp search_events(search_term, search_like, limit) do
