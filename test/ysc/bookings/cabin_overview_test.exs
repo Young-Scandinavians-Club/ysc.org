@@ -132,6 +132,61 @@ defmodule Ysc.Bookings.CabinOverviewTest do
       assert option(overview, :room).rate == Money.new(45, :USD)
     end
 
+    test "season-specific buyout beats a cheaper year-round rule" do
+      # Tahoe buyout is summer-only. A cheaper year-round row must not become
+      # the public "from" rate — guests actually pay the summer-specific amount.
+      create_rule(%{
+        property: :tahoe,
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        amount: Money.new(45, :USD)
+      })
+
+      create_rule(%{
+        property: :tahoe,
+        booking_mode: :buyout,
+        price_unit: :buyout_fixed,
+        amount: Money.new(300, :USD)
+      })
+
+      create_rule(%{
+        property: :tahoe,
+        booking_mode: :buyout,
+        price_unit: :buyout_fixed,
+        amount: Money.new(425, :USD),
+        season_id: season(:tahoe, "Summer").id
+      })
+
+      overview = CabinOverview.for_property(:tahoe, seasons(:tahoe))
+      buyout = option(overview, :buyout)
+
+      assert buyout.rate == Money.new(425, :USD)
+      refute buyout.year_round?
+      assert [%{name: "Summer", span: "May–October"}] = buyout.seasons
+    end
+
+    test "season-specific children rate beats year-round for the from price" do
+      create_rule(%{
+        property: :tahoe,
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        amount: Money.new(45, :USD),
+        children_amount: Money.new(25, :USD)
+      })
+
+      create_rule(%{
+        property: :tahoe,
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        amount: Money.new(45, :USD),
+        children_amount: Money.new(10, :USD),
+        season_id: season(:tahoe, "Summer").id
+      })
+
+      overview = CabinOverview.for_property(:tahoe, seasons(:tahoe))
+      assert option(overview, :room).children_rate == Money.new(10, :USD)
+    end
+
     test "omits a stay type with no pricing rule" do
       create_rule(%{
         property: :tahoe,
