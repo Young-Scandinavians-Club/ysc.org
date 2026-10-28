@@ -55,6 +55,52 @@ defmodule YscWeb.Authorization.Policy.ChecksTest do
     end
   end
 
+  describe "own_resource/2 for self and creator" do
+    test "a user owns their own user record" do
+      user = user_fixture()
+      assert Checks.own_resource(user, user)
+    end
+
+    test "a user does not own somebody else's user record" do
+      user = user_fixture()
+      refute Checks.own_resource(user, user_fixture())
+    end
+
+    test "returns true when the user created the record" do
+      user = user_fixture()
+      assert Checks.own_resource(user, %{created_by_id: user.id})
+      assert Checks.own_resource(user, %{created_by_id: user.id}, %{})
+    end
+
+    test "returns false when somebody else created the record" do
+      user = user_fixture()
+      refute Checks.own_resource(user, %{created_by_id: user_fixture().id})
+    end
+
+    test "a record created by the user but owned by another still matches" do
+      user = user_fixture()
+
+      assert Checks.own_resource(user, %{
+               user_id: "someone-else",
+               created_by_id: user.id
+             })
+    end
+  end
+
+  describe "authenticated/2" do
+    test "is true for any signed-in user, whatever the role" do
+      for role <- ["member", "volunteer", "admin"] do
+        assert Checks.authenticated(user_fixture(%{role: role}), %{})
+        assert Checks.authenticated(user_fixture(%{role: role}), %{}, %{})
+      end
+    end
+
+    test "is false for anonymous callers" do
+      refute Checks.authenticated(nil, %{})
+      refute Checks.authenticated(nil, %{}, %{})
+    end
+  end
+
   describe "role/3" do
     test "returns true when user's role matches the required role" do
       admin = user_fixture(%{role: "admin"})
