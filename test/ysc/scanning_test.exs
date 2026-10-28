@@ -222,7 +222,7 @@ defmodule Ysc.ScanningTest do
   end
 
   describe "fetch_membership_checkin_session/2" do
-    test "returns preloaded session when access is allowed" do
+    test "returns session with event when access is allowed" do
       owner = user_fixture(%{role: "admin"})
       event = event_fixture(%{organizer_id: owner.id})
       session = event_membership_session_fixture(event, owner)
@@ -232,7 +232,80 @@ defmodule Ysc.ScanningTest do
 
       assert loaded.id == session.id
       assert loaded.event.id == event.id
-      assert loaded.created_by.id == owner.id
+      assert loaded.created_by == nil
+    end
+
+    test "preload: false skips event and user lookups" do
+      owner = user_fixture(%{role: "admin"})
+
+      event =
+        event_fixture(%{organizer_id: owner.id, title: "Desk Event Title"})
+
+      session = event_membership_session_fixture(event, owner)
+
+      events_pattern = ~r/FROM "events"/i
+      users_pattern = ~r/FROM "users"/i
+
+      {{:ok, loaded}, event_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Scanning.fetch_membership_checkin_session(session.id, owner.id,
+              preload: false
+            )
+          end,
+          pattern: events_pattern,
+          caller_pids: [self()]
+        )
+
+      {_result, user_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Scanning.fetch_membership_checkin_session(session.id, owner.id,
+              preload: false
+            )
+          end,
+          pattern: users_pattern,
+          caller_pids: [self()]
+        )
+
+      assert event_queries == 0
+      assert user_queries == 0
+      assert loaded.id == session.id
+      assert loaded.name == session.name
+      assert loaded.event == nil
+      assert loaded.created_by == nil
+    end
+
+    test "default preload loads event in one extra query and skips created_by" do
+      owner = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+
+      events_pattern = ~r/FROM "events"/i
+      users_pattern = ~r/FROM "users"/i
+
+      {{:ok, loaded}, event_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Scanning.fetch_membership_checkin_session(session.id, owner.id)
+          end,
+          pattern: events_pattern,
+          caller_pids: [self()]
+        )
+
+      {_result, user_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Scanning.fetch_membership_checkin_session(session.id, owner.id)
+          end,
+          pattern: users_pattern,
+          caller_pids: [self()]
+        )
+
+      assert event_queries == 1
+      assert user_queries == 0
+      assert loaded.event.id == event.id
+      assert loaded.created_by == nil
     end
 
     test "denies another admin access to a closed event_membership session" do

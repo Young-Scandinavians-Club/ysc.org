@@ -53,6 +53,16 @@ defmodule Ysc.Scanning do
   @scan_record_ticket_fields [:id, :reference_id]
   # Scanner session lists only render event title and creator name.
   @session_event_fields [:id, :title]
+  # Membership desk chrome + auth. Omits timestamps; `created_by` is never
+  # rendered on that LiveView, and `event` is loaded only after connect.
+  @membership_desk_session_fields [
+    :id,
+    :name,
+    :type,
+    :event_id,
+    :created_by_id,
+    :closed_at
+  ]
 
   # --- Session Management ---
 
@@ -120,20 +130,43 @@ defmodule Ysc.Scanning do
   end
 
   @doc """
-  Loads an `event_membership` check-in session with associations when access is allowed.
+  Loads an `event_membership` check-in session when access is allowed.
 
-  Combines authorization and preload in a single database round-trip.
+  Selects only the desk columns (`id`, `name`, `type`, event/creator ids,
+  `closed_at`). Pass `preload: false` to skip the event title lookup — the
+  disconnected LiveView mount uses this so first paint does not wait on
+  `events` / `users`. The connected mount passes `preload: true` (the default)
+  to load `event`. `created_by` is never preloaded; the desk never renders it.
   """
-  def fetch_membership_checkin_session(session_id, user_id) do
-    case Repo.get(ScanSession, session_id) |> preload_session_assocs() do
+  def fetch_membership_checkin_session(session_id, user_id, opts \\ []) do
+    preload? = Keyword.get(opts, :preload, true)
+
+    case Repo.one(membership_checkin_session_query(session_id)) do
       %ScanSession{} = session ->
         case authorize_membership_checkin_session(session, user_id) do
-          :ok -> {:ok, session}
+          :ok -> {:ok, put_membership_desk_assocs(session, preload?)}
           error -> error
         end
 
       nil ->
         {:error, :not_found}
+    end
+  end
+
+  defp membership_checkin_session_query(session_id) do
+    from(s in ScanSession,
+      where: s.id == ^session_id,
+      select: struct(s, ^@membership_desk_session_fields)
+    )
+  end
+
+  defp put_membership_desk_assocs(session, preload?) do
+    session = %{session | created_by: nil}
+
+    if preload? do
+      Repo.preload(session, event: session_event_query())
+    else
+      %{session | event: nil}
     end
   end
 
@@ -1536,6 +1569,11 @@ defmodule Ysc.Scanning do
       Ysc.Ci.QueryExplain.Fixtures.ulid(),
       nil
     )
+  end
+
+  @doc false
+  def ci_query_explain_membership_checkin_session_query do
+    membership_checkin_session_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false
