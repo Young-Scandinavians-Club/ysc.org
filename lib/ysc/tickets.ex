@@ -1415,7 +1415,10 @@ defmodule Ysc.Tickets do
         cancelled_id_set = MapSet.new(cancelled_ids)
 
         cancelled_tickets =
-          Enum.filter(tickets_to_refund, &MapSet.member?(cancelled_id_set, &1.id))
+          Enum.filter(
+            tickets_to_refund,
+            &MapSet.member?(cancelled_id_set, &1.id)
+          )
 
         remaining_tickets =
           ticket_order.id
