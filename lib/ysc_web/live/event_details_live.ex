@@ -7335,10 +7335,13 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   defp pacific_event_datetime(date, %Time{} = time) do
-    date
-    |> event_calendar_date()
-    |> DateTime.new!(time, "America/Los_Angeles")
-    |> DateTime.shift_zone!("Etc/UTC")
+    case event_calendar_date(date) do
+      %Date{} = calendar_date ->
+        YscWeb.TimeZone.at_utc(calendar_date, time)
+
+      nil ->
+        raise ArgumentError, "missing event calendar date"
+    end
   end
 
   defp calculate_total_price(
