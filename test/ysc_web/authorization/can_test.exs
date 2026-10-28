@@ -1,4 +1,4 @@
-defmodule YscWeb.AuthorizationTest do
+defmodule YscWeb.Authorization.CanTest do
   use Ysc.DataCase, async: true
 
   import Ysc.AccountsFixtures
