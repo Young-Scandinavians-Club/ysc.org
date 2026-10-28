@@ -28,16 +28,7 @@ defmodule Ysc.MixProject do
           # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
           # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
           "EEF-CVE-2026-95105",
-          "EEF-CVE-2026-94206",
-          # hackney 4.7.4: patched in 4.8.6+/4.9.1, which also require h2 0.12.5,
-          # webtransport 0.4.8, certifi 2.18, and quic 2.x. App HTTP uses Req;
-          # hackney is transitive (ex_aws, stripity_stripe). Revisit with the
-          # h2 0.12.5 bump. Requires Hex >= 2.5.1-dev.
-          "EEF-CVE-2026-112880",
-          "EEF-CVE-2026-97200",
-          "EEF-CVE-2026-115700",
-          "EEF-CVE-2026-115693",
-          "EEF-CVE-2026-113440"
+          "EEF-CVE-2026-94206"
         ]
       ],
       test_coverage: [
@@ -192,7 +183,26 @@ defmodule Ysc.MixProject do
       {:decimal, "~> 3.2.0", override: true},
       # ex_aws 2.7+ and stripity_stripe 3.3+ require hackney 4.x; tzdata still lists ~> 1.17
       # and its Hackney adapter expects the 1.x body/ref API. See Ysc.Tzdata.HttpClient.
-      # webtransport 0.4.5 pins h2 ~> 0.12; hackney 4.7.4 needs h2 ~> 0.12.0 — override below.
+      # App HTTP uses Req (ExAws.Request.Req, Ysc.Stripe.HttpClient,
+      # Ysc.Tzdata.HttpClient). We do not call hackney APIs, pin cacerts,
+      # follow redirects with basic_auth, use proxy_auth_fun, HTTP/3, or
+      # WebTransport. 4.8.x is pooling / HTTP/2 / HTTP/3 correctness plus
+      # h2 0.12.5, certifi 2.18.0 (drops compromised eMudhra CAs),
+      # webtransport 0.4.8, and quic 2.1.2. 4.9.1 is docs-only over 4.9.0.
+      # 4.9.0: max_body_size (default 512 MiB, also as 1.x max_body) stops
+      # unbounded buffered / auto_decompress bodies with
+      # {error, body_too_large} (EEF-CVE-2026-97200 HIGH); cacerts /
+      # cacertfile actually restrict trust (EEF-CVE-2026-115693 CRITICAL);
+      # redirects keep basic_auth/cookie only on same scheme+host+port
+      # unless location_trusted (EEF-CVE-2026-113440 MEDIUM); percent-
+      # encoded bracketed IPv6 and trailing-dot IP literals are refused
+      # like other IP literals (EEF-CVE-2026-115700 MEDIUM); proxy_auth_fun
+      # values with CR/LF/NUL return
+      # {error, {proxy_auth_error, invalid_header}} (EEF-CVE-2026-112880
+      # LOW). Also HTTPS CONNECT proxy cert checks, requester-side pool
+      # dials, and max_per_host slot accounting. Requires webtransport
+      # ~> 0.4.8, certifi ~> 2.18.0, quic ~> 2.1.2, h2 ~> 0.12.5.
+      {:hackney, "~> 4.9.1", override: true},
       # 0.12.0: serve_socket/2 for embedders that own the TLS listener; handshake
       # now runs in the per-connection process. We do not start h2 servers;
       # hackney talks to h2_connection client APIs only, so those are unused.
@@ -212,10 +222,10 @@ defmodule Ysc.MixProject do
       # 0.12.5: optional connection_window_size (65535..2147483647,
       # default still 65535) raises the connection receive window via
       # a stream-0 WINDOW_UPDATE after SETTINGS. We do not start h2
-      # servers; hackney start_link/4 still passes #{}, so the default
-      # 64 KB window stays in effect. Invalid values return
-      # {error, {invalid_option, {connection_window_size, V}}}.
-      {:hackney, "~> 4.7", override: true},
+      # servers. hackney 4.9.1 now passes connection_window_size =>
+      # 32 MiB (and initial_window_size 8 MiB) so HTTP/2 downloads
+      # over slow links are not stuck at 64 KB/RTT. Invalid values
+      # return {error, {invalid_option, {connection_window_size, V}}}.
       {:h2, "~> 0.12.5", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
