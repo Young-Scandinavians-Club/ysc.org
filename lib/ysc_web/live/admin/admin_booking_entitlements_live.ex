@@ -197,10 +197,11 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
           Outstanding member benefits
         </.admin_page_title>
 
-        <div class="rounded-lg border border-zinc-200 p-4 bg-white max-w-4xl">
-          <h2 class="text-sm text-zinc-800 mb-3 type-subhead">
-            Grant new benefit
-          </h2>
+        <.admin_form_card
+          id="grant-entitlement-card-org"
+          title="Grant new benefit"
+          class="max-w-4xl"
+        >
           <.form
             for={@entitlement_form}
             id="grant-entitlement-form-org"
@@ -233,7 +234,7 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
               Grant benefit & email member
             </.button>
           </.form>
-        </div>
+        </.admin_form_card>
 
         <div class="flex flex-wrap gap-2 items-center">
           <span class="text-sm text-zinc-600">Property:</span>

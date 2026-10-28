@@ -2527,6 +2527,79 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_form_card
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Bordered white card for admin forms and inset content panels.
+
+  Unlike `admin_table_card`, padding is on the card itself — there is no
+  header bar or overflow wrapper. Use this for grant forms, editor loading
+  skeletons, and similar short panels.
+
+  - `padding={:compact}` — `p-4` (grant forms)
+  - `padding={:comfortable}` — `p-6` (loading skeletons)
+
+  ## Examples
+
+      <.admin_form_card id="grant-benefit-card" title="Grant new benefit" class="max-w-4xl">
+        <.form for={@form} id="grant-entitlement-form" phx-submit="grant">
+          ...
+        </.form>
+      </.admin_form_card>
+
+      <.admin_form_card padding={:comfortable} class="space-y-4">
+        <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded-sm" />
+      </.admin_form_card>
+  """
+  attr :id, :string, default: nil
+  attr :title, :string, default: nil
+
+  attr :title_level, :integer,
+    default: 2,
+    values: [2, 3],
+    doc:
+      "Heading level for `title` (`h2` on index pages, `h3` in nested panels)"
+
+  attr :padding, :atom,
+    default: :compact,
+    values: [:compact, :comfortable]
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the card"
+
+  slot :inner_block, required: true
+
+  def admin_form_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "rounded-lg border border-zinc-200 bg-white",
+        @padding == :compact && "p-4",
+        @padding == :comfortable && "p-6",
+        @class
+      ]}
+    >
+      <h2
+        :if={@title && @title_level == 2}
+        class="text-sm text-zinc-800 mb-3 type-subhead"
+      >
+        {@title}
+      </h2>
+      <h3
+        :if={@title && @title_level == 3}
+        class="text-sm text-zinc-800 mb-3 type-subhead"
+      >
+        {@title}
+      </h3>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_list_empty_state
   # ---------------------------------------------------------------------------
 

@@ -63,9 +63,9 @@ defmodule YscWeb.AdminUserDetailsLive do
         <div class="flex flex-wrap gap-2">
           <.skeleton_block :for={_ <- 1..8} class="h-9 w-24 rounded-full" />
         </div>
-        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
+        <.admin_form_card padding={:comfortable} class="space-y-4">
           <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded-sm" />
-        </div>
+        </.admin_form_card>
       </div>
       <div :if={!@loading_user_detail?} class="flex flex-col justify-between py-6">
         <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
@@ -659,10 +659,11 @@ defmodule YscWeb.AdminUserDetailsLive do
                 ).
               </p>
 
-              <div class="rounded-lg border border-zinc-200 p-4 bg-white">
-                <h3 class="text-sm text-zinc-800 mb-3 type-subhead">
-                  Grant new benefit
-                </h3>
+              <.admin_form_card
+                id="grant-entitlement-card"
+                title="Grant new benefit"
+                title_level={3}
+              >
                 <.form
                   for={@entitlement_form}
                   id="grant-entitlement-form"
@@ -679,7 +680,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     Grant benefit & email member
                   </.button>
                 </.form>
-              </div>
+              </.admin_form_card>
 
               <div class="overflow-x-auto rounded-lg border border-zinc-200">
                 <table class="min-w-full text-sm">

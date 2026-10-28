@@ -55,9 +55,9 @@ defmodule YscWeb.AdminEventsNewLive do
           <div class="flex flex-wrap gap-2">
             <.skeleton_block :for={_ <- 1..5} class="h-9 w-24 rounded-full" />
           </div>
-          <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
+          <.admin_form_card padding={:comfortable} class="space-y-4">
             <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded-sm" />
-          </div>
+          </.admin_form_card>
         </div>
 
         <div :if={!@loading_event?}>

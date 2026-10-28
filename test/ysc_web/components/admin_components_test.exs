@@ -660,6 +660,66 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_form_card/1" do
+    test "renders compact padded card with h2 title" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_form_card
+          id="grant-entitlement-card-org"
+          title="Grant new benefit"
+          class="max-w-4xl"
+        >
+          <form id="grant-entitlement-form-org"></form>
+        </.admin_form_card>
+        """)
+
+      assert html =~ ~s(id="grant-entitlement-card-org")
+      assert html =~ ~s(id="grant-entitlement-form-org")
+      assert html =~ "Grant new benefit"
+      assert html =~ "rounded-lg border border-zinc-200 bg-white"
+      assert html =~ "p-4"
+      assert html =~ "max-w-4xl"
+      assert html =~ ~s(<h2 class="text-sm text-zinc-800 mb-3 type-subhead")
+      refute html =~ "<h3"
+    end
+
+    test "renders nested h3 title when title_level is 3" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_form_card title="Grant new benefit" title_level={3}>
+          <form id="grant-entitlement-form"></form>
+        </.admin_form_card>
+        """)
+
+      assert html =~ ~s(<h3 class="text-sm text-zinc-800 mb-3 type-subhead")
+      assert html =~ "Grant new benefit"
+      refute html =~ "<h2"
+    end
+
+    test "renders comfortable padding without a title for loading skeletons" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_form_card padding={:comfortable} class="space-y-4">
+          <div id="skeleton-row"></div>
+        </.admin_form_card>
+        """)
+
+      assert html =~ ~s(id="skeleton-row")
+      assert html =~ "p-6"
+      assert html =~ "space-y-4"
+      refute html =~ "p-4"
+      refute html =~ "Grant new benefit"
+      refute html =~ "<h2"
+      refute html =~ "<h3"
+    end
+  end
+
   describe "admin_clipboard_button/1" do
     test "icon variant renders compact clipboard control" do
       assigns = %{}
