@@ -31,7 +31,7 @@ defmodule Ysc.GooglePhotos.PosterSyncDevStubTest do
     event = event_fixture()
     assert PosterAlbums.has_items?(event.id)
 
-    assert {:ok, _} = Events.cancel_event(event)
+    assert {:ok, _} = Events.cancel_event(event, actor: :system)
     refute PosterAlbums.has_items?(event.id)
   end
 
@@ -46,7 +46,7 @@ defmodule Ysc.GooglePhotos.PosterSyncDevStubTest do
     event = event_fixture()
     assert PosterAlbums.has_items?(event.id)
 
-    assert {:ok, draft} = Events.unpublish_event(event)
+    assert {:ok, draft} = Events.unpublish_event(event, actor: :system)
     assert draft.state == :draft
     refute PosterAlbums.has_items?(event.id)
   end

@@ -34,7 +34,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           <h3 class="text-lg type-subhead">Ticket Tiers</h3>
           <div class="flex items-center">
             <.button
-              :if={@admin_role == :admin}
+              :if={can?(@admin_role, :ticket_tier_create)}
               id={"add-ticket-tier-btn-#{@event_id}"}
               phx-click="open-add-ticket-tier-modal"
               phx-target={@myself}
@@ -76,7 +76,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           class="text-center py-8 text-zinc-500"
         >
           <p class="font-semibold">No ticket tiers created yet.</p>
-          <p :if={@admin_role == :admin} class="text-sm">
+          <p :if={can?(@admin_role, :ticket_tier_create)} class="text-sm">
             Click "Add Ticket Tier" to create your first ticket tier.
           </p>
         </div>
@@ -206,12 +206,12 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
                 <div class="flex justify-end pt-4 lg:pt-0 border-t lg:border-t-0 border-zinc-100">
                   <.row_actions_dropdown
-                    :if={@admin_role == :admin}
+                    :if={can?(@admin_role, :ticket_tier_update)}
                     id={"ticket-tier-actions-#{ticket_tier.id}"}
                     label={"Actions for #{ticket_tier.name}"}
                   >
                     <.dropdown_menu_item
-                      :if={!is_donation and @admin_role == :admin}
+                      :if={!is_donation and can?(@admin_role, :ticket_create)}
                       id={"ticket-tier-actions-#{ticket_tier.id}-grant"}
                       icon="hero-gift"
                       tone={:success}
@@ -222,7 +222,10 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       Grant tickets
                     </.dropdown_menu_item>
                     <.dropdown_menu_item
-                      :if={!is_donation and @admin_role == :admin}
+                      :if={
+                        !is_donation and
+                          can?(@admin_role, :ticket_reservation_create)
+                      }
                       id={"ticket-tier-actions-#{ticket_tier.id}-reserve"}
                       icon="hero-ticket"
                       tone={:info}
@@ -233,7 +236,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       Reserve tickets
                     </.dropdown_menu_item>
                     <.dropdown_menu_item
-                      :if={@admin_role == :admin}
+                      :if={can?(@admin_role, :ticket_tier_update)}
                       id={"ticket-tier-actions-#{ticket_tier.id}-edit"}
                       icon="hero-pencil-square"
                       phx-click="edit-ticket-tier"
@@ -243,7 +246,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       Edit tier
                     </.dropdown_menu_item>
                     <.dropdown_menu_item
-                      :if={@admin_role == :admin}
+                      :if={can?(@admin_role, :ticket_tier_delete)}
                       id={"ticket-tier-actions-#{ticket_tier.id}-delete"}
                       icon="hero-trash"
                       tone={:danger}
@@ -304,7 +307,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                             </div>
                           </div>
                           <button
-                            :if={@admin_role == :admin}
+                            :if={can?(@admin_role, :ticket_reservation_update)}
                             id={"cancel-reservation-#{reservation.id}"}
                             phx-click="cancel-reservation"
                             phx-value-id={reservation.id}
@@ -356,7 +359,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                             </div>
                           </div>
                           <button
-                            :if={@admin_role == :admin}
+                            :if={can?(@admin_role, :ticket_reservation_update)}
                             id={"cancel-reservation-#{reservation.id}"}
                             phx-click="cancel-reservation"
                             phx-value-id={reservation.id}
@@ -757,7 +760,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("open-add-ticket-tier-modal", _params, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_tier_create) do
       {:noreply, deny_full_admin(socket, "Add Ticket Tier")}
     else
       {:noreply, assign(socket, :show_add_modal, true)}
@@ -792,7 +795,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("edit-ticket-tier", %{"id" => id}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_tier_update) do
       {:noreply, deny_full_admin(socket, "Edit Ticket Tier")}
     else
       ticket_tier = Events.get_ticket_tier!(id)
@@ -806,7 +809,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("delete-ticket-tier", %{"id" => id}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_tier_delete) do
       {:noreply, deny_full_admin(socket, "Delete Ticket Tier")}
     else
       delete_ticket_tier_as_admin(socket, id)
@@ -846,7 +849,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("grant-tickets", params, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_create) do
       {:noreply, deny_full_admin(socket, "Grant Tickets")}
     else
       case tier_id_from_event_params(params) do
@@ -873,7 +876,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def handle_event("reserve-tickets", params, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_reservation_create) do
       {:noreply, deny_full_admin(socket, "Reservation")}
     else
       case tier_id_from_event_params(params) do
@@ -903,7 +906,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     # Finding 53: cancelling a hold is a money action (releases discounted
     # inventory / forces full price). Gate like grant/reserve after Findings
     # 46/50, and refuse ids that are not on this event's tiers.
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_reservation_update) do
       {:noreply, deny_full_admin(socket, "Cancel Reservation")}
     else
       cancel_reservation_as_admin(socket, id)
@@ -1127,7 +1130,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   defp tier_id_from_event_params(_), do: nil
 
   defp grant_tickets_for_tier(socket, ticket_tier) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_create) do
       {:noreply, deny_full_admin(socket, "Grant Tickets")}
     else
       is_donation =
@@ -1229,7 +1232,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   end
 
   defp reserve_tickets_for_tier(socket, ticket_tier) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_reservation_create) do
       {:noreply, deny_full_admin(socket, "Reservation")}
     else
       reserve_tickets_for_tier_as_admin(socket, ticket_tier)

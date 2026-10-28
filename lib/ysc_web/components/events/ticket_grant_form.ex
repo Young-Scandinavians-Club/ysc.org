@@ -158,7 +158,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
 
   @impl true
   def handle_event("search-users", %{"value" => query}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_create) do
       {:noreply, socket}
     else
       {:noreply, AdminUserSearch.search(socket, query)}
@@ -167,7 +167,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
 
   @impl true
   def handle_event("select-user", %{"id" => id}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_create) do
       {:noreply, socket}
     else
       socket = AdminUserSearch.select(socket, id)
@@ -191,7 +191,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
 
   @impl true
   def handle_event("save", %{"ticket_grant" => params}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_create) do
       {:noreply,
        YscWeb.Flash.put_toast(
          socket,

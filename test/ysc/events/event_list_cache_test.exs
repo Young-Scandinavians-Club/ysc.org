@@ -108,7 +108,8 @@ defmodule Ysc.Events.EventListCacheTest do
       EventListCache.list_upcoming_events(20)
       EventListCache.subscribe()
 
-      {:ok, copied} = Ysc.Events.copy_event(published, published.organizer_id)
+      {:ok, copied} =
+        Ysc.Events.copy_event(published, published.organizer_id, actor: :system)
 
       assert copied.state == :draft
       refute_received {:event_list_cache_invalidated, _}

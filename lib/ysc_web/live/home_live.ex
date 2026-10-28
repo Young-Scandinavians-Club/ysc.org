@@ -1063,7 +1063,7 @@ defmodule YscWeb.HomeLive do
                 title="Clear Lake"
                 subtitle="Book a stay"
               />
-              <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
+              <%= if YscWeb.Authorization.can?(@current_user, :admin_panel_access) do %>
                 <.quick_action_card
                   id="home-quick-action-expenses"
                   navigate={~p"/expensereports"}

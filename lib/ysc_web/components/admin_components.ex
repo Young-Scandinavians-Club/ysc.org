@@ -10,6 +10,8 @@ defmodule YscWeb.AdminComponents do
   use Gettext, backend: YscWeb.Gettext
   use YscWeb, :verified_routes
 
+  import YscWeb.Authorization, only: [can?: 2]
+
   alias Phoenix.LiveView.JS
   alias Ysc.Accounts.{SignupApplication, UserDisplay}
   alias YscWeb.Admin.DateTimeDisplay
@@ -3801,7 +3803,7 @@ defmodule YscWeb.AdminComponents do
                   </.link>
                 </li>
 
-                <li :if={@role == :admin}>
+                <li :if={can?(@role, :admin_panel_manage)}>
                   <.link
                     navigate="/admin/bookings"
                     title="Bookings"
@@ -3834,7 +3836,7 @@ defmodule YscWeb.AdminComponents do
                   </.link>
                 </li>
 
-                <li :if={@role == :admin}>
+                <li :if={can?(@role, :admin_panel_manage)}>
                   <.link
                     navigate="/admin/merch"
                     title="Merch"
@@ -3867,7 +3869,7 @@ defmodule YscWeb.AdminComponents do
                   </.link>
                 </li>
 
-                <li :if={@role == :admin}>
+                <li :if={can?(@role, :admin_panel_manage)}>
                   <.link
                     navigate="/admin/users"
                     title="Users"
@@ -3900,7 +3902,10 @@ defmodule YscWeb.AdminComponents do
                   </.link>
                 </li>
 
-                <li :if={@role == :admin && @board_position == :membership_director}>
+                <li :if={
+                  can?(@role, :admin_panel_manage) &&
+                    @board_position == :membership_director
+                }>
                   <.link
                     navigate="/admin/memberships"
                     title="Memberships"
@@ -3933,7 +3938,9 @@ defmodule YscWeb.AdminComponents do
                   </.link>
                 </li>
 
-                <li :if={@role == :admin && @board_position == :treasurer}>
+                <li :if={
+                  can?(@role, :admin_panel_manage) && @board_position == :treasurer
+                }>
                   <.link
                     navigate="/admin/money"
                     title="Money"
@@ -4034,7 +4041,7 @@ defmodule YscWeb.AdminComponents do
               </ul>
 
               <ul
-                :if={@role == :admin && @query_console_url}
+                :if={can?(@role, :admin_panel_manage) && @query_console_url}
                 id="admin-nav-query-console-list"
                 class="mt-auto pt-4 space-y-2 leading-6 font-medium"
               >

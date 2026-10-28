@@ -14,6 +14,7 @@ defmodule YscWeb.UserAuth do
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Subscriptions
   alias YscWeb.AccountSetupAccess
+  alias YscWeb.Authorization
 
   # Make the remember me cookie valid for 60 days.
   # If you want bump or reduce this value, also change
@@ -444,8 +445,11 @@ defmodule YscWeb.UserAuth do
     admin_user =
       socket.assigns[:real_current_user] || socket.assigns.current_user
 
-    if admin_user && admin_user.role in [:admin, :volunteer] do
-      {:cont, Phoenix.Component.assign(socket, :admin_role, admin_user.role)}
+    if Authorization.can?(admin_user, :admin_panel_access) do
+      {:cont,
+       socket
+       |> Phoenix.Component.assign(:admin_role, admin_user.role)
+       |> Phoenix.Component.assign(:staff_user, admin_user)}
     else
       socket =
         socket
@@ -464,7 +468,7 @@ defmodule YscWeb.UserAuth do
     admin_user =
       socket.assigns[:real_current_user] || socket.assigns.current_user
 
-    if admin_user && admin_user.role == :admin do
+    if Authorization.can?(admin_user, :admin_panel_manage) do
       {:cont, socket}
     else
       socket =
@@ -674,11 +678,12 @@ defmodule YscWeb.UserAuth do
   end
 
   defp impersonation_permitted?(
-         %{role: :admin, id: admin_id},
+         %{id: admin_id} = real_user,
          original_admin_id
        )
        when not is_nil(original_admin_id) do
-    to_string(admin_id) == to_string(original_admin_id)
+    Authorization.can?(real_user, :user_impersonate) and
+      to_string(admin_id) == to_string(original_admin_id)
   end
 
   defp impersonation_permitted?(_real_user, _original_admin_id), do: false
@@ -791,10 +796,8 @@ defmodule YscWeb.UserAuth do
       valid_code_challenge?(challenge)
   end
 
-  defp mobile_staff_user?(%{role: role}) when role in [:admin, :volunteer],
-    do: true
-
-  defp mobile_staff_user?(_), do: false
+  defp mobile_staff_user?(user),
+    do: Authorization.can?(user, :admin_panel_access)
 
   # Pattern-matched directly on a plain map (rather than params["key"], which
   # uses the Access behaviour) so this safely returns nil for a
@@ -854,7 +857,7 @@ defmodule YscWeb.UserAuth do
   def require_admin(conn, _opts) do
     user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
 
-    if user && user.role in [:admin, :volunteer] do
+    if Authorization.can?(user, :admin_panel_access) do
       conn
     else
       conn
@@ -872,7 +875,7 @@ defmodule YscWeb.UserAuth do
   def require_full_admin(conn, _opts) do
     user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
 
-    if user && user.role == :admin do
+    if Authorization.can?(user, :admin_panel_manage) do
       conn
     else
       conn

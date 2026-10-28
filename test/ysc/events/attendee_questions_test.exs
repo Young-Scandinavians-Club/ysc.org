@@ -231,7 +231,7 @@ defmodule Ysc.Events.AttendeeQuestionsTest do
         })
 
       source = Repo.preload(source, :ticket_tiers, force: true)
-      assert {:ok, copied} = Events.copy_event(source, user.id)
+      assert {:ok, copied} = Events.copy_event(source, user.id, actor: :system)
 
       [copied_tier] =
         Repo.all(from t in TicketTier, where: t.event_id == ^copied.id)

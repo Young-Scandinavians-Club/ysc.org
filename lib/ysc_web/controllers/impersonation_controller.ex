@@ -50,13 +50,15 @@ defmodule YscWeb.ImpersonationController do
       admin = user_token && Accounts.get_user_by_session_token(user_token)
 
       redirect_to =
-        if admin && admin.id == original_admin_id && admin.role == :admin &&
+        if admin && admin.id == original_admin_id &&
+             YscWeb.Authorization.can?(admin, :user_impersonate) &&
              impersonated_user_id do
           ~p"/admin/users/#{impersonated_user_id}/details"
         else
-          if admin && admin.id == original_admin_id && admin.role == :admin,
-            do: ~p"/admin",
-            else: ~p"/"
+          if admin && admin.id == original_admin_id &&
+               YscWeb.Authorization.can?(admin, :user_impersonate),
+             do: ~p"/admin",
+             else: ~p"/"
         end
 
       conn

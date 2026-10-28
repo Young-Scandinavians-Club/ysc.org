@@ -114,7 +114,7 @@ defmodule YscWeb.Authorization.PolicyMatrixTest do
   ]
 
   # Policy objects with no table of their own.
-  @virtual_objects [:family_sub_account]
+  @virtual_objects [:family_sub_account, :admin_panel]
 
   # Who may perform each action on a record owned by somebody else:
   #
@@ -162,6 +162,9 @@ defmodule YscWeb.Authorization.PolicyMatrixTest do
         post_update scan_record_create scan_record_read
         scan_session_create session_check_in_create session_check_in_delete
         session_check_in_read
+        admin_panel_access
+        event_delete_draft
+        event_publish
       )a,
     owner_or_staff: ~w(
         ticket_detail_create ticket_detail_read ticket_detail_update
@@ -216,6 +219,11 @@ defmodule YscWeb.Authorization.PolicyMatrixTest do
         user_event_read user_note_create user_note_read
         user_update volunteer_delete volunteer_read
         volunteer_update webhook_event_delete webhook_event_read
+        admin_panel_manage
+        event_cancel
+        event_unpublish
+        merch_order_comp
+        user_impersonate
       )a,
     owner_or_admin: ~w(
         address_delete address_read address_update

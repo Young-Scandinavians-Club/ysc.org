@@ -22,6 +22,7 @@ defmodule Ysc.Events do
   alias Ysc.Accounts.User
   alias Ysc.Avatars.Avatar
   alias Ysc.StaffPreview
+  alias YscWeb.Authorization
   alias Ysc.Tickets.TicketOrder
 
   @max_sales_chart_days 120
@@ -660,13 +661,13 @@ defmodule Ysc.Events do
 
   ## Options
 
-    * `:acting_role` - the staff role performing the copy (`:admin` or `:volunteer`).
-      Volunteers never receive copied ticket tiers (Finding 55): Copy Event would
+    * `:actor` - who is copying: a `%User{}` or `:system`. Ticket tiers are only
+      copied when the actor may create ticket tiers (`:ticket_tier_create`), so
+      volunteers never receive copied tiers (Finding 55): Copy Event would
       otherwise mint Free / $0 / donation inventory and bypass the ticket-tier
-      create gates.
-    * `:copy_ticket_tiers` - when `false`, skip ticket tiers even for admins.
-      Ignored when `:acting_role` is a non-admin staff role. Defaults to `true`
-      when `:acting_role` is omitted (scripts and tests).
+      create gates. With no actor, tiers are not copied.
+    * `:copy_ticket_tiers` - when `false`, skip ticket tiers even when the actor
+      may copy them. Defaults to `true`.
 
   Returns `{:ok, new_event}` or `{:error, reason}`.
   """
@@ -804,14 +805,8 @@ defmodule Ysc.Events do
   end
 
   defp copy_ticket_tiers?(opts) when is_list(opts) do
-    case Keyword.get(opts, :acting_role) do
-      :admin -> Keyword.get(opts, :copy_ticket_tiers, true)
-      :volunteer -> false
-      "admin" -> Keyword.get(opts, :copy_ticket_tiers, true)
-      "volunteer" -> false
-      nil -> Keyword.get(opts, :copy_ticket_tiers, true)
-      _ -> false
-    end
+    Authorization.authorize(Keyword.get(opts, :actor), :ticket_tier_create) ==
+      :ok and Keyword.get(opts, :copy_ticket_tiers, true)
   end
 
   @doc """
@@ -869,8 +864,9 @@ defmodule Ysc.Events do
   deleted, so ticket holders keep a public status page. Matches the admin help
   copy and the events-list delete affordance.
 
-  Pass `acting_role:` from the admin LiveView. Omitted role stays
-  admin-compatible for scripts and tests.
+  Pass `actor:` (a `%User{}`, or `:system` for internal callers). Drafts need
+  `:event_delete_draft` (admin and volunteer); scheduled events need
+  `:event_delete` (admin). With no actor the call is refused.
 
   Finding 59: refuse published/cancelled deletes so volunteers cannot wipe
   another organizer's live event (and sold tickets).
@@ -883,10 +879,12 @@ defmodule Ysc.Events do
   def delete_event(%Event{} = event, opts \\ []) do
     cond do
       event.state == :draft ->
-        do_soft_delete_event(event)
+        with :ok <- authorize_event(:event_delete_draft, event, opts) do
+          do_soft_delete_event(event)
+        end
 
       event.state == :scheduled ->
-        with :ok <- require_full_admin_lifecycle(opts) do
+        with :ok <- authorize_event(:event_delete, event, opts) do
           do_soft_delete_event(event)
         end
 
@@ -1620,10 +1618,10 @@ defmodule Ysc.Events do
   defp maybe_reschedule_event_notification(_event), do: :ok
 
   # Finding 67: volunteers must not unpublish or cancel live events (sibling of
-  # Finding 59's published-event delete gate). Pass `acting_role:` from the
-  # editor; omitted role stays admin-compatible for existing callers.
+  # Finding 59's published-event delete gate). Pass `actor:` (a `%User{}` or
+  # `:system`); with no actor the call is refused.
   def unpublish_event(%Event{} = event, opts \\ []) do
-    with :ok <- require_full_admin_lifecycle(opts) do
+    with :ok <- authorize_event(:event_unpublish, event, opts) do
       event
       |> Event.changeset(%{state: "draft", published_at: nil})
       |> Repo.update()
@@ -1643,7 +1641,7 @@ defmodule Ysc.Events do
   """
   @dialyzer {:nowarn_function, cancel_event: 2}
   def cancel_event(%Event{} = event, opts \\ []) do
-    with :ok <- require_full_admin_lifecycle(opts) do
+    with :ok <- authorize_event(:event_cancel, event, opts) do
       Ecto.Multi.new()
       |> Ecto.Multi.run(:current, fn repo, _changes ->
         # Lock so a double-submitted cancel only notifies once.
@@ -1685,11 +1683,8 @@ defmodule Ysc.Events do
     end
   end
 
-  defp require_full_admin_lifecycle(opts) when is_list(opts) do
-    case Keyword.get(opts, :acting_role, :admin) do
-      role when role in [:admin, "admin"] -> :ok
-      _ -> {:error, :unauthorized}
-    end
+  defp authorize_event(action, %Event{} = event, opts) when is_list(opts) do
+    Authorization.authorize(Keyword.get(opts, :actor), action, event)
   end
 
   defp finalize_lifecycle_broadcast({:ok, event}) do

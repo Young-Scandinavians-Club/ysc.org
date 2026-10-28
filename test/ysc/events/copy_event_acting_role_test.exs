@@ -1,7 +1,7 @@
 defmodule Ysc.Events.CopyEventActingRoleTest do
   @moduledoc """
   Leftover Finding 55 guards: `copy_ticket_tiers: true` must not mint Free /
-  $0 / donation inventory when the acting role is volunteer.
+  $0 / donation inventory when the actor is a volunteer.
   """
   use Ysc.DataCase, async: false
 
@@ -45,14 +45,14 @@ defmodule Ysc.Events.CopyEventActingRoleTest do
       %{user: user_fixture()}
     end
 
-    test "ignores copy_ticket_tiers: true when acting_role is volunteer", %{
+    test "ignores copy_ticket_tiers: true when the actor is a volunteer", %{
       user: user
     } do
       source = source_with_free_and_donation(user)
 
       assert {:ok, copied} =
                Events.copy_event(source, user.id,
-                 acting_role: :volunteer,
+                 actor: user_fixture(%{role: :volunteer}),
                  copy_ticket_tiers: true
                )
 
@@ -60,18 +60,28 @@ defmodule Ysc.Events.CopyEventActingRoleTest do
       assert copied.ticket_tiers == []
     end
 
-    test "ignores copy_ticket_tiers: true when acting_role is the string volunteer",
-         %{user: user} do
+    test "ignores copy_ticket_tiers: true when no actor is given", %{
+      user: user
+    } do
+      source = source_with_free_and_donation(user)
+
+      assert {:ok, copied} =
+               Events.copy_event(source, user.id, copy_ticket_tiers: true)
+
+      copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
+      assert copied.ticket_tiers == []
+    end
+
+    test "copies tiers for an admin actor", %{user: user} do
       source = source_with_free_and_donation(user)
 
       assert {:ok, copied} =
                Events.copy_event(source, user.id,
-                 acting_role: "volunteer",
-                 copy_ticket_tiers: true
+                 actor: user_fixture(%{role: :admin})
                )
 
       copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
-      assert copied.ticket_tiers == []
+      assert length(copied.ticket_tiers) == 2
     end
   end
 end

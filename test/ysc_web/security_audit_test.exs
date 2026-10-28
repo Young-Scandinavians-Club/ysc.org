@@ -1522,7 +1522,7 @@ defmodule YscWeb.SecurityAuditTest do
 
     test "update_event_editor cannot resurrect a deleted event via forged publish params" do
       event = event_fixture(%{state: :draft})
-      {:ok, deleted} = Events.delete_event(event)
+      {:ok, deleted} = Events.delete_event(event, actor: :system)
 
       assert deleted.state == :deleted
 

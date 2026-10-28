@@ -319,7 +319,7 @@ defmodule Ysc.EventsTest do
           start_date: DateTime.add(DateTime.utc_now(), 30, :day)
         })
 
-      assert {:ok, deleted} = Events.delete_event(event)
+      assert {:ok, deleted} = Events.delete_event(event, actor: :system)
       assert deleted.state == :deleted
     end
 
@@ -334,8 +334,50 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now()
         })
 
-      assert {:error, :invalid_state} = Events.delete_event(event)
+      assert {:error, :invalid_state} =
+               Events.delete_event(event, actor: :system)
+
       assert Events.get_event!(event.id).state == :published
+    end
+
+    test "delete_event/2 lets a volunteer delete a draft", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Volunteer Draft Delete",
+          description: "Description",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert {:ok, deleted} =
+               Events.delete_event(event,
+                 actor: user_fixture(%{role: :volunteer})
+               )
+
+      assert deleted.state == :deleted
+    end
+
+    test "delete_event/2 refuses every caller that gives no actor", %{
+      user: user
+    } do
+      {:ok, draft} =
+        Events.create_event(%{
+          title: "No Actor Draft",
+          description: "Description",
+          state: :draft,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert {:error, :unauthorized} = Events.delete_event(draft)
+
+      assert {:error, :unauthorized} =
+               Events.delete_event(draft,
+                 actor: user_fixture(%{role: :member})
+               )
+
+      assert Events.get_event!(draft.id).state == :draft
     end
 
     test "delete_event/2 refuses scheduled events for volunteers", %{user: user} do
@@ -351,7 +393,9 @@ defmodule Ysc.EventsTest do
         })
 
       assert {:error, :unauthorized} =
-               Events.delete_event(event, acting_role: :volunteer)
+               Events.delete_event(event,
+                 actor: user_fixture(%{role: :volunteer})
+               )
 
       assert Events.get_event!(event.id).state == :scheduled
     end
@@ -370,7 +414,9 @@ defmodule Ysc.EventsTest do
           published_at: nil
         })
 
-      assert {:ok, deleted} = Events.delete_event(event, acting_role: :admin)
+      assert {:ok, deleted} =
+               Events.delete_event(event, actor: user_fixture(%{role: :admin}))
+
       assert deleted.state == :deleted
     end
   end
@@ -389,7 +435,7 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now()
         })
 
-      assert {:ok, copied} = Events.copy_event(source, user.id)
+      assert {:ok, copied} = Events.copy_event(source, user.id, actor: :system)
 
       assert copied.state == :draft
       assert copied.title == "Copy of Original Event"
@@ -415,7 +461,8 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now()
         })
 
-      assert {:ok, copied} = Events.copy_event(source, copying_user.id)
+      assert {:ok, copied} =
+               Events.copy_event(source, copying_user.id, actor: :system)
 
       assert copied.organizer_id == copying_user.id
       refute copied.organizer_id == original_creator.id
@@ -441,7 +488,7 @@ defmodule Ysc.EventsTest do
       source =
         Events.get_event!(source.id) |> Repo.preload(agendas: :agenda_items)
 
-      assert {:ok, copied} = Events.copy_event(source, user.id)
+      assert {:ok, copied} = Events.copy_event(source, user.id, actor: :system)
 
       copied =
         Events.get_event!(copied.id) |> Repo.preload(agendas: :agenda_items)
@@ -475,7 +522,7 @@ defmodule Ysc.EventsTest do
 
       source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
 
-      assert {:ok, copied} = Events.copy_event(source, user.id)
+      assert {:ok, copied} = Events.copy_event(source, user.id, actor: :system)
 
       copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
       assert length(copied.ticket_tiers) == 1
@@ -486,7 +533,7 @@ defmodule Ysc.EventsTest do
       assert tickets == []
     end
 
-    test "does not copy ticket tiers when acting_role is volunteer (Finding 55)",
+    test "does not copy ticket tiers when the actor is a volunteer (Finding 55)",
          %{user: user} do
       {:ok, source} =
         Events.create_event(%{
@@ -518,13 +565,15 @@ defmodule Ysc.EventsTest do
       source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
 
       assert {:ok, copied} =
-               Events.copy_event(source, user.id, acting_role: :volunteer)
+               Events.copy_event(source, user.id,
+                 actor: user_fixture(%{role: :volunteer})
+               )
 
       copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
       assert copied.ticket_tiers == []
     end
 
-    test "still copies ticket tiers when acting_role is admin", %{user: user} do
+    test "still copies ticket tiers when the actor is an admin", %{user: user} do
       {:ok, source} =
         Events.create_event(%{
           title: "Admin Copy Keeps Tiers",
@@ -546,75 +595,16 @@ defmodule Ysc.EventsTest do
       source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
 
       assert {:ok, copied} =
-               Events.copy_event(source, user.id, acting_role: :admin)
+               Events.copy_event(source, user.id,
+                 actor: user_fixture(%{role: :admin})
+               )
 
       copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
       assert length(copied.ticket_tiers) == 1
       assert hd(copied.ticket_tiers).type == :free
     end
 
-    test "honors copy_ticket_tiers: false when acting_role is the string admin",
-         %{user: user} do
-      {:ok, source} =
-        Events.create_event(%{
-          title: "String Admin Can Skip Tiers",
-          description: "Desc",
-          state: :published,
-          organizer_id: user.id,
-          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
-          published_at: DateTime.utc_now()
-        })
-
-      {:ok, _free} =
-        Events.create_ticket_tier(%{
-          name: "RSVP",
-          type: :free,
-          quantity: 50,
-          event_id: source.id
-        })
-
-      source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
-
-      assert {:ok, copied} =
-               Events.copy_event(source, user.id,
-                 acting_role: "admin",
-                 copy_ticket_tiers: false
-               )
-
-      copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
-      assert copied.ticket_tiers == []
-    end
-
-    test "does not copy ticket tiers when acting_role is the string volunteer",
-         %{user: user} do
-      {:ok, source} =
-        Events.create_event(%{
-          title: "String Volunteer Skips Tiers",
-          description: "Desc",
-          state: :published,
-          organizer_id: user.id,
-          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
-          published_at: DateTime.utc_now()
-        })
-
-      {:ok, _free} =
-        Events.create_ticket_tier(%{
-          name: "RSVP",
-          type: :free,
-          quantity: 50,
-          event_id: source.id
-        })
-
-      source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
-
-      assert {:ok, copied} =
-               Events.copy_event(source, user.id, acting_role: "volunteer")
-
-      copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
-      assert copied.ticket_tiers == []
-    end
-
-    test "does not copy ticket tiers for an unrecognized acting_role", %{
+    test "does not copy ticket tiers when no actor is given", %{
       user: user
     } do
       {:ok, source} =
@@ -638,7 +628,7 @@ defmodule Ysc.EventsTest do
       source = Events.get_event!(source.id) |> Repo.preload(:ticket_tiers)
 
       assert {:ok, copied} =
-               Events.copy_event(source, user.id, acting_role: :host)
+               Events.copy_event(source, user.id)
 
       copied = Events.get_event!(copied.id) |> Repo.preload(:ticket_tiers)
       assert copied.ticket_tiers == []
@@ -664,7 +654,7 @@ defmodule Ysc.EventsTest do
 
       source = Events.get_event!(source.id) |> Repo.preload(:faq_questions)
 
-      assert {:ok, copied} = Events.copy_event(source, user.id)
+      assert {:ok, copied} = Events.copy_event(source, user.id, actor: :system)
 
       copied = Events.get_event!(copied.id) |> Repo.preload(:faq_questions)
       assert length(copied.faq_questions) == 1
@@ -4300,11 +4290,11 @@ defmodule Ysc.EventsTest do
 
     test "unpublish_event and cancel_event update state", %{event: event} do
       assert {:ok, published} = Events.publish_event(event)
-      assert {:ok, draft} = Events.unpublish_event(published)
+      assert {:ok, draft} = Events.unpublish_event(published, actor: :system)
       assert draft.state == :draft
 
       assert {:ok, published2} = Events.publish_event(draft)
-      assert {:ok, cancelled} = Events.cancel_event(published2)
+      assert {:ok, cancelled} = Events.cancel_event(published2, actor: :system)
       assert cancelled.state == :cancelled
     end
 
@@ -4318,7 +4308,7 @@ defmodule Ysc.EventsTest do
       insert_ticket!(published, tier, user_fixture(), :expired)
 
       Oban.Testing.with_testing_mode(:manual, fn ->
-        assert {:ok, cancelled} = Events.cancel_event(published)
+        assert {:ok, cancelled} = Events.cancel_event(published, actor: :system)
 
         # The admin editor renders these straight from the returned event.
         assert %User{} = cancelled.organizer
@@ -4337,7 +4327,7 @@ defmodule Ysc.EventsTest do
                ]
 
         # Re-cancelling an already-cancelled event must not notify again.
-        assert {:ok, _} = Events.cancel_event(cancelled)
+        assert {:ok, _} = Events.cancel_event(cancelled, actor: :system)
 
         assert [_only_job] =
                  all_enqueued(
@@ -4346,18 +4336,32 @@ defmodule Ysc.EventsTest do
       end)
     end
 
-    test "unpublish_event and cancel_event refuse volunteer acting_role", %{
+    test "unpublish_event and cancel_event refuse a call with no actor", %{
+      event: event
+    } do
+      assert {:ok, published} = Events.publish_event(event)
+
+      assert {:error, :unauthorized} = Events.unpublish_event(published)
+      assert {:error, :unauthorized} = Events.cancel_event(published)
+      assert Repo.get!(Event, published.id).state == :published
+    end
+
+    test "unpublish_event and cancel_event refuse a volunteer actor", %{
       event: event
     } do
       assert {:ok, published} = Events.publish_event(event)
 
       assert {:error, :unauthorized} =
-               Events.unpublish_event(published, acting_role: :volunteer)
+               Events.unpublish_event(published,
+                 actor: user_fixture(%{role: :volunteer})
+               )
 
       assert Repo.get!(Event, published.id).state == :published
 
       assert {:error, :unauthorized} =
-               Events.cancel_event(published, acting_role: :volunteer)
+               Events.cancel_event(published,
+                 actor: user_fixture(%{role: :volunteer})
+               )
 
       assert Repo.get!(Event, published.id).state == :published
     end
@@ -5080,7 +5084,8 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now() |> DateTime.truncate(:second)
         })
 
-      assert {:error, %Ecto.Changeset{}} = Events.copy_event(source, user.id)
+      assert {:error, %Ecto.Changeset{}} =
+               Events.copy_event(source, user.id, actor: :system)
     end
   end
 

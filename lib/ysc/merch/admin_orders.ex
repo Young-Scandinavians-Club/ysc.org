@@ -348,17 +348,19 @@ defmodule Ysc.Merch.AdminOrders do
   @spec create_comp_order(User.t(), map()) ::
           {:ok, Order.t()}
           | {:error, :not_authorized | :no_items | :failed | Ecto.Changeset.t()}
-  def create_comp_order(%User{role: :admin} = admin, params) do
-    lines = Map.fetch!(params, :lines)
+  def create_comp_order(%User{} = admin, params) do
+    if YscWeb.Authorization.can?(admin, :merch_order_comp) do
+      lines = Map.fetch!(params, :lines)
 
-    if lines == [] do
-      {:error, :no_items}
+      if lines == [] do
+        {:error, :no_items}
+      else
+        insert_comp_order(admin, params, lines)
+      end
     else
-      insert_comp_order(admin, params, lines)
+      {:error, :not_authorized}
     end
   end
-
-  def create_comp_order(%User{}, _params), do: {:error, :not_authorized}
 
   # Dialyzer false positive on Ecto.Multi pipelines (same as elsewhere in the app).
   @dialyzer {:nowarn_function, insert_comp_order: 3}

@@ -30,9 +30,18 @@ defmodule YscWeb.Authorization.Policy do
   ## What this policy cannot express
 
   Rules see the subject and object but not record state, so "public reads"
-  of posts and events rely on the context to hide unpublished rows, and
-  volunteer limits that depend on state (draft-only event deletes, the cabin
-  door code window) are enforced where the data is loaded.
+  of posts and events rely on the context to hide unpublished rows. Where a
+  role limit depends on state, the context picks the action from the state
+  (`Events.delete_event/2` asks for `:event_delete_draft` on a draft and
+  `:event_delete` on a scheduled event); the cabin door-code window is
+  enforced where the booking is loaded.
+
+  ## Calling it
+
+  Use `YscWeb.Authorization` (`can?/3`, `authorize/3`) rather than calling
+  this module directly. It accepts a user or a role atom, and `:system` for
+  trusted internal callers. `:admin_panel_access` / `:admin_panel_manage`
+  guard the admin area itself.
 
   ## Keeping it current
 
@@ -131,6 +140,24 @@ defmodule YscWeb.Authorization.Policy do
   end
 
   # ---------------------------------------------------------------------------
+  # Admin area
+  # ---------------------------------------------------------------------------
+
+  # Virtual object for the admin area itself. `access` is the staff door
+  # (admin and volunteer); `manage` is the full-admin-only sections (users,
+  # money, memberships, bookings, merch, settings) and the revenue widgets.
+  object :admin_panel do
+    action :access do
+      allow role: :admin
+      allow role: :volunteer
+    end
+
+    action :manage do
+      allow role: :admin
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Accounts
   # ---------------------------------------------------------------------------
 
@@ -153,6 +180,10 @@ defmodule YscWeb.Authorization.Policy do
 
     action :delete do
       deny true
+    end
+
+    action :impersonate do
+      allow role: :admin
     end
   end
 
@@ -410,10 +441,10 @@ defmodule YscWeb.Authorization.Policy do
   # Events and tickets
   # ---------------------------------------------------------------------------
 
-  # Volunteers create and edit events. Publishing, unpublishing, cancelling
-  # and blackouts are narrowed further by `Events` and the event editor, and
-  # volunteers may only delete drafts there; this policy is the outer bound.
-  # Reads are public; the context hides unpublished events.
+  # Volunteers create, edit and publish events, and may delete drafts
+  # (`delete_draft`). Unpublishing, cancelling and deleting scheduled events
+  # are admin-only. `Events` picks `delete_draft` or `delete` from the event's
+  # state. Reads are public; the context hides unpublished events.
   object :event do
     action :create do
       allow role: :admin
@@ -431,6 +462,24 @@ defmodule YscWeb.Authorization.Policy do
 
     action :delete do
       allow role: :admin
+    end
+
+    action :publish do
+      allow role: :admin
+      allow role: :volunteer
+    end
+
+    action :unpublish do
+      allow role: :admin
+    end
+
+    action :cancel do
+      allow role: :admin
+    end
+
+    action :delete_draft do
+      allow role: :admin
+      allow role: :volunteer
     end
   end
 
@@ -1575,6 +1624,10 @@ defmodule YscWeb.Authorization.Policy do
 
     action :delete do
       deny true
+    end
+
+    action :comp do
+      allow role: :admin
     end
   end
 

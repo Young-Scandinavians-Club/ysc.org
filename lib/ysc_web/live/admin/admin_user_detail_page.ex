@@ -1247,7 +1247,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </div>
 
               <div
-                :if={@current_user.role == :admin}
+                :if={can?(@admin_role, :refund_create)}
                 id="cancel-refund-membership-section"
                 class="border-t border-zinc-200 pt-6"
               >
@@ -3530,7 +3530,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     subscription = socket.assigns[:active_subscription]
 
     cond do
-      current_user.role != :admin ->
+      cannot?(socket.assigns.admin_role, :refund_create) ->
         {:noreply,
          YscWeb.Flash.put_toast(socket, :error, "Not authorized.",
            title: "Cancel & refund"
