@@ -156,7 +156,7 @@ defmodule YscWeb.LetMeUpgradeTest do
   describe "compiled expressions still use Spek structs" do
     test "role allow compiles to Spek.Check with ctx args" do
       assert {:ok, %Check{} = check} =
-               Policy.fetch_expression(:media_image_create)
+               Policy.fetch_expression(:site_setting_create)
 
       assert check.module == Checks
       assert check.fun == :role

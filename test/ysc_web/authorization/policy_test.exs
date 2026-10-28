@@ -148,6 +148,22 @@ defmodule YscWeb.Authorization.PolicyTest do
     test "admin can delete images", %{admin: admin} do
       assert :ok = Policy.authorize(:media_image_delete, admin)
     end
+
+    test "volunteer can create, update and delete images" do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      assert :ok = Policy.authorize(:media_image_create, volunteer)
+      assert :ok = Policy.authorize(:media_image_update, volunteer)
+      assert :ok = Policy.authorize(:media_image_delete, volunteer)
+    end
+
+    test "member cannot update or delete images", %{member: member} do
+      assert {:error, :unauthorized} =
+               Policy.authorize(:media_image_update, member)
+
+      assert {:error, :unauthorized} =
+               Policy.authorize(:media_image_delete, member)
+    end
   end
 
   describe "site_setting policies" do

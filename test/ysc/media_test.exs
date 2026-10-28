@@ -484,6 +484,38 @@ defmodule Ysc.MediaTest do
       assert Media.fetch_image(updated.id) == nil
     end
 
+    test "volunteer can create, update, and delete an image" do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      assert {:ok, image} =
+               Media.add_new_image(
+                 %{raw_image_path: "https://example.com/volunteer.jpg"},
+                 volunteer
+               )
+
+      assert {:ok, updated} =
+               Media.update_image(image, %{title: "Volunteer title"}, volunteer)
+
+      assert updated.title == "Volunteer title"
+
+      assert {:ok, _} = Media.delete_image(updated, volunteer)
+      assert Media.fetch_image(updated.id) == nil
+    end
+
+    test "member cannot update or delete an image", %{user: user} do
+      admin = user_fixture(%{role: "admin"})
+
+      {:ok, image} =
+        Media.add_new_image(
+          %{raw_image_path: "https://example.com/protected.jpg"},
+          admin
+        )
+
+      assert {:error, _} = Media.update_image(image, %{title: "Nope"}, user)
+      assert {:error, _} = Media.delete_image(image, user)
+      assert Media.fetch_image(image.id)
+    end
+
     test "member cannot create an image", %{user: user} do
       assert {:error, _} =
                Media.add_new_image(

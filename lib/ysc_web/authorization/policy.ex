@@ -65,9 +65,12 @@ defmodule YscWeb.Authorization.Policy do
     end
   end
 
+  # Volunteers run the media library (uploads, edits, Trix editor images), so
+  # they get the same access as admins. Members and anonymous users get none.
   object :media_image do
     action :create do
       allow role: :admin
+      allow role: :volunteer
     end
 
     action :read do
@@ -76,10 +79,12 @@ defmodule YscWeb.Authorization.Policy do
 
     action :update do
       allow role: :admin
+      allow role: :volunteer
     end
 
     action :delete do
       allow role: :admin
+      allow role: :volunteer
     end
   end
 
