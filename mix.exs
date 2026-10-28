@@ -510,6 +510,7 @@ defmodule Ysc.MixProject do
         "credo --strict",
         "dialyzer",
         "shell_lint",
+        "cmd python3 etc/scripts/lint_fly_config.py",
         "lint_notification_samples"
       ],
       test: [

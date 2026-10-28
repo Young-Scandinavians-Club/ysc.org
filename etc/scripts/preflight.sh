@@ -53,8 +53,8 @@ fi
 echo "${GREEN}✓ Code formatting is correct${RESET}"
 echo ""
 
-next_step "Checking shell scripts and config files (ShellCheck, shfmt, dprint)..."
-if ! make shell-lint shell-format-check config-format-check; then
+next_step "Checking shell scripts and config files (ShellCheck, shfmt, dprint, Fly layout)..."
+if ! make shell-lint shell-format-check config-format-check fly-config-check; then
   echo "${RED}✗ Shell script or config file checks failed. Run 'make format' to fix formatting issues.${RESET}"
   exit 1
 fi
