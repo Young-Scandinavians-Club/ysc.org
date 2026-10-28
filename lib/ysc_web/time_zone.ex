@@ -1,10 +1,14 @@
 defmodule YscWeb.TimeZone do
   @moduledoc """
   Browser timezone resolution for LiveViews, plus helpers for HTML
-  `datetime-local` inputs.
+  `datetime-local` inputs and Pacific wall-clock instants.
 
   LiveSocket sends the IANA name via connect params (`timezone`). Invalid or
   missing values fall back to Pacific time (`America/Los_Angeles`).
+
+  Use `at/2` and `at_utc/2` to turn a calendar date plus wall-clock time into
+  a zoned `DateTime` (or UTC) without repeating `DateTime.new!/3` +
+  `shift_zone!/2` at each call site.
   """
 
   @default "America/Los_Angeles"
@@ -59,6 +63,30 @@ defmodule YscWeb.TimeZone do
   """
   def shift(%DateTime{} = datetime, timezone) do
     DateTime.shift_zone!(datetime, from_name(timezone))
+  end
+
+  @doc """
+  Wall-clock instant for `date` at `time` in `timezone` (Pacific by default).
+
+      TimeZone.at(~D[2024-06-15], ~T[13:00:00]).time_zone
+      #=> "America/Los_Angeles"
+  """
+  def at(%Date{} = date, %Time{} = time, timezone \\ default()) do
+    DateTime.new!(date, time, from_name(timezone))
+  end
+
+  @doc """
+  UTC instant for `date` at `time` in `timezone` (Pacific by default).
+
+  Use this to schedule Oban jobs and compare against `DateTime.utc_now/0`.
+
+      TimeZone.at_utc(~D[2024-06-15], ~T[13:00:00])
+      #=> ~U[2024-06-15 20:00:00Z]
+  """
+  def at_utc(%Date{} = date, %Time{} = time, timezone \\ default()) do
+    date
+    |> at(time, timezone)
+    |> DateTime.shift_zone!("Etc/UTC")
   end
 
   @doc """

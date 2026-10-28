@@ -137,7 +137,7 @@ query-explain-main:  ## EXPLAIN + SQL for CI targets vs main since merge-base (f
 SHELL_SCRIPTS := $(shell ./etc/scripts/list_lintable_shell_scripts.sh)
 
 .PHONY: format
-format:  ## Format the code (Elixir, shell scripts, and JSON/YAML/TOML)
+format:  ## Format the code (Elixir, shell scripts, JSON/YAML/TOML, and Fly configs)
 	@mix format
 	@if command -v shfmt >/dev/null 2>&1 && [ -n "$(SHELL_SCRIPTS)" ]; then \
 		shfmt -w -i 2 -ci $(SHELL_SCRIPTS); \
@@ -145,11 +145,20 @@ format:  ## Format the code (Elixir, shell scripts, and JSON/YAML/TOML)
 	@if command -v dprint >/dev/null 2>&1; then \
 		dprint fmt; \
 	fi
+	@python3 etc/scripts/lint_fly_config.py --fix
 
 .PHONY: config-format-check
 config-format-check:  ## Check JSON/YAML/TOML formatting with dprint
 	@command -v dprint >/dev/null 2>&1 || { echo "Install dprint: brew install dprint"; exit 1; }
 	@dprint check
+
+.PHONY: fly-config-check
+fly-config-check:  ## Check Fly.io config layout (section order, sorted [env], quoting)
+	@python3 etc/scripts/lint_fly_config.py
+
+.PHONY: fly-config-format
+fly-config-format:  ## Rewrite Fly.io config files into the canonical layout
+	@python3 etc/scripts/lint_fly_config.py --fix
 
 .PHONY: shell-lint
 shell-lint:  ## Lint shell scripts with ShellCheck
@@ -170,7 +179,7 @@ lint:  ## Run the lint suite
 	@mix credo --all
 	@mix format --check-formatted
 	@mix lint_notification_samples
-	@$(MAKE) shell-lint shell-format-check config-format-check
+	@$(MAKE) shell-lint shell-format-check config-format-check fly-config-check
 
 .PHONY: preflight
 preflight:  ## Run all CI checks locally (compile, format, credo, dialyzer, notification samples, sobelow, audit, tests)

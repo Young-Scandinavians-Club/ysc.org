@@ -38,6 +38,58 @@ defmodule Ysc.Events.TicketTierHelpersTest do
     end
   end
 
+  describe "check_in_ticket?/1" do
+    test "allows confirmed event tickets" do
+      assert TicketTierHelpers.check_in_ticket?(%{
+               status: :confirmed,
+               ticket_tier: %{type: :paid}
+             })
+    end
+
+    test "rejects donations even when confirmed" do
+      refute TicketTierHelpers.check_in_ticket?(%{
+               status: :confirmed,
+               ticket_tier: %{type: :donation}
+             })
+
+      refute TicketTierHelpers.check_in_ticket?(%{
+               status: :confirmed,
+               ticket_tier: %{type: "donation"}
+             })
+    end
+
+    test "rejects unconfirmed event tickets" do
+      refute TicketTierHelpers.check_in_ticket?(%{
+               status: :pending,
+               ticket_tier: %{type: :paid}
+             })
+
+      refute TicketTierHelpers.check_in_ticket?(%{
+               status: :cancelled,
+               ticket_tier: %{type: :paid}
+             })
+    end
+  end
+
+  describe "has_check_in_tickets?/1" do
+    test "is true when any confirmed event ticket is present" do
+      tickets = [
+        %{status: :confirmed, ticket_tier: %{type: :donation}},
+        %{status: :confirmed, ticket_tier: %{type: :paid}}
+      ]
+
+      assert TicketTierHelpers.has_check_in_tickets?(tickets)
+    end
+
+    test "is false for donation-only confirmed tickets" do
+      tickets = [
+        %{status: :confirmed, ticket_tier: %{type: :donation}}
+      ]
+
+      refute TicketTierHelpers.has_check_in_tickets?(tickets)
+    end
+  end
+
   describe "free_tier?/1" do
     test "recognizes free type atoms and strings" do
       assert TicketTierHelpers.free_tier?(:free)

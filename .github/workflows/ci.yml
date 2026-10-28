@@ -241,6 +241,11 @@ jobs:
       - name: dprint (format check)
         run: dprint check
 
+      - name: Fly config layout (section order, sorted env, quoting)
+        run: |
+          python3 etc/scripts/lint_fly_config.py --self-test
+          python3 etc/scripts/lint_fly_config.py
+
   formatting:
     name: Code Formatting
     runs-on: ubuntu-latest

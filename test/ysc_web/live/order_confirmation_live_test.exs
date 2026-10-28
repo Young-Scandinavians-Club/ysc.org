@@ -622,6 +622,14 @@ defmodule YscWeb.OrderConfirmationLiveTest do
         |> String.trim()
 
       assert payment_ticket_count == "1"
+
+      assert has_element?(
+               view,
+               "#order-confirmation-payment-donation-count",
+               "1"
+             )
+
+      assert has_element?(view, "#order-confirmation-checkin-qr")
     end
   end
 
@@ -1043,6 +1051,15 @@ defmodule YscWeb.OrderConfirmationLiveTest do
                view,
                "[id^='donation-not-event-ticket-']",
                "Not an event ticket"
+             )
+
+      refute has_element?(view, "#order-confirmation-checkin-qr")
+      refute has_element?(view, "#order-confirmation-payment-ticket-count")
+
+      assert has_element?(
+               view,
+               "#order-confirmation-payment-donation-count",
+               "1"
              )
     end
   end
