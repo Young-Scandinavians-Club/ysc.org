@@ -9,9 +9,10 @@ defmodule Ysc.H2UpgradeTest do
   `{error, {invalid_option, {connection_window_size, V}}}` from
   `h2_connection:start_link/3,4`.
 
-  We do not start h2 servers. hackney 4.7.4 still calls
-  `h2_connection:start_link/4` with an empty opts map, so the default
-  64 KB window stays in effect. Public client APIs are unchanged.
+  We do not start h2 servers. hackney 4.9.1 now calls
+  `h2_connection:start_link/4` with `connection_window_size` 32 MiB
+  (and stream `initial_window_size` 8 MiB) so HTTP/2 downloads are
+  not stuck at the 64 KB default. Public client APIs are unchanged.
   """
   use ExUnit.Case, async: false
 
@@ -58,7 +59,7 @@ defmodule Ysc.H2UpgradeTest do
       mix_exs = File.read!(@mix_exs)
       assert mix_exs =~ ~s|{:h2, "~> 0.12.5", override: true}|
 
-      assert File.read!(@hackney_rebar) =~ ~s|{h2, "~>0.12.0"}|
+      assert File.read!(@hackney_rebar) =~ ~s|{h2, "~>0.12.5"}|
       assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.12"}|
     end
 
@@ -136,7 +137,10 @@ defmodule Ysc.H2UpgradeTest do
 
     test "hackney still talks to h2_connection not serve_socket/2" do
       conn = File.read!(@hackney_conn)
-      assert conn =~ ~S|h2_connection:start_link(client, Socket, self(), #{})|
+
+      assert conn =~
+               ~S|h2_connection:start_link(client, Socket, self(), H2Opts)|
+
       refute conn =~ "serve_socket"
       refute File.read!(@webtransport_h2) =~ "serve_socket"
       refute File.read!(@h2_src) =~ "reject_header_block"
@@ -406,11 +410,19 @@ defmodule Ysc.H2UpgradeTest do
                "maybe_send_conn_window_update(_DataSize, #state{recv_conn_window_size = ConnWindow,"
     end
 
-    test "hackney and webtransport still omit connection_window_size" do
-      assert File.read!(@hackney_conn) =~
-               ~S|h2_connection:start_link(client, Socket, self(), #{})|
+    test "hackney raises the connection window; webtransport still omits it" do
+      conn = File.read!(@hackney_conn)
 
-      refute File.read!(@hackney_conn) =~ "connection_window_size"
+      assert conn =~
+               ~S|H2Opts = #{settings => #{initial_window_size => ?H2_STREAM_WINDOW},|
+
+      assert conn =~ ~S|connection_window_size => ?H2_CONN_WINDOW}|
+
+      assert conn =~
+               ~S|h2_connection:start_link(client, Socket, self(), H2Opts)|
+
+      assert conn =~ "-define(H2_STREAM_WINDOW, 8 * 1024 * 1024)."
+      assert conn =~ "-define(H2_CONN_WINDOW, 32 * 1024 * 1024)."
       refute File.read!(@webtransport_h2) =~ "connection_window_size"
     end
 
