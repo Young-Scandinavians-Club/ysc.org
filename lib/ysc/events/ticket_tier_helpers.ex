@@ -27,6 +27,24 @@ defmodule Ysc.Events.TicketTierHelpers do
   def donation_ticket?(_), do: false
 
   @doc """
+  Returns true when a ticket can be used at event check-in.
+
+  Confirmed event tickets qualify. Donations never do, even when confirmed.
+  """
+  def check_in_ticket?(%{status: :confirmed} = ticket),
+    do: not donation_ticket?(ticket)
+
+  def check_in_ticket?(_), do: false
+
+  @doc """
+  Returns true when any ticket in the list can be used at event check-in.
+  """
+  def has_check_in_tickets?(tickets) when is_list(tickets),
+    do: Enum.any?(tickets, &check_in_ticket?/1)
+
+  def has_check_in_tickets?(_), do: false
+
+  @doc """
   Returns true when the tier or type represents a free / RSVP tier.
   """
   def free_tier?(type) when type in @free_types, do: true

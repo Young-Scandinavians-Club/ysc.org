@@ -443,7 +443,10 @@ defmodule YscWeb.TicketQrLiveTest do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
 
-      assert_redirect(view, "/users/tickets")
+      flash = assert_redirect(view, "/users/tickets")
+
+      assert flash["error"] =~ "doesn't include tickets for check-in"
+      assert flash["error"] =~ "Donations"
     end
   end
 
@@ -508,7 +511,9 @@ defmodule YscWeb.TicketQrLiveTest do
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets/qr")
 
-      assert_redirect(view, "/users/tickets")
+      flash = assert_redirect(view, "/users/tickets")
+
+      assert flash["error"] =~ "doesn't include tickets for check-in"
     end
 
     test "renders event title and combined ticket count from multiple orders",

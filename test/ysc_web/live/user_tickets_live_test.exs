@@ -3,6 +3,8 @@ defmodule YscWeb.UserTicketsLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
+  import Ysc.TicketsFixtures
 
   describe "mount/3" do
     test "shows upcoming ticket order when user has completed order", %{
@@ -50,6 +52,61 @@ defmodule YscWeb.UserTicketsLiveTest do
         assert has_element?(view, row, ticket.reference_id)
         assert has_element?(view, row, ticket.ticket_tier.name)
       end)
+
+      assert has_element?(view, "#show-checkin-tickets-#{data.order.id}")
+    end
+
+    test "donation-only orders do not offer check-in tickets", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.reload!()
+
+      event = event_fixture()
+
+      donation_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Donation",
+          type: :donation,
+          price: nil,
+          quantity: nil
+        })
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: donation_tier,
+          status: :completed
+        })
+
+      loaded =
+        Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        |> Ysc.Repo.preload(tickets: :ticket_tier)
+
+      Enum.each(loaded.tickets, fn ticket ->
+        ticket
+        |> Ecto.Changeset.change(status: :confirmed)
+        |> Ysc.Repo.update!()
+      end)
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/users/tickets")
+      render(view)
+
+      row = "#ticket_orders-#{order.id}"
+
+      assert has_element?(view, row, "1 Donation")
+      refute has_element?(view, row, "1 Ticket")
+      refute has_element?(view, "#show-checkin-tickets-#{order.id}")
+      assert has_element?(view, row, "View order & receipt")
     end
 
     test "loads tickets page successfully", %{conn: conn} do
