@@ -336,7 +336,12 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   def mount(%{"session_id" => session_id}, _session, socket) do
     user_id = socket.assigns.current_user.id
 
-    case Scanning.fetch_membership_checkin_session(session_id, user_id) do
+    # Auth + session name/closed_at are enough for the static HTML. Event
+    # title is loaded after the WebSocket connects so first paint skips the
+    # extra `events` query.
+    case Scanning.fetch_membership_checkin_session(session_id, user_id,
+           preload: connected?(socket)
+         ) do
       {:ok, session} ->
         mount_desk(session, socket)
 

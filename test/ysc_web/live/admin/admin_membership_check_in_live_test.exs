@@ -77,13 +77,15 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
     setup [:create_admin]
 
     test "shows session name and checked-in count", %{conn: conn, admin: admin} do
-      %{session: session} = setup_session(admin)
+      %{event: event, session: session} = setup_session(admin)
 
-      {:ok, view, _html} =
+      {:ok, view, html} =
         live(conn, ~p"/admin/membership-check-in/#{session.id}")
 
       assert has_element?(view, "#member-search-form")
       assert has_element?(view, "#checked-in-members")
+      assert html =~ session.name
+      assert html =~ event.title
     end
 
     test "shows the QR Scanner button", %{conn: conn, admin: admin} do

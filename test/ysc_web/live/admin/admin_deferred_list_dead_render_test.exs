@@ -213,6 +213,55 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     refute html =~ "Static Render Check-in Event"
   end
 
+  test "dead render skips membership check-in event preload and keeps session chrome",
+       %{
+         conn: conn,
+         admin: admin
+       } do
+    event =
+      event_fixture(%{
+        organizer_id: admin.id,
+        title: "Static Render Membership Event",
+        state: :published
+      })
+
+    session =
+      event_membership_session_fixture(event, admin, %{
+        name: "Static Membership Desk"
+      })
+
+    events_pattern = ~r/FROM "events"/i
+    check_ins_pattern = ~r/FROM "session_check_ins"/i
+
+    {html, event_queries} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/membership-check-in/#{session.id}")
+          |> html_response(200)
+        end,
+        pattern: events_pattern,
+        caller_pids: [self()]
+      )
+
+    {_html, check_in_queries} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/membership-check-in/#{session.id}")
+          |> html_response(200)
+        end,
+        pattern: check_ins_pattern,
+        caller_pids: [self()]
+      )
+
+    assert event_queries == 0
+    assert check_in_queries == 0
+    assert html =~ "Static Membership Desk"
+    assert html =~ ~s|id="member-search-form"|
+    refute html =~ "Static Render Membership Event"
+  end
+
   test "dead render skips newsletter edition query and shows loading state", %{
     conn: conn,
     admin: admin
