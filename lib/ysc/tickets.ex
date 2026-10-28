@@ -1387,10 +1387,7 @@ defmodule Ysc.Tickets do
         # cancels of sibling tickets whose shares were already refunded and
         # leave them live (#1727). Keep every cancel we applied; ids that
         # raced away are already non-refundable.
-        # Test-only race injection (process-local; see tickets_test).
-        if hook = Process.get(:ysc_refund_tickets_after_fetch) do
-          hook.(tickets_to_refund)
-        end
+        maybe_inject_refund_tickets_race(tickets_to_refund)
 
         now = DateTime.utc_now()
         refund_ids = Enum.map(tickets_to_refund, & &1.id)
@@ -1412,7 +1409,7 @@ defmodule Ysc.Tickets do
           )
         end
 
-        cancelled_id_set = MapSet.new(cancelled_ids)
+        cancelled_id_set = MapSet.new(cancelled_ids || [])
 
         cancelled_tickets =
           Enum.filter(
@@ -1839,6 +1836,15 @@ defmodule Ysc.Tickets do
       where: t.status in [:confirmed, :pending],
       where: t.id in ^ticket_ids
     )
+  end
+
+  # Test-only: tickets_test injects a concurrent cancel between fetch and
+  # update_all via a process-local callback. No-op in production.
+  defp maybe_inject_refund_tickets_race(tickets_to_refund) do
+    case Process.get(:ysc_refund_tickets_after_fetch) do
+      fun when is_function(fun, 1) -> fun.(tickets_to_refund)
+      _ -> :ok
+    end
   end
 
   @doc """

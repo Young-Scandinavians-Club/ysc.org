@@ -2829,19 +2829,23 @@ defmodule Ysc.TicketsTest do
         |> Repo.update!()
       end)
 
-      assert {:ok, refund_info} =
-               Tickets.refund_tickets(
-                 order,
-                 [first.id, second.id],
-                 "overlap"
-               )
+      try do
+        assert {:ok, refund_info} =
+                 Tickets.refund_tickets(
+                   order,
+                   [first.id, second.id],
+                   "overlap"
+                 )
 
-      assert Repo.get!(Ticket, first.id).status == :cancelled
-      assert Repo.get!(Ticket, second.id).status == :cancelled
-      assert Repo.get!(Ticket, third.id).status == :pending
-      assert Tickets.get_ticket_order(order.id).status == :pending
-      assert Enum.map(refund_info.refunded_tickets, & &1.id) == [second.id]
-      assert Money.equal?(refund_info.refund_amount, Money.new(100, :USD))
+        assert Repo.get!(Ticket, first.id).status == :cancelled
+        assert Repo.get!(Ticket, second.id).status == :cancelled
+        assert Repo.get!(Ticket, third.id).status == :pending
+        assert Tickets.get_ticket_order(order.id).status == :pending
+        assert Enum.map(refund_info.refunded_tickets, & &1.id) == [second.id]
+        assert Money.equal?(refund_info.refund_amount, Money.new(100, :USD))
+      after
+        Process.delete(:ysc_refund_tickets_after_fetch)
+      end
     end
   end
 
