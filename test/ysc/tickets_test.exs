@@ -2806,6 +2806,47 @@ defmodule Ysc.TicketsTest do
       # ticket closes the order.
       assert Tickets.get_ticket_order(order.id).status == :cancelled
     end
+
+    test "concurrent cancel of a subset does not roll back sibling cancels", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      # Stripe-first callers may already have refunded [first, second] when a
+      # overlapping refund cancels `first` between fetch and update_all. The
+      # #1727 count-mismatch rollback undid `second`'s cancel and left it live.
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+
+      [first, second, third] = tickets_for_order(order.id)
+
+      Process.put(:ysc_refund_tickets_after_fetch, fn tickets ->
+        overlapping =
+          Enum.find(tickets, &(&1.id == first.id)) || List.first(tickets)
+
+        overlapping
+        |> Ticket.status_changeset(%{status: :cancelled})
+        |> Repo.update!()
+      end)
+
+      try do
+        assert {:ok, refund_info} =
+                 Tickets.refund_tickets(
+                   order,
+                   [first.id, second.id],
+                   "overlap"
+                 )
+
+        assert Repo.get!(Ticket, first.id).status == :cancelled
+        assert Repo.get!(Ticket, second.id).status == :cancelled
+        assert Repo.get!(Ticket, third.id).status == :pending
+        assert Tickets.get_ticket_order(order.id).status == :pending
+        assert Enum.map(refund_info.refunded_tickets, & &1.id) == [second.id]
+        assert Money.equal?(refund_info.refund_amount, Money.new(100, :USD))
+      after
+        Process.delete(:ysc_refund_tickets_after_fetch)
+      end
+    end
   end
 
   describe "reassign_ticket/2" do
