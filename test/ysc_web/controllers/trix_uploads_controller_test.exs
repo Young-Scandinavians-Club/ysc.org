@@ -451,6 +451,25 @@ defmodule YscWeb.TrixUploadsControllerTest do
       assert %Image{} = Media.find_image_by_content_hash(hash)
     end
 
+    test "volunteers can insert a new image through the editor" do
+      volunteer = user_fixture(%{role: :volunteer})
+      conn = log_in_user(build_conn(), volunteer)
+
+      path = write_tmp(File.read!(@tiny_png_path), "volunteer_image.png")
+      hash = Media.compute_file_hash(path)
+      count_before = Media.count_images()
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "volunteer_image.png")
+        })
+
+      assert json_response(conn, 201)["url"]
+      assert Media.count_images() == count_before + 1
+      assert %Image{user_id: user_id} = Media.find_image_by_content_hash(hash)
+      assert user_id == volunteer.id
+    end
+
     test "returns 201 using the in-flight image when the same bytes exist (processing)",
          %{conn: conn, user: user} do
       tiny_content = File.read!(@tiny_png_path)
