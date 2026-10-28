@@ -52,7 +52,11 @@ defmodule YscWeb.AdminDashboardLive do
           </p>
         </div>
         <div class="w-full md:w-96">
-          <.live_component module={YscWeb.AdminSearchComponent} id="admin-search" />
+          <.live_component
+            module={YscWeb.AdminSearchComponent}
+            id="admin-search"
+            admin_role={@admin_role}
+          />
         </div>
       </div>
       <%!-- Admin-only stats row --%>

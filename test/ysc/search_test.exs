@@ -155,6 +155,40 @@ defmodule Ysc.SearchTest do
       assert Enum.any?(result.bookings, fn b -> b.id == booking.id end)
     end
 
+    test "volunteer role omits users and bookings", %{
+      user: user,
+      booking: booking,
+      event: event
+    } do
+      by_booking =
+        Search.global_search(booking.reference_id, role: :volunteer)
+
+      assert by_booking.bookings == []
+      assert by_booking.users == []
+
+      by_name = Search.global_search("SearchTest", role: :volunteer)
+      assert by_name.users == []
+      refute Enum.any?(by_name.users, &(&1.id == user.id))
+
+      by_event =
+        Search.global_search("Searchable Event", role: :volunteer)
+
+      assert Enum.any?(by_event.events, &(&1.id == event.id))
+    end
+
+    test "admin role still returns users and bookings", %{
+      user: user,
+      booking: booking
+    } do
+      result =
+        Search.global_search(booking.reference_id, role: :admin, limit: 5)
+
+      assert Enum.any?(result.bookings, &(&1.id == booking.id))
+
+      by_name = Search.global_search("SearchTest", role: :admin)
+      assert Enum.any?(by_name.users, &(&1.id == user.id))
+    end
+
     test "finds tickets by reference_id with event title and holder name", %{
       ticket: ticket,
       event: event,

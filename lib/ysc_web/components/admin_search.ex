@@ -32,7 +32,7 @@ defmodule YscWeb.AdminSearchComponent do
           autocapitalize="off"
           enterkeyhint="search"
           spellcheck="false"
-          placeholder="Search events, posts, tickets, users, bookings..."
+          placeholder={search_placeholder(@admin_role)}
           tabindex="0"
           class="block pt-3 pb-3 ps-10 text-sm text-zinc-800 border border-zinc-200 rounded-sm w-full bg-zinc-50 focus:ring-blue-500 focus:border-blue-500"
         />
@@ -104,7 +104,11 @@ defmodule YscWeb.AdminSearchComponent do
             </.admin_magic_search_link>
           </.admin_magic_search_section>
 
-          <.admin_magic_search_section title="Users" show?={@results.users != []}>
+          <.admin_magic_search_section
+            id="admin-search-users"
+            title="Users"
+            show?={@results.users != []}
+          >
             <.admin_magic_search_link
               :for={user <- @results.users}
               navigate={~p"/admin/users/#{user.id}/details"}
@@ -117,6 +121,7 @@ defmodule YscWeb.AdminSearchComponent do
           </.admin_magic_search_section>
 
           <.admin_magic_search_section
+            id="admin-search-bookings"
             title="Bookings"
             show?={@results.bookings != []}
           >
@@ -162,7 +167,8 @@ defmodule YscWeb.AdminSearchComponent do
      |> assign(:query, "")
      |> assign(:results, empty_results())
      |> assign(:loading, false)
-     |> assign(:show_results, false)}
+     |> assign(:show_results, false)
+     |> assign_new(:admin_role, fn -> :volunteer end)}
   end
 
   @impl true
@@ -177,7 +183,11 @@ defmodule YscWeb.AdminSearchComponent do
        |> assign(:show_results, false)
        |> assign(:loading, false)}
     else
-      results = Search.global_search(query, 5)
+      results =
+        Search.global_search(query,
+          limit: 5,
+          role: socket.assigns.admin_role
+        )
 
       {:noreply,
        socket
@@ -203,4 +213,10 @@ defmodule YscWeb.AdminSearchComponent do
   defp empty_results do
     %{events: [], posts: [], tickets: [], users: [], bookings: []}
   end
+
+  # Finding 98: volunteers must not be prompted to search full-admin resources.
+  defp search_placeholder(:volunteer), do: "Search events, posts, tickets..."
+
+  defp search_placeholder(_admin_role),
+    do: "Search events, posts, tickets, users, bookings..."
 end

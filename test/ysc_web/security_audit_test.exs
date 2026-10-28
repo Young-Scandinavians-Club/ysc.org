@@ -92,6 +92,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 95 (HIGH)     Password reset and password change deleted `users_tokens` but never broadcast LiveView `"disconnect"`. Finding 87/94 already showed `mount_current_user/2` only runs on mount, so a stolen session with an already-open bookings/tickets/settings LiveView kept `current_user` and could keep acting after the victim recovered the account. First-password set (`set_user_initial_password/2`) was the leftover: OAuth / family-invite / WP-migration users who added a password left other sessions valid.
   Finding 96 (MEDIUM)   Event Tickets-tab leftover `validate-capacity`/`save-capacity` forwarded the full event param map into `update_event_editor/3`, persisting client `rendered_details` without TrixScrubber. Public `/feeds/events.atom` emits that HTML unsanitized.
   Finding 97 (HIGH)     OAuth reauth resume tokens (`reauth_resume`) were encrypted but not bound to the initiating user. `UserAuth.log_in_user/6` always starts a 5-minute `reauth_verified_at` grace window, so a member who minted a token (email/phone/password intent) could send another signed-in member `/users/settings?reauth_resume=…` during that window. Phone changes to non-US/CA numbers skip OTP and persist immediately, including `profile_params` (name/DOB).
+  Finding 98 (MEDIUM)   Volunteer dashboard magic search (`Ysc.Search.global_search/2`) had no role filter, so typing on `/admin` returned cabin bookings (member name, property, stay dates, reference) and user emails. Users and Bookings are full-admin-only (`ensure_full_admin`); clicking through was blocked, but the dropdown already disclosed the data. Same class as Finding 76.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -6807,6 +6808,108 @@ defmodule YscWeb.SecurityAuditTest do
 
       refute html =~ "We&#39;ve confirmed it&#39;s you"
       refute render(view) =~ "We've confirmed it's you"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 98 (MEDIUM): Volunteer magic search must not leak cabin bookings
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 98: volunteer magic search omits bookings and users" do
+    import Ysc.BookingsFixtures
+
+    test "volunteer dashboard search does not disclose cabin booking details",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      member =
+        user_fixture(%{
+          first_name: "Astrid",
+          last_name: "Finding98Cabin",
+          email:
+            "astrid.finding98.#{System.unique_integer([:positive])}@ysc.org"
+        })
+
+      booking =
+        booking_fixture(%{
+          user_id: member.id,
+          status: :complete,
+          reference_id:
+            "BK-F98-#{System.unique_integer([:positive]) |> rem(100_000)}"
+        })
+
+      {:ok, view, _html} = live(log_in_user(conn, volunteer), ~p"/admin")
+
+      html =
+        view
+        |> form("#admin-search-admin-search-form", %{
+          "query" => booking.reference_id
+        })
+        |> render_change()
+
+      # The query string is in the input; the leak is the stay details, not the typed ref.
+      refute has_element?(view, "#admin-search-bookings")
+      refute html =~ "Finding98Cabin"
+      refute html =~ "tahoe"
+    end
+
+    test "volunteer dashboard search does not list users by email", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      member =
+        user_fixture(%{
+          first_name: "Linnea",
+          last_name: "Finding98User",
+          email:
+            "linnea.finding98.#{System.unique_integer([:positive])}@ysc.org"
+        })
+
+      {:ok, view, _html} = live(log_in_user(conn, volunteer), ~p"/admin")
+
+      html =
+        view
+        |> form("#admin-search-admin-search-form", %{"query" => member.email})
+        |> render_change()
+
+      refute has_element?(view, "#admin-search-users")
+      refute html =~ "Finding98User"
+      refute html =~ "Linnea"
+    end
+
+    test "full admin dashboard search still returns the cabin booking", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: :admin})
+
+      member =
+        user_fixture(%{
+          first_name: "Freja",
+          last_name: "Finding98Admin",
+          email: "freja.finding98.#{System.unique_integer([:positive])}@ysc.org"
+        })
+
+      booking =
+        booking_fixture(%{
+          user_id: member.id,
+          status: :complete,
+          reference_id:
+            "BK-F98A-#{System.unique_integer([:positive]) |> rem(100_000)}"
+        })
+
+      {:ok, view, _html} = live(log_in_user(conn, admin), ~p"/admin")
+
+      html =
+        view
+        |> form("#admin-search-admin-search-form", %{
+          "query" => booking.reference_id
+        })
+        |> render_change()
+
+      assert html =~ booking.reference_id
+      assert has_element?(view, "#admin-search-bookings")
+      assert html =~ "Finding98Admin"
     end
   end
 
