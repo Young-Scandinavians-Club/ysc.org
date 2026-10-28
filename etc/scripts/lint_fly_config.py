@@ -45,6 +45,9 @@ ENV_ENTRY_RE = re.compile(r"^([A-Za-z0-9_\-]+)\s*=\s*(.*)$")
 def section_rank(name: str | None) -> int:
     if name is None:
         return -1
+    # Child tables like [http_service.checks.headers] must stay beside their parent.
+    if name.startswith("http_service.checks."):
+        return SECTION_ORDER.index("http_service.checks")
     if name in SECTION_ORDER:
         return SECTION_ORDER.index(name)
     return len(SECTION_ORDER)
@@ -168,7 +171,13 @@ def tracked_fly_files() -> list[str]:
         capture_output=True,
         text=True,
     )
-    return sorted({path for path in result.stdout.splitlines() if FLY_FILE_RE.match(Path(path).name)})
+    return sorted(
+        {
+            path
+            for path in result.stdout.splitlines()
+            if FLY_FILE_RE.match(Path(path).name) and Path(path).is_file()
+        }
+    )
 
 
 def run(paths: list[str], fix: bool) -> int:
@@ -226,6 +235,27 @@ def self_test() -> int:
         '[metrics]\n'
         'port = 4000\n'
     )
+    checks = (
+        '[[vm]]\n'
+        "size = 'x'\n"
+        '\n'
+        '[[http_service.checks]]\n'
+        "path = '/a'\n"
+        '\n'
+        '[http_service.checks.headers]\n'
+        "X-A = '1'\n"
+        '\n'
+        '[[http_service.checks]]\n'
+        "path = '/b'\n"
+        '\n'
+        '[http_service.checks.headers]\n'
+        "X-B = '2'\n"
+        '\n'
+        '[http_service]\n'
+        'internal_port = 4000\n'
+    )
+    kept = format_text(checks)
+    assert kept.index("[http_service]") < kept.index("path = '/a'") < kept.index("X-A") < kept.index("path = '/b'") < kept.index("X-B") < kept.index("[[vm]]"), kept
     got = format_text(messy)
     assert got == expected, f"unexpected output:\n{got}"
     assert format_text(got) == got, "formatter is not idempotent"
