@@ -61,7 +61,7 @@ pid_format=$!
 pid_audit=$!
 
 (
-  make shell-lint shell-format-check config-format-check >"$tmpdir/shell.log" 2>&1 &&
+  make shell-lint shell-format-check config-format-check fly-config-check >"$tmpdir/shell.log" 2>&1 &&
     echo "✓ shell" >"$tmpdir/shell.status" ||
     echo "✗ shell" >"$tmpdir/shell.status"
 ) &
