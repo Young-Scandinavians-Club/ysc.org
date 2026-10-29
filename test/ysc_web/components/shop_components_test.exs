@@ -59,4 +59,49 @@ defmodule YscWeb.ShopComponentsTest do
       assert status_display(:in_production) == {"Being made", "sky"}
     end
   end
+
+  describe "shop_empty_state/1" do
+    test "renders title, copy, and bag icon without a browse button" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.shop_empty_state id="shop-empty" title="The shop is stocking up">
+          New club gear is on the way. Check back soon.
+        </.shop_empty_state>
+        """)
+
+      assert html =~ ~s(id="shop-empty")
+      assert html =~ "The shop is stocking up"
+      assert html =~ "New club gear is on the way. Check back soon."
+      assert html =~ "rounded-3xl bg-zinc-50 px-6 py-24 text-center"
+      assert html =~ "hero-shopping-bag"
+      assert html =~ ~s(<h2 class="type-title text-2xl text-zinc-900")
+      refute html =~ "Browse the shop"
+      refute html =~ ~s(id="cart-browse")
+    end
+
+    test "renders the browse-the-shop button when browse_id is set" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.shop_empty_state
+          id="cart-empty"
+          title="Your cart is empty"
+          browse_id="cart-browse"
+        >
+          Find something you like in the shop.
+        </.shop_empty_state>
+        """)
+
+      assert html =~ ~s(id="cart-empty")
+      assert html =~ "Your cart is empty"
+      assert html =~ "Find something you like in the shop."
+      assert html =~ ~s(id="cart-browse")
+      assert html =~ "Browse the shop"
+      assert html =~ ~s(href="/shop")
+      assert html =~ "mt-8 motion-safe:active:scale-[0.98]"
+    end
+  end
 end

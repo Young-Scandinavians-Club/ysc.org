@@ -10,7 +10,9 @@ defmodule YscWeb.ShopComponents do
   use Phoenix.Component
   use YscWeb, :verified_routes
 
-  import YscWeb.CoreComponents, only: [badge: 1, icon: 1, page_masthead: 1]
+  import YscWeb.CoreComponents,
+    only: [badge: 1, button: 1, icon: 1, page_masthead: 1]
+
   import Ysc.MoneyHelper, only: [format_price: 1]
 
   alias Phoenix.LiveView.JS
@@ -133,6 +135,55 @@ defmodule YscWeb.ShopComponents do
       <div class="aspect-[4/3] max-w-xl rounded-2xl bg-zinc-200"></div>
       <div class="h-4 w-3/4 rounded-sm bg-zinc-200"></div>
       <div class="h-4 w-1/2 rounded-sm bg-zinc-100"></div>
+    </div>
+    """
+  end
+
+  @doc """
+  Centered empty-state panel for shop pages with nothing to show.
+
+  Pass `browse_id` to include the standard "Browse the shop" button.
+
+  ## Examples
+
+      <.shop_empty_state id="shop-empty" title="The shop is stocking up">
+        New club gear is on the way. Check back soon.
+      </.shop_empty_state>
+
+      <.shop_empty_state
+        id="cart-empty"
+        title="Your cart is empty"
+        browse_id="cart-browse"
+      >
+        Find something you like in the shop.
+      </.shop_empty_state>
+  """
+  attr :id, :string, required: true
+  attr :title, :string, required: true
+  attr :icon, :string, default: "hero-shopping-bag"
+
+  attr :browse_id, :string,
+    default: nil,
+    doc: "When set, renders a Browse the shop button with this DOM id"
+
+  slot :inner_block, required: true
+
+  def shop_empty_state(assigns) do
+    ~H"""
+    <div id={@id} class="rounded-3xl bg-zinc-50 px-6 py-24 text-center">
+      <.icon name={@icon} class="mx-auto mb-6 size-12 text-zinc-400" />
+      <h2 class="type-title text-2xl text-zinc-900">{@title}</h2>
+      <p class="mt-3 text-lg text-zinc-600">
+        {render_slot(@inner_block)}
+      </p>
+      <.button
+        :if={@browse_id}
+        id={@browse_id}
+        navigate={~p"/shop"}
+        class="mt-8 motion-safe:active:scale-[0.98]"
+      >
+        Browse the shop
+      </.button>
     </div>
     """
   end
