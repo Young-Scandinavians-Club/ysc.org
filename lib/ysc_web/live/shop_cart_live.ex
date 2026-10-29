@@ -110,22 +110,14 @@ defmodule YscWeb.ShopCartLive do
     >
       <.shop_page_loading :if={!@async_data_loaded} id="shop-cart-loading" />
 
-      <div
+      <.shop_empty_state
         :if={@async_data_loaded && @lines == []}
         id="cart-empty"
-        class="rounded-3xl bg-zinc-50 px-6 py-24 text-center"
+        title="Your cart is empty"
+        browse_id="cart-browse"
       >
-        <.icon name="hero-shopping-bag" class="mx-auto mb-6 size-12 text-zinc-400" />
-        <h2 class="type-title text-2xl text-zinc-900">Your cart is empty</h2>
-        <p class="mt-3 text-lg text-zinc-600">
-          Find something you like in the shop.
-        </p>
-        <.button
-          id="cart-browse"
-          navigate={~p"/shop"}
-          class="mt-8 motion-safe:active:scale-[0.98]"
-        >Browse the shop</.button>
-      </div>
+        Find something you like in the shop.
+      </.shop_empty_state>
 
       <div
         :if={@async_data_loaded && @lines != []}

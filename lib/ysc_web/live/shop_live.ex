@@ -220,17 +220,13 @@ defmodule YscWeb.ShopLive do
         </div>
       </div>
 
-      <div
+      <.shop_empty_state
         :if={@async_data_loaded && @products == []}
         id="shop-empty"
-        class="rounded-3xl bg-zinc-50 px-6 py-24 text-center"
+        title="The shop is stocking up"
       >
-        <.icon name="hero-shopping-bag" class="mx-auto mb-6 size-12 text-zinc-400" />
-        <h2 class="type-title text-2xl text-zinc-900">The shop is stocking up</h2>
-        <p class="mt-3 text-lg text-zinc-600">
-          New club gear is on the way. Check back soon.
-        </p>
-      </div>
+        New club gear is on the way. Check back soon.
+      </.shop_empty_state>
 
       <div :if={@async_data_loaded && @products != []} id="shop-toolbar">
         <div class="flex items-center justify-between gap-4">

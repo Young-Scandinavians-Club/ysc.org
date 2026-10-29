@@ -76,22 +76,14 @@ defmodule YscWeb.ShopOrdersLive do
     >
       <.shop_page_loading :if={!@async_data_loaded} id="shop-orders-loading" />
 
-      <div
+      <.shop_empty_state
         :if={@async_data_loaded && @orders == []}
         id="orders-empty"
-        class="rounded-3xl bg-zinc-50 px-6 py-24 text-center"
+        title="No orders yet"
+        browse_id="orders-browse"
       >
-        <.icon name="hero-shopping-bag" class="mx-auto mb-6 size-12 text-zinc-400" />
-        <h2 class="type-title text-2xl text-zinc-900">No orders yet</h2>
-        <p class="mt-3 text-lg text-zinc-600">
-          When you buy something from the shop, it will show up here.
-        </p>
-        <.button
-          id="orders-browse"
-          navigate={~p"/shop"}
-          class="mt-8 motion-safe:active:scale-[0.98]"
-        >Browse the shop</.button>
-      </div>
+        When you buy something from the shop, it will show up here.
+      </.shop_empty_state>
 
       <ul
         :if={@async_data_loaded && @orders != []}
