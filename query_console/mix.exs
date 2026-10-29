@@ -128,11 +128,18 @@ defmodule QueryConsole.MixProject do
       # (EEF-CVE-2026-114213), WebSocket frames after close
       # (EEF-CVE-2026-110314). Defaults: max_concurrent_streams 500,
       # max_header_list_size 262144. HTTP/2 read_body may return more
-      # than :length (up to the stream window). We use
-      # Bandit.PhoenixAdapter (bandit_pid/1 for idle shutdown) and do
-      # not set http_2_options or call Plug.Conn.read_body ourselves.
-      # Public adapter APIs are unchanged.
-      {:bandit, "~> 1.14.0"},
+      # than :length (up to the stream window).
+      # 1.14.1: collect HTTP/2 request bodies into one binary so 1-byte
+      # DATA frames cannot amplify stream-process memory
+      # (EEF-CVE-2026-116078 HIGH / GHSA-pxjf-g536-7r93). Also strip
+      # connection-specific HTTP/2 response headers, reject host vs
+      # :authority mismatch, close HTTP/1 after 2xx CONNECT, trim HTTP/1
+      # header trailing whitespace, and parse Accept-Encoding q-values
+      # with the RFC 9110 grammar. We use Bandit.PhoenixAdapter
+      # (bandit_pid/1 for idle shutdown) and do not set http_2_options
+      # or call Plug.Conn.read_body ourselves. Public adapter APIs are
+      # unchanged.
+      {:bandit, "~> 1.14.1"},
       # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
       # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
       # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
