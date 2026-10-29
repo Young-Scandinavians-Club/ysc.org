@@ -165,6 +165,8 @@ defmodule YscWeb.Authorization.PolicyMatrixTest do
         admin_panel_access
         event_delete_draft
         event_publish
+        event_read_unpublished
+        post_read_unpublished
       )a,
     owner_or_staff: ~w(
         ticket_detail_create ticket_detail_read ticket_detail_update

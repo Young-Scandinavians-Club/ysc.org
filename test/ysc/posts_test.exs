@@ -1494,6 +1494,7 @@ defmodule Ysc.PostsTest do
       volunteer = user_fixture(%{role: :volunteer})
 
       assert Posts.get_post_for_page(draft.id, member) == nil
+      assert Posts.get_post_for_page(draft.id, nil) == nil
       assert %Post{id: id} = Posts.get_post_for_page(draft.id, admin)
       assert id == draft.id
       assert %Post{id: id} = Posts.get_post_for_page(draft.id, volunteer)

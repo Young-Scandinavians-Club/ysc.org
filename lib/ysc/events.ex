@@ -21,7 +21,6 @@ defmodule Ysc.Events do
   alias Ysc.Events.PricingDisplay
   alias Ysc.Accounts.User
   alias Ysc.Avatars.Avatar
-  alias Ysc.StaffPreview
   alias YscWeb.Authorization
   alias Ysc.Tickets.TicketOrder
 
@@ -225,7 +224,7 @@ defmodule Ysc.Events do
   end
 
   defp get_staff_preview_event(id, viewer) do
-    if StaffPreview.staff_content_preview?(viewer) do
+    if Authorization.can?(viewer, :event_read_unpublished) do
       case Ecto.ULID.cast(id) do
         {:ok, id} ->
           from(e in Event,
@@ -240,7 +239,7 @@ defmodule Ysc.Events do
   end
 
   defp get_staff_preview_event_by_reference(reference_id, viewer) do
-    if StaffPreview.staff_content_preview?(viewer) do
+    if Authorization.can?(viewer, :event_read_unpublished) do
       from(e in Event,
         where:
           e.reference_id == ^reference_id and

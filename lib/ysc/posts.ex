@@ -12,7 +12,7 @@ defmodule Ysc.Posts do
   alias Ysc.Accounts.User
   alias Ysc.Avatars.Avatar
   alias Ysc.Media.Image
-  alias Ysc.StaffPreview
+  alias YscWeb.Authorization
 
   # Home / news cards: title, preview/excerpt, reading time, author identity,
   # cover. Omits `deleted_on`. Author skips hashed_password / bios / Stripe
@@ -205,7 +205,7 @@ defmodule Ysc.Posts do
   end
 
   defp get_staff_preview_post(id, viewer, preloads) do
-    if StaffPreview.staff_content_preview?(viewer) do
+    if Authorization.can?(viewer, :post_read_unpublished) do
       case Ecto.ULID.cast(id) do
         {:ok, id} ->
           from(p in Post,
@@ -221,7 +221,7 @@ defmodule Ysc.Posts do
   end
 
   defp get_staff_preview_post_by_url_name(url_name, viewer, preloads) do
-    if StaffPreview.staff_content_preview?(viewer) do
+    if Authorization.can?(viewer, :post_read_unpublished) do
       from(p in Post,
         where:
           p.url_name == ^url_name and p.state in ^@staff_preview_post_states

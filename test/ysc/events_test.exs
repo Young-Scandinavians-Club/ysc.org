@@ -6068,6 +6068,7 @@ defmodule Ysc.EventsTest do
       volunteer = user_fixture(%{role: :volunteer})
 
       assert Events.get_event_for_page(draft.id, member) == nil
+      assert Events.get_event_for_page(draft.id, nil) == nil
       assert %Event{id: id} = Events.get_event_for_page(draft.id, admin)
       assert id == draft.id
       assert %Event{id: id} = Events.get_event_for_page(draft.id, volunteer)

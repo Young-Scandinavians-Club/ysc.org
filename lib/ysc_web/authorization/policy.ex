@@ -59,7 +59,9 @@ defmodule YscWeb.Authorization.Policy do
   # ---------------------------------------------------------------------------
 
   # Volunteers write news; they cannot delete (drafts are soft-deleted
-  # through `:post_update`). Reads are public; the context hides unpublished posts.
+  # through `:post_update`). Reads are public;
+  # `read_unpublished` (staff) lets the context show drafts and scheduled
+  # posts for preview.
   object :post do
     action :create do
       allow role: :admin
@@ -77,6 +79,11 @@ defmodule YscWeb.Authorization.Policy do
 
     action :delete do
       deny true
+    end
+
+    action :read_unpublished do
+      allow role: :admin
+      allow role: :volunteer
     end
   end
 
@@ -444,7 +451,9 @@ defmodule YscWeb.Authorization.Policy do
   # Volunteers create, edit and publish events, and may delete drafts
   # (`delete_draft`). Unpublishing, cancelling and deleting scheduled events
   # are admin-only. `Events` picks `delete_draft` or `delete` from the event's
-  # state. Reads are public; the context hides unpublished events.
+  # state. Reads are public;
+  # `read_unpublished` (staff) lets the context show unpublished events for
+  # preview.
   object :event do
     action :create do
       allow role: :admin
@@ -478,6 +487,11 @@ defmodule YscWeb.Authorization.Policy do
     end
 
     action :delete_draft do
+      allow role: :admin
+      allow role: :volunteer
+    end
+
+    action :read_unpublished do
       allow role: :admin
       allow role: :volunteer
     end
