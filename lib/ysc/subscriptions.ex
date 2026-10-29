@@ -60,6 +60,44 @@ defmodule Ysc.Subscriptions do
     from(s in Subscription, where: s.user_id == ^user_id)
   end
 
+  @doc """
+  True when the user (or their primary, for sub-accounts) has held a real
+  membership subscription before.
+
+  Counts any row that reached a live status, WP-migrated `migrated_*`
+  placeholders, and canceled rows that have a membership payment recorded
+  against them. Ignores `incomplete` / `incomplete_expired` rows and canceled
+  rows that were never paid (e.g. a checkout abandoned when the applicant
+  switched plans). Used to tell a lapsed member rejoining from a newly
+  approved applicant paying for the first time.
+  """
+  def returning_member?(nil), do: false
+
+  def returning_member?(%{id: id, primary_user_id: primary_user_id}) do
+    (primary_user_id || id)
+    |> prior_membership_query()
+    |> Repo.exists?()
+  end
+
+  defp prior_membership_query(user_id) do
+    paid_entries =
+      from(e in Ysc.Ledgers.LedgerEntry,
+        where:
+          e.related_entity_type == :membership and
+            e.related_entity_id == parent_as(:subscription).id,
+        select: 1
+      )
+
+    from(s in Subscription,
+      as: :subscription,
+      where:
+        s.user_id == ^user_id and
+          s.stripe_status not in ["incomplete", "incomplete_expired"] and
+          (s.stripe_status not in ["canceled", "cancelled"] or
+             like(s.stripe_id, "migrated_%") or exists(paid_entries))
+    )
+  end
+
   # Stripe still retries or will resume charging these statuses. Canceled /
   # incomplete_expired rows and `migrated_*` placeholders are not real Stripe
   # subscriptions and must not block payment-method changes.
@@ -2688,6 +2726,11 @@ defmodule Ysc.Subscriptions do
       where: s.user_id == ^user_id,
       preload: :subscription_items
     )
+  end
+
+  @doc false
+  def ci_query_explain_prior_membership_query do
+    prior_membership_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false

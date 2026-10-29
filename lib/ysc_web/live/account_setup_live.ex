@@ -881,13 +881,16 @@ defmodule YscWeb.AccountSetupLive do
     user_needs = compute_user_needs(user, check_payment?: true)
 
     if is_owner and user_needs.membership_activation do
+      returning_member? = Subscriptions.returning_member?(user)
+
       case Subscriptions.activate_membership_with_saved_payment_method(user,
              return_url: membership_return_url(user)
            ) do
         {:ok, status} when status in [:activated, :already_active] ->
           YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
             user,
-            status
+            status,
+            returning_member: returning_member?
           )
 
           refreshed = Accounts.get_user!(user.id, [:registration_form])
@@ -913,6 +916,8 @@ defmodule YscWeb.AccountSetupLive do
 
       connected?(socket) and setup_owner?(socket) and
           user_needs.membership_activation ->
+        returning_member? = Subscriptions.returning_member?(fresh_user)
+
         case Subscriptions.activate_membership_with_saved_payment_method(
                fresh_user,
                return_url: membership_return_url(fresh_user)
@@ -920,7 +925,8 @@ defmodule YscWeb.AccountSetupLive do
           {:ok, status} when status in [:activated, :already_active] ->
             YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
               fresh_user,
-              status
+              status,
+              returning_member: returning_member?
             )
 
             refresh_setup_user_and_needs(socket)
@@ -1627,6 +1633,7 @@ defmodule YscWeb.AccountSetupLive do
   def handle_event("retry_membership_activation", _params, socket) do
     if setup_owner?(socket) do
       user = Accounts.get_user!(socket.assigns.user.id, [:registration_form])
+      returning_member? = Subscriptions.returning_member?(user)
 
       case Subscriptions.activate_membership_with_saved_payment_method(user,
              return_url: membership_return_url(user)
@@ -1634,7 +1641,8 @@ defmodule YscWeb.AccountSetupLive do
         {:ok, status} when status in [:activated, :already_active] ->
           YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
             user,
-            status
+            status,
+            returning_member: returning_member?
           )
 
           socket = refresh_setup_user_and_needs(socket)
@@ -1717,13 +1725,16 @@ defmodule YscWeb.AccountSetupLive do
 
     {socket, toast_message, activated?} =
       if user.state == :active and unpaid_active_primary?(user) do
+        returning_member? = Subscriptions.returning_member?(user)
+
         case Subscriptions.activate_membership_with_saved_payment_method(user,
                return_url: membership_return_url(user)
              ) do
           {:ok, status} when status in [:activated, :already_active] ->
             YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
               user,
-              status
+              status,
+              returning_member: returning_member?
             )
 
             socket = refresh_setup_user_and_needs(socket)

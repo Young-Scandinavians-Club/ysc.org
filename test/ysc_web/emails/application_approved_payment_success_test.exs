@@ -138,4 +138,17 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
       to: {nil, user.email}
     )
   end
+
+  test "maybe_schedule/3 skips returning members, whose application was approved long ago" do
+    user = user_fixture()
+
+    assert :ok =
+             ApplicationApprovedPaymentSuccess.maybe_schedule(
+               user,
+               :activated,
+               returning_member: true
+             )
+
+    refute_email_sent()
+  end
 end

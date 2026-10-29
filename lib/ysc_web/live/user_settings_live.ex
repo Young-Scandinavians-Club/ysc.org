@@ -4888,6 +4888,7 @@ defmodule YscWeb.UserSettingsLive do
 
     if unpaid_primary? do
       return_url = YscWeb.Endpoint.url() <> "/billing/user/#{user.id}/finalize"
+      returning_member? = Subscriptions.returning_member?(user)
 
       case Subscriptions.activate_membership_with_saved_payment_method(user,
              return_url: return_url
@@ -4895,7 +4896,8 @@ defmodule YscWeb.UserSettingsLive do
         {:ok, status} when status in [:activated, :already_active] ->
           YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
             user,
-            status
+            status,
+            returning_member: returning_member?
           )
 
           _ = MembershipCache.invalidate_user(user.id)
