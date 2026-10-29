@@ -11,11 +11,16 @@ defmodule YscWeb.EventDetailsQueryTest do
 
   import Phoenix.LiveViewTest
   import Ysc.EventsFixtures
-  import Ysc.TestDataFactory, only: [event_with_state: 2]
+
+  import Ysc.TestDataFactory,
+    only: [event_with_state: 2, user_with_membership: 2]
 
   alias Ysc.Events.EventPricingCache
+  alias Ysc.Subscriptions
 
   @tier_list_pattern ~r/FROM "ticket_tiers".*GROUP BY/s
+  @images_pattern ~r/FROM "images"/i
+  @subscription_exists_pattern ~r/SELECT TRUE FROM "subscriptions"/i
 
   describe "tier loading" do
     setup do
@@ -112,6 +117,138 @@ defmodule YscWeb.EventDetailsQueryTest do
       assert html =~ "/uploads/test_image_optimized.jpg"
       assert html =~ ~s(rel="canonical")
       assert html =~ "/events/#{event.id}"
+    end
+
+    test "primed pricing cache dead render does not query images", %{
+      conn: conn
+    } do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Cached Cover Event"}
+        )
+
+      ticket_tier_fixture(%{event_id: event.id})
+      EventPricingCache.enrich_event(event)
+
+      {_html, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/events/#{event.id}")
+            |> html_response(200)
+          end,
+          pattern: @images_pattern,
+          caller_pids: [self()]
+        )
+
+      # Before: Repo.preload(:cover_image) even when the pricing cache already
+      # holds the image. After: SEO and the hero reuse the cached payload.
+      assert query_count == 0
+    end
+
+    test "cold pricing cache dead render loads the cover once", %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Cold Cover Event"}
+        )
+
+      ticket_tier_fixture(%{event_id: event.id})
+
+      {_html, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/events/#{event.id}")
+            |> html_response(200)
+          end,
+          pattern: @images_pattern,
+          caller_pids: [self()]
+        )
+
+      # Before: preload + EventPricingCache batch_load_images (2). After: enrich only.
+      assert query_count == 1
+    end
+  end
+
+  describe "membership extras on first paint" do
+    setup do
+      EventPricingCache.invalidate()
+      :ok
+    end
+
+    test "Repo.exists? subscription lookup matches the SELECT TRUE pattern" do
+      user = user_with_membership(:none, %{})
+
+      {_result, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Subscriptions.has_any_subscription?(user) end,
+          pattern: @subscription_exists_pattern,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 1
+    end
+
+    test "lapsed member dead render reuses membership cache and shows renew copy",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:none, %{state: :active})
+
+      {:ok, _expired_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_expired_query_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Expired Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      conn = log_in_user(conn, user)
+      event = event_fixture(%{title: "Lapsed Member Event", state: :published})
+      ticket_tier_fixture(%{event_id: event.id})
+
+      {html, exists_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/events/#{event.id}")
+            |> html_response(200)
+          end,
+          pattern: @subscription_exists_pattern,
+          caller_pids: [self()]
+        )
+
+      # UserAuth already loaded subscriptions for current_membership. Do not
+      # issue a second EXISTS for expired-vs-never copy.
+      assert exists_count == 0
+      assert html =~ "Your membership has expired"
+      assert html =~ "renew to buy tickets"
+    end
+
+    test "never-subscribed member dead render skips subscription EXISTS", %{
+      conn: conn
+    } do
+      user = user_with_membership(:none, %{state: :active})
+      conn = log_in_user(conn, user)
+      event = event_fixture(%{title: "New Member Event", state: :published})
+      ticket_tier_fixture(%{event_id: event.id})
+
+      {html, exists_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/events/#{event.id}")
+            |> html_response(200)
+          end,
+          pattern: @subscription_exists_pattern,
+          caller_pids: [self()]
+        )
+
+      assert exists_count == 0
+      assert html =~ "Choose a membership and pay your dues to buy tickets"
     end
   end
 end

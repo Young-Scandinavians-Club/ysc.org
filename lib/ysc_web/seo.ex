@@ -8,7 +8,6 @@ defmodule YscWeb.SEO do
   """
 
   alias Ysc.Media.Image
-  alias Ysc.Events.Event
   alias Ysc.Posts.Post
 
   @default_description "Young Scandinavians Club — community, events, and cabins in California."
@@ -160,20 +159,22 @@ defmodule YscWeb.SEO do
   Uses the event title, short `description` field, cover image as the link poster,
   and the canonical `/events/:id` URL.
   """
-  def assigns_for_event(%Event{} = event) do
+  def assigns_for_event(event) when is_map(event) do
     description =
-      truncate_description(event.description) ||
+      truncate_description(Map.get(event, :description)) ||
         "View event details and purchase tickets on Young Scandinavians Club."
 
     path = "/events/#{event.id}"
+
+    cover =
+      loaded_assoc(event, :cover_image) || Map.get(event, :image)
 
     %{
       page_title: event.title,
       meta_description: description,
       og_type: "website",
       og_url: absolute_url(path),
-      og_image:
-        image_url(loaded_assoc(event, :cover_image)) || default_og_image_url(),
+      og_image: image_url(cover) || default_og_image_url(),
       canonical_url: absolute_url(path)
     }
   end

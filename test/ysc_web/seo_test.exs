@@ -195,5 +195,29 @@ defmodule YscWeb.SEOTest do
 
       assert seo.meta_description =~ "View event details"
     end
+
+    test "accepts an enriched event map using :image for the cover" do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "Enriched Map Event",
+            description: "Cover comes from the pricing cache payload."
+          }
+        )
+
+      image = Repo.preload(event, :cover_image).cover_image
+
+      seo =
+        SEO.assigns_for_event(%{
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          image: image
+        })
+
+      assert seo.page_title == "Enriched Map Event"
+      assert seo.og_image =~ "/uploads/test_image_optimized.jpg"
+    end
   end
 end
