@@ -36,6 +36,14 @@ defmodule YscWeb.ShopComponents do
   attr :active, :atom, values: [:shop, :cart, :orders], required: true
   attr :cart_count, :integer, default: 0
 
+  attr :signed_in?, :boolean,
+    default: true,
+    doc: "false for visitors, who have no orders to list"
+
+  attr :can_buy?, :boolean,
+    default: true,
+    doc: "false for visitors and non-members, who have no cart to open"
+
   attr :section_only?, :boolean,
     default: false,
     doc:
@@ -61,6 +69,8 @@ defmodule YscWeb.ShopComponents do
         <.shop_nav
           active={@active}
           cart_count={@cart_count}
+          signed_in?={@signed_in?}
+          can_buy?={@can_buy?}
           section_only?={@section_only?}
         />
       </div>
@@ -69,6 +79,44 @@ defmodule YscWeb.ShopComponents do
       <div class="mx-auto max-w-(--breakpoint-xl) px-4 pb-16 md:pb-24">
         {render_slot(@inner_block)}
       </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Explains that only active members can buy, and where to go to become one.
+  Shown in place of the buy controls to visitors and non-members.
+  """
+  attr :id, :string, default: "shop-members-notice"
+  attr :signed_in?, :boolean, required: true, doc: "false sends to sign in"
+  attr :redirect_to, :string, required: true, doc: "where sign in returns to"
+  attr :class, :any, default: nil
+
+  def shop_members_notice(assigns) do
+    ~H"""
+    <div id={@id} class={["rounded-2xl bg-zinc-50 p-5 md:p-6", @class]}>
+      <p class="type-subhead text-lg text-zinc-900">
+        Club gear is for YSC members
+      </p>
+      <p class="mt-1 text-base text-zinc-600">
+        <%= if @signed_in? do %>
+          Anyone can look around, but you need an active membership to buy.
+        <% else %>
+          Anyone can look around. Sign in with your member account to buy.
+        <% end %>
+      </p>
+      <.link
+        id={"#{@id}-action"}
+        navigate={
+          if(@signed_in?,
+            do: ~p"/users/membership",
+            else: ~p"/users/log-in?#{%{redirect_to: @redirect_to}}"
+          )
+        }
+        class="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-6 text-base font-medium text-white transition hover:bg-zinc-700 motion-safe:active:scale-[0.97]"
+      >
+        {if @signed_in?, do: "See membership", else: "Sign in"}
+      </.link>
     </div>
     """
   end
@@ -96,6 +144,8 @@ defmodule YscWeb.ShopComponents do
   """
   attr :active, :atom, values: [:shop, :cart, :orders], required: true
   attr :cart_count, :integer, default: 0
+  attr :signed_in?, :boolean, default: true
+  attr :can_buy?, :boolean, default: true
   attr :section_only?, :boolean, default: false
 
   def shop_nav(assigns) do
@@ -116,6 +166,7 @@ defmodule YscWeb.ShopComponents do
           Products
         </.shop_nav_link>
         <.shop_nav_link
+          :if={@signed_in?}
           id="shop-nav-orders"
           to={~p"/shop/orders"}
           icon="hero-truck"
@@ -126,6 +177,7 @@ defmodule YscWeb.ShopComponents do
       </div>
 
       <.link
+        :if={@can_buy?}
         id="shop-nav-cart"
         navigate={~p"/shop/cart"}
         aria-current={@active == :cart && "page"}

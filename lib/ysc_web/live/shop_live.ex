@@ -1,6 +1,7 @@
 defmodule YscWeb.ShopLive do
   @moduledoc """
-  The merch shop: every product members can buy.
+  The merch shop: every product members can buy. Anyone can browse it; only
+  active members get a cart (see `YscWeb.ShopAccess`).
 
   The first HTML is a skeleton. Catalog and cart-summary queries run after the
   WebSocket connects so the HTTP response is never blocked on those loads, and
@@ -8,7 +9,7 @@ defmodule YscWeb.ShopLive do
   """
   use YscWeb, :live_view
 
-  on_mount {YscWeb.ShopAccess, :ensure_member}
+  on_mount {YscWeb.ShopAccess, :assign_buyer}
 
   require Ysc.Logging
 
@@ -79,7 +80,8 @@ defmodule YscWeb.ShopLive do
   end
 
   defp load_catalog_async(socket) do
-    user = socket.assigns.current_user
+    # Only buyers have a cart worth summarising.
+    user = if socket.assigns.can_buy?, do: socket.assigns.current_user
 
     socket
     |> assign(:catalog_task_started?, true)
@@ -196,7 +198,16 @@ defmodule YscWeb.ShopLive do
       title="Club Gear"
       active={:shop}
       cart_count={@cart_summary.count}
+      signed_in?={@current_user != nil}
+      can_buy?={@can_buy?}
     >
+      <.shop_members_notice
+        :if={!@can_buy?}
+        signed_in?={@current_user != nil}
+        redirect_to={~p"/shop"}
+        class="mb-8"
+      />
+
       <div
         :if={!@async_data_loaded}
         id="shop-loading"
