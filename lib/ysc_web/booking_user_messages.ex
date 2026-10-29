@@ -18,7 +18,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def modification_forfeiture_title do
-    "No refunds for changed dates"
+    "No refunds after you change this booking"
   end
 
   def modification_forfeiture_body do
@@ -322,11 +322,11 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def door_code_not_ready_email_body do
-    "Your door code isn't ready yet. Open your booking page with View Booking Details below — if the code still isn't there, contact the Cabin Master (details at the bottom of this email)."
+    "Your door code isn't ready yet. It will show on your booking page #{door_code_page_timing_phrase()} — use View Booking Details below. Contact the Cabin Master (details at the bottom of this email) only if it's still missing then."
   end
 
   def door_code_not_ready_sms_phrase do
-    "Your door code isn't ready yet. Check your booking page, or contact the Cabin Master."
+    "Your door code isn't ready yet. It shows on your booking page #{door_code_page_timing_phrase()}. Contact the Cabin Master if it's still missing then."
   end
 
   def checkout_manage_booking_step do
