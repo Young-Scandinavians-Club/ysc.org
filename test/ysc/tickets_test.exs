@@ -2847,6 +2847,87 @@ defmodule Ysc.TicketsTest do
         Process.delete(:ysc_refund_tickets_after_fetch)
       end
     end
+
+    test "concurrent cancel of last remaining tickets still closes the order",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
+      # Same Stripe-first overlap as above, but these are the last live
+      # tickets. remaining_tickets == 0 must still cancel the order; a
+      # count-mismatch rollback would leave both tickets and the order live
+      # after money had already moved.
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      [first, second] = tickets_for_order(order.id)
+
+      Process.put(:ysc_refund_tickets_after_fetch, fn tickets ->
+        overlapping =
+          Enum.find(tickets, &(&1.id == first.id)) || List.first(tickets)
+
+        overlapping
+        |> Ticket.status_changeset(%{status: :cancelled})
+        |> Repo.update!()
+      end)
+
+      try do
+        assert {:ok, refund_info} =
+                 Tickets.refund_tickets(
+                   order,
+                   [first.id, second.id],
+                   "overlap last"
+                 )
+
+        assert Repo.get!(Ticket, first.id).status == :cancelled
+        assert Repo.get!(Ticket, second.id).status == :cancelled
+        assert Tickets.get_ticket_order(order.id).status == :cancelled
+        assert Enum.map(refund_info.refunded_tickets, & &1.id) == [second.id]
+      after
+        Process.delete(:ysc_refund_tickets_after_fetch)
+      end
+    end
+
+    test "concurrent cancel of every requested ticket still succeeds", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      # Both refunded ids race to cancelled before update_all. A count of 0
+      # must not roll the transaction back: that would un-cancel them (same
+      # txn as the test hook) and leave them check-inable after Stripe
+      # already refunded their shares.
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 3})
+
+      [first, second, third] = tickets_for_order(order.id)
+
+      Process.put(:ysc_refund_tickets_after_fetch, fn tickets ->
+        Enum.each(tickets, fn ticket ->
+          ticket
+          |> Ticket.status_changeset(%{status: :cancelled})
+          |> Repo.update!()
+        end)
+      end)
+
+      try do
+        assert {:ok, refund_info} =
+                 Tickets.refund_tickets(
+                   order,
+                   [first.id, second.id],
+                   "all raced"
+                 )
+
+        assert refund_info.refunded_tickets == []
+        assert Repo.get!(Ticket, first.id).status == :cancelled
+        assert Repo.get!(Ticket, second.id).status == :cancelled
+        assert Repo.get!(Ticket, third.id).status == :pending
+        assert Tickets.get_ticket_order(order.id).status == :pending
+      after
+        Process.delete(:ysc_refund_tickets_after_fetch)
+      end
+    end
   end
 
   describe "reassign_ticket/2" do
