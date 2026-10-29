@@ -30,26 +30,68 @@ defmodule YscWeb.ShopBrowseTest do
   end
 
   describe "access" do
-    test "visitors are sent to sign in", %{conn: conn} do
-      assert {:error, {:redirect, %{to: "/users/log-in"}}} =
-               live(conn, ~p"/shop")
+    test "visitors can browse the shop but are not offered a cart", %{
+      conn: conn
+    } do
+      %{product: product} = tee_product()
+
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop")
+
+      assert has_element?(view, "#shop-product-#{product.id}", "Club Tee")
+      assert has_element?(view, "#shop-members-notice")
+
+      assert has_element?(
+               view,
+               "#shop-members-notice-action[href='/users/log-in?redirect_to=%2Fshop']"
+             )
+
+      refute has_element?(view, "#shop-nav-cart")
+      refute has_element?(view, "#shop-nav-orders")
     end
 
-    test "non-members are sent to the membership page", %{conn: conn} do
-      conn = log_in_user(conn, user_fixture())
+    test "non-members can browse the shop and are pointed at membership", %{
+      conn: conn
+    } do
+      %{product: product} = tee_product()
 
-      assert {:error, {:redirect, %{to: "/users/membership"}}} =
-               live(conn, ~p"/shop")
+      {:ok, view, _html} =
+        live_shop_page(log_in_user(conn, user_fixture()), ~p"/shop")
 
-      assert {:error, {:redirect, %{to: "/users/membership"}}} =
-               live(conn, ~p"/shop/cart")
+      assert has_element?(view, "#shop-product-#{product.id}", "Club Tee")
+
+      assert has_element?(
+               view,
+               "#shop-members-notice-action[href='/users/membership']"
+             )
+
+      refute has_element?(view, "#shop-nav-cart")
+      assert has_element?(view, "#shop-nav-orders")
+    end
+
+    test "the cart and checkout are for members only", %{conn: conn} do
+      for path <- [~p"/shop/cart", ~p"/shop/checkout"] do
+        assert {:error, {:redirect, %{to: "/users/log-in"}}} =
+                 live(conn, path)
+
+        assert {:error, {:redirect, %{to: "/users/membership"}}} =
+                 live(log_in_user(conn, user_fixture()), path)
+      end
     end
 
     test "active members and admins can shop", %{conn: conn} do
-      {:ok, _view, _html} = live(log_in_user(conn, member_fixture()), ~p"/shop")
+      {:ok, view, _html} =
+        live_shop_page(log_in_user(conn, member_fixture()), ~p"/shop")
 
-      {:ok, _view, _html} =
-        live(log_in_user(conn, user_fixture(%{role: "admin"})), ~p"/shop")
+      refute has_element?(view, "#shop-members-notice")
+      assert has_element?(view, "#shop-nav-cart")
+
+      {:ok, view, _html} =
+        live_shop_page(
+          log_in_user(conn, user_fixture(%{role: "admin"})),
+          ~p"/shop"
+        )
+
+      refute has_element?(view, "#shop-members-notice")
     end
 
     test "a lapsed member can still see their orders", %{conn: conn} do
@@ -57,6 +99,7 @@ defmodule YscWeb.ShopBrowseTest do
         live_shop_page(log_in_user(conn, user_fixture()), ~p"/shop/orders")
 
       assert has_element?(view, "#orders-empty")
+      refute has_element?(view, "#shop-nav-cart")
     end
   end
 
@@ -95,14 +138,16 @@ defmodule YscWeb.ShopBrowseTest do
       assert has_element?(view, "#nav-shop-mobile")
     end
 
-    test "non-members and visitors never see it", %{conn: conn} do
+    test "non-members and visitors see it too, since anyone can look", %{
+      conn: conn
+    } do
       Application.put_env(:ysc, :shop_nav_visible, true)
 
       {:ok, view, _html} = live(log_in_user(conn, user_fixture()), ~p"/events")
-      refute has_element?(view, "#nav-shop-desktop")
+      assert has_element?(view, "#nav-shop-desktop")
 
       {:ok, view, _html} = live(build_conn(), ~p"/events")
-      refute has_element?(view, "#nav-shop-desktop")
+      assert has_element?(view, "#nav-shop-desktop")
     end
   end
 
@@ -177,6 +222,60 @@ defmodule YscWeb.ShopBrowseTest do
       # product, not the Products page.
       assert has_element?(view, "#shop-nav-products[aria-current=true]")
       refute has_element?(view, "#shop-nav-products[aria-current=page]")
+    end
+
+    test "visitors see the product but not the buy controls", %{
+      product: product
+    } do
+      {:ok, view, _html} =
+        live_shop_page(build_conn(), ~p"/shop/products/#{product.id}")
+
+      assert has_element?(view, "#shop-product-price")
+      assert has_element?(view, "#shop-colors")
+      assert has_element?(view, "#shop-sizes")
+      refute has_element?(view, "#add-to-cart-form")
+      refute has_element?(view, "#add-to-cart")
+
+      expected =
+        "/users/log-in?redirect_to=%2Fshop%2Fproducts%2F#{product.id}"
+
+      assert has_element?(
+               view,
+               "#shop-members-notice-action[href='#{expected}']"
+             )
+    end
+
+    test "a hand-made add_to_cart from a visitor sends them to sign in", %{
+      product: product
+    } do
+      {:ok, view, _html} =
+        live_shop_page(build_conn(), ~p"/shop/products/#{product.id}")
+
+      view |> element("#size-xl") |> render_click()
+      render_hook(view, "add_to_cart", %{})
+
+      {path, _flash} = assert_redirect(view)
+      assert path =~ "/users/log-in"
+    end
+
+    test "a hand-made add_to_cart from a non-member is refused", %{
+      product: product
+    } do
+      user = user_fixture()
+
+      {:ok, view, _html} =
+        live_shop_page(
+          log_in_user(build_conn(), user),
+          ~p"/shop/products/#{product.id}"
+        )
+
+      refute has_element?(view, "#add-to-cart-form")
+
+      view |> element("#size-xl") |> render_click()
+      render_hook(view, "add_to_cart", %{})
+
+      assert_redirect(view, ~p"/users/membership")
+      assert Cart.summary(user).count == 0
     end
 
     test "needs a size before it can be added", %{conn: conn, product: product} do

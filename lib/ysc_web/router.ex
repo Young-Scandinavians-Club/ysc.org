@@ -531,9 +531,8 @@ defmodule YscWeb.Router do
       live "/events/:event_id/tickets/qr", TicketQrLive, :event
       live "/orders/:order_id/confirmation", OrderConfirmationLive, :index
 
-      # Merch shop (members only; see YscWeb.ShopAccess)
-      live "/shop", ShopLive, :index
-      live "/shop/products/:id", ShopProductLive, :show
+      # Merch shop: buying is members only (see YscWeb.ShopAccess); browsing
+      # is public and lives in the :current_user session below.
       live "/shop/cart", ShopCartLive, :index
       live "/shop/checkout", ShopCheckoutLive, :index
       live "/shop/orders", ShopOrdersLive, :index
@@ -561,6 +560,9 @@ defmodule YscWeb.Router do
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
       ] do
+      live "/shop", ShopLive, :index
+      live "/shop/products/:id", ShopProductLive, :show
+
       live "/family-invite/:token/accept", FamilyInviteAcceptanceLive, :index
 
       live "/family-invite/:token/logout-required",

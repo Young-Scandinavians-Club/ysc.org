@@ -9,6 +9,8 @@ defmodule YscWeb.ShopOrdersLive do
   """
   use YscWeb, :live_view
 
+  on_mount {YscWeb.ShopAccess, :assign_buyer}
+
   require Ysc.Logging
 
   import Ysc.MoneyHelper, only: [format_price: 1]
@@ -70,6 +72,7 @@ defmodule YscWeb.ShopOrdersLive do
       title="Your Orders"
       active={:orders}
       cart_count={@cart_count}
+      can_buy?={@can_buy?}
     >
       <.shop_page_loading :if={!@async_data_loaded} id="shop-orders-loading" />
 

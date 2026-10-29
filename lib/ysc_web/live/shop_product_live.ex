@@ -1,6 +1,7 @@
 defmodule YscWeb.ShopProductLive do
   @moduledoc """
   A single merch product: pick a color and size, then add it to the cart.
+  Anyone can look; only active members can add to a cart.
 
   The first HTML is a skeleton. Product and cart-summary queries run after the
   WebSocket connects so the HTTP response is never blocked on those loads, and
@@ -8,7 +9,7 @@ defmodule YscWeb.ShopProductLive do
   """
   use YscWeb, :live_view
 
-  on_mount {YscWeb.ShopAccess, :ensure_member}
+  on_mount {YscWeb.ShopAccess, :assign_buyer}
 
   require Ysc.Logging
 
@@ -42,7 +43,8 @@ defmodule YscWeb.ShopProductLive do
 
   defp maybe_load_product(socket) do
     if connected?(socket) do
-      user = socket.assigns.current_user
+      # Only buyers have a cart worth summarising.
+      user = if socket.assigns.can_buy?, do: socket.assigns.current_user
       id = socket.assigns.product_id
 
       start_async(socket, :load_product, fn ->
@@ -203,6 +205,14 @@ defmodule YscWeb.ShopProductLive do
     {:noreply, update(socket, :quantity, &max(&1 - 1, 1))}
   end
 
+  def handle_event(
+        "add_to_cart",
+        _params,
+        %{assigns: %{can_buy?: false}} = socket
+      ) do
+    {:noreply, redirect_to_join(socket)}
+  end
+
   def handle_event("add_to_cart", _params, %{assigns: %{variant: nil}} = socket) do
     {:noreply,
      YscWeb.Flash.put_toast(socket, :error, "Choose your options first.",
@@ -253,6 +263,29 @@ defmodule YscWeb.ShopProductLive do
   @impl true
   def handle_info({:hide_cart_peek, token}, socket),
     do: {:noreply, ShopCartPeek.hide_if_current(socket, token)}
+
+  # The buy controls are not rendered for non-buyers, so this is a stale tab or
+  # a hand-made event: send them to where they can become one.
+  defp redirect_to_join(%{assigns: %{current_user: nil}} = socket) do
+    socket
+    |> YscWeb.Flash.put_toast(:info, "Sign in with your member account to buy.",
+      title: "Sign in required"
+    )
+    |> push_navigate(
+      to:
+        ~p"/users/log-in?#{%{redirect_to: ~p"/shop/products/#{socket.assigns.product_id}"}}"
+    )
+  end
+
+  defp redirect_to_join(socket) do
+    socket
+    |> YscWeb.Flash.put_toast(
+      :info,
+      "The shop is for active YSC members. Renew your membership to shop.",
+      title: "Members only"
+    )
+    |> push_navigate(to: ~p"/users/membership")
+  end
 
   defp peek_item(%{product: product}, variant, quantity) do
     %{
@@ -353,6 +386,8 @@ defmodule YscWeb.ShopProductLive do
       active={:shop}
       section_only?={true}
       cart_count={@cart_summary.count}
+      signed_in?={@current_user != nil}
+      can_buy?={@can_buy?}
     >
       <.shop_page_loading id="shop-product-loading" />
     </.shop_frame>
@@ -385,6 +420,8 @@ defmodule YscWeb.ShopProductLive do
       active={:shop}
       section_only?={true}
       cart_count={@cart_summary.count}
+      signed_in?={@current_user != nil}
+      can_buy?={@can_buy?}
     >
       <.link
         id="back-to-products"
@@ -562,7 +599,14 @@ defmodule YscWeb.ShopProductLive do
             </div>
           </div>
 
+          <.shop_members_notice
+            :if={!@can_buy?}
+            signed_in?={@current_user != nil}
+            redirect_to={~p"/shop/products/#{@product_id}"}
+          />
+
           <form
+            :if={@can_buy?}
             id="add-to-cart-form"
             phx-change="set_quantity"
             phx-submit="add_to_cart"
