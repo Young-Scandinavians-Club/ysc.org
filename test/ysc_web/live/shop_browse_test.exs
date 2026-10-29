@@ -99,6 +99,7 @@ defmodule YscWeb.ShopBrowseTest do
         live_shop_page(log_in_user(conn, user_fixture()), ~p"/shop/orders")
 
       assert has_element?(view, "#orders-empty")
+      refute has_element?(view, "#shop-nav-cart")
     end
   end
 

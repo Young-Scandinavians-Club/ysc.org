@@ -13,6 +13,8 @@ defmodule YscWeb.ShopOrderLive do
   """
   use YscWeb, :live_view
 
+  on_mount {YscWeb.ShopAccess, :assign_buyer}
+
   require Ysc.Logging
 
   import YscWeb.Live.AsyncHelpers
@@ -200,6 +202,7 @@ defmodule YscWeb.ShopOrderLive do
       title="Your Order"
       active={:orders}
       cart_count={@cart_count}
+      can_buy?={@can_buy?}
     >
       <.shop_page_loading id="shop-order-loading" />
     </.shop_frame>
@@ -213,6 +216,7 @@ defmodule YscWeb.ShopOrderLive do
       title="Your Order"
       active={:orders}
       cart_count={@cart_count}
+      can_buy?={@can_buy?}
     >
       <div class="space-y-10">
         <.status_banner
