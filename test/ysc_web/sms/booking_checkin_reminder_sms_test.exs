@@ -28,6 +28,8 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
       assert body =~ "Property"
       assert body =~ "isn't ready yet"
       assert body =~ "Cabin Master"
+      assert body =~ "starting 48 hours before check-in"
+      assert body =~ "if it's still missing then"
       refute body =~ "Not Available"
       assert body =~ BookingDisplay.checkin_time_label()
     end

@@ -35,8 +35,11 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.modification_acknowledgment_required() =~
              "check the box at the bottom"
 
-    assert BookingUserMessages.modification_forfeiture_title() =~
-             "No refunds"
+    assert BookingUserMessages.modification_forfeiture_title() ==
+             "No refunds after you change this booking"
+
+    refute BookingUserMessages.modification_forfeiture_title() =~
+             "changed dates"
 
     assert BookingUserMessages.modification_forfeiture_body() =~
              "cannot get a refund later"
@@ -312,6 +315,12 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.door_code_not_ready_email_body() =~
              "Cabin Master"
 
+    assert BookingUserMessages.door_code_not_ready_email_body() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
+    assert BookingUserMessages.door_code_not_ready_email_body() =~
+             "only if it's still missing then"
+
     refute BookingUserMessages.door_code_not_ready_email_body() =~
              "Not Available"
 
@@ -320,6 +329,12 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.door_code_not_ready_sms_phrase() =~
              "Cabin Master"
+
+    assert BookingUserMessages.door_code_not_ready_sms_phrase() =~
+             BookingUserMessages.door_code_page_timing_phrase()
+
+    assert BookingUserMessages.door_code_not_ready_sms_phrase() =~
+             "if it's still missing then"
 
     refute BookingUserMessages.door_code_not_ready_sms_phrase() =~
              "Not Available"

@@ -103,7 +103,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     {view, html} = live_change(conn, booking)
 
     assert html =~ "Change Booking"
-    assert html =~ "No refunds for changed dates"
+    assert html =~ "No refunds after you change this booking"
+    refute html =~ "No refunds for changed dates"
     assert html =~ "cannot get a refund later"
     assert html =~ "Check-in &amp; Check-out Dates"
     assert has_element?(view, "#modification-dates")
@@ -129,7 +130,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert html =~ ~s|id="booking-change-loading"|
     refute html =~ booking.reference_id
     refute html =~ "Loading availability and price preview"
-    refute html =~ "No refunds for changed dates"
+    refute html =~ "No refunds after you change this booking"
   end
 
   test "submit is blocked until acknowledgment is checked", %{conn: conn} do

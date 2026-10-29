@@ -587,6 +587,8 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "isn't ready yet"
       assert text =~ "View Booking Details"
       assert text =~ "Cabin Master"
+      assert text =~ "starting 48 hours before check-in"
+      assert text =~ "only if it's still missing then"
       refute text =~ "Not Available"
       refute text =~ "Please save this code"
     end
