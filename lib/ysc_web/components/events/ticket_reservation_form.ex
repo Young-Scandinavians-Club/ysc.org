@@ -178,7 +178,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
 
   @impl true
   def handle_event("search-users", %{"value" => query}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_reservation_create) do
       {:noreply, socket}
     else
       {:noreply, AdminUserSearch.search(socket, query)}
@@ -187,7 +187,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
 
   @impl true
   def handle_event("select-user", %{"id" => id}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_reservation_create) do
       {:noreply, socket}
     else
       socket = AdminUserSearch.select(socket, id)
@@ -252,7 +252,7 @@ defmodule YscWeb.AdminEventsLive.TicketReservationForm do
         %{"ticket_reservation" => reservation_params},
         socket
       ) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_reservation_create) do
       {:noreply,
        YscWeb.Flash.put_toast(
          socket,

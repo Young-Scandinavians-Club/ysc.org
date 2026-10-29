@@ -14,7 +14,7 @@ defmodule YscWeb.AdminExportController do
     user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
 
     cond do
-      is_nil(user) or user.role not in [:admin, :volunteer] ->
+      not YscWeb.Authorization.can?(user, :admin_panel_access) ->
         YscWeb.ErrorHTML.render_page(conn, :"403")
 
       not AdminExportFiles.valid_filename?(filename) ->

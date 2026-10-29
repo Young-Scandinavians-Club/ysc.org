@@ -1834,7 +1834,7 @@ defmodule Ysc.ExpenseReports do
   - `{:error, :unauthorized}` if the user does not own the expense report and is not an admin
   """
   def can_access_file?(%User{} = user, s3_path) when is_binary(s3_path) do
-    is_admin = user.role == :admin
+    is_admin = YscWeb.Authorization.can?(user, :expense_report_read)
     normalized_path = normalize_s3_path(s3_path)
 
     case authorize_upload_path_prefix(user, normalized_path, is_admin) do

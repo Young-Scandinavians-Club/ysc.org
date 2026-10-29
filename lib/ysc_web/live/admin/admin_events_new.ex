@@ -149,7 +149,10 @@ defmodule YscWeb.AdminEventsNewLive do
                 </div>
 
                 <div
-                  :if={@event.state in [:published] && @admin_role == :admin}
+                  :if={
+                    @event.state in [:published] &&
+                      can?(@admin_role, :event_unpublish)
+                  }
                   class="hidden sm:block"
                 >
                   <.button
@@ -240,7 +243,10 @@ defmodule YscWeb.AdminEventsNewLive do
                       </li>
 
                       <li
-                        :if={@event.state == :published && @admin_role == :admin}
+                        :if={
+                          @event.state == :published &&
+                            can?(@admin_role, :event_unpublish)
+                        }
                         class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100 sm:hidden"
                       >
                         <button
@@ -257,7 +263,10 @@ defmodule YscWeb.AdminEventsNewLive do
                       </li>
 
                       <li
-                        :if={@event.state == :published && @admin_role == :admin}
+                        :if={
+                          @event.state == :published &&
+                            can?(@admin_role, :event_cancel)
+                        }
                         class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100"
                       >
                         <button
@@ -276,7 +285,8 @@ defmodule YscWeb.AdminEventsNewLive do
                       <li
                         :if={
                           @event.state == :draft or
-                            (@event.state == :scheduled and @admin_role == :admin)
+                            (@event.state == :scheduled and
+                               can?(@admin_role, :event_delete))
                         }
                         class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100"
                       >
@@ -382,7 +392,10 @@ defmodule YscWeb.AdminEventsNewLive do
                     ) <> " anyway"}
               </.button>
               <.button
-                :if={@blackout_prompt.blackout_needed? && @admin_role == :admin}
+                :if={
+                  @blackout_prompt.blackout_needed? &&
+                    can?(@admin_role, :blackout_create)
+                }
                 type="button"
                 id="confirm-blackout-btn"
                 color="blue"
@@ -1323,7 +1336,7 @@ defmodule YscWeb.AdminEventsNewLive do
               </div>
 
               <div
-                :if={@admin_role == :admin}
+                :if={can?(@admin_role, :expense_report_read)}
                 id="event-expense-reports-section"
                 class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4"
               >
@@ -1396,7 +1409,7 @@ defmodule YscWeb.AdminEventsNewLive do
               </div>
 
               <div
-                :if={@admin_role == :admin}
+                :if={can?(@admin_role, :merch_order_read)}
                 id="event-merch-section"
                 class="bg-white shadow-xs border border-zinc-100 rounded-lg p-6 space-y-4"
               >
@@ -2047,7 +2060,8 @@ defmodule YscWeb.AdminEventsNewLive do
             :statistics ->
               # Finding 76: per-report rows (submitter, purpose, status, amount)
               # are treasurer-only. Volunteers still get aggregate cost KPIs.
-              include_expense_reports? = socket.assigns[:admin_role] == :admin
+              include_expense_reports? =
+                can?(socket.assigns[:admin_role], :expense_report_read)
 
               socket
               |> assign(:statistics_loading?, true)
@@ -2074,7 +2088,7 @@ defmodule YscWeb.AdminEventsNewLive do
     event = socket.assigns.event
 
     case Events.copy_event(event, socket.assigns.current_user.id,
-           acting_role: socket.assigns.admin_role
+           actor: socket.assigns.staff_user
          ) do
       {:ok, new_event} ->
         {:noreply,
@@ -2091,7 +2105,7 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("delete-event", _, socket) do
     # Finding 74: volunteers must not wipe scheduled events (queued publish).
     case Events.delete_event(socket.assigns.event,
-           acting_role: socket.assigns.admin_role
+           actor: socket.assigns.staff_user
          ) do
       {:ok, _event} ->
         {:noreply,
@@ -2124,16 +2138,21 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_event("publish-event", _, socket) do
-    if socket.assigns.can_publish do
-      maybe_prompt_blackout(socket, :publish)
-    else
-      {:noreply,
-       YscWeb.Flash.put_toast(
-         socket,
-         :error,
-         "A title and event date must be set before publishing.",
-         title: "Event"
-       )}
+    cond do
+      cannot?(socket.assigns[:admin_role], :event_publish) ->
+        {:noreply, deny_full_admin(socket, "Event")}
+
+      socket.assigns.can_publish ->
+        maybe_prompt_blackout(socket, :publish)
+
+      true ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "A title and event date must be set before publishing.",
+           title: "Event"
+         )}
     end
   end
 
@@ -2142,7 +2161,7 @@ defmodule YscWeb.AdminEventsNewLive do
     # Finding 68: volunteers must not mint cabin blackouts (LetMe
     # `:blackout_create` is admin-only; /admin/bookings is full-admin so they
     # also could not undo one).
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :blackout_create) do
       {:noreply, deny_full_admin(socket, "Blackout")}
     else
       case socket.assigns[:blackout_prompt] do
@@ -2184,11 +2203,11 @@ defmodule YscWeb.AdminEventsNewLive do
   @impl true
   def handle_event("unpublish-event", _, socket) do
     # Finding 67: volunteers must not take live events off the site.
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :event_unpublish) do
       {:noreply, deny_full_admin(socket, "Event")}
     else
       case Events.unpublish_event(socket.assigns.event,
-             acting_role: socket.assigns.admin_role
+             actor: socket.assigns.staff_user
            ) do
         {:ok, _event} ->
           {:noreply,
@@ -2213,11 +2232,11 @@ defmodule YscWeb.AdminEventsNewLive do
   @impl true
   def handle_event("cancel-event", _, socket) do
     # Finding 67: volunteers must not cancel live events.
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :event_cancel) do
       {:noreply, deny_full_admin(socket, "Event")}
     else
       case Events.cancel_event(socket.assigns.event,
-             acting_role: socket.assigns.admin_role
+             actor: socket.assigns.staff_user
            ) do
         {:ok, event} ->
           {:noreply,
@@ -2858,7 +2877,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
   defp maybe_create_blackout(socket, prompt) do
     cond do
-      socket.assigns[:admin_role] != :admin ->
+      cannot?(socket.assigns[:admin_role], :blackout_create) ->
         deny_full_admin(socket, "Blackout")
 
       # Re-check right before creating: another admin may have added a blackout

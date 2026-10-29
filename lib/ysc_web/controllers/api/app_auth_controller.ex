@@ -21,7 +21,7 @@ defmodule YscWeb.Api.AppAuthController do
     with :ok <- Ysc.AuthRateLimit.check_identifier(email, conn.remote_ip),
          %Accounts.User{} = user <-
            Accounts.get_user_by_email_and_password(email, password),
-         true <- user.role in [:admin, :volunteer],
+         true <- YscWeb.Authorization.can?(user, :admin_panel_access),
          true <- Accounts.login_allowed_state?(user) do
       token = Accounts.generate_user_mobile_token(user)
 
@@ -88,7 +88,7 @@ defmodule YscWeb.Api.AppAuthController do
              code,
              code_verifier
            ),
-         true <- user.role in [:admin, :volunteer],
+         true <- YscWeb.Authorization.can?(user, :admin_panel_access),
          true <- Accounts.login_allowed_state?(user) do
       token = Accounts.generate_user_mobile_token(user)
 

@@ -115,7 +115,7 @@ defmodule YscWeb.Api.AppMembershipsController do
         conn,
         %{"member_id" => member_id, "plan" => plan_id} = params
       ) do
-    with :ok <- MobileUserAuth.require_full_admin(conn),
+    with :ok <- MobileUserAuth.authorize(conn, :subscription_create),
          {:ok, member} <- fetch_member(member_id),
          :ok <- reject_duplicate_membership(member),
          {:ok, plan} <- fetch_plan(plan_id),

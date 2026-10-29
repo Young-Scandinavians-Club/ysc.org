@@ -85,19 +85,29 @@ defmodule YscWeb.Plugs.MobileUserAuthTest do
     end
   end
 
-  describe "require_full_admin/1" do
-    test "returns :ok for an admin", %{conn: conn} do
+  describe "authorize/2" do
+    test "returns :ok for an admin on admin-only actions", %{conn: conn} do
       user = user_fixture(%{role: :admin})
       conn = Plug.Conn.assign(conn, :current_user, user)
 
-      assert MobileUserAuth.require_full_admin(conn) == :ok
+      assert MobileUserAuth.authorize(conn, :subscription_create) == :ok
+      assert MobileUserAuth.authorize(conn, :ticket_create) == :ok
     end
 
-    test "returns :full_admin_required for a volunteer", %{conn: conn} do
+    test "returns :full_admin_required for a volunteer on admin-only actions",
+         %{conn: conn} do
       user = user_fixture(%{role: :volunteer})
       conn = Plug.Conn.assign(conn, :current_user, user)
 
-      assert MobileUserAuth.require_full_admin(conn) ==
+      assert MobileUserAuth.authorize(conn, :subscription_create) ==
+               {:error, :full_admin_required}
+
+      assert MobileUserAuth.authorize(conn, :ticket_create) ==
+               {:error, :full_admin_required}
+    end
+
+    test "returns :full_admin_required when nobody is signed in", %{conn: conn} do
+      assert MobileUserAuth.authorize(conn, :ticket_create) ==
                {:error, :full_admin_required}
     end
   end

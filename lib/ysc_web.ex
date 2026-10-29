@@ -145,6 +145,10 @@ defmodule YscWeb do
       import YscWeb.NewsletterComponents
       import YscWeb.Gettext
 
+      # `can?(subject, :action)` for showing/hiding UI by policy
+      import YscWeb.Authorization,
+        only: [can?: 2, can?: 3, cannot?: 2, cannot?: 3]
+
       # Shortcut for generating JS commands
       alias Phoenix.LiveView.JS
 

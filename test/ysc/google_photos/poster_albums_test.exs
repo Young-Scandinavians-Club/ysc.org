@@ -285,7 +285,7 @@ defmodule Ysc.GooglePhotos.PosterAlbumsTest do
       assert {:ok, _} = PosterAlbums.sync(access_token: @access_token)
       flush_messages()
 
-      {:ok, _} = Ysc.Events.cancel_event(event)
+      {:ok, _} = Ysc.Events.cancel_event(event, actor: :system)
 
       assert {:ok, %{removed: 3}} =
                PosterAlbums.sync(access_token: @access_token)
@@ -298,7 +298,7 @@ defmodule Ysc.GooglePhotos.PosterAlbumsTest do
       event = event_fixture()
       assert {:ok, _} = PosterAlbums.sync(access_token: @access_token)
 
-      {:ok, _} = Ysc.Events.cancel_event(event)
+      {:ok, _} = Ysc.Events.cancel_event(event, actor: :system)
 
       assert {:ok, %{removed: 3}} =
                PosterAlbums.sync(access_token: @access_token)
@@ -311,7 +311,7 @@ defmodule Ysc.GooglePhotos.PosterAlbumsTest do
       event = event_fixture()
       assert {:ok, _} = PosterAlbums.sync(access_token: @access_token)
 
-      {:ok, _} = Ysc.Events.cancel_event(event)
+      {:ok, _} = Ysc.Events.cancel_event(event, actor: :system)
 
       assert {:error, {:sync_failed, _}} =
                PosterAlbums.sync(access_token: @access_token)

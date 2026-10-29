@@ -11,13 +11,14 @@ defmodule YscWeb.Plugs.MobileUserAuth do
   import Plug.Conn
 
   alias Ysc.Accounts
+  alias YscWeb.Authorization
 
   def init(opts), do: opts
 
   def call(conn, _opts) do
     with token when is_binary(token) <- extract_token(conn),
          %Accounts.User{} = user <- Accounts.get_user_by_mobile_token(token),
-         true <- user.role in [:admin, :volunteer] do
+         true <- Authorization.can?(user, :admin_panel_access) do
       assign(conn, :current_user, user)
     else
       _ -> halt_unauthorized(conn)
@@ -32,17 +33,18 @@ defmodule YscWeb.Plugs.MobileUserAuth do
   end
 
   @doc """
-  Returns `:ok` when the authenticated mobile-app user is a full admin.
+  Returns `:ok` when the authenticated mobile-app user may perform `action`
+  under `YscWeb.Authorization.Policy`, otherwise `{:error, :full_admin_required}`.
 
   Volunteers share this API with admins for in-person card-present door
   sales, but unpaid honor-system actions (offline ticket grants and
   out-of-band memberships) must stay admin-only — the same split Findings
   46 and 50 enforce on the web Tickets tab.
   """
-  def require_full_admin(conn) do
-    case conn.assigns[:current_user] do
-      %{role: :admin} -> :ok
-      _ -> {:error, :full_admin_required}
+  def authorize(conn, action) do
+    case Authorization.authorize(conn.assigns[:current_user], action) do
+      :ok -> :ok
+      {:error, :unauthorized} -> {:error, :full_admin_required}
     end
   end
 

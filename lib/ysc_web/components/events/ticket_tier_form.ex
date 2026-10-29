@@ -767,7 +767,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
 
   @impl true
   def handle_event("save", params, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(
+         socket.assigns[:admin_role],
+         if(socket.assigns[:ticket_tier],
+           do: :ticket_tier_update,
+           else: :ticket_tier_create
+         )
+       ) do
       {:noreply,
        YscWeb.Flash.put_toast(
          socket,

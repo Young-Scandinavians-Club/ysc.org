@@ -204,7 +204,7 @@ defmodule Ysc.EventPhotos do
   """
   def authorized_to_upload?(%Event{} = event, user) do
     cond do
-      user.role == :admin ->
+      YscWeb.Authorization.can?(user, :event_photos_collection_create) ->
         true
 
       is_binary(user.email) ->

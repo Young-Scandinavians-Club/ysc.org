@@ -124,7 +124,7 @@ defmodule YscWeb.Api.AppTicketsController do
           params
       )
       when is_map(tiers) and map_size(tiers) > 0 do
-    with :ok <- MobileUserAuth.require_full_admin(conn),
+    with :ok <- MobileUserAuth.authorize(conn, :ticket_create),
          {:ok, event} <- fetch_event(event_id),
          {:ok, member} <- fetch_member(member_id),
          :ok <- require_active_membership(member),

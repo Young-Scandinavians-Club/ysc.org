@@ -204,7 +204,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                       else: "Add attendee info"}
                   </.dropdown_menu_item>
                   <.dropdown_menu_item
-                    :if={@admin_role == :admin}
+                    :if={can?(@admin_role, :ticket_update)}
                     id={"ticket-actions-#{ticket.id}-reassign"}
                     icon="hero-arrows-right-left"
                     phx-click="open-reassign"
@@ -214,7 +214,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                     Reassign ticket
                   </.dropdown_menu_item>
                   <.dropdown_menu_item
-                    :if={@admin_role == :admin}
+                    :if={can?(@admin_role, :refund_create)}
                     id={"ticket-actions-#{ticket.id}-refund"}
                     icon="hero-banknotes"
                     tone={:danger}
@@ -710,7 +710,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("open-reassign", %{"id" => id}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_update) do
       {:noreply, deny_full_admin(socket, "Reassign Ticket")}
     else
       ticket = find_ticket!(socket, id)
@@ -729,7 +729,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("search-users", %{"value" => query}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_update) do
       {:noreply, deny_full_admin(socket, "Reassign Ticket")}
     else
       {:noreply, AdminUserSearch.search(socket, query)}
@@ -738,7 +738,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("select-user", %{"id" => id}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_update) do
       {:noreply, deny_full_admin(socket, "Reassign Ticket")}
     else
       {:noreply, AdminUserSearch.select(socket, id)}
@@ -752,7 +752,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("confirm-reassign", _params, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :ticket_update) do
       {:noreply, deny_full_admin(socket, "Reassign Ticket")}
     else
       ticket = socket.assigns.reassigning_ticket
@@ -805,7 +805,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("open-refund", %{"id" => id}, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :refund_create) do
       {:noreply, deny_full_admin(socket, "Refund Ticket")}
     else
       ticket = find_ticket!(socket, id)
@@ -848,7 +848,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
   @impl true
   def handle_event("confirm-refund", params, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :refund_create) do
       {:noreply, deny_full_admin(socket, "Refund Ticket")}
     else
       ticket = socket.assigns.refunding_ticket

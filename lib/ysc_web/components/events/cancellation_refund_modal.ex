@@ -370,7 +370,7 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
 
   @impl true
   def handle_event("refund-selected", _params, socket) do
-    if socket.assigns[:admin_role] != :admin do
+    if cannot?(socket.assigns[:admin_role], :refund_create) do
       {:noreply, deny_full_admin(socket)}
     else
       selected_entries =

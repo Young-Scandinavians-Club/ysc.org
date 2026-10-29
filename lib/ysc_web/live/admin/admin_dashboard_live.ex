@@ -61,7 +61,7 @@ defmodule YscWeb.AdminDashboardLive do
       </div>
       <%!-- Admin-only stats row --%>
       <div
-        :if={@admin_role == :admin}
+        :if={can?(@admin_role, :admin_panel_manage)}
         id="admin-stats-row"
         class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
       >
@@ -334,7 +334,7 @@ defmodule YscWeb.AdminDashboardLive do
 
       <%!-- Admin-only: Property Status Matrix --%>
       <div
-        :if={@admin_role == :admin}
+        :if={can?(@admin_role, :admin_panel_manage)}
         id="property-matrix"
         class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8"
       >
@@ -443,7 +443,10 @@ defmodule YscWeb.AdminDashboardLive do
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 pb-8">
         <div class={[
           "min-w-0",
-          if(@admin_role == :admin, do: "lg:col-span-8", else: "lg:col-span-12")
+          if(can?(@admin_role, :admin_panel_manage),
+            do: "lg:col-span-8",
+            else: "lg:col-span-12"
+          )
         ]}>
           <div
             id="dashboard-events-timeline"
@@ -584,7 +587,7 @@ defmodule YscWeb.AdminDashboardLive do
         </div>
 
         <div
-          :if={@admin_role == :admin}
+          :if={can?(@admin_role, :admin_panel_manage)}
           class="lg:col-span-4 space-y-6 min-w-0"
         >
           <div
@@ -821,7 +824,7 @@ defmodule YscWeb.AdminDashboardLive do
       </div>
 
       <div
-        :if={@admin_role == :admin}
+        :if={can?(@admin_role, :admin_panel_manage)}
         id="review-applications-section"
         class="bg-white rounded-sm border border-zinc-200 p-5 sm:p-6 shadow-xs mb-6"
       >
@@ -1104,10 +1107,15 @@ defmodule YscWeb.AdminDashboardLive do
   end
 
   @impl true
-  def handle_info(
-        :load_dashboard_data,
-        %{assigns: %{admin_role: :volunteer}} = socket
-      ) do
+  def handle_info(:load_dashboard_data, socket) do
+    if can?(socket.assigns.admin_role, :admin_panel_manage) do
+      load_admin_dashboard(socket)
+    else
+      load_staff_dashboard(socket)
+    end
+  end
+
+  defp load_staff_dashboard(socket) do
     socket =
       try do
         data =
@@ -1162,8 +1170,7 @@ defmodule YscWeb.AdminDashboardLive do
     {:noreply, assign(socket, :loading_dashboard, false)}
   end
 
-  @impl true
-  def handle_info(:load_dashboard_data, socket) do
+  defp load_admin_dashboard(socket) do
     socket =
       try do
         data =

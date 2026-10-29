@@ -307,7 +307,7 @@ defmodule YscWeb.AdminEventsLive do
       <.dropdown_menu_item
         :if={
           @event.state == :draft or
-            (@event.state == :scheduled and @admin_role == :admin)
+            (@event.state == :scheduled and can?(@admin_role, :event_delete))
         }
         id={"#{@menu_id}-delete"}
         icon="hero-trash"
@@ -416,7 +416,7 @@ defmodule YscWeb.AdminEventsLive do
     event = Events.get_event!(id)
 
     case Events.copy_event(event, socket.assigns.current_user.id,
-           acting_role: socket.assigns.admin_role
+           actor: socket.assigns.staff_user
          ) do
       {:ok, new_event} ->
         {:noreply,
@@ -434,7 +434,7 @@ defmodule YscWeb.AdminEventsLive do
     event = Events.get_event!(id)
 
     # Finding 74: volunteers must not wipe scheduled events (queued publish).
-    case Events.delete_event(event, acting_role: socket.assigns.admin_role) do
+    case Events.delete_event(event, actor: socket.assigns.staff_user) do
       {:ok, _event} ->
         {:noreply,
          socket
