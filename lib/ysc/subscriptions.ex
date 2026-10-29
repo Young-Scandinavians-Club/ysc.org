@@ -60,6 +60,30 @@ defmodule Ysc.Subscriptions do
     from(s in Subscription, where: s.user_id == ^user_id)
   end
 
+  @doc """
+  True when the user (or their primary, for sub-accounts) has held a real
+  membership subscription before, including canceled and WP-migrated ones.
+
+  Ignores `incomplete` / `incomplete_expired` rows, which come from checkouts
+  that never completed. Used to tell a lapsed member rejoining from a newly
+  approved applicant paying for the first time.
+  """
+  def returning_member?(nil), do: false
+
+  def returning_member?(%{id: id, primary_user_id: primary_user_id}) do
+    (primary_user_id || id)
+    |> prior_membership_query()
+    |> Repo.exists?()
+  end
+
+  defp prior_membership_query(user_id) do
+    from(s in Subscription,
+      where:
+        s.user_id == ^user_id and
+          s.stripe_status not in ["incomplete", "incomplete_expired"]
+    )
+  end
+
   # Stripe still retries or will resume charging these statuses. Canceled /
   # incomplete_expired rows and `migrated_*` placeholders are not real Stripe
   # subscriptions and must not block payment-method changes.
@@ -2688,6 +2712,11 @@ defmodule Ysc.Subscriptions do
       where: s.user_id == ^user_id,
       preload: :subscription_items
     )
+  end
+
+  @doc false
+  def ci_query_explain_prior_membership_query do
+    prior_membership_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false

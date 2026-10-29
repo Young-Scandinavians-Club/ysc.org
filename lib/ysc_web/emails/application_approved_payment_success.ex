@@ -98,11 +98,22 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccess do
   @doc """
   Schedules only when activation newly succeeded (`:activated`).
   Skips `:already_active` and other statuses to avoid duplicate sends.
-  """
-  def maybe_schedule(%Ysc.Accounts.User{} = user, :activated),
-    do: schedule(user)
 
-  def maybe_schedule(_user, _status), do: :ok
+  Pass `returning_member: true` for a lapsed member rejoining: their
+  application was approved long ago, so "your application has been approved"
+  would be wrong. They still get the membership payment receipt.
+  """
+  def maybe_schedule(user, status, opts \\ [])
+
+  def maybe_schedule(%Ysc.Accounts.User{} = user, :activated, opts) do
+    if Keyword.get(opts, :returning_member, false) do
+      :ok
+    else
+      schedule(user)
+    end
+  end
+
+  def maybe_schedule(_user, _status, _opts), do: :ok
 
   defp bank_payment_method?(user) do
     case Ysc.Payments.get_default_payment_method(user) do

@@ -235,6 +235,40 @@ defmodule Ysc.SubscriptionsTest do
       assert Subscriptions.has_any_subscription?(sub_account)
     end
 
+    test "returning_member?/1 counts canceled and migrated rows, not abandoned checkouts",
+         %{user: user} do
+      refute Subscriptions.returning_member?(nil)
+      refute Subscriptions.returning_member?(user)
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_abandoned_#{System.unique_integer([:positive])}",
+          stripe_status: "incomplete",
+          name: "Membership"
+        })
+
+      refute Subscriptions.returning_member?(user)
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "migrated_#{user.id}",
+          stripe_status: "canceled",
+          name: "Membership Subscription",
+          ends_at: DateTime.add(DateTime.utc_now(), -30, :day)
+        })
+
+      assert Subscriptions.returning_member?(user)
+
+      sub_account =
+        user_fixture_unique()
+        |> Ecto.Changeset.change(primary_user_id: user.id)
+        |> Repo.update!()
+
+      assert Subscriptions.returning_member?(sub_account)
+    end
+
     test "get_subscription/1 returns subscription by id", %{user: user} do
       {:ok, subscription} =
         Subscriptions.create_subscription(%{
