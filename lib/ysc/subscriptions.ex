@@ -62,10 +62,13 @@ defmodule Ysc.Subscriptions do
 
   @doc """
   True when the user (or their primary, for sub-accounts) has held a real
-  membership subscription before, including canceled and WP-migrated ones.
+  membership subscription before.
 
-  Ignores `incomplete` / `incomplete_expired` rows, which come from checkouts
-  that never completed. Used to tell a lapsed member rejoining from a newly
+  Counts any row that reached a live status, WP-migrated `migrated_*`
+  placeholders, and canceled rows that have a membership payment recorded
+  against them. Ignores `incomplete` / `incomplete_expired` rows and canceled
+  rows that were never paid (e.g. a checkout abandoned when the applicant
+  switched plans). Used to tell a lapsed member rejoining from a newly
   approved applicant paying for the first time.
   """
   def returning_member?(nil), do: false
@@ -77,10 +80,21 @@ defmodule Ysc.Subscriptions do
   end
 
   defp prior_membership_query(user_id) do
+    paid_entries =
+      from(e in Ysc.Ledgers.LedgerEntry,
+        where:
+          e.related_entity_type == :membership and
+            e.related_entity_id == parent_as(:subscription).id,
+        select: 1
+      )
+
     from(s in Subscription,
+      as: :subscription,
       where:
         s.user_id == ^user_id and
-          s.stripe_status not in ["incomplete", "incomplete_expired"]
+          s.stripe_status not in ["incomplete", "incomplete_expired"] and
+          (s.stripe_status not in ["canceled", "cancelled"] or
+             like(s.stripe_id, "migrated_%") or exists(paid_entries))
     )
   end
 

@@ -6,6 +6,7 @@ defmodule Ysc.SubscriptionsTest do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.User
+  alias Ysc.Ledgers
   alias Ysc.Repo
   alias Ysc.Subscriptions
   alias Ysc.Subscriptions.Subscription
@@ -235,7 +236,7 @@ defmodule Ysc.SubscriptionsTest do
       assert Subscriptions.has_any_subscription?(sub_account)
     end
 
-    test "returning_member?/1 counts canceled and migrated rows, not abandoned checkouts",
+    test "returning_member?/1 counts paid and migrated rows, not abandoned checkouts",
          %{user: user} do
       refute Subscriptions.returning_member?(nil)
       refute Subscriptions.returning_member?(user)
@@ -243,13 +244,50 @@ defmodule Ysc.SubscriptionsTest do
       {:ok, _} =
         Subscriptions.create_subscription(%{
           user_id: user.id,
-          stripe_id: "sub_abandoned_#{System.unique_integer([:positive])}",
+          stripe_id: "sub_incomplete_#{System.unique_integer([:positive])}",
           stripe_status: "incomplete",
+          name: "Membership"
+        })
+
+      # Abandoned checkout (plan switched): canceled, never paid.
+      {:ok, abandoned} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_abandoned_#{System.unique_integer([:positive])}",
+          stripe_status: "cancelled",
           name: "Membership"
         })
 
       refute Subscriptions.returning_member?(user)
 
+      # Canceled membership with a recorded payment.
+      Ledgers.ensure_basic_accounts()
+
+      {:ok, payment} =
+        Ledgers.create_payment(%{
+          user_id: user.id,
+          external_provider: :stripe,
+          external_payment_id: "in_rm_#{System.unique_integer([:positive])}",
+          amount: Money.new(:USD, 45),
+          status: :completed,
+          payment_date: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: Ledgers.get_account_by_name("membership_revenue").id,
+          payment_id: payment.id,
+          related_entity_type: :membership,
+          related_entity_id: abandoned.id,
+          amount: payment.amount,
+          debit_credit: :credit
+        })
+
+      assert Subscriptions.returning_member?(user)
+    end
+
+    test "returning_member?/1 counts migrated placeholders and sub-accounts",
+         %{user: user} do
       {:ok, _} =
         Subscriptions.create_subscription(%{
           user_id: user.id,
