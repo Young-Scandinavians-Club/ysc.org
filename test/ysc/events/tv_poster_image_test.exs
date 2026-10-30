@@ -5,6 +5,7 @@ defmodule Ysc.Events.TvPosterImageTest do
 
   alias Ysc.Events
   alias Ysc.Events.TvPosterImage
+  alias Ysc.Media.Image
 
   describe "normalize_format/1" do
     test "defaults invalid formats to png" do
@@ -83,12 +84,103 @@ defmodule Ysc.Events.TvPosterImageTest do
                |> TvPosterImage.hash_assigns()
     end
 
+    test "changes when the alt text of an Image struct changes" do
+      assigns = poster_assigns()
+
+      with_image = fn image_attrs ->
+        hash_with(assigns, fn event ->
+          Map.put(
+            event,
+            :image,
+            struct!(
+              Image,
+              Map.merge(%{raw_image_path: "/images/cover.jpg"}, image_attrs)
+            )
+          )
+        end)
+      end
+
+      alt = with_image.(%{alt_text: "Crowd at the hall", title: "Cover"})
+      title_only = with_image.(%{alt_text: "", title: "Cover"})
+      neither = with_image.(%{alt_text: nil, title: nil})
+
+      refute alt == title_only
+      refute title_only == neither
+
+      assert alt ==
+               with_image.(%{alt_text: "Crowd at the hall", title: "Other"})
+    end
+
+    test "alt falls back to the event title, then a generic label" do
+      assigns = poster_assigns()
+      image = struct!(Image, raw_image_path: "/images/cover.jpg")
+
+      titled =
+        hash_with(assigns, fn event -> Map.put(event, :image, image) end)
+
+      untitled =
+        hash_with(assigns, fn event ->
+          event |> Map.put(:image, image) |> Map.put(:title, nil)
+        end)
+
+      refute titled == untitled
+    end
+
+    test "uses a default pricing label when the event has no display text" do
+      assigns = poster_assigns()
+
+      no_pricing =
+        hash_with(assigns, fn event -> Map.put(event, :pricing_info, nil) end)
+
+      non_binary_text =
+        hash_with(assigns, fn event ->
+          Map.put(event, :pricing_info, %{display_text: nil})
+        end)
+
+      assert no_pricing == non_binary_text
+      refute no_pricing == TvPosterImage.hash_assigns(assigns)
+    end
+
+    test "falls back to the site origin when asset_base_url is not given" do
+      assigns = poster_assigns()
+      without_base = Map.delete(assigns, :asset_base_url)
+
+      with_origin =
+        Map.put(assigns, :asset_base_url, YscWeb.Emails.Helpers.origin() <> "/")
+
+      assert TvPosterImage.hash_assigns(without_base) ==
+               TvPosterImage.hash_assigns(with_origin)
+    end
+
     test "does not HEEx-render the capture document" do
       html = TvPosterImage.build_html(poster_assigns())
       hash = TvPosterImage.hash_assigns(poster_assigns())
 
       assert html =~ "event-tv-poster"
       refute hash == :crypto.hash(:sha256, html) |> Base.encode16(case: :lower)
+    end
+  end
+
+  describe "hash_html/1" do
+    test "hashes the rendered capture document" do
+      event =
+        event_fixture(%{title: "Html Hash Night"})
+        |> then(&Events.get_event_for_tv_poster(&1.id))
+
+      assigns = TvPosterImage.assigns_for_event(event)
+      hash = TvPosterImage.hash_html(assigns)
+
+      assert hash =~ ~r/^[0-9a-f]{64}$/
+      assert hash == TvPosterImage.hash_html(assigns)
+
+      expected =
+        assigns
+        |> TvPosterImage.build_html()
+        |> then(&:crypto.hash(:sha256, &1))
+        |> Base.encode16(case: :lower)
+
+      assert hash == expected
+      refute hash == TvPosterImage.hash_html(Map.put(assigns, :sold_out, true))
     end
   end
 
