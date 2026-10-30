@@ -69,14 +69,14 @@ defmodule QueryConsole.MixProject do
       {:decimal, "~> 3.2.0", override: true},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      # 1.1.33: EEF-CVE-2026-64941 (LOW / GHSA-36m4-rm57-3prf) rejects ASCII
-      # tab, LF, CR, and encoded tab (`/%09`) in LiveView redirect /
-      # push_navigate / push_patch `:to` paths so `/\t/evil.com` cannot
-      # become a scheme-relative open redirect. lotus_web still requires
-      # `< 1.2.0`, so stay on 1.1.x. We only pass compile-time `~p` paths
+      # 1.2.13: lotus_web 1.4 allows LiveView >= 1.1 and < 1.3. Includes the
+      # 1.1.33 fix for EEF-CVE-2026-64941 (LOW / GHSA-36m4-rm57-3prf), which
+      # rejects ASCII tab, LF, CR, and encoded tab (`/%09`) in LiveView redirect /
+      # push_navigate / push_patch `:to` paths so `/\t/evil.com` cannot become a
+      # scheme-relative open redirect. We only pass compile-time `~p` paths
       # (`/auth/ysc`, `/workbooks/:id`); we do not forward user input to
       # `redirect/2`.
-      {:phoenix_live_view, "~> 1.1.33"},
+      {:phoenix_live_view, "~> 1.2.13"},
       # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
       # SVG and MathML on to_html/2 (mutation XSS). We use lazy_html only in
       # tests via LiveViewTest; pin the patched floor.
@@ -97,7 +97,7 @@ defmodule QueryConsole.MixProject do
       # tag_values or a tags function. ConsoleReporter is commented out.
       {:telemetry_metrics, "~> 1.2"},
       {:telemetry_poller, "~> 1.0"},
-      {:gettext, "~> 0.26"},
+      {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       # 0.3.0: optional :resource_types (defaults [:a, :aaaa], also :srv).
       # Fly 6PN uses AAAA on ${FLY_APP_NAME}.internal; we do not pass :srv.
@@ -162,8 +162,8 @@ defmodule QueryConsole.MixProject do
       # :params, :path_params, :form_multipart, or :aws_sigv4. Token
       # exchange expects 200 (no 303 follow). Pin the patched floor.
       {:req, "~> 0.7.5"},
-      {:lotus, "~> 0.16.6"},
-      {:lotus_web, "~> 0.14.1"},
+      {:lotus, "~> 1.3"},
+      {:lotus_web, "~> 1.4"},
       {:cachex, "~> 4.0"},
       {:pg_query_ex, "~> 0.10.0"},
       {:ecto_ulid, "~> 0.3"}

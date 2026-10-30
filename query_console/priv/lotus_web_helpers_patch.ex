@@ -3,9 +3,15 @@ defmodule Lotus.Web.Helpers do
 
   # Loaded at runtime by QueryConsole.LotusWeb.HelpersPatch (not compiled into
   # query_console) so mix release does not see a duplicate module with lotus_web.
-  # Fixes root-mounted path joins: "" → "/", "queries/new" → "/queries/new".
+  # A copy of upstream lotus_web/lib/lotus/web/helpers.ex whose only change is the
+  # path join (see join_prefix/2): root-mounted paths "" → "/" and
+  # "queries/new" → "/queries/new". Refresh the copy whenever lotus_web changes.
+
+  use Gettext, backend: Lotus.Web.Gettext
 
   alias Phoenix.VerifiedRoutes
+
+  # Routing Helpers
 
   @pdict_key :__lotus_web_prefix__
 
@@ -17,7 +23,12 @@ defmodule Lotus.Web.Helpers do
     Process.put(@pdict_key, {socket, prefix})
   end
 
-  @doc false
+  @doc """
+  Construct a path to a dashboard page with optional params.
+
+  Routing is based on a socket and prefix tuple stored in the process dictionary. Proper routing
+  can be disabled for testing by setting the value to `:nowhere`.
+  """
   def lotus_path(route, params \\ %{})
 
   def lotus_path(route, params) when is_list(route) do
@@ -58,6 +69,9 @@ defmodule Lotus.Web.Helpers do
     String.trim_trailing(prefix, "/") <> "/" <> to_string(route)
   end
 
+  @doc """
+  Prepare parsed params for URI encoding.
+  """
   def encode_params(params) do
     for {key, val} <- params, val != nil, val != "" do
       case val do
@@ -73,27 +87,8 @@ defmodule Lotus.Web.Helpers do
     end
   end
 
-  def decode_params(params) do
-    Map.new(params, fn
-      {"limit", val} ->
-        {:limit, String.to_integer(val)}
-
-      {key, val} when key in ~w(args meta) ->
-        val =
-          val
-          |> String.split("++")
-          |> List.update_at(0, &String.split(&1, ","))
-
-        {String.to_existing_atom(key), val}
-
-      {key, val} when key in ~w(ids modes nodes priorities queues stats tags workers) ->
-        {String.to_existing_atom(key), String.split(val, ",")}
-
-      {key, val} ->
-        {String.to_existing_atom(key), val}
-    end)
-  end
-
+  @doc """
+  """
   def active_filter?(params, :state, value) do
     params[:state] == value or (is_nil(params[:state]) and value == "executing")
   end
@@ -105,8 +100,22 @@ defmodule Lotus.Web.Helpers do
     |> Enum.member?(to_string(value))
   end
 
+  @doc """
+  The message for a content change that a `:before_content_change` plug refused.
+
+  Shows the plug's reason when it is a string. Any other reason, such as an
+  exception, gets a generic message, so internal terms never reach the page.
+  """
+  def refused_message(reason) when is_binary(reason),
+    do: gettext("The change was refused: %{reason}", reason: reason)
+
+  def refused_message(_reason), do: gettext("The change was refused")
+
   require Logger
 
+  @doc """
+  Encodes data to JSON, returning `{:ok, json}` or `{:error, :encoding_failed}`.
+  """
   def safe_json_encode(data) do
     {:ok, Lotus.JSON.encode!(data)}
   rescue
@@ -115,6 +124,9 @@ defmodule Lotus.Web.Helpers do
       {:error, :encoding_failed}
   end
 
+  @doc """
+  Encodes data to JSON, returning `"{}"` on failure.
+  """
   def safe_json_encode_or_empty(data) do
     Lotus.JSON.encode!(data)
   rescue
