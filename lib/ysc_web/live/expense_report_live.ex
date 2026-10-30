@@ -2057,13 +2057,13 @@ defmodule YscWeb.ExpenseReportLive do
                   />
                   <div class="space-y-1">
                     <p class="type-subhead text-base text-red-900">
-                      A receipt is required for every expense
+                      Purchases need a receipt
                     </p>
                     <p class="text-sm text-red-900/80">
-                      Attach a photo or PDF of the itemized receipt to each expense you add. We can't reimburse an expense without one, and you won't be able to submit until every expense has a receipt.
+                      Attach a photo or PDF of the itemized receipt to each purchase. We can't reimburse a purchase without one, and you won't be able to submit until every purchase has a receipt.
                     </p>
                     <p class="text-xs text-red-900/70">
-                      The only exception is mileage, which needs the trip details instead.
+                      Mileage is different: enter the trip details instead of a receipt.
                     </p>
                   </div>
                 </div>
@@ -2549,7 +2549,7 @@ defmodule YscWeb.ExpenseReportLive do
                             id={"receipt-help-#{expense_f.index}"}
                             class="text-xs text-zinc-500 mb-3"
                           >
-                            A receipt is required for every expense. Upload a photo or PDF of the itemized receipt, dated within 30 days. Accepted formats: PDF, JPG, JPEG, PNG, WEBP (max 10MB)
+                            A receipt is required for this purchase. Upload a photo or PDF of the itemized receipt, dated within 30 days. Accepted formats: PDF, JPG, JPEG, PNG, WEBP (max 10MB)
                           </p>
                           <!-- Show uploaded receipt with inline preview -->
                           <div
@@ -4075,7 +4075,7 @@ defmodule YscWeb.ExpenseReportLive do
          do: :error,
          else: if(expense_items_complete, do: :completed, else: :pending)
        )},
-      {"All expense items have receipts",
+      {"Receipts attached where required",
        if(receipts_has_error,
          do: :error,
          else: if(all_receipts_attached, do: :completed, else: :pending)

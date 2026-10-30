@@ -18,6 +18,13 @@ defmodule YscWeb.ExpenseReportLiveTest do
     assert html =~ "Expense Report"
     assert html =~ "Amount we will reimburse"
     refute html =~ "Net Total"
+    assert html =~ "Purchases need a receipt"
+    refute html =~ "A receipt is required for every expense"
+    assert html =~ "A receipt is required for this purchase"
+
+    assert html =~
+             "Mileage is different: enter the trip details instead of a receipt."
+
     assert has_element?(view, "#expense-report-autosave-status")
 
     assert has_element?(
@@ -111,13 +118,13 @@ defmodule YscWeb.ExpenseReportLiveTest do
     assert has_element?(
              view,
              "span.text-zinc-600",
-             "All expense items have receipts"
+             "Receipts attached where required"
            )
 
     refute has_element?(
              view,
              "span.line-through",
-             "All expense items have receipts"
+             "Receipts attached where required"
            )
   end
 
@@ -156,7 +163,7 @@ defmodule YscWeb.ExpenseReportLiveTest do
     assert has_element?(
              view,
              "span.line-through",
-             "All expense items have receipts"
+             "Receipts attached where required"
            )
   end
 
