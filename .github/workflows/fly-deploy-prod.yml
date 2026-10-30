@@ -48,6 +48,8 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-sandbox
 
+      # --local-only builds then pushes to registry.fly.io. A 502 on that push
+      # failed v2.52.0 prod after a successful compile (run 41090055389).
       - name: Deploy to Fly.io sandbox
         run: |
           GIT_HASH=$(git rev-parse --short=7 HEAD)
@@ -58,7 +60,13 @@ jobs:
           else
             VERSION="unknown-${GIT_HASH}"
           fi
-          flyctl deploy --dockerfile etc/docker/Dockerfile -a ysc-sandbox -c etc/fly/fly-sandbox.toml --local-only --build-arg BUILD_VERSION="$VERSION" --image-label "$VERSION"
+          bash etc/scripts/flyctl_deploy_retry.sh \
+            --dockerfile etc/docker/Dockerfile \
+            -a ysc-sandbox \
+            -c etc/fly/fly-sandbox.toml \
+            --local-only \
+            --build-arg BUILD_VERSION="$VERSION" \
+            --image-label "$VERSION"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
 
@@ -90,7 +98,10 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-query-console-sandbox
 
+      # Same Fly registry 502 retry as the app sandbox deploy. This job's
+      # default working-directory is query_console/, so run from the repo root.
       - name: Deploy query console to Fly.io sandbox
+        working-directory: .
         run: |
           GIT_HASH=$(git rev-parse --short=7 HEAD)
           VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
@@ -100,7 +111,12 @@ jobs:
           else
             VERSION="unknown-${GIT_HASH}"
           fi
-          flyctl deploy -a ysc-query-console-sandbox -c fly.sandbox.toml --local-only --build-arg BUILD_VERSION="$VERSION" --image-label "$VERSION"
+          bash etc/scripts/flyctl_deploy_retry.sh \
+            -a ysc-query-console-sandbox \
+            -c query_console/fly.sandbox.toml \
+            --local-only \
+            --build-arg BUILD_VERSION="$VERSION" \
+            --image-label "$VERSION"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
 
@@ -127,14 +143,17 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_PROD_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-query-console
 
+      # Same Fly registry 502 retry as the app production deploy. This job's
+      # default working-directory is query_console/, so run from the repo root.
       - name: Deploy query console to Fly.io production
+        working-directory: .
         run: |
           VERSION_TAG="${{ github.ref_name }}"
           GIT_HASH=$(git rev-parse --short=7 HEAD)
           VERSION="${VERSION_TAG}-${GIT_HASH}"
-          flyctl deploy \
+          bash etc/scripts/flyctl_deploy_retry.sh \
             -a ysc-query-console \
-            -c fly.prod.toml \
+            -c query_console/fly.prod.toml \
             --local-only \
             --build-arg BUILD_VERSION="$VERSION" \
             --image-label "$VERSION"
@@ -166,12 +185,15 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_PROD_API_TOKEN }}
         run: bash etc/scripts/fly_ensure_min_started_machines.sh ysc-prod 2
 
+      # --local-only builds then pushes to registry.fly.io. A 502 on that push
+      # failed v2.52.0 after a successful compile (run 41090055389 / job
+      # 124185686654). Docker layer cache makes retries cheap.
       - name: Deploy to Fly.io production
         run: |
           VERSION_TAG="${{ github.ref_name }}"
           GIT_HASH=$(git rev-parse --short=7 HEAD)
           VERSION="${VERSION_TAG}-${GIT_HASH}"
-          flyctl deploy \
+          bash etc/scripts/flyctl_deploy_retry.sh \
             --dockerfile etc/docker/Dockerfile \
             -a ysc-prod \
             -c etc/fly/fly-prod.toml \
