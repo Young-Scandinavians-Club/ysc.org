@@ -1232,22 +1232,12 @@ defmodule YscWeb.AdminGhostComponents do
   attr :class, :string, default: nil
   slot :inner_block, required: true
 
-  @doc "Bordered section card matching the event editor layout."
+  @doc "Bordered section card matching the event editor layout (`admin_form_section/1`)."
   def admin_ghost_event_section(assigns) do
     ~H"""
-    <div
-      id={@id}
-      class={[
-        "border border-zinc-200 rounded-sm py-6 px-4 space-y-4 bg-white",
-        @class
-      ]}
-    >
-      <div>
-        <h2 class="text-xl text-zinc-900 type-subhead">{@title}</h2>
-        <p :if={@subtitle} class="text-sm text-zinc-600">{@subtitle}</p>
-      </div>
+    <.admin_form_section id={@id} title={@title} subtitle={@subtitle} class={@class}>
       {render_slot(@inner_block)}
-    </div>
+    </.admin_form_section>
     """
   end
 

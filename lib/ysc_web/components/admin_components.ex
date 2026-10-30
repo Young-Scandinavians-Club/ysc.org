@@ -2602,6 +2602,66 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_form_section
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Bordered editor section with a `text-xl` heading.
+
+  This is the event-editor layout (`rounded-sm py-6 px-4`, optional muted
+  subtitle). Use it instead of hand-rolling the same chrome on stacked admin
+  editor panels.
+
+  Unlike `admin_form_card` (compact `text-sm` title, `rounded-lg`, `p-4`/`p-6`),
+  this is a full-width editor block. Do not convert statistics cards
+  (`shadow-xs rounded-lg`) or compact grant forms onto this component.
+
+  ## Examples
+
+      <.admin_form_section title="Cover Image" class="max-w-3xl">
+        <.live_component module={MediaPickerComponent} id={:event_cover} ... />
+      </.admin_form_section>
+
+      <.admin_form_section
+        id="event-photo-upload-link-card"
+        title="Event photo uploads"
+        subtitle="Share this link with attendees so they can contribute photos after the event."
+      >
+        <.admin_readonly_copy_field ... />
+      </.admin_form_section>
+  """
+  attr :id, :string, default: nil
+  attr :title, :string, required: true
+
+  attr :subtitle, :string,
+    default: nil,
+    doc: "Optional muted helper copy under the title"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the section"
+
+  slot :inner_block, required: true
+
+  def admin_form_section(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "border border-zinc-200 rounded-sm py-6 px-4 space-y-4 bg-white",
+        @class
+      ]}
+    >
+      <div>
+        <h2 class="text-xl type-subhead">{@title}</h2>
+        <p :if={@subtitle} class="text-zinc-600 text-sm">{@subtitle}</p>
+      </div>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_list_empty_state
   # ---------------------------------------------------------------------------
 

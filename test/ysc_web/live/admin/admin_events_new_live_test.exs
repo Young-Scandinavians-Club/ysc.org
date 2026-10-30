@@ -718,6 +718,20 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert has_element?(view, "#host-search-input")
     end
 
+    test "renders shared editor form sections on the details tab", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "#event-cover-section")
+      assert has_element?(view, "#event-cover-section", "Cover Image")
+      assert has_element?(view, "#event-basics-section", "Basics")
+      assert has_element?(view, "#event-date-section", "Date and Location")
+      assert has_element?(view, "#event-overview-section", "Overview")
+    end
+
     test "shows host search input", %{conn: conn, admin: admin} do
       event = event_fixture(%{organizer_id: admin.id})
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
@@ -755,9 +769,10 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       admin: admin
     } do
       event = event_fixture(%{organizer_id: admin.id})
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+      {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
 
       refute html =~ "event-hosts-manager"
+      assert has_element?(view, "#event-capacity-section", "Event Capacity")
     end
   end
 
@@ -801,6 +816,13 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
 
       assert has_element?(view, "#communication-timeline")
+
+      assert has_element?(
+               view,
+               "#event-update-composer",
+               "Send Update to Attendees"
+             )
+
       assert has_element?(view, "#preview-event-update-btn")
     end
 

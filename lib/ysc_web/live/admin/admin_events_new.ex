@@ -416,16 +416,18 @@ defmodule YscWeb.AdminEventsNewLive do
           />
 
           <div :if={@live_action == :edit} class="relative py-8">
-            <div class="border max-w-3xl rounded-sm border-zinc-200 py-6 px-4 space-y-4">
-              <h2 class="text-xl type-subhead">Cover Image</h2>
-
+            <.admin_form_section
+              id="event-cover-section"
+              title="Cover Image"
+              class="max-w-3xl"
+            >
               <.live_component
                 module={YscWeb.MediaPickerComponent}
                 id={:event_cover}
                 user_id={@current_user.id}
                 image_id={@form[:image_id].value}
               />
-            </div>
+            </.admin_form_section>
 
             <.form
               for={@form}
@@ -440,13 +442,11 @@ defmodule YscWeb.AdminEventsNewLive do
               />
               <.input type="hidden" field={@form[:image_id]} />
 
-              <div class="border rounded-sm border-zinc-200 py-6 px-4 space-y-4">
-                <div>
-                  <h2 class="text-xl type-subhead">Basics</h2>
-                  <p class="text-zinc-600 text-sm">
-                    Give your event a nice title and summary to attract attendees.
-                  </p>
-                </div>
+              <.admin_form_section
+                id="event-basics-section"
+                title="Basics"
+                subtitle="Give your event a nice title and summary to attract attendees."
+              >
                 <.input
                   type="text"
                   field={@form[:title]}
@@ -474,11 +474,9 @@ defmodule YscWeb.AdminEventsNewLive do
                 >
                   Shown to attendees as an RSVP callout on the event page, alongside any ticket tiers.
                 </p>
-              </div>
+              </.admin_form_section>
 
-              <div class="border border-zinc-200 rounded-sm py-6 px-4 flex flex-col gap-4">
-                <h2 class="text-xl type-subhead">Date and Location</h2>
-
+              <.admin_form_section id="event-date-section" title="Date and Location">
                 <h3 class="text-lg type-subhead">Date and Time</h3>
                 <div class="flex flex-row w-full space-x-4">
                   <div class="flex">
@@ -593,16 +591,13 @@ defmodule YscWeb.AdminEventsNewLive do
                     </p>
                   </div>
                 </div>
-              </div>
+              </.admin_form_section>
 
-              <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
-                <div>
-                  <h2 class="text-xl type-subhead">Overview</h2>
-                  <p class="text-zinc-600 text-sm">
-                    Add more details about the event to help attendees understand what to expect.
-                  </p>
-                </div>
-
+              <.admin_form_section
+                id="event-overview-section"
+                title="Overview"
+                subtitle="Add more details about the event to help attendees understand what to expect."
+              >
                 <.trix_editor
                   id="post[raw_body]"
                   field={@form[:raw_details]}
@@ -612,18 +607,14 @@ defmodule YscWeb.AdminEventsNewLive do
                   phx-debounce={200}
                   editor_class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border-l border-b border-r text-wrap"
                 />
-              </div>
+              </.admin_form_section>
             </.form>
 
             <div id="hosts-section" class="max-w-3xl mt-6">
-              <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
-                <div>
-                  <h2 class="text-xl type-subhead">Hosts</h2>
-                  <p class="text-zinc-600 text-sm">
-                    Search and add members who will be listed as hosts of this event.
-                  </p>
-                </div>
-
+              <.admin_form_section
+                title="Hosts"
+                subtitle="Search and add members who will be listed as hosts of this event."
+              >
                 <div id="event-hosts-manager" class="space-y-3">
                   <%!-- Current hosts list --%>
                   <div
@@ -733,7 +724,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     </p>
                   </div>
                 </div>
-              </div>
+              </.admin_form_section>
             </div>
 
             <div class="max-w-3xl mt-6">
@@ -843,14 +834,11 @@ defmodule YscWeb.AdminEventsNewLive do
           <div :if={@live_action == :tickets} class="relative py-8">
             <div class="max-w-3xl">
               <div class="mb-6">
-                <div class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
-                  <div>
-                    <h2 class="text-xl type-subhead">Event Capacity</h2>
-                    <p class="text-zinc-600 text-sm">
-                      Set the maximum number of attendees for this event. This limit applies across all ticket tiers.
-                    </p>
-                  </div>
-
+                <.admin_form_section
+                  id="event-capacity-section"
+                  title="Event Capacity"
+                  subtitle="Set the maximum number of attendees for this event. This limit applies across all ticket tiers."
+                >
                   <.form
                     for={@capacity_form}
                     id="capacity_form"
@@ -889,7 +877,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       </div>
                     </div>
                   </.form>
-                </div>
+                </.admin_form_section>
               </div>
 
               <.live_component
@@ -906,20 +894,14 @@ defmodule YscWeb.AdminEventsNewLive do
           <div :if={@live_action == :updates} class="relative py-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div class="lg:col-span-7 space-y-8">
-                <div
+                <.admin_form_section
                   :if={
                     @event.state in [:published, "published"] and @photo_upload_url
                   }
-                  class="border border-zinc-200 rounded-sm py-6 px-4 space-y-4"
                   id="event-photo-upload-link-card"
+                  title="Event photo uploads"
+                  subtitle="Share this link with attendees so they can contribute photos after the event. Reminder emails are sent automatically the morning after the event ends."
                 >
-                  <div>
-                    <h2 class="text-xl type-subhead">Event photo uploads</h2>
-                    <p class="text-zinc-600 text-sm mt-1">
-                      Share this link with attendees so they can contribute photos after the event.
-                      Reminder emails are sent automatically the morning after the event ends.
-                    </p>
-                  </div>
                   <.admin_readonly_copy_field
                     id="event-photo-upload-url"
                     copy_button_id="copy-photo-upload-url-btn"
@@ -956,16 +938,15 @@ defmodule YscWeb.AdminEventsNewLive do
                       </.link>
                     </div>
                   </div>
-                </div>
+                </.admin_form_section>
 
-                <div class="bg-white border border-zinc-200 rounded-sm py-6 px-4 space-y-4">
+                <.admin_form_section
+                  id="event-update-composer"
+                  title="Send Update to Attendees"
+                  subtitle="Send a branded email notification to everyone who has a ticket for this event. This includes both ticket purchasers and registered attendees."
+                >
                   <div>
-                    <h2 class="text-xl type-subhead">Send Update to Attendees</h2>
-                    <p class="text-zinc-600 text-sm">
-                      Send a branded email notification to everyone who has a ticket for this event.
-                      This includes both ticket purchasers and registered attendees.
-                    </p>
-                    <p class="mt-2 text-sm font-medium text-blue-600">
+                    <p class="text-sm font-medium text-blue-600 -mt-2">
                       {@recipient_count} email recipient(s) will receive this update
                     </p>
                     <p
@@ -1096,7 +1077,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       </.button>
                     </div>
                   </.form>
-                </div>
+                </.admin_form_section>
               </div>
 
               <div class="lg:col-span-5 lg:sticky lg:top-8 self-start">

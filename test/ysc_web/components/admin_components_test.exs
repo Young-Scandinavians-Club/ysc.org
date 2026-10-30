@@ -720,6 +720,53 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_form_section/1" do
+    test "renders title-only editor section chrome" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_form_section title="Cover Image" class="max-w-3xl">
+          <div id="cover-picker"></div>
+        </.admin_form_section>
+        """)
+
+      assert html =~ ~s(id="cover-picker")
+      assert html =~ "Cover Image"
+      assert html =~ "max-w-3xl"
+
+      assert html =~
+               "border border-zinc-200 rounded-sm py-6 px-4 space-y-4 bg-white"
+
+      assert html =~ ~s(<h2 class="text-xl type-subhead")
+      refute html =~ "text-zinc-600 text-sm"
+    end
+
+    test "renders subtitle, id, and inner content" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_form_section
+          id="event-photo-upload-link-card"
+          title="Event photo uploads"
+          subtitle="Share this link with attendees so they can contribute photos after the event."
+        >
+          <input id="event-photo-upload-url" />
+        </.admin_form_section>
+        """)
+
+      assert html =~ ~s(id="event-photo-upload-link-card")
+      assert html =~ ~s(id="event-photo-upload-url")
+      assert html =~ "Event photo uploads"
+
+      assert html =~
+               "Share this link with attendees so they can contribute photos after the event."
+
+      assert html =~ ~s(<p class="text-zinc-600 text-sm")
+    end
+  end
+
   describe "admin_clipboard_button/1" do
     test "icon variant renders compact clipboard control" do
       assigns = %{}
