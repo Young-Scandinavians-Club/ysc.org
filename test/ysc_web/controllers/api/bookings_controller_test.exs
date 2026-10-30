@@ -14,29 +14,11 @@ defmodule YscWeb.Api.BookingsControllerTest do
 
   @test_token "test-kiosk-secret"
 
-  # Creates a booking that is currently active (checked in already, not yet checked out),
-  # which is required for the lookup endpoint to find it.
-  defp active_booking_fixture(attrs) do
-    attrs = Map.new(attrs)
-    user_id = Map.get(attrs, :user_id) || Ysc.AccountsFixtures.user_fixture().id
-    {checkin, checkout} = active_stay_dates()
-
-    {:ok, booking} =
-      attrs
-      |> Enum.into(%{
-        checkin_date: checkin,
-        checkout_date: checkout,
-        guests_count: 2,
-        property: :tahoe,
-        booking_mode: :buyout,
-        user_id: user_id,
-        status: :complete,
-        total_price: Money.new(200, :USD)
-      })
-      |> Ysc.Bookings.create_booking()
-
-    booking
-  end
+  # Lookup/calendar need a stay covering today (`checkin <= today < checkout`).
+  # Do not call `Bookings.create_booking/1` with `:buyout` here: `active_stay_dates/0`
+  # can include winter nights (Tahoe rooms-only), which fails validation every year
+  # from ~Oct 26 through April. `active_check_in_booking_fixture/1` goes through
+  # `booking_fixture/1`, which converts those stays to a room booking.
 
   # Index defaults to today-7 .. today+30; fixture stays can land outside that
   # window when seasons push buyout nights later — always pass an explicit range.
@@ -282,7 +264,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
   describe "GET /api/v1/mobile/bookings/lookup (lookup)" do
     test "finds bookings by member last name", %{conn: conn} do
       user = user_fixture(last_name: "Testsson")
-      booking = active_booking_fixture(user_id: user.id)
+      booking = active_check_in_booking_fixture(user_id: user.id)
 
       response =
         get(conn, ~p"/api/v1/mobile/bookings/lookup?last_name=Testsson")
@@ -293,7 +275,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
 
     test "lookup is case-insensitive", %{conn: conn} do
       user = user_fixture(last_name: "Johansson")
-      booking = active_booking_fixture(user_id: user.id)
+      booking = active_check_in_booking_fixture(user_id: user.id)
 
       response =
         get(conn, ~p"/api/v1/mobile/bookings/lookup?last_name=johansson")
@@ -304,7 +286,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
 
     test "trims whitespace from last_name", %{conn: conn} do
       user = user_fixture(last_name: "Lindgren")
-      booking = active_booking_fixture(user_id: user.id)
+      booking = active_check_in_booking_fixture(user_id: user.id)
 
       response =
         get(conn, ~p"/api/v1/mobile/bookings/lookup?last_name= Lindgren ")
@@ -339,7 +321,9 @@ defmodule YscWeb.Api.BookingsControllerTest do
 
     test "filters by property when specified", %{conn: conn} do
       user = user_fixture(last_name: "Eriksson")
-      tahoe_booking = active_booking_fixture(user_id: user.id, property: :tahoe)
+
+      tahoe_booking =
+        active_check_in_booking_fixture(user_id: user.id, property: :tahoe)
 
       response =
         get(
@@ -360,7 +344,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
 
     test "lookup returns check-ins with vehicle details", %{conn: conn} do
       user = user_fixture(last_name: "VehicleTest")
-      booking = active_booking_fixture(user_id: user.id)
+      booking = active_check_in_booking_fixture(user_id: user.id)
 
       {:ok, _check_in} =
         Ysc.Bookings.create_check_in(%{
@@ -401,7 +385,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
 
     test "calendar includes member avatar_url in each booking", %{conn: conn} do
       user = user_fixture(last_name: "CalendarAvatar")
-      booking = active_booking_fixture(user_id: user.id)
+      booking = active_check_in_booking_fixture(user_id: user.id)
 
       response =
         get(
@@ -422,7 +406,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
 
     test "lookup includes member avatar_url", %{conn: conn} do
       user = user_fixture(last_name: "LookupAvatar")
-      _booking = active_booking_fixture(user_id: user.id)
+      _booking = active_check_in_booking_fixture(user_id: user.id)
 
       response =
         get(conn, ~p"/api/v1/mobile/bookings/lookup?last_name=LookupAvatar")
