@@ -162,6 +162,25 @@ defmodule QueryConsole.MixProject do
       # :params, :path_params, :form_multipart, or :aws_sigv4. Token
       # exchange expects 200 (no 303 follow). Pin the patched floor.
       {:req, "~> 0.7.5"},
+      # 1.29.0: EEF-CVE-2026-107685 CRITICAL / GHSA-6vww-5m28-f26v —
+      # OpenAI Responses / Realtime / Codex WebSocket sessions now set
+      # insecure: false and ssl_options with verify: :verify_peer plus
+      # system CAs (`:public_key.cacerts_get/0`) and hostname checks.
+      # 1.9.0..1.28.0 inherited WebSockex's insecure: true default
+      # (verify: :verify_none). HTTP streaming through Finch is
+      # unchanged. lotus lists req_llm ~> 1.6, so pin the patched floor
+      # as an override. Query Console enables Lotus AI only with
+      # OPENROUTER_API_KEY (OpenRouter HTTP, default openai_stream_transport
+      # :sse). We do not call start_responses_session/2 or Realtime.
+      # Other 1.29.0 notes: HTTP redirects default off (OpenRouter 200);
+      # dotenv skip in releases (we use runtime.exs System.get_env).
+      # Public Lotus APIs (generate_text/3, Context, Response.text/usage/
+      # classify, tool/1, Error.API.Request) are unchanged. Extras:
+      # llm_db 2026.10.7 and zoi 0.18.11 are required; dotenvy 1.2.1,
+      # jsv 0.26.1, splode 0.3.3, texture 2.0.0 came along. finch stays
+      # 0.24.0, mint 1.11.0, req 0.7.5, phoenix_template 1.0.4,
+      # bandit 1.14.1.
+      {:req_llm, "~> 1.29.0", override: true},
       {:lotus, "~> 0.16.6"},
       {:lotus_web, "~> 0.14.1"},
       {:cachex, "~> 4.0"},
