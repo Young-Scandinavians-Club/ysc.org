@@ -307,6 +307,55 @@ defmodule Ysc.SubscriptionsTest do
       assert Subscriptions.returning_member?(sub_account)
     end
 
+    test "returning_member?/1 counts live statuses and ignores incomplete_expired",
+         %{user: user} do
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_expired_#{System.unique_integer([:positive])}",
+          stripe_status: "incomplete_expired",
+          name: "Membership"
+        })
+
+      refute Subscriptions.returning_member?(user)
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_canceled_#{System.unique_integer([:positive])}",
+          stripe_status: "canceled",
+          name: "Membership"
+        })
+
+      refute Subscriptions.returning_member?(user)
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_past_due_#{System.unique_integer([:positive])}",
+          stripe_status: "past_due",
+          name: "Membership"
+        })
+
+      assert Subscriptions.returning_member?(user)
+    end
+
+    test "returning_member?/1 is true after a new active row, so callers must compute it before activation",
+         %{user: user} do
+      refute Subscriptions.returning_member?(user)
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_new_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert Subscriptions.returning_member?(user)
+    end
+
     test "get_subscription/1 returns subscription by id", %{user: user} do
       {:ok, subscription} =
         Subscriptions.create_subscription(%{

@@ -4,6 +4,7 @@ defmodule YscWeb.AccountSetupLiveTest do
   use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import Swoosh.TestAssertions
   import Ysc.AccountsFixtures
   import Mox
 
@@ -15,6 +16,7 @@ defmodule YscWeb.AccountSetupLiveTest do
   alias Ysc.EmailVerificationRateLimit
   alias Ysc.Payments
   alias Ysc.Subscriptions
+  alias YscWeb.Emails.ApplicationApprovedPaymentSuccess
 
   # ---------------------------------------------------------------------------
   # Shared helpers
@@ -149,6 +151,57 @@ defmodule YscWeb.AccountSetupLiveTest do
       stripe_id: "cus_#{System.unique_integer([:positive])}"
     })
     |> Ysc.Repo.update!()
+  end
+
+  defp unpaid_active_user_ready_to_activate(conn) do
+    user = unpaid_active_user_needing_payment()
+    {:ok, user} = Accounts.mark_password_set(user)
+    {:ok, user} = Accounts.mark_phone_verified(user)
+
+    {:ok, _pm} =
+      Payments.insert_payment_method(%{
+        user_id: user.id,
+        provider: :stripe,
+        provider_id: "pm_#{System.unique_integer([:positive])}",
+        provider_customer_id: user.stripe_id,
+        type: :card,
+        provider_type: "card",
+        is_default: true
+      })
+
+    stripe_sub_id = "sub_mount_#{System.unique_integer([:positive])}"
+
+    expect(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+      {:ok,
+       Ysc.Stripe.SubscriptionFixtures.subscription(
+         id: stripe_sub_id,
+         customer: user.stripe_id,
+         status: "active"
+       )}
+    end)
+
+    {log_in_user(conn, user), user}
+  end
+
+  defp drain_emails do
+    drain_emails([])
+  end
+
+  defp drain_emails(acc) do
+    receive do
+      {:email, email} -> drain_emails([email | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
+  defp approved_payment_success_email(emails, user) do
+    subject = ApplicationApprovedPaymentSuccess.get_subject()
+
+    Enum.find(emails, fn email ->
+      email.subject == subject and
+        Enum.any?(email.to, fn {_name, address} -> address == user.email end)
+    end)
   end
 
   # Advances a user to the phone-verification step (step 4):
@@ -1416,37 +1469,58 @@ defmodule YscWeb.AccountSetupLiveTest do
       refute html =~ "Activate Your Membership"
     end
 
-    test "redirects home when membership activates on mount", %{conn: conn} do
-      user = unpaid_active_user_needing_payment()
-      {:ok, user} = Accounts.mark_password_set(user)
-      {:ok, user} = Accounts.mark_phone_verified(user)
-
-      {:ok, _pm} =
-        Payments.insert_payment_method(%{
-          user_id: user.id,
-          provider: :stripe,
-          provider_id: "pm_#{System.unique_integer([:positive])}",
-          provider_customer_id: user.stripe_id,
-          type: :card,
-          provider_type: "card",
-          is_default: true
-        })
-
-      stripe_sub_id = "sub_mount_#{System.unique_integer([:positive])}"
-
-      expect(Stripe.SubscriptionMock, :create, fn _params, _opts ->
-        {:ok,
-         Ysc.Stripe.SubscriptionFixtures.subscription(
-           id: stripe_sub_id,
-           customer: user.stripe_id,
-           status: "active"
-         )}
-      end)
-
-      conn = log_in_user(conn, user)
+    test "redirects home when membership activates on mount and welcomes a first-time member",
+         %{conn: conn} do
+      set_swoosh_global()
+      {conn, user} = unpaid_active_user_ready_to_activate(conn)
 
       assert {:error, {:redirect, %{to: "/"}}} =
                live(conn, account_setup_path(user))
+
+      assert approved_payment_success_email(drain_emails(), user)
+    end
+
+    test "does not send the application-approved email to a returning member",
+         %{conn: conn} do
+      set_swoosh_global()
+      {conn, user} = unpaid_active_user_ready_to_activate(conn)
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "migrated_#{user.id}",
+          stripe_status: "canceled",
+          name: "Membership Subscription",
+          ends_at: DateTime.add(DateTime.utc_now(), -30, :day)
+        })
+
+      assert Subscriptions.returning_member?(user)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               live(conn, account_setup_path(user))
+
+      refute approved_payment_success_email(drain_emails(), user)
+    end
+
+    test "still welcomes a first-time applicant whose unpaid checkout was canceled",
+         %{conn: conn} do
+      set_swoosh_global()
+      {conn, user} = unpaid_active_user_ready_to_activate(conn)
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_abandoned_#{System.unique_integer([:positive])}",
+          stripe_status: "cancelled",
+          name: "Membership"
+        })
+
+      refute Subscriptions.returning_member?(user)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               live(conn, account_setup_path(user))
+
+      assert approved_payment_success_email(drain_emails(), user)
     end
   end
 end
