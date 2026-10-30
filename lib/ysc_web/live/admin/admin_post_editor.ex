@@ -24,114 +24,6 @@ defmodule YscWeb.AdminPostEditorLive do
       user={@current_user}
       role={@admin_role}
     >
-      <.modal
-        :if={@live_action == :preview}
-        show={true}
-        fullscreen={true}
-        id="admin-post-preview-modal"
-        on_cancel={JS.patch(~p"/admin/posts/#{@post_id}")}
-      >
-        <div class="flex flex-col h-[86vh]">
-          <ul class="flex flex-wrap items-center justify-center pb-4">
-            <li>
-              <button
-                type="button"
-                class={[
-                  "flex-none rounded-sm hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded-sm text-zinc-800 mr-3",
-                  @preview_device == :phone && "bg-zinc-100"
-                ]}
-                phx-click="phone-preview"
-              >
-                <.icon name="hero-device-phone-mobile" class="w-8 h-8" />
-                <span class="sr-only">Phone preview</span>
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                class={[
-                  "flex-none rounded-sm hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded-sm text-zinc-800 mr-3",
-                  @preview_device == :tablet && "bg-zinc-100"
-                ]}
-                phx-click="tablet-preview"
-              >
-                <.icon name="hero-device-tablet" class="w-8 h-8 " />
-                <span class="sr-only">Tablet preview</span>
-              </button>
-            </li>
-            <li>
-              <button
-                type="button"
-                class={[
-                  "flex-none rounded-sm hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded-sm text-zinc-800 mr-3",
-                  @preview_device == :computer && "bg-zinc-100"
-                ]}
-                phx-click="computer-preview"
-              >
-                <.icon name="hero-computer-desktop" class="w-8 h-8 " />
-                <span class="sr-only">Desktop preview</span>
-              </button>
-            </li>
-          </ul>
-
-          <div class={[
-            "w-full bg-blue-100 h-full rounded-sm border border border-zinc-300",
-            (@preview_device == :phone || @preview_device == :tablet) && "py-20"
-          ]}>
-            <.phone_mockup :if={@preview_device == :phone} class="m-auto">
-              <iframe
-                src={"/posts/#{@post_id}"}
-                class={[
-                  "h-full w-full"
-                ]}
-              ></iframe>
-            </.phone_mockup>
-
-            <.tablet_mockup :if={@preview_device == :tablet} class="m-auto">
-              <iframe
-                src={"/posts/#{@post_id}"}
-                class={[
-                  "h-full w-full"
-                ]}
-              ></iframe>
-            </.tablet_mockup>
-
-            <iframe
-              :if={@preview_device == :computer}
-              src={"/posts/#{@post_id}"}
-              class={[
-                "h-full w-full"
-              ]}
-            ></iframe>
-          </div>
-        </div>
-      </.modal>
-
-      <.modal
-        :if={@live_action == :settings}
-        show={true}
-        fullscreen={false}
-        id="admin-post-settings-modal"
-        on_cancel={JS.patch(~p"/admin/posts/#{@post_id}")}
-      >
-        <div class="flex flex-col">
-          <.admin_page_title level={2} class="mb-4">
-            Post Settings
-          </.admin_page_title>
-
-          <div class="rounded-sm border border border-zinc-100 px-3 py-4">
-            <p class="text-lg font-semibold mb-3">Featured Image</p>
-
-            <.live_component
-              module={YscWeb.MediaPickerComponent}
-              id={:post_featured_image}
-              user_id={@current_user.id}
-              image_id={@post.image_id}
-            />
-          </div>
-        </div>
-      </.modal>
-
       <div
         :if={@loading_post?}
         id="admin-post-loading"
@@ -385,6 +277,115 @@ defmodule YscWeb.AdminPostEditorLive do
           editor_class="trix-content block mt-8 max-w-2xl mx-auto px-8 py-8 bg-white border-0 focus:ring-0 text-wrap"
         />
       </.form>
+
+      <%!-- Modals render after the editor so inserting one never moves the Trix forms (a move disconnects <trix-editor> and drops its toolbar). --%>
+      <.modal
+        :if={@live_action == :preview}
+        show={true}
+        fullscreen={true}
+        id="admin-post-preview-modal"
+        on_cancel={JS.patch(~p"/admin/posts/#{@post_id}")}
+      >
+        <div class="flex flex-col h-[86vh]">
+          <ul class="flex flex-wrap items-center justify-center pb-4">
+            <li>
+              <button
+                type="button"
+                class={[
+                  "flex-none rounded-sm hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded-sm text-zinc-800 mr-3",
+                  @preview_device == :phone && "bg-zinc-100"
+                ]}
+                phx-click="phone-preview"
+              >
+                <.icon name="hero-device-phone-mobile" class="w-8 h-8" />
+                <span class="sr-only">Phone preview</span>
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class={[
+                  "flex-none rounded-sm hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded-sm text-zinc-800 mr-3",
+                  @preview_device == :tablet && "bg-zinc-100"
+                ]}
+                phx-click="tablet-preview"
+              >
+                <.icon name="hero-device-tablet" class="w-8 h-8 " />
+                <span class="sr-only">Tablet preview</span>
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class={[
+                  "flex-none rounded-sm hover:bg-zinc-100 px-3 py-2 transition ease-in-out duration-200 rounded-sm text-zinc-800 mr-3",
+                  @preview_device == :computer && "bg-zinc-100"
+                ]}
+                phx-click="computer-preview"
+              >
+                <.icon name="hero-computer-desktop" class="w-8 h-8 " />
+                <span class="sr-only">Desktop preview</span>
+              </button>
+            </li>
+          </ul>
+
+          <div class={[
+            "w-full bg-blue-100 h-full rounded-sm border border border-zinc-300",
+            (@preview_device == :phone || @preview_device == :tablet) && "py-20"
+          ]}>
+            <.phone_mockup :if={@preview_device == :phone} class="m-auto">
+              <iframe
+                src={"/posts/#{@post_id}"}
+                class={[
+                  "h-full w-full"
+                ]}
+              ></iframe>
+            </.phone_mockup>
+
+            <.tablet_mockup :if={@preview_device == :tablet} class="m-auto">
+              <iframe
+                src={"/posts/#{@post_id}"}
+                class={[
+                  "h-full w-full"
+                ]}
+              ></iframe>
+            </.tablet_mockup>
+
+            <iframe
+              :if={@preview_device == :computer}
+              src={"/posts/#{@post_id}"}
+              class={[
+                "h-full w-full"
+              ]}
+            ></iframe>
+          </div>
+        </div>
+      </.modal>
+
+      <.modal
+        :if={@live_action == :settings}
+        show={true}
+        fullscreen={false}
+        id="admin-post-settings-modal"
+        on_cancel={JS.patch(~p"/admin/posts/#{@post_id}")}
+      >
+        <div class="flex flex-col">
+          <.admin_page_title level={2} class="mb-4">
+            Post Settings
+          </.admin_page_title>
+
+          <div class="rounded-sm border border border-zinc-100 px-3 py-4">
+            <p class="text-lg font-semibold mb-3">Featured Image</p>
+
+            <.live_component
+              module={YscWeb.MediaPickerComponent}
+              id={:post_featured_image}
+              user_id={@current_user.id}
+              image_id={@post.image_id}
+            />
+          </div>
+        </div>
+      </.modal>
     </.side_menu>
     """
   end
