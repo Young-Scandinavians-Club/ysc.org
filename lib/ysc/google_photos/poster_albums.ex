@@ -281,18 +281,34 @@ defmodule Ysc.GooglePhotos.PosterAlbums do
        ),
        do: true
 
+  # Rows stored before this change hashed the HEEx document. If that HTML
+  # hash still matches, rewrite it to the input fingerprint and skip capture.
+  defp up_to_date?(%{hash: hash, event: event}, %PosterItem{} = item, album_id) do
+    if item.google_album_id == album_id and
+         item.poster_hash == html_poster_hash(event) do
+      item
+      |> PosterItem.changeset(%{poster_hash: hash})
+      |> Repo.update()
+
+      true
+    else
+      false
+    end
+  end
+
   defp up_to_date?(_entry, _item, _album_id), do: false
 
-  # Fingerprint of the rendered poster. It captures everything the poster shows
-  # (title, date, price, sold out, cover image, ...), so an unchanged poster is
-  # never re-captured or re-uploaded.
-  defp poster_hash(event) do
+  defp html_poster_hash(event) do
     event
     |> TvPosterImage.assigns_for_event()
-    |> TvPosterImage.build_html()
-    |> then(&:crypto.hash(:sha256, &1))
-    |> Base.encode16(case: :lower)
+    |> TvPosterImage.hash_html()
   end
+
+  # Fingerprint of the values the poster shows (title, date, price, sold out,
+  # cover path, ...), plus the poster template sources. Unchanged posters are
+  # never re-captured or re-uploaded, and sync does not HEEx-render every
+  # upcoming event just to decide that.
+  defp poster_hash(event), do: TvPosterImage.hash_event(event)
 
   defp ensure_album(access_token, key) do
     case Repo.get_by(PosterAlbum, key: key) do

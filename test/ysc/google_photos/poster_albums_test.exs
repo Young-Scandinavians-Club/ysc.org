@@ -204,6 +204,41 @@ defmodule Ysc.GooglePhotos.PosterAlbumsTest do
       assert flush_messages() == []
     end
 
+    test "rewrites a legacy HTML poster_hash without recapturing" do
+      stub_google()
+      event = event_fixture()
+
+      assert {:ok, %{published: 3}} =
+               PosterAlbums.sync(access_token: @access_token)
+
+      loaded =
+        Ysc.Events.list_tv_poster_events()
+        |> Enum.find(&(&1.id == event.id))
+
+      input_hash = Ysc.Events.TvPosterImage.hash_event(loaded)
+
+      html_hash =
+        loaded
+        |> Ysc.Events.TvPosterImage.assigns_for_event()
+        |> Ysc.Events.TvPosterImage.hash_html()
+
+      refute html_hash == input_hash
+
+      {3, _} =
+        Repo.update_all(
+          from(i in PosterItem, where: i.event_id == ^event.id),
+          set: [poster_hash: html_hash]
+        )
+
+      flush_messages()
+
+      assert {:ok, %{published: 0, removed: 0}} =
+               PosterAlbums.sync(access_token: @access_token)
+
+      assert flush_messages() == []
+      assert Enum.all?(items_for(event), &(&1.poster_hash == input_hash))
+    end
+
     test "reuses an existing album with the same title instead of creating one" do
       stub_google(
         albums: [
