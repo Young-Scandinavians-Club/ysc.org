@@ -23,6 +23,19 @@ defmodule QueryConsoleWeb.LotusDashboardTest do
     {:ok, _view, _live_html} = live(conn, ~p"/")
   end
 
+  test "serves the hashed Lotus CSS and JS bundles from the root mount", %{conn: conn} do
+    conn = log_in_user(conn, user_fixture())
+
+    html = conn |> get(~p"/") |> html_response(200)
+
+    assert [css_path] = Regex.run(~r/href="(\/css-[0-9a-f]{32})"/, html, capture: :all_but_first)
+    assert [js_path] = Regex.run(~r/src="(\/js-[0-9a-f]{32})"/, html, capture: :all_but_first)
+
+    assert conn |> get(css_path) |> response(200)
+    assert conn |> get(js_path) |> response(200)
+    assert conn |> get("/css-00000000000000000000000000000000") |> response(404)
+  end
+
   test "new query editor mounts at /queries/new (not /new)", %{conn: conn} do
     user = user_fixture()
     conn = log_in_user(conn, user)

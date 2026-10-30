@@ -1,19 +1,20 @@
 defmodule QueryConsole.PhoenixLiveViewUpgradeTest do
   @moduledoc """
-  Guards the phoenix_live_view 1.1.32 → 1.1.33 upgrade.
+  Guards the phoenix_live_view 1.1.33 → 1.2.13 upgrade.
 
-  1.1.33 is a patch (2026-08-10). It patches EEF-CVE-2026-64941 (LOW /
-  GHSA-36m4-rm57-3prf): `validate_local_url!/2` now rejects ASCII tab,
-  LF, CR, and encoded tab (`/%09`) in `redirect/2`, `push_navigate/2`,
-  and `push_patch/2` `:to` paths. Browsers strip those characters before
-  URL parsing, so `/\\t/evil.com` used to pass as a local path and then
-  resolve as a scheme-relative open redirect. Only `redirect/2` is the
-  sink; live navigation expands against the current origin.
+  lotus_web 1.4 allows LiveView `>= 1.1.0 and < 1.3.0`, so Query Console
+  moves to 1.2.x. The floor keeps the fix for EEF-CVE-2026-64941 (LOW /
+  GHSA-36m4-rm57-3prf, 1.1.33 / 1.2.9): `validate_local_url!/2` rejects
+  ASCII tab, LF, CR, and encoded tab (`/%09`) in `redirect/2`,
+  `push_navigate/2`, and `push_patch/2` `:to` paths. Browsers strip those
+  characters before URL parsing, so `/\\t/evil.com` used to pass as a local
+  path and then resolve as a scheme-relative open redirect. Only
+  `redirect/2` is the sink; live navigation expands against the current
+  origin.
 
-  lotus_web still requires `< 1.2.0`, so Query Console stays on 1.1.x.
   We only pass compile-time `~p` paths (`/auth/ysc`, `/`, `/workbooks/:id`)
   and do not forward user input to `Phoenix.LiveView.redirect/2`.
-  `phoenix_template` stays 1.0.4.
+  `phoenix_template` moves to 1.1.0 with it.
   """
   use ExUnit.Case, async: true
 
@@ -46,30 +47,29 @@ defmodule QueryConsole.PhoenixLiveViewUpgradeTest do
     :ok
   end
 
-  describe "1.1.33 Hex lock and public APIs" do
-    test "locks the Hex package to 1.1.33" do
-      assert to_string(Application.spec(:phoenix_live_view, :vsn)) == "1.1.33"
+  describe "1.2.13 Hex lock and public APIs" do
+    test "locks the Hex package to 1.2.13" do
+      assert to_string(Application.spec(:phoenix_live_view, :vsn)) == "1.2.13"
     end
 
-    test "mix.exs pins the patched 1.1.x floor" do
+    test "mix.exs pins the patched 1.2.x floor" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s({:phoenix_live_view, "~> 1.1.33"})
-      refute mix_exs =~ ~s({:phoenix_live_view, "~> 1.1.0"})
+      assert mix_exs =~ ~s({:phoenix_live_view, "~> 1.2.13"})
+      refute mix_exs =~ ~s({:phoenix_live_view, "~> 1.1.33"})
     end
 
-    test "companion lock is 1.1.33 and phoenix_template stays 1.0.4" do
+    test "companion lock is 1.2.13 with phoenix_template 1.1.0" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.1.33"|
-      refute lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.1.32"|
-      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
-      refute lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
+      assert lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.13"|
+      refute lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.1.33"|
+      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
 
-      assert to_string(Application.spec(:phoenix_template, :vsn)) == "1.0.4"
+      assert to_string(Application.spec(:phoenix_template, :vsn)) == "1.1.0"
     end
 
-    test "lotus_web still requires LiveView below 1.2.0" do
+    test "lotus_web allows LiveView 1.2" do
       assert File.read!(@lotus_web_mix) =~
-               ~s({:phoenix_live_view, ">= 1.0.0 and < 1.2.0"})
+               ~s({:phoenix_live_view, ">= 1.1.0 and < 1.3.0"})
     end
 
     test "redirect, push_navigate, and push_patch still exist" do
@@ -81,16 +81,16 @@ defmodule QueryConsole.PhoenixLiveViewUpgradeTest do
     end
   end
 
-  describe "1.1.33 changelog" do
-    test "documents CVE-2026-64941 under the v1.1.33 heading" do
+  describe "1.2.x changelog" do
+    test "documents CVE-2026-64941 under the v1.2.9 heading" do
       changelog = File.read!(@changelog)
-      heading = changelog_section(changelog, "v1.1.33")
+      heading = changelog_section(changelog, "v1.2.9")
 
       assert heading
       assert heading =~ "CVE-2026-64941"
       assert heading =~ "open redirect"
       assert heading =~ "ASCII tab, LF and CR"
-      refute heading =~ "v1.1.32"
+      refute heading =~ "v1.2.8"
     end
   end
 

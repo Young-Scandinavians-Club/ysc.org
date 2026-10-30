@@ -13,7 +13,7 @@ defmodule QueryConsole.PhoenixUpgradeTest do
   Phoenix 1.8.16 requires `phoenix_pubsub ~> 2.4` (lock 2.4.1). That adds
   `Phoenix.PubSub.Sender` and `unsubscribe_sender/3`. Query Console only
   starts `{Phoenix.PubSub, name: QueryConsole.PubSub}` with the default
-  dispatcher. `phoenix_template` stays 1.0.4.
+  dispatcher. `phoenix_template` is 1.1.0 (via LiveView 1.2).
 
   We import `phoenix` via esbuild `NODE_PATH=deps`, enable LongPoll on the
   LiveView socket (`longpoll:` plus `longPollFallbackMs: 2500`), and keep
@@ -85,11 +85,11 @@ defmodule QueryConsole.PhoenixUpgradeTest do
                Code.ensure_loaded(Phoenix.PubSub.Sender)
     end
 
-    test "companion phoenix_template lock stays 1.0.4" do
-      assert to_string(Application.spec(:phoenix_template, :vsn)) == "1.0.4"
+    test "companion phoenix_template lock is 1.1.0" do
+      assert to_string(Application.spec(:phoenix_template, :vsn)) == "1.1.0"
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
-      refute lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
+      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
+      refute lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
     end
 
     test "app PubSub uses the default dispatcher and no sender metadata" do

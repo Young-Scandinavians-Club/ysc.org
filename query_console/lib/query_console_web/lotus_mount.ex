@@ -19,11 +19,13 @@ defmodule QueryConsoleWeb.LotusMount do
           other -> String.trim_trailing(other, "/")
         end
 
+      Lotus.Web.Router.__register_resolver_check__(__MODULE__, opts)
+
       scope path, alias: false, as: false do
         import Phoenix.LiveView.Router, only: [live: 3, live: 4, live_session: 3]
-        import Phoenix.Router, only: [get: 3]
+        import Phoenix.Router, only: [get: 4]
 
-        {session_name, session_opts, public_session_opts, route_opts} =
+        {session_name, session_opts, public_session_opts, route_opts, export_opts} =
           Lotus.Web.Router.__options__(prefix, opts)
 
         session_opts =
@@ -40,10 +42,13 @@ defmodule QueryConsoleWeb.LotusMount do
             [QueryConsoleWeb.LotusPathFix | List.wrap(hooks)]
           end)
 
-        get("/export/csv", Lotus.Web.ExportController, :csv)
+        get("/css-:md5", Lotus.Web.Assets, :css, as: :lotus_asset)
+        get("/js-:md5", Lotus.Web.Assets, :js, as: :lotus_asset)
+
+        get("/export/csv", Lotus.Web.ExportController, :csv, export_opts)
 
         live_session :"#{session_name}_public", public_session_opts do
-          live("/public/:token", Lotus.Web.PublicDashboardLive, :show)
+          live("/public/:token", Lotus.Web.DashboardLive, :show)
         end
 
         live_session session_name, session_opts do

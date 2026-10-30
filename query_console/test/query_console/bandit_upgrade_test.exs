@@ -100,7 +100,7 @@ defmodule QueryConsole.BanditUpgradeTest do
       refute lock =~ ~s|"thousand_island": {:hex, :thousand_island, "1.5.0"|
       assert lock =~ ~s|"hpax": {:hex, :hpax, "1.1.0"|
       assert lock =~ ~s|"finch": {:hex, :finch, "0.24.0"|
-      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
+      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
     end
 
     test "PhoenixAdapter APIs used for idle shutdown still exist" do

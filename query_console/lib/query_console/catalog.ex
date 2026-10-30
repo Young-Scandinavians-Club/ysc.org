@@ -139,7 +139,7 @@ defmodule QueryConsole.Catalog do
 
   defp build_table(schema, table) do
     columns =
-      case Lotus.get_table_schema("analytics", table, schema: schema) do
+      case Lotus.describe_table("analytics", table, schema: schema) do
         {:ok, cols} when is_list(cols) ->
           Enum.map(cols, fn col ->
             name = col[:name] || col["name"] || ""

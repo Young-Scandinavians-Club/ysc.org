@@ -146,7 +146,9 @@ defmodule QueryConsoleWeb.Layouts do
   @doc """
   Root layout for Lotus Web with YSC Admin + Sign out chrome.
 
-  Chrome sits outside LiveView `@inner_content` so patches do not remove it.
+  Mirrors upstream `Lotus.Web.Layouts` `root.html.heex` (themes, hashed CSS/JS
+  asset links) and adds our chrome outside LiveView `@inner_content` so patches
+  do not remove it.
   """
   def lotus_root(assigns) do
     assigns =
@@ -154,10 +156,16 @@ defmodule QueryConsoleWeb.Layouts do
       |> assign_new(:csp_nonces, fn -> %{style: nil, script: nil} end)
       |> assign_new(:current_user, fn -> nil end)
       |> assign(:ysc_admin_url, QueryConsole.SSO.admin_url())
+      |> assign(:lotus_css_path, lotus_asset_path(:css))
+      |> assign(:lotus_js_path, lotus_asset_path(:js))
 
     ~H"""
     <!DOCTYPE html>
-    <html lang="en">
+    <html
+      lang="en"
+      data-lotus-theme={assigns[:theme] || :lotus}
+      data-lotus-themes={Enum.join(assigns[:themes] || Lotus.Web.Theme.names(), " ")}
+    >
       <head>
         <meta charset="utf-8" />
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
@@ -166,9 +174,17 @@ defmodule QueryConsoleWeb.Layouts do
 
         <title>{assigns[:page_title] || "YSC Query Console"}</title>
 
-        <style phx-track-static nonce={@csp_nonces[:style]}>
-          <%= raw(Lotus.Web.Layouts.render("app.css")) %>
+        <style :if={Lotus.Web.Theme.css(assigns[:theme_colors])} nonce={@csp_nonces[:style]}>
+          <%= Lotus.Web.Theme.css(assigns[:theme_colors]) %>
         </style>
+        <link
+          phx-track-static
+          rel="stylesheet"
+          nonce={@csp_nonces[:style]}
+          href={@lotus_css_path}
+        />
+        <script phx-track-static nonce={@csp_nonces[:script]} src={@lotus_js_path} defer>
+        </script>
         <script
           src="https://cdn.jsdelivr.net/npm/@tailwindplus/elements@1"
           type="module"
@@ -206,11 +222,13 @@ defmodule QueryConsoleWeb.Layouts do
         </div>
         {@inner_content}
       </body>
-
-      <script phx-track-static type="text/javascript" nonce={@csp_nonces[:script]}>
-        <%= raw(Lotus.Web.Layouts.render("app.js")) %>
-      </script>
     </html>
     """
+  end
+
+  # Same URLs upstream's `Lotus.Web.Layouts` builds: the router serves
+  # `css-<md5>` / `js-<md5>` under the mount prefix (see QueryConsoleWeb.LotusMount).
+  defp lotus_asset_path(asset) when asset in [:css, :js] do
+    Lotus.Web.Helpers.lotus_path("#{asset}-#{Lotus.Web.Assets.current_hash(asset)}")
   end
 end

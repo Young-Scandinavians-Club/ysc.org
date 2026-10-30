@@ -51,7 +51,7 @@ defmodule QueryConsole.FinchUpgradeTest do
       refute lock =~ ~s|"finch": {:hex, :finch, "0.23.0"|
       assert lock =~ ~s|"mint": {:hex, :mint, "1.11.0"|
       assert lock =~ ~s|"req": {:hex, :req, "0.7.5"|
-      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
+      assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
     end
 
     test "build and request APIs Req uses still exist" do

@@ -41,9 +41,9 @@ config :query_console, QueryConsoleWeb.Endpoint,
 
 # Lotus stores metadata in QueryConsole.Repo; analytics reads use AnalyticsRepo.
 config :lotus,
-  ecto_repo: QueryConsole.Repo,
-  default_repo: "analytics",
-  data_repos: %{
+  storage_repo: QueryConsole.Repo,
+  default_source: "analytics",
+  data_sources: %{
     "analytics" => QueryConsole.AnalyticsRepo
   },
   unique_names: false,
