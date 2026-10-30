@@ -81,12 +81,87 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       html = render_click(lv, "next-step")
 
-      assert html =~
+      assert html =~ "Tell us about your connection to Scandinavia"
+      assert html =~ "Answer at least one of these three questions."
+
+      refute html =~
                "Tell us about your connection to Scandinavia (answer at least one)"
 
       assert html =~ "Tell us about your connection to Scandinavia/the Nordics"
       assert html =~ "Country of birth"
       refute html =~ "Place of Birth"
+      assert has_element?(lv, "#scandinavia-connection-questions")
+      assert has_element?(lv, "#how-did-you-hear")
+
+      assert html =~
+               "How did you hear about the Young Scandinavians Club (YSC)? (optional)"
+
+      assert html =~
+               "This does not count as one of the three connection questions above."
+    end
+
+    test "how you heard about YSC does not satisfy the Scandinavia connection questions",
+         %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/users/register")
+      form = form(lv, "#registration_form")
+
+      render_change(form, %{
+        "user" => %{
+          "registration_form" => %{
+            "membership_type" => "single",
+            "membership_eligibility" => ["born_in_scandinavia"]
+          }
+        }
+      })
+
+      assert render_click(lv, "next-step") =~ "Account Information"
+
+      render_change(form, %{
+        "user" => %{
+          "email" => "hearonly#{System.unique_integer()}@example.com",
+          "first_name" => "Hear",
+          "last_name" => "Only",
+          "registration_form" => %{
+            "birth_date" => "1990-01-01",
+            "address" => "1 Main St",
+            "city" => "SF",
+            "region" => "CA",
+            "country" => "US",
+            "postal_code" => "94105"
+          }
+        }
+      })
+
+      assert render_click(lv, "next-step") =~ "Additional Questions"
+
+      html =
+        render_submit(form, %{
+          "user" => %{
+            "email" => "hearonly#{System.unique_integer()}@example.com",
+            "first_name" => "Hear",
+            "last_name" => "Only",
+            "registration_form" => %{
+              "membership_type" => "single",
+              "membership_eligibility" => ["born_in_scandinavia"],
+              "birth_date" => "1990-01-01",
+              "address" => "1 Main St",
+              "city" => "SF",
+              "region" => "CA",
+              "country" => "US",
+              "postal_code" => "94105",
+              "place_of_birth" => "SE",
+              "citizenship" => "SE",
+              "most_connected_nordic_country" => "SE",
+              "hear_about_the_club" => "A friend at Midsummer",
+              "agreed_to_bylaws" => true
+            }
+          }
+        })
+
+      assert html =~ "Some required information is missing or incorrect"
+
+      assert html =~
+               "Please answer at least one question about your connection to Scandinavia"
     end
 
     test "completes full registration process successfully", %{conn: conn} do

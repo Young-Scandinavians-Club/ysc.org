@@ -2629,13 +2629,13 @@ defmodule Ysc.AccountsTest do
                  "Please check the box to confirm you agree to the bylaws"
                ],
                link_to_scandinavia: [
-                 "Please fill in at least one of these three fields"
+                 "Please answer at least one question about your connection to Scandinavia"
                ],
                lived_in_scandinavia: [
-                 "Please fill in at least one of these three fields"
+                 "Please answer at least one question about your connection to Scandinavia"
                ],
                spoken_languages: [
-                 "Please fill in at least one of these three fields"
+                 "Please answer at least one question about your connection to Scandinavia"
                ]
              } =
                errors_on(changeset)
