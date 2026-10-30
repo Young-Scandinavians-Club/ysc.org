@@ -47,13 +47,6 @@ defmodule YscWeb.ShopAccess do
     end
   end
 
-  @doc """
-  Whether the main navigation links to the shop. Off until switched on with
-  `SHOP_NAV_VISIBLE=true` (see `config/runtime.exs`); the shop itself stays
-  reachable at `/shop` for anyone, signed in or not.
-  """
-  def nav_visible?, do: Application.get_env(:ysc, :shop_nav_visible, false)
-
   @doc false
   def member_access?(nil, _active?), do: false
   def member_access?(%{role: :admin}, _active?), do: true

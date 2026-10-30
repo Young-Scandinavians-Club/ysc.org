@@ -104,33 +104,7 @@ defmodule YscWeb.ShopBrowseTest do
   end
 
   describe "main navigation" do
-    setup do
-      original = Application.get_env(:ysc, :shop_nav_visible)
-      on_exit(fn -> Application.put_env(:ysc, :shop_nav_visible, original) end)
-    end
-
-    test "is hidden by default, even for active members", %{conn: conn} do
-      Application.delete_env(:ysc, :shop_nav_visible)
-
-      {:ok, view, _html} =
-        live(log_in_user(conn, member_fixture()), ~p"/events")
-
-      refute has_element?(view, "#nav-shop-desktop")
-      refute has_element?(view, "#nav-shop-mobile")
-    end
-
-    test "the shop is still reachable at /shop while the link is hidden", %{
-      conn: conn
-    } do
-      Application.put_env(:ysc, :shop_nav_visible, false)
-
-      assert {:ok, _view, _html} =
-               live(log_in_user(conn, member_fixture()), ~p"/shop")
-    end
-
-    test "active members see a Shop link once it is switched on", %{conn: conn} do
-      Application.put_env(:ysc, :shop_nav_visible, true)
-
+    test "active members see a Shop link", %{conn: conn} do
       {:ok, view, _html} =
         live(log_in_user(conn, member_fixture()), ~p"/events")
 
@@ -141,8 +115,6 @@ defmodule YscWeb.ShopBrowseTest do
     test "non-members and visitors see it too, since anyone can look", %{
       conn: conn
     } do
-      Application.put_env(:ysc, :shop_nav_visible, true)
-
       {:ok, view, _html} = live(log_in_user(conn, user_fixture()), ~p"/events")
       assert has_element?(view, "#nav-shop-desktop")
 
