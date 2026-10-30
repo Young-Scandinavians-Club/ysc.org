@@ -68,6 +68,21 @@ defmodule YscWeb.Components.LayoutSiteComponentsTest do
     end
   end
 
+  describe "footer_dev_links/1" do
+    test "links to the public repo and the GitHub releases changelog" do
+      html = render_component(&Layouts.footer_dev_links/1, %{version: "2.52.0"})
+
+      assert html =~
+               ~s(href="https://github.com/Young-Scandinavians-Club/ysc.org")
+
+      assert html =~
+               ~s(href="https://github.com/Young-Scandinavians-Club/ysc.org/releases")
+
+      assert html =~ "v2.52.0"
+      assert html =~ ~s(rel="noopener noreferrer")
+    end
+  end
+
   describe "footer_nav_link/1" do
     test "renders link with shared footer underline classes" do
       html =

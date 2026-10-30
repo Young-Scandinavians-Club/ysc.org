@@ -329,6 +329,46 @@ defmodule YscWeb.Layouts do
     """
   end
 
+  @source_url "https://github.com/Young-Scandinavians-Club/ysc.org"
+
+  attr :version, :string, default: Ysc.BuildVersion.version()
+
+  @doc """
+  Quiet links for club members who want to peek at how the site is built:
+  the public source repository and the changelog (GitHub Releases).
+  """
+  def footer_dev_links(assigns) do
+    assigns = assign(assigns, :source_url, @source_url)
+
+    ~H"""
+    <span
+      id="footer-dev-links"
+      class="inline-flex items-baseline gap-x-2 text-xs text-zinc-500"
+    >
+      <span aria-hidden="true">·</span>
+      <a
+        id="footer-source-link"
+        href={@source_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hover:text-zinc-900 transition-colors"
+      >
+        Source
+      </a>
+      <span aria-hidden="true">·</span>
+      <a
+        id="footer-changelog-link"
+        href={"#{@source_url}/releases"}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hover:text-zinc-900 transition-colors"
+      >
+        Changelog (v{@version})
+      </a>
+    </span>
+    """
+  end
+
   attr :label, :string, required: true
   attr :class, :string, default: nil
   attr :rest, :global, include: ~w(navigate href target rel aria-label)
