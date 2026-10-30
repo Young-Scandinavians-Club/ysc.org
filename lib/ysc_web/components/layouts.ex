@@ -338,7 +338,13 @@ defmodule YscWeb.Layouts do
   the public source repository and the changelog (GitHub Releases).
   """
   def footer_dev_links(assigns) do
-    assigns = assign(assigns, :source_url, @source_url)
+    assigns =
+      assigns
+      |> assign(:source_url, @source_url)
+      |> assign(
+        :version_label,
+        "v" <> String.trim_leading(assigns.version, "v")
+      )
 
     ~H"""
     <span
@@ -363,7 +369,7 @@ defmodule YscWeb.Layouts do
         rel="noopener noreferrer"
         class="hover:text-zinc-900 transition-colors"
       >
-        Changelog (v{@version})
+        Changelog ({@version_label})
       </a>
     </span>
     """

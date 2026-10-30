@@ -78,8 +78,18 @@ defmodule YscWeb.Components.LayoutSiteComponentsTest do
       assert html =~
                ~s(href="https://github.com/Young-Scandinavians-Club/ysc.org/releases")
 
-      assert html =~ "v2.52.0"
+      assert html =~ "(v2.52.0)"
       assert html =~ ~s(rel="noopener noreferrer")
+    end
+
+    test "does not double the v prefix when the build version already has one" do
+      html =
+        render_component(&Layouts.footer_dev_links/1, %{
+          version: "v2.53.0-9b4f4e9"
+        })
+
+      assert html =~ "(v2.53.0-9b4f4e9)"
+      refute html =~ "vv2.53.0"
     end
   end
 
