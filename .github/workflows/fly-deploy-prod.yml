@@ -98,10 +98,11 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_SANDBOX_API_TOKEN || secrets.FLY_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-query-console-sandbox
 
-      # Same Fly registry 502 retry as the app sandbox deploy. This job's
-      # default working-directory is query_console/, so run from the repo root.
+      # flyctl --local-only uses the process cwd as the Docker build context.
+      # Stay in query_console/ so COPY mix.exs is the console app, not the
+      # main site (v2.53.0/v2.53.1 copied vendor/blurhash and failed compile).
+      # Retry script is one directory up from this job's default cwd.
       - name: Deploy query console to Fly.io sandbox
-        working-directory: .
         run: |
           GIT_HASH=$(git rev-parse --short=7 HEAD)
           VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
@@ -111,9 +112,9 @@ jobs:
           else
             VERSION="unknown-${GIT_HASH}"
           fi
-          bash etc/scripts/flyctl_deploy_retry.sh \
+          bash ../etc/scripts/flyctl_deploy_retry.sh \
             -a ysc-query-console-sandbox \
-            -c query_console/fly.sandbox.toml \
+            -c fly.sandbox.toml \
             --local-only \
             --build-arg BUILD_VERSION="$VERSION" \
             --image-label "$VERSION"
@@ -143,17 +144,16 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_PROD_API_TOKEN }}
         run: bash etc/scripts/fly_verify_app_access.sh ysc-query-console
 
-      # Same Fly registry 502 retry as the app production deploy. This job's
-      # default working-directory is query_console/, so run from the repo root.
+      # Stay in query_console/ — same Docker-context requirement as the
+      # sandbox gate. Retry script is one directory up from this cwd.
       - name: Deploy query console to Fly.io production
-        working-directory: .
         run: |
           VERSION_TAG="${{ github.ref_name }}"
           GIT_HASH=$(git rev-parse --short=7 HEAD)
           VERSION="${VERSION_TAG}-${GIT_HASH}"
-          bash etc/scripts/flyctl_deploy_retry.sh \
+          bash ../etc/scripts/flyctl_deploy_retry.sh \
             -a ysc-query-console \
-            -c query_console/fly.prod.toml \
+            -c fly.prod.toml \
             --local-only \
             --build-arg BUILD_VERSION="$VERSION" \
             --image-label "$VERSION"
