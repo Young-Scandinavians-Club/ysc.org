@@ -883,13 +883,39 @@ defmodule Ysc.Accounts.SignupApplicationTest do
 
       assert %{
                link_to_scandinavia: [
-                 "Please fill in at least one of these three fields"
+                 "Please answer at least one question about your connection to Scandinavia"
                ],
                lived_in_scandinavia: [
-                 "Please fill in at least one of these three fields"
+                 "Please answer at least one question about your connection to Scandinavia"
                ],
                spoken_languages: [
-                 "Please fill in at least one of these three fields"
+                 "Please answer at least one question about your connection to Scandinavia"
+               ]
+             } = errors_on(changeset)
+    end
+
+    test "does not count how you heard about YSC as a Scandinavia connection answer" do
+      changeset =
+        SignupApplication.application_changeset(%SignupApplication{}, %{
+          membership_type: "single",
+          membership_eligibility: ["born_in_scandinavia"],
+          birth_date: ~D[1990-01-01],
+          address: "123 Viking Way",
+          country: "USA",
+          city: "San Francisco",
+          postal_code: "94107",
+          place_of_birth: "Oslo",
+          citizenship: "Norwegian",
+          most_connected_nordic_country: "Norway",
+          hear_about_the_club: "A friend at Midsummer",
+          agreed_to_bylaws: true
+        })
+
+      refute changeset.valid?
+
+      assert %{
+               link_to_scandinavia: [
+                 "Please answer at least one question about your connection to Scandinavia"
                ]
              } = errors_on(changeset)
     end

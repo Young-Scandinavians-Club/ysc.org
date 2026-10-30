@@ -350,29 +350,39 @@ defmodule YscWeb.UserRegistrationLive do
                   ]}
                   required
                 />
-                <.header class="text-left pt-4">
-                  Tell us about your connection to Scandinavia (answer at least one)
-                </.header>
-                <.input
-                  field={rf[:link_to_scandinavia]}
-                  label="Tell us about your connection to Scandinavia/the Nordics, such as citizenship, it being your birthplace, or family ties."
-                  type="textarea"
-                />
-                <.input
-                  field={rf[:lived_in_scandinavia]}
-                  label="If you have lived in a Scandinavian country, where and for how long?"
-                  type="textarea"
-                />
-                <.input
-                  field={rf[:spoken_languages]}
-                  label="Which Scandinavian languages do you speak, if any?"
-                  type="textarea"
-                />
-                <.input
-                  field={rf[:hear_about_the_club]}
-                  label="How did you hear about the Young Scandinavians Club (YSC)?"
-                  type="textarea"
-                />
+                <div id="scandinavia-connection-questions">
+                  <.header class="text-left pt-4">
+                    Tell us about your connection to Scandinavia
+                    <:subtitle>
+                      Answer at least one of these three questions.
+                    </:subtitle>
+                  </.header>
+                  <.input
+                    field={rf[:link_to_scandinavia]}
+                    label="Tell us about your connection to Scandinavia/the Nordics, such as citizenship, it being your birthplace, or family ties."
+                    type="textarea"
+                  />
+                  <.input
+                    field={rf[:lived_in_scandinavia]}
+                    label="If you have lived in a Scandinavian country, where and for how long?"
+                    type="textarea"
+                  />
+                  <.input
+                    field={rf[:spoken_languages]}
+                    label="Which Scandinavian languages do you speak, if any?"
+                    type="textarea"
+                  />
+                </div>
+                <div id="how-did-you-hear" class="pt-4">
+                  <.input
+                    field={rf[:hear_about_the_club]}
+                    label="How did you hear about the Young Scandinavians Club (YSC)? (optional)"
+                    type="textarea"
+                  />
+                  <p class="mt-1 text-sm text-zinc-500">
+                    This does not count as one of the three connection questions above.
+                  </p>
+                </div>
 
                 <% field = rf[:agreed_to_bylaws] %>
                 <% checked =

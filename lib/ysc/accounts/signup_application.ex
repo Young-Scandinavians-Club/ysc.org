@@ -291,6 +291,8 @@ defmodule Ysc.Accounts.SignupApplication do
     :spoken_languages
   ]
 
+  @scandinavia_connection_error "Please answer at least one question about your connection to Scandinavia"
+
   defp validate_scandinavia_connection_fields(changeset) do
     any_present? =
       Enum.any?(@scandinavia_connection_fields, fn field ->
@@ -304,11 +306,7 @@ defmodule Ysc.Accounts.SignupApplication do
       changeset
     else
       Enum.reduce(@scandinavia_connection_fields, changeset, fn field, cs ->
-        add_error(
-          cs,
-          field,
-          "Please fill in at least one of these three fields"
-        )
+        add_error(cs, field, @scandinavia_connection_error)
       end)
     end
   end
