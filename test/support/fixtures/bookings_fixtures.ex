@@ -656,6 +656,11 @@ defmodule Ysc.BookingsFixtures do
   @doc """
   Returns `{checkin, checkout}` for an active stay window (`checkin <= today < checkout`)
   that satisfies Tahoe Saturday/Sunday booking rules regardless of which weekday today falls on.
+
+  The window is not constrained to buyout-allowed (summer) nights. From late October
+  through April it can include winter nights, which are rooms-only. Persist these
+  dates with `booking_fixture/1` or `active_check_in_booking_fixture/1`, not
+  `Bookings.create_booking/1` with `:buyout`.
   """
   def active_stay_dates(today \\ nil, max_nights \\ 4) do
     today =
