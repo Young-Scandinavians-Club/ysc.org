@@ -45,8 +45,33 @@ defmodule YscWeb.Components.Events.AttendeeInfoCards do
     end
   end
 
-  def checkout_timer_intro do
-    "Time remaining to complete purchase:"
+  @doc """
+  Page title for paid checkout.
+
+  "Complete Your Purchase" is only true once who's going / ticket details are
+  done (or never asked). Until then the Pay button is greyed out.
+  """
+  def checkout_heading(tickets, complete?)
+      when is_list(tickets) and is_boolean(complete?) do
+    if tickets == [] or complete? do
+      "Complete Your Purchase"
+    else
+      "Finish ticket details"
+    end
+  end
+
+  @doc """
+  Label beside the paid-checkout hold countdown.
+
+  Mentions completing the purchase only when payment is the next step.
+  """
+  def checkout_timer_intro(tickets, complete?)
+      when is_list(tickets) and is_boolean(complete?) do
+    if tickets == [] or complete? do
+      "Time remaining to complete purchase:"
+    else
+      "Time remaining:"
+    end
   end
 
   @doc """

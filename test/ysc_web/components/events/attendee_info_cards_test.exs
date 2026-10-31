@@ -23,6 +23,34 @@ defmodule YscWeb.Components.Events.AttendeeInfoCardsTest do
     }
   end
 
+  test "checkout heading and timer intro say complete purchase when names are done or never asked" do
+    assert AttendeeInfoCards.checkout_heading([identity_ticket()], true) ==
+             "Complete Your Purchase"
+
+    assert AttendeeInfoCards.checkout_heading([], false) ==
+             "Complete Your Purchase"
+
+    assert AttendeeInfoCards.checkout_timer_intro([identity_ticket()], true) ==
+             "Time remaining to complete purchase:"
+
+    assert AttendeeInfoCards.checkout_timer_intro([], false) ==
+             "Time remaining to complete purchase:"
+  end
+
+  test "checkout heading and timer intro do not say complete purchase while details are incomplete" do
+    assert AttendeeInfoCards.checkout_heading([identity_ticket()], false) ==
+             "Finish ticket details"
+
+    assert AttendeeInfoCards.checkout_heading([questions_ticket()], false) ==
+             "Finish ticket details"
+
+    assert AttendeeInfoCards.checkout_timer_intro([identity_ticket()], false) ==
+             "Time remaining:"
+
+    assert AttendeeInfoCards.checkout_timer_intro([questions_ticket()], false) ==
+             "Time remaining:"
+  end
+
   test "checkout timer says complete payment when names are done or never asked" do
     paid =
       AttendeeInfoCards.checkout_timer_next_step([identity_ticket()], true)

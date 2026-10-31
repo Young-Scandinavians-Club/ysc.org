@@ -2197,8 +2197,14 @@ defmodule YscWeb.EventDetailsLive do
             <div class="flex flex-col items-center gap-1">
               <div class="flex items-center justify-center space-x-2">
                 <.icon name="hero-clock" class="w-5 h-5 text-blue-600" />
-                <span class="text-sm font-medium text-blue-800">
-                  {AttendeeInfoCards.checkout_timer_intro()}
+                <span
+                  id="checkout-timer-intro"
+                  class="text-sm font-medium text-blue-800"
+                >
+                  {AttendeeInfoCards.checkout_timer_intro(
+                    tickets_requiring_registration,
+                    all_registrations_complete
+                  )}
                 </span>
                 <div
                   id="checkout-timer"
@@ -2228,7 +2234,12 @@ defmodule YscWeb.EventDetailsLive do
             <!-- Left Panel: Payment Details -->
             <div class="lg:w-2/3 space-y-6">
               <div class="text-center">
-                <h2 class="text-2xl type-title">Complete Your Purchase</h2>
+                <h2 id="checkout-heading" class="text-2xl type-title">
+                  {AttendeeInfoCards.checkout_heading(
+                    tickets_requiring_registration,
+                    all_registrations_complete
+                  )}
+                </h2>
                 <p class="text-zinc-600 mt-2">
                   Order: {@ticket_order.reference_id}
                 </p>

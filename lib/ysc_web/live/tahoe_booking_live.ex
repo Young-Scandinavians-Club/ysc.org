@@ -2616,10 +2616,10 @@ defmodule YscWeb.TahoeBookingLive do
                 Ski boots go in the laundry room racks; all other ski gear in the outside stairwell. Do not clutter common areas.
               </p>
             </.modal_section>
-            <.modal_section title="What to bring">
+            <.modal_section id="tahoe-rules-what-to-bring" title="What to bring">
               <p>
                 <strong>Linens:</strong>
-                Your own sheets, pillowcases, towels, and sleeping bags. None are provided.
+                Bring your own sheets, pillowcases, towels, and sleeping bags. The cabin does not supply linens.
               </p>
               <p>
                 <strong>Food:</strong>
@@ -2630,7 +2630,10 @@ defmodule YscWeb.TahoeBookingLive do
                 Bring fire starter or kindling and some dry wood to start the stove.
               </p>
             </.modal_section>
-            <.modal_section title="Cleaning & chores">
+            <.modal_section
+              id="tahoe-rules-cleaning-chores"
+              title="Cleaning & chores"
+            >
               <p>
                 <strong>Kitchen:</strong>
                 Leave it spotless; remove all food from the refrigerator.
@@ -2640,7 +2643,7 @@ defmodule YscWeb.TahoeBookingLive do
               </p>
               <p>
                 <strong>Laundry:</strong>
-                If you use club bedding, wash, dry, and fold it before leaving.
+                Leftover club bedding is sometimes on site. If you use it, wash, dry, and fold it before leaving.
               </p>
             </.modal_section>
             <.modal_section
@@ -3041,9 +3044,10 @@ defmodule YscWeb.TahoeBookingLive do
                 </.info_section>
 
                 <.info_section
+                  id="tahoe-packing-list"
                   heading_id="tahoe-packing-list-heading"
                   title="What to Pack"
-                  description="Bedding and towels are not provided."
+                  description="Bring your own bedding and towels — the cabin does not supply them."
                 >
                   <.icon_list tone={:strong}>
                     <:item title="Bedding:">
@@ -3072,7 +3076,7 @@ defmodule YscWeb.TahoeBookingLive do
                     items={[
                       "Clean up after yourselves",
                       "Strip and clean your rooms",
-                      "Wash, dry, and store any used club bedding",
+                      "If you used leftover club bedding, wash, dry, and fold it",
                       "Leave the kitchen spotless and remove all food",
                       "Secure bear-proof garbage lids"
                     ]}
