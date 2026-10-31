@@ -134,6 +134,47 @@ defmodule Ysc.Accounts.MembershipCacheTest do
       assert query_count == 0
     end
 
+    test "records had_any_subscription? while loading membership" do
+      user = user_fixture()
+      assert MembershipCache.get_active_membership(user) == nil
+      assert MembershipCache.had_any_subscription?(user) == false
+
+      {_had_any, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipCache.had_any_subscription?(user) end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 0
+    end
+
+    test "had_any_subscription? is true for an expired subscription without a second lookup" do
+      user = user_fixture()
+
+      {:ok, _expired_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_expired_had_any_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Expired Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      MembershipCache.invalidate_user(user.id)
+      assert MembershipCache.get_active_membership(user) == nil
+      assert MembershipCache.had_any_subscription?(user) == true
+
+      {_had_any, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> MembershipCache.had_any_subscription?(user) end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 0
+    end
+
     test "caches nil plan type so a second lookup does not query subscriptions" do
       user = user_fixture()
       assert MembershipCache.get_membership_plan_type(user) == nil

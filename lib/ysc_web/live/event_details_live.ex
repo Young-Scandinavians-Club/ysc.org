@@ -23,8 +23,6 @@ defmodule YscWeb.EventDetailsLive do
 
   alias Ysc.Accounts.MembershipCache
   alias Ysc.MoneyHelper
-  alias Ysc.Repo
-  alias Ysc.Subscriptions
   alias Ysc.Tickets.DonationDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
   alias Ysc.Tickets.ReservationDiscount
@@ -2928,6 +2926,17 @@ defmodule YscWeb.EventDetailsLive do
           end
 
         if connected?(socket) do
+          # Plan type is only needed once the ticket modal can open. Dead render
+          # skips it so members do not hit MembershipCache/plan-type work before
+          # first paint; `/events/:id/tickets` still computes it in
+          # `mount_minimal_assigns/3` because that modal is in the static HTML.
+          socket =
+            assign(
+              socket,
+              :member_only_ticket_limit,
+              MemberOnlyTickets.event_limit(viewer_membership_plan_type(socket))
+            )
+
           # Subscribe to real-time updates only when connected
           Events.subscribe()
           Agendas.subscribe(event_id)
@@ -2955,13 +2964,10 @@ defmodule YscWeb.EventDetailsLive do
 
   # Minimal assigns for fast initial static render (SEO-friendly)
   defp mount_minimal_assigns(socket, event, _event_id) do
-    # Cover image for the hero; pricing/tiers via EventPricingCache (same sold-count
-    # query as list_ticket_tiers_for_event, cached) so connect can reuse tiers.
-    event_for_seo = Repo.preload(event, :cover_image)
-
-    event =
-      event_for_seo
-      |> EventPricingCache.enrich_event()
+    # Pricing/tiers/cover via EventPricingCache (same sold-count query as
+    # list_ticket_tiers_for_event, cached) so connect can reuse tiers and SEO
+    # can use the cached image without a second `images` SELECT.
+    event = EventPricingCache.enrich_event(event)
 
     ticket_tiers =
       case event.ticket_tiers do
@@ -2978,14 +2984,20 @@ defmodule YscWeb.EventDetailsLive do
     show_ticket_modal =
       socket.assigns.live_action == :tickets and not ticket_sales_closed?(event)
 
+    # Member-only limits are only visible in the ticket modal. On the regular
+    # event page the modal is closed, so skip plan-type work until connect.
+    member_only_ticket_limit =
+      if show_ticket_modal do
+        MemberOnlyTickets.event_limit(viewer_membership_plan_type(socket))
+      else
+        0
+      end
+
     socket
-    |> SEO.assign_seo(SEO.assigns_for_event(event_for_seo))
+    |> SEO.assign_seo(SEO.assigns_for_event(event))
     |> assign(:event, event)
     |> assign(:had_membership?, event_had_membership?(socket))
-    |> assign(
-      :member_only_ticket_limit,
-      MemberOnlyTickets.event_limit(viewer_membership_plan_type(socket))
-    )
+    |> assign(:member_only_ticket_limit, member_only_ticket_limit)
     |> assign(:member_only_tickets_owned, 0)
     # Async data - will be populated after connection
     |> assign(:agendas, [])
@@ -3051,7 +3063,7 @@ defmodule YscWeb.EventDetailsLive do
     active? = socket.assigns[:active_membership?] == true
 
     if user && not active? do
-      Subscriptions.has_any_subscription?(user)
+      MembershipCache.had_any_subscription?(user)
     else
       false
     end
@@ -4621,10 +4633,7 @@ defmodule YscWeb.EventDetailsLive do
       ) do
     # Only update if this is the event we're viewing
     if event.id == socket.assigns.event.id do
-      event =
-        event
-        |> Repo.preload(:cover_image)
-        |> EventPricingCache.refresh_event()
+      event = EventPricingCache.refresh_event(event)
 
       subscribed =
         Events.subscribed_to_event_notification?(

@@ -101,6 +101,30 @@ defmodule Ysc.Accounts.MembershipCache do
   end
 
   @doc """
+  True when the user (or their primary, for sub-accounts) has any subscription
+  row, including expired ones, or currently has an active membership.
+
+  `get_active_membership/1` records this next to the membership cache entry so
+  EventDetailsLive can distinguish "never subscribed" vs "lapsed" on first
+  paint without a second `EXISTS` on `subscriptions`.
+  """
+  def had_any_subscription?(user) when is_nil(user), do: false
+
+  def had_any_subscription?(user) do
+    cache_key = build_cache_key(user.id, "had_any")
+
+    case read_wrapped(cache_key) do
+      {:hit, had_any?} ->
+        had_any?
+
+      :miss ->
+        had_any? = had_any_subscription_uncached(user)
+        cache_with_ttl(cache_key, had_any?)
+        had_any?
+    end
+  end
+
+  @doc """
   Gets both membership status and plan type for a user from cache.
 
   Returns a tuple `{membership, plan_type}` where:
@@ -214,9 +238,11 @@ defmodule Ysc.Accounts.MembershipCache do
   def invalidate_user(user_id) when is_binary(user_id) or is_integer(user_id) do
     active_key = build_cache_key(user_id, "active")
     plan_type_key = build_cache_key(user_id, "plan_type")
+    had_any_key = build_cache_key(user_id, "had_any")
 
     Cachex.del(@cache_name, active_key)
     Cachex.del(@cache_name, plan_type_key)
+    Cachex.del(@cache_name, had_any_key)
 
     Ysc.Logging.debug("Membership cache invalidated for user", user_id: user_id)
     :ok
@@ -412,14 +438,18 @@ defmodule Ysc.Accounts.MembershipCache do
     if Accounts.sub_account?(user) do
       case Accounts.get_primary_user(user) do
         nil ->
+          remember_had_any_subscription(user, false)
           nil
 
         primary ->
           if Accounts.has_lifetime_membership?(primary) do
+            remember_had_any_subscription(user, true)
             lifetime_membership(primary)
           else
-            primary
-            |> loaded_subscriptions()
+            subscriptions = loaded_subscriptions(primary)
+            remember_had_any_subscription(user, subscriptions != [])
+
+            subscriptions
             |> Enum.filter(
               &(Subscriptions.valid?(&1) and family_plan_subscription?(&1))
             )
@@ -428,13 +458,40 @@ defmodule Ysc.Accounts.MembershipCache do
       end
     else
       if Accounts.has_lifetime_membership?(user) do
+        remember_had_any_subscription(user, true)
         lifetime_membership(user)
       else
-        user
-        |> loaded_subscriptions()
+        subscriptions = loaded_subscriptions(user)
+        remember_had_any_subscription(user, subscriptions != [])
+
+        subscriptions
         |> Enum.filter(&Subscriptions.valid?/1)
         |> pick_active_subscription()
       end
+    end
+  end
+
+  defp remember_had_any_subscription(%{id: user_id}, had_any?)
+       when is_boolean(had_any?) do
+    cache_with_ttl(build_cache_key(user_id, "had_any"), had_any?)
+    had_any?
+  end
+
+  # Prefer the side-car written by `get_active_membership_db/1`. Fall back to
+  # EXISTS only for membership cache hits that predate this key.
+  defp had_any_subscription_uncached(user) do
+    membership = get_active_membership(user)
+
+    case read_wrapped(build_cache_key(user.id, "had_any")) do
+      {:hit, had_any?} ->
+        had_any?
+
+      :miss ->
+        if is_nil(membership) do
+          Subscriptions.has_any_subscription?(user)
+        else
+          true
+        end
     end
   end
 
