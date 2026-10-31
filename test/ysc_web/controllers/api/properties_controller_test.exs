@@ -319,6 +319,7 @@ defmodule YscWeb.Api.PropertiesControllerTest do
         )
 
       assert checklist_section["content"] =~ "-"
+      assert checklist_section["content"] =~ "leftover club bedding"
     end
 
     test "tahoe_check_in_time from settings overrides static default", %{

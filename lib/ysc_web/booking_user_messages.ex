@@ -472,7 +472,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def cabin_rules_receipt_reminder(:tahoe) do
-    "Bring your own sheets, pillowcases, towels, and sleeping bags. None are provided. Leave the kitchen clean before you go."
+    "Bring your own sheets, pillowcases, towels, and sleeping bags. The cabin does not supply linens. Leave the kitchen clean before you go."
   end
 
   def cabin_rules_receipt_reminder(:clear_lake) do

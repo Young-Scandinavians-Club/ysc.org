@@ -1580,6 +1580,53 @@ defmodule YscWeb.TahoeBookingLiveTest do
              )
     end
 
+    test "rules and packing copy say bring linens and wash leftover club bedding",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?tab=information&info_tab=manual")
+
+      render_async(view, 2_000)
+
+      assert has_element?(
+               view,
+               "#tahoe-packing-list",
+               "Bring your own bedding and towels — the cabin does not supply them."
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-checkout-chores",
+               "If you used leftover club bedding, wash, dry, and fold it"
+             )
+
+      refute has_element?(view, "#tahoe-checkout-chores", "None are provided")
+
+      render_click(view, "show-terms-modal")
+
+      assert has_element?(
+               view,
+               "#tahoe-rules-what-to-bring",
+               "The cabin does not supply linens"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-rules-what-to-bring",
+               "None are provided"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-rules-cleaning-chores",
+               "Leftover club bedding is sometimes on site"
+             )
+    end
+
     test "rules modal renders above the navbar and closes on its backdrop", %{
       conn: conn
     } do

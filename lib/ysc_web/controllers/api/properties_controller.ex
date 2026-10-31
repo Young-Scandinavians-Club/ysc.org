@@ -155,7 +155,7 @@ defmodule YscWeb.Api.PropertiesController do
         %{
           title: "The Dugnad Cleaning Checklist",
           content:
-            "\"Dugnad\" is our tradition of community work. Please complete these before **#{BookingDisplay.checkout_time_label()}**:\n\n- **Rooms:** Strip beds and clean the space.\n- **Laundry:** If you used club bedding, wash, dry, and fold it.\n- **Kitchen:** Wash all dishes and remove all food from the fridge.\n- **Bathrooms:** Wipe down surfaces (supplies are in sink cabinets).\n- **Trash:** Secure all bear bins and turn the bear wire **ON**.\n- **Storage:** Ski boots in laundry room racks; other gear in the outside stairwell."
+            "\"Dugnad\" is our tradition of community work. Please complete these before **#{BookingDisplay.checkout_time_label()}**:\n\n- **Rooms:** Strip beds and clean the space.\n- **Laundry:** If you used leftover club bedding, wash, dry, and fold it.\n- **Kitchen:** Wash all dishes and remove all food from the fridge.\n- **Bathrooms:** Wipe down surfaces (supplies are in sink cabinets).\n- **Trash:** Secure all bear bins and turn the bear wire **ON**.\n- **Storage:** Ski boots in laundry room racks; other gear in the outside stairwell."
         },
         %{
           title: "Cabin Master Note",
