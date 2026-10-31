@@ -148,6 +148,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
       assert html =~ "Date of birth: June 01, 2012"
       refute html =~ "DOB:"
       assert has_element?(view, "#active-family-members-table")
+      assert has_element?(view, "#active-family-members-table th", "Member")
       assert has_element?(view, "#family-members-help", "18 or older")
     end
 

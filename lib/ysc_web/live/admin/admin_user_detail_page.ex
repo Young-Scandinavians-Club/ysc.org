@@ -683,15 +683,18 @@ defmodule YscWeb.AdminUserDetailsLive do
               </.admin_form_card>
 
               <div class="overflow-x-auto rounded-lg border border-zinc-200">
-                <table class="min-w-full text-sm">
-                  <thead class="bg-zinc-50 text-left text-xs text-zinc-600 type-eyebrow">
+                <table
+                  id="user-booking-entitlements-table"
+                  class="min-w-full text-sm"
+                >
+                  <thead class="bg-zinc-50">
                     <tr>
-                      <th class="px-4 py-3">Status</th>
-                      <th class="px-4 py-3">Benefit</th>
-                      <th class="px-4 py-3">Property</th>
-                      <th class="px-4 py-3">Created</th>
-                      <th class="px-4 py-3">Expires</th>
-                      <th class="px-4 py-3"></th>
+                      <.admin_th density={:medium}>Status</.admin_th>
+                      <.admin_th density={:medium}>Benefit</.admin_th>
+                      <.admin_th density={:medium}>Property</.admin_th>
+                      <.admin_th density={:medium}>Created</.admin_th>
+                      <.admin_th density={:medium}>Expires</.admin_th>
+                      <.admin_th density={:medium}></.admin_th>
                     </tr>
                   </thead>
                   <tbody
@@ -1533,24 +1536,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <table class="min-w-full divide-y divide-zinc-200">
                     <thead class="bg-zinc-50">
                       <tr>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                        >
-                          Category
-                        </th>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
-                        >
-                          Email
-                        </th>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
-                        >
-                          SMS
-                        </th>
+                        <.admin_th>Category</.admin_th>
+                        <.admin_th align={:center}>Email</.admin_th>
+                        <.admin_th align={:center}>SMS</.admin_th>
                       </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-zinc-200">

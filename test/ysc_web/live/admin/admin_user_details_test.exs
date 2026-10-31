@@ -273,6 +273,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       assert has_element?(view, "#grant-entitlement-card")
       assert has_element?(view, "#grant-entitlement-form")
+      assert has_element?(view, "#user-booking-entitlements-table th", "Status")
 
       assert has_element?(
                view,

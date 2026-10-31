@@ -516,30 +516,10 @@ defmodule YscWeb.FamilyManagementLive do
           >
             <thead class="bg-zinc-50">
               <tr>
-                <th
-                  scope="col"
-                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                >
-                  Member
-                </th>
-                <th
-                  scope="col"
-                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                >
-                  Relationship
-                </th>
-                <th
-                  scope="col"
-                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                >
-                  Status
-                </th>
-                <th
-                  scope="col"
-                  class="px-4 py-3 text-right text-xs text-zinc-500 type-eyebrow"
-                >
-                  Actions
-                </th>
+                <.table_th density={:medium}>Member</.table_th>
+                <.table_th density={:medium}>Relationship</.table_th>
+                <.table_th density={:medium}>Status</.table_th>
+                <.table_th align={:right} density={:medium}>Actions</.table_th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-zinc-200">
@@ -591,30 +571,10 @@ defmodule YscWeb.FamilyManagementLive do
           >
             <thead class="bg-zinc-50">
               <tr>
-                <th
-                  scope="col"
-                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                >
-                  Email
-                </th>
-                <th
-                  scope="col"
-                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                >
-                  Relationship
-                </th>
-                <th
-                  scope="col"
-                  class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                >
-                  Expires
-                </th>
-                <th
-                  scope="col"
-                  class="px-4 py-3 text-right text-xs text-zinc-500 type-eyebrow"
-                >
-                  Actions
-                </th>
+                <.table_th density={:medium}>Email</.table_th>
+                <.table_th density={:medium}>Relationship</.table_th>
+                <.table_th density={:medium}>Expires</.table_th>
+                <.table_th align={:right} density={:medium}>Actions</.table_th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-zinc-200">
@@ -827,12 +787,8 @@ defmodule YscWeb.FamilyManagementLive do
           >
             <thead class="bg-zinc-50">
               <tr>
-                <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                  Name
-                </th>
-                <th class="px-4 py-3 text-left text-xs text-zinc-500 type-eyebrow">
-                  Email
-                </th>
+                <.table_th density={:medium}>Name</.table_th>
+                <.table_th density={:medium}>Email</.table_th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-zinc-200">

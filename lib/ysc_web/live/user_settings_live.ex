@@ -1781,24 +1781,9 @@ defmodule YscWeb.UserSettingsLive do
                     <table class="min-w-full divide-y divide-zinc-200">
                       <thead class="bg-zinc-50">
                         <tr>
-                          <th
-                            scope="col"
-                            class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                          >
-                            Category
-                          </th>
-                          <th
-                            scope="col"
-                            class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
-                          >
-                            Email
-                          </th>
-                          <th
-                            scope="col"
-                            class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
-                          >
-                            Text
-                          </th>
+                          <.table_th>Category</.table_th>
+                          <.table_th align={:center}>Email</.table_th>
+                          <.table_th align={:center}>Text</.table_th>
                         </tr>
                       </thead>
                       <tbody class="bg-white divide-y divide-zinc-200">
@@ -2283,30 +2268,10 @@ defmodule YscWeb.UserSettingsLive do
                   <table class="min-w-full divide-y divide-zinc-200">
                     <thead class="bg-zinc-50">
                       <tr>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                        >
-                          Transaction
-                        </th>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-left text-xs text-zinc-500 type-eyebrow"
-                        >
-                          Details
-                        </th>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-right text-xs text-zinc-500 type-eyebrow"
-                        >
-                          Amount
-                        </th>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-center text-xs text-zinc-500 type-eyebrow"
-                        >
-                          Status
-                        </th>
+                        <.table_th>Transaction</.table_th>
+                        <.table_th>Details</.table_th>
+                        <.table_th align={:right}>Amount</.table_th>
+                        <.table_th align={:center}>Status</.table_th>
                       </tr>
                     </thead>
                     <tbody
