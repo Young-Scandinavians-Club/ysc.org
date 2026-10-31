@@ -441,6 +441,109 @@ defmodule YscWeb.AdminPostEditorLiveTest do
     end
   end
 
+  describe "Trix editor stays before overlay modals" do
+    # Opening a keyed modal *before* FORM#edit_post_form / FORM#trix-editor-form
+    # made morphdom move those forms, which disconnected <trix-editor> and dropped
+    # its toolbar until a full refresh (#1765). LiveViewTest has no morphdom, so
+    # we lock the HTML source order that keeps the forms in place.
+
+    test "preview modal is rendered after the Trix forms", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Preview order",
+            "url_name" => "preview-order-#{System.unique_integer()}",
+            "state" => "draft",
+            "body" => "Content"
+          },
+          user
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      view
+      |> element("#post-editor-preview-patch")
+      |> render_click()
+
+      assert_patch(view, ~p"/admin/posts/#{post.id}/preview")
+
+      html = render(view)
+
+      assert has_element?(view, "#edit_post_form")
+      assert has_element?(view, "#trix-editor-form")
+      assert has_element?(view, "trix-editor")
+      assert has_element?(view, "#admin-post-preview-modal")
+      assert_html_id_before(html, "edit_post_form", "admin-post-preview-modal")
+
+      assert_html_id_before(
+        html,
+        "trix-editor-form",
+        "admin-post-preview-modal"
+      )
+    end
+
+    test "settings modal is rendered after the Trix forms", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Settings order",
+            "url_name" => "settings-order-#{System.unique_integer()}",
+            "state" => "draft",
+            "body" => "Content"
+          },
+          user
+        )
+
+      {:ok, view, html} = live(conn, ~p"/admin/posts/#{post.id}/settings")
+
+      assert has_element?(view, "#edit_post_form")
+      assert has_element?(view, "#trix-editor-form")
+      assert has_element?(view, "trix-editor")
+      assert has_element?(view, "#admin-post-settings-modal")
+      assert_html_id_before(html, "edit_post_form", "admin-post-settings-modal")
+
+      assert_html_id_before(
+        html,
+        "trix-editor-form",
+        "admin-post-settings-modal"
+      )
+    end
+
+    test "closing preview leaves the Trix editor on the page", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Preview close",
+            "url_name" => "preview-close-#{System.unique_integer()}",
+            "state" => "draft",
+            "body" => "Content"
+          },
+          user
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}/preview")
+
+      assert has_element?(view, "#admin-post-preview-modal")
+      assert has_element?(view, "#trix-editor-form")
+
+      render_patch(view, ~p"/admin/posts/#{post.id}")
+
+      refute has_element?(view, "#admin-post-preview-modal")
+      assert has_element?(view, "#edit_post_form")
+      assert has_element?(view, "#trix-editor-form")
+      assert has_element?(view, "trix-editor")
+    end
+  end
+
   describe "settings modal" do
     test "can navigate to settings", %{conn: conn, user: user} do
       {:ok, post} =
@@ -745,5 +848,22 @@ defmodule YscWeb.AdminPostEditorLiveTest do
   defp register_and_log_in_admin(%{conn: conn}) do
     user = user_fixture(%{role: :admin})
     %{conn: log_in_user(conn, user), user: user}
+  end
+
+  defp assert_html_id_before(html, earlier_id, later_id) do
+    earlier = ~s(id="#{earlier_id}")
+    later = ~s(id="#{later_id}")
+
+    case {:binary.match(html, earlier), :binary.match(html, later)} do
+      {{earlier_pos, _}, {later_pos, _}} ->
+        assert earlier_pos < later_pos,
+               "#{earlier_id} must appear before #{later_id} in the HTML"
+
+      {:nomatch, _} ->
+        flunk("expected #{earlier} in HTML")
+
+      {_, :nomatch} ->
+        flunk("expected #{later} in HTML")
+    end
   end
 end
