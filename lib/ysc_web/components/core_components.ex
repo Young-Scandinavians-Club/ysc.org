@@ -4628,6 +4628,65 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Column header for data tables on member-facing pages (family, settings,
+  payments).
+
+  Same chrome as `YscWeb.AdminComponents.admin_th/1` (`text-xs text-zinc-500
+  type-eyebrow` with density padding) so tables read as one system. Use this
+  from LiveViews that do not import AdminComponents. Admin pages keep calling
+  `admin_th/1`.
+
+  ## Densities
+
+    * `:comfortable` — `px-6 py-3` (default; full-page tables)
+    * `:medium` — `px-4 py-3` (family tables)
+    * `:compact` — `px-4 py-2`
+    * `:tight` — `px-2 py-2`
+
+  ## Examples
+
+      <.table_th density={:medium}>Member</.table_th>
+      <.table_th align={:right} density={:medium}>Actions</.table_th>
+      <.table_th align={:center}>Status</.table_th>
+  """
+  attr :align, :atom,
+    default: :left,
+    values: [:left, :right, :center]
+
+  attr :density, :atom,
+    default: :comfortable,
+    values: [:comfortable, :medium, :compact, :tight]
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the `<th>`"
+
+  attr :rest, :global
+  slot :inner_block, required: true
+
+  def table_th(assigns) do
+    ~H"""
+    <th
+      scope="col"
+      class={[
+        "text-xs text-zinc-500 type-eyebrow",
+        @density == :comfortable && "px-6 py-3",
+        @density == :medium && "px-4 py-3",
+        @density == :compact && "px-4 py-2",
+        @density == :tight && "px-2 py-2",
+        @align == :left && "text-left",
+        @align == :right && "text-right",
+        @align == :center && "text-center",
+        @class
+      ]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </th>
+    """
+  end
+
+  @doc """
   Bordered card for a section on account settings pages (profile, security, family).
 
   Wraps a type-subhead title and body in the shared `rounded-sm border` chrome

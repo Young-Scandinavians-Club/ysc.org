@@ -616,6 +616,26 @@ defmodule YscWeb.AdminComponentsTest do
       assert html =~ "px-4 py-3"
       assert html =~ "px-2 py-2"
     end
+
+    test "center alignment uses table_th chrome" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <table>
+          <thead>
+            <tr>
+              <.admin_th align={:center}>SMS</.admin_th>
+            </tr>
+          </thead>
+        </table>
+        """)
+
+      assert html =~ "SMS"
+      assert html =~ "text-center"
+      assert html =~ ~s(scope="col")
+      assert html =~ "type-eyebrow"
+    end
   end
 
   describe "admin_table_card/1" do

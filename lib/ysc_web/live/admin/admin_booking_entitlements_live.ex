@@ -262,16 +262,16 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
         </div>
 
         <div class="overflow-x-auto rounded-lg border border-zinc-200">
-          <table class="min-w-full text-sm">
-            <thead class="bg-zinc-50 text-left text-xs text-zinc-600 type-eyebrow">
+          <table id="outstanding-entitlements-table" class="min-w-full text-sm">
+            <thead class="bg-zinc-50">
               <tr>
-                <th class="px-4 py-3">Member</th>
-                <th class="px-4 py-3">Benefit</th>
-                <th class="px-4 py-3">Property</th>
-                <th class="px-4 py-3">Granted</th>
-                <th class="px-4 py-3">Expires</th>
-                <th class="px-4 py-3">Issued by</th>
-                <th class="px-4 py-3 text-right">Actions</th>
+                <.admin_th density={:medium}>Member</.admin_th>
+                <.admin_th density={:medium}>Benefit</.admin_th>
+                <.admin_th density={:medium}>Property</.admin_th>
+                <.admin_th density={:medium}>Granted</.admin_th>
+                <.admin_th density={:medium}>Expires</.admin_th>
+                <.admin_th density={:medium}>Issued by</.admin_th>
+                <.admin_th align={:right} density={:medium}>Actions</.admin_th>
               </tr>
             </thead>
             <tbody

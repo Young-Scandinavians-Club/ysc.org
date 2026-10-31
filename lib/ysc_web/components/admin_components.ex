@@ -2426,8 +2426,10 @@ defmodule YscWeb.AdminComponents do
   @doc """
   Shared admin table header cell.
 
-  Applies the `type-eyebrow` column caption used on Money, Settings, and other
-  admin data tables. Pass `align={:right}` for numeric/action columns.
+  Delegates to `YscWeb.CoreComponents.table_th/1` so admin and member tables
+  share the same `type-eyebrow` caption chrome. Prefer this name on admin
+  pages. Pass `align={:right}` for numeric/action columns and
+  `align={:center}` for status/toggle columns.
 
   ## Densities
 
@@ -2444,7 +2446,7 @@ defmodule YscWeb.AdminComponents do
   """
   attr :align, :atom,
     default: :left,
-    values: [:left, :right]
+    values: [:left, :right, :center]
 
   attr :density, :atom,
     default: :comfortable,
@@ -2459,21 +2461,9 @@ defmodule YscWeb.AdminComponents do
 
   def admin_th(assigns) do
     ~H"""
-    <th
-      class={[
-        "text-xs text-zinc-500 type-eyebrow",
-        @density == :comfortable && "px-6 py-3",
-        @density == :medium && "px-4 py-3",
-        @density == :compact && "px-4 py-2",
-        @density == :tight && "px-2 py-2",
-        @align == :left && "text-left",
-        @align == :right && "text-right",
-        @class
-      ]}
-      {@rest}
-    >
+    <.table_th align={@align} density={@density} class={@class} {@rest}>
       {render_slot(@inner_block)}
-    </th>
+    </.table_th>
     """
   end
 

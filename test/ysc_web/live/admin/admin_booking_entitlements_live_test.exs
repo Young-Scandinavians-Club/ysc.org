@@ -68,6 +68,7 @@ defmodule YscWeb.AdminBookingEntitlementsLiveTest do
       assert html =~ "Deferred Member"
       assert has_element?(view, "#grant-entitlement-card-org")
       assert has_element?(view, "#grant-entitlement-form-org")
+      assert has_element?(view, "#outstanding-entitlements-table th", "Member")
     end
 
     test "shows empty state after connect when no entitlements match filter", %{

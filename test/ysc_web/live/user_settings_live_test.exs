@@ -748,6 +748,8 @@ defmodule YscWeb.UserSettingsLiveTest do
                "#notification_form[data-testid=notification-preferences-ready]"
              )
 
+      assert has_element?(view, "#notification_form th", "Category")
+
       subscriber = Newsletter.get_subscriber_by_email(user.email)
       assert subscriber.subscribed
 
