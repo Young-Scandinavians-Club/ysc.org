@@ -20,6 +20,12 @@
 #    Docker layer cache makes a retry cheap; the next flyctl process also
 #    re-auths so a 10-minute cold build cannot leave a stale registry token.
 #
+# Query-console --local-only deploys must run with cwd query_console/ (and
+# -c fly.sandbox.toml / fly.prod.toml). flyctl uses the process cwd as the
+# Docker build context; running from the repo root copies the main app
+# mix.exs, which path-deps vendor/blurhash the console image does not have
+# (v2.53.0/v2.53.1, runs 41118049812 and 41131633952).
+#
 # Usage:
 #   ./etc/scripts/flyctl_deploy_retry.sh \
 #     --image registry.fly.io/ysc-sandbox:version \
@@ -30,6 +36,12 @@
 #     --dockerfile etc/docker/Dockerfile \
 #     -a ysc-prod \
 #     -c etc/fly/fly-prod.toml \
+#     --local-only \
+#     --build-arg BUILD_VERSION=version \
+#     --image-label version
+#   ../etc/scripts/flyctl_deploy_retry.sh \
+#     -a ysc-query-console-sandbox \
+#     -c fly.sandbox.toml \
 #     --local-only \
 #     --build-arg BUILD_VERSION=version \
 #     --image-label version
@@ -153,6 +165,17 @@ self_test() {
     [[ "${out}" != *"--local-only"* ]] ||
     [[ "${out}" != *"BUILD_VERSION=1"* ]]; then
     echo "flyctl_deploy_retry.sh: unexpected local-only deploy command: ${out}" >&2
+    return 1
+  fi
+
+  parse_args -a ysc-query-console-sandbox -c fly.sandbox.toml \
+    --local-only --build-arg BUILD_VERSION=1 --image-label 1
+  out="$(format_deploy_cmd)"
+  if [[ "${out}" != *"ysc-query-console-sandbox"* ]] ||
+    [[ "${out}" != *"fly.sandbox.toml"* ]] ||
+    [[ "${out}" == *"query_console/fly.sandbox.toml"* ]] ||
+    [[ "${out}" != *"--local-only"* ]]; then
+    echo "flyctl_deploy_retry.sh: unexpected query-console deploy command: ${out}" >&2
     return 1
   fi
 
