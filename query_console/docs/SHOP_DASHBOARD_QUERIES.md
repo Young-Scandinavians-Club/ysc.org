@@ -18,7 +18,7 @@ as-is. To change a window, edit the interval (`30 days`, `90 days`, ...).
 | Sold | A purchase whose status is **not** `pending`, `canceled` or `refunded`. This includes `failed` (paid, but Printful rejected it and an admin has to act). |
 | Refunded | `status = 'refunded'`. Counted in gross, removed from net. |
 | Billed | `submitting`, `submitted`, `in_production`, `shipped`, `delivered`: Printful has charged (or will charge) the club. |
-| Cost | `COALESCE(printful_cost, estimated_cost)`, the same rule as `Ysc.Merch.Order.cost/1`. |
+| Cost | `COALESCE(printful_cost, estimated_cost)`, or zero when both are `NULL`: the same rule as `Ysc.Merch.Order.cost/1`. |
 
 Money columns are `money_with_currency` composites; `(col).amount` is dollars.
 Timestamps are stored as UTC without a zone, so the queries compare against
@@ -33,10 +33,14 @@ member removes the line or when the order is fulfilled. History comes from
 
 | `action` | Written when | `quantity` |
 |----------|--------------|------------|
-| `added` | Add to cart | units added by that click (after the 25-unit cap) |
-| `quantity_set` | Quantity changed on the cart page | the line's new quantity |
-| `removed` | Member removes a line, or sets it to 0 | units that were in the line |
+| `added` | Add to cart, or raising the quantity on the cart page | units the cart really grew by (an add capped at 25 units records only what fit; one that changed nothing records nothing) |
+| `removed` | Lowering the quantity, removing the line, or setting it to 0 | units the cart shrank by |
 | `purchased` | Order fulfilled and the carted line is cleared | units that were in the line |
+
+It is a ledger of units: for any line, `added - removed - purchased` is what is
+currently in the cart. Timestamps have microsecond precision, so events from one
+member can be ordered; events written in the same batch (`Cart.clear/1`) share a
+timestamp.
 
 The log starts on the day the migration is deployed; there is nothing before
 that, so section 2 is empty until members use the cart. A `purchased` event
@@ -234,7 +238,8 @@ ORDER BY carted_units_now DESC, sold_units_30d DESC
 ### 2.1 Cart activity per day
 
 Chart: line or stacked bar, last 30 days, zero-filled. `carts_started` is
-members who added something that day.
+members whose cart grew that day, and `add_events` counts those increases
+(including quantity bumps on the cart page).
 
 ```sql
 -- Cart activity per day, last 30 days
@@ -617,14 +622,15 @@ SELECT
   date_trunc('month', inserted_at)::date AS month,
   COUNT(*) AS orders,
   SUM((total_amount).amount) AS revenue_usd,
-  SUM((COALESCE(printful_cost, estimated_cost)).amount) AS printful_cost_usd,
-  SUM((total_amount).amount) - SUM((COALESCE(printful_cost, estimated_cost)).amount) AS margin_usd,
+  SUM(COALESCE((COALESCE(printful_cost, estimated_cost)).amount, 0)) AS printful_cost_usd,
+  SUM((total_amount).amount) - SUM(COALESCE((COALESCE(printful_cost, estimated_cost)).amount, 0)) AS margin_usd,
   ROUND(
-    100.0 * (SUM((total_amount).amount) - SUM((COALESCE(printful_cost, estimated_cost)).amount))
+    100.0 * (SUM((total_amount).amount) - SUM(COALESCE((COALESCE(printful_cost, estimated_cost)).amount, 0)))
     / NULLIF(SUM((total_amount).amount), 0),
     1
   ) AS margin_pct,
-  COUNT(*) FILTER (WHERE printful_cost IS NULL) AS orders_on_estimate
+  COUNT(*) FILTER (WHERE printful_cost IS NULL AND estimated_cost IS NOT NULL)
+    AS orders_on_estimate
 FROM merch_orders
 WHERE kind = 'purchase'
   AND status IN ('submitting', 'submitted', 'in_production', 'shipped', 'delivered')
@@ -853,8 +859,10 @@ ORDER BY orders DESC
 
 ### 7.1 Orders by status
 
-Chart: bar. `oldest_hours_in_status` is time since the last status change of the
-oldest order in that status.
+Chart: bar. `oldest_hours_since_update` is time since the oldest order in that
+status was last updated. Orders have no status-transition timestamp, and
+`updated_at` also moves when fulfilment stores Printful ids or costs, so this is
+an upper bound on how long the order has been in the status.
 
 ```sql
 -- Orders by status
@@ -864,7 +872,7 @@ SELECT
   COUNT(*) AS orders,
   ROUND(
     MAX(EXTRACT(EPOCH FROM (now() AT TIME ZONE 'UTC') - updated_at)) / 3600
-  ) AS oldest_hours_in_status
+  ) AS oldest_hours_since_update
 FROM merch_orders
 GROUP BY status, kind
 ORDER BY orders DESC
@@ -872,10 +880,10 @@ ORDER BY orders DESC
 
 ### 7.2 Orders that need attention
 
-Chart: table. Should normally be empty. Thresholds: paid but not accepted by
-Printful for 30 minutes, in production for 10 days, shipped past the delivery
-estimate, a checkout still `pending` after 24 hours (the sweeper should have
-canceled it).
+Chart: table. This table should normally be empty. Thresholds: paid but not
+accepted by Printful for 30 minutes (since the order's last update), in
+production for 10 days, shipped past the delivery estimate, a checkout still
+`pending` after 24 hours (the sweeper should have canceled it).
 
 ```sql
 -- Orders needing attention
@@ -903,12 +911,12 @@ SELECT
   kind,
   status,
   issue,
-  ROUND(EXTRACT(EPOCH FROM (now_utc - updated_at)) / 3600) AS hours_in_status,
+  ROUND(EXTRACT(EPOCH FROM (now_utc - updated_at)) / 3600) AS hours_since_update,
   (total_amount).amount AS total_usd,
   failure_reason
 FROM flagged
 WHERE issue IS NOT NULL
-ORDER BY hours_in_status DESC
+ORDER BY hours_since_update DESC
 ```
 
 ### 7.3 Fulfilment speed and on-time delivery
@@ -968,8 +976,9 @@ charge; this uses the same cost rule as the admin pages.
 SELECT
   date_trunc('month', inserted_at)::date AS month,
   COUNT(*) AS orders,
-  SUM((COALESCE(printful_cost, estimated_cost)).amount) AS cost_usd,
-  COUNT(*) FILTER (WHERE printful_cost IS NULL) AS orders_on_estimate
+  SUM(COALESCE((COALESCE(printful_cost, estimated_cost)).amount, 0)) AS cost_usd,
+  COUNT(*) FILTER (WHERE printful_cost IS NULL AND estimated_cost IS NOT NULL)
+    AS orders_on_estimate
 FROM merch_orders
 WHERE kind = 'admin_comp'
   AND status IN ('submitting', 'submitted', 'in_production', 'shipped', 'delivered')
@@ -986,7 +995,7 @@ Chart: table. Orders tied to an event, matching the event cost statistics.
 SELECT
   e.title AS event,
   COUNT(*) AS orders,
-  SUM((COALESCE(o.printful_cost, o.estimated_cost)).amount) AS cost_usd
+  SUM(COALESCE((COALESCE(o.printful_cost, o.estimated_cost)).amount, 0)) AS cost_usd
 FROM merch_orders o
 JOIN events e ON e.id = o.event_id
 WHERE o.kind = 'admin_comp'

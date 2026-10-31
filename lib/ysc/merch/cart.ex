@@ -186,9 +186,15 @@ defmodule Ysc.Merch.Cart do
     with {:ok, _variant} <- fetch_available_variant(variant_id) do
       max = CartItem.max_quantity()
 
-      # One statement, so two requests adding the same variant at once both
-      # count instead of one hitting the unique index.
-      result =
+      # The lock and the read of the previous quantity are only there so the
+      # event log can record how many units this click really added (the cap
+      # can make that fewer than asked for).
+      Repo.transaction(fn ->
+        lock_line(user.id, variant_id)
+        previous = line_quantity(user.id, variant_id)
+
+        # One statement, so two requests adding the same variant at once both
+        # count instead of one hitting the unique index.
         %CartItem{user_id: user.id, variant_id: variant_id}
         |> CartItem.changeset(%{quantity: min(quantity, max)})
         |> Repo.insert(
@@ -205,12 +211,19 @@ defmodule Ysc.Merch.Cart do
           conflict_target: [:user_id, :variant_id],
           returning: true
         )
+        |> case do
+          {:ok, item} -> {item, item.quantity - previous}
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
+      |> case do
+        {:ok, {item, delta}} ->
+          record_change(user.id, variant_id, delta)
+          {:ok, item}
 
-      with {:ok, _item} <- result do
-        CartEvents.record(user.id, [{variant_id, :added, min(quantity, max)}])
+        {:error, changeset} ->
+          {:error, changeset}
       end
-
-      result
     end
   end
 
@@ -227,27 +240,30 @@ defmodule Ysc.Merch.Cart do
         {:ok, nil}
 
       true ->
-        {_count, items} =
-          from(c in CartItem,
-            where: c.user_id == ^user.id and c.variant_id == ^variant_id,
-            select: c
-          )
-          |> Repo.update_all(
-            set: [
-              quantity: min(quantity, CartItem.max_quantity()),
-              updated_at: now()
-            ]
-          )
+        Repo.transaction(fn ->
+          lock_line(user.id, variant_id)
+          previous = line_quantity(user.id, variant_id)
 
-        case List.first(items) do
-          nil ->
-            {:ok, nil}
+          {_count, items} =
+            from(c in CartItem,
+              where: c.user_id == ^user.id and c.variant_id == ^variant_id,
+              select: c
+            )
+            |> Repo.update_all(
+              set: [
+                quantity: min(quantity, CartItem.max_quantity()),
+                updated_at: now()
+              ]
+            )
 
-          item ->
-            CartEvents.record(user.id, [
-              {variant_id, :quantity_set, item.quantity}
-            ])
-
+          case List.first(items) do
+            nil -> {nil, 0}
+            item -> {item, item.quantity - previous}
+          end
+        end)
+        |> case do
+          {:ok, {item, delta}} ->
+            record_change(user.id, variant_id, delta)
             {:ok, item}
         end
     end
@@ -308,6 +324,34 @@ defmodule Ysc.Merch.Cart do
   rescue
     Ecto.Query.CastError -> {:error, :unavailable}
   end
+
+  # Serializes changes to one cart line until the transaction ends, so the
+  # previous quantity read below is still right when the write lands. A line
+  # that does not exist yet has no row to lock, hence an advisory lock.
+  defp lock_line(user_id, variant_id) do
+    Repo.query!("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+      user_id <> variant_id
+    ])
+  end
+
+  defp line_quantity(user_id, variant_id) do
+    from(c in CartItem,
+      where: c.user_id == ^user_id and c.variant_id == ^variant_id,
+      select: c.quantity
+    )
+    |> Repo.one()
+    |> Kernel.||(0)
+  end
+
+  # The event log is a ledger of units: increases are `:added`, decreases
+  # `:removed`, so added - removed - purchased is what is in carts.
+  defp record_change(_user_id, _variant_id, 0), do: :ok
+
+  defp record_change(user_id, variant_id, delta) when delta > 0,
+    do: CartEvents.record(user_id, [{variant_id, :added, delta}])
+
+  defp record_change(user_id, variant_id, delta),
+    do: CartEvents.record(user_id, [{variant_id, :removed, -delta}])
 
   defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
 

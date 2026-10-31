@@ -19,7 +19,8 @@ defmodule Ysc.Merch.CartEvents do
   def record(_user_id, []), do: :ok
 
   def record(user_id, entries) when is_binary(user_id) and is_list(entries) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    # Microseconds, so events from back-to-back calls keep their order.
+    now = DateTime.utc_now()
 
     rows =
       Enum.map(entries, fn {variant_id, action, quantity} ->

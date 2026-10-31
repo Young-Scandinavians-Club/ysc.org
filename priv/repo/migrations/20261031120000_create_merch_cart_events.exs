@@ -17,11 +17,12 @@ defmodule Ysc.Repo.Migrations.CreateMerchCartEvents do
           references(:merch_variants, column: :id, type: :binary_id, on_delete: :delete_all),
           null: false
 
-      # "added" | "quantity_set" | "removed" | "purchased"
+      # "added" | "removed" | "purchased"; `quantity` is the units moved, so
+      # added - removed - purchased is what is in carts.
       add :action, :string, null: false
       add :quantity, :integer, null: false
 
-      timestamps(updated_at: false)
+      timestamps(updated_at: false, type: :utc_datetime_usec)
     end
 
     create index(:merch_cart_events, [:inserted_at])

@@ -26,10 +26,21 @@ defmodule Ysc.Merch.CartEventsTest do
     assert events(user) == [added: 2, added: 1]
   end
 
-  test "add logs the capped quantity", %{user: user, variant: variant} do
+  test "add logs only the units that fit under the cap", %{
+    user: user,
+    variant: variant
+  } do
     {:ok, _} = Cart.add(user, variant.id, 1000)
+    {:ok, _} = Cart.add(user, variant.id, 1)
 
     assert events(user) == [added: 25]
+  end
+
+  test "a capped add logs the real increase", %{user: user, variant: variant} do
+    {:ok, _} = Cart.add(user, variant.id, 20)
+    {:ok, _} = Cart.add(user, variant.id, 10)
+
+    assert events(user) == [added: 20, added: 5]
   end
 
   test "a variant that cannot be added logs nothing", %{user: user} do
@@ -39,15 +50,44 @@ defmodule Ysc.Merch.CartEventsTest do
     assert events(user) == []
   end
 
-  test "set_quantity logs the new quantity, and zero logs a removal", %{
+  test "set_quantity logs the difference, and zero logs a removal", %{
     user: user,
     variant: variant
   } do
     {:ok, _} = Cart.add(user, variant.id, 2)
     {:ok, _} = Cart.set_quantity(user, variant.id, 5)
+    {:ok, _} = Cart.set_quantity(user, variant.id, 5)
+    {:ok, _} = Cart.set_quantity(user, variant.id, 1)
     {:ok, nil} = Cart.set_quantity(user, variant.id, 0)
 
-    assert events(user) == [added: 2, quantity_set: 5, removed: 5]
+    assert events(user) == [added: 2, added: 3, removed: 4, removed: 1]
+  end
+
+  test "added minus removed minus purchased is what is in the cart", %{
+    user: user,
+    variant: variant
+  } do
+    {:ok, _} = Cart.add(user, variant.id, 20)
+    {:ok, _} = Cart.add(user, variant.id, 10)
+    {:ok, _} = Cart.set_quantity(user, variant.id, 7)
+    {:ok, %{quantity: 9}} = Cart.add(user, variant.id, 2)
+
+    net =
+      Enum.reduce(events(user), 0, fn
+        {:added, n}, acc -> acc + n
+        {_, n}, acc -> acc - n
+      end)
+
+    assert net == 9
+    :ok = Cart.remove(user, variant.id, :purchased)
+
+    net_after =
+      Enum.reduce(events(user), 0, fn
+        {:added, n}, acc -> acc + n
+        {_, n}, acc -> acc - n
+      end)
+
+    assert net_after == 0
   end
 
   test "set_quantity on a line that is not in the cart logs nothing", %{
