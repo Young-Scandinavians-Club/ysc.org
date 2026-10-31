@@ -67,7 +67,15 @@ defmodule QueryConsole.MixProject do
       # call round/3, compare NaN, or pass a custom Context. ecto and
       # postgrex still list ~> 3.0, so pin the patched floor.
       {:decimal, "~> 3.2.0", override: true},
-      {:phoenix_html, "~> 4.1"},
+      # 4.4.0: attributes_escape/1 rejects binary attribute names that
+      # contain whitespace, quotes, `>`, `/`, `=`, control chars, or DEL
+      # (EEF-CVE-2026-117645 MEDIUM). Atom keys stay dasherized without
+      # that check. Also adds json_escape/1 (unused). Form APIs we use
+      # (FormField, normalize_value/2, options_for_select/2) are unchanged.
+      # We import Phoenix.HTML and spread `{@rest}` from LiveView global
+      # attrs (compile-time names); we do not pass user-controlled
+      # attribute names to attributes_escape/1. Pin the patched floor.
+      {:phoenix_html, "~> 4.4.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       # 1.2.13: lotus_web 1.4 allows LiveView >= 1.1 and < 1.3. Includes the
       # 1.1.33 fix for EEF-CVE-2026-64941 (LOW / GHSA-36m4-rm57-3prf), which
