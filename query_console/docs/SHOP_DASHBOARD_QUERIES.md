@@ -862,7 +862,7 @@ ORDER BY orders DESC
 Chart: bar. `oldest_hours_since_update` is time since the oldest order in that
 status was last updated. Orders have no status-transition timestamp, and
 `updated_at` also moves when fulfilment stores Printful ids or costs, so this is
-an upper bound on how long the order has been in the status.
+a lower bound on how long the order has been in the status.
 
 ```sql
 -- Orders by status
