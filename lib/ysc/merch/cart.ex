@@ -11,7 +11,7 @@ defmodule Ysc.Merch.Cart do
 
   alias Ysc.Accounts.User
   alias Ysc.Media.Image
-  alias Ysc.Merch.{CartItem, Product, Variant}
+  alias Ysc.Merch.{CartEvents, CartItem, Product, Variant}
   alias Ysc.Repo
 
   # Cart / checkout need Printful's variant id for shipping quotes. Skip
@@ -188,22 +188,29 @@ defmodule Ysc.Merch.Cart do
 
       # One statement, so two requests adding the same variant at once both
       # count instead of one hitting the unique index.
-      %CartItem{user_id: user.id, variant_id: variant_id}
-      |> CartItem.changeset(%{quantity: min(quantity, max)})
-      |> Repo.insert(
-        on_conflict:
-          from(c in CartItem,
-            update: [
-              set: [
-                quantity:
-                  fragment("LEAST(? + ?, ?)", c.quantity, ^quantity, ^max),
-                updated_at: ^now()
+      result =
+        %CartItem{user_id: user.id, variant_id: variant_id}
+        |> CartItem.changeset(%{quantity: min(quantity, max)})
+        |> Repo.insert(
+          on_conflict:
+            from(c in CartItem,
+              update: [
+                set: [
+                  quantity:
+                    fragment("LEAST(? + ?, ?)", c.quantity, ^quantity, ^max),
+                  updated_at: ^now()
+                ]
               ]
-            ]
-          ),
-        conflict_target: [:user_id, :variant_id],
-        returning: true
-      )
+            ),
+          conflict_target: [:user_id, :variant_id],
+          returning: true
+        )
+
+      with {:ok, _item} <- result do
+        CartEvents.record(user.id, [{variant_id, :added, min(quantity, max)}])
+      end
+
+      result
     end
   end
 
@@ -232,26 +239,58 @@ defmodule Ysc.Merch.Cart do
             ]
           )
 
-        {:ok, List.first(items)}
+        case List.first(items) do
+          nil ->
+            {:ok, nil}
+
+          item ->
+            CartEvents.record(user.id, [
+              {variant_id, :quantity_set, item.quantity}
+            ])
+
+            {:ok, item}
+        end
     end
   end
 
-  @doc "Removes a line. Always succeeds."
-  @spec remove(User.t(), String.t()) :: :ok
-  def remove(%User{id: user_id}, variant_id) when is_binary(variant_id) do
-    from(c in CartItem,
-      where: c.user_id == ^user_id and c.variant_id == ^variant_id
-    )
-    |> Repo.delete_all()
+  @doc """
+  Removes a line. Always succeeds.
 
-    :ok
+  `reason` is what the cart event log records: `:removed` when the member
+  took the line out, `:purchased` when its order was fulfilled.
+  """
+  @spec remove(User.t(), String.t(), :removed | :purchased) :: :ok
+  def remove(%User{id: user_id}, variant_id, reason \\ :removed)
+      when is_binary(variant_id) and reason in [:removed, :purchased] do
+    {_count, quantities} =
+      from(c in CartItem,
+        where: c.user_id == ^user_id and c.variant_id == ^variant_id,
+        select: c.quantity
+      )
+      |> Repo.delete_all()
+
+    CartEvents.record(
+      user_id,
+      Enum.map(quantities, &{variant_id, reason, &1})
+    )
   end
 
   @doc "Empties the cart."
   @spec clear(User.t()) :: :ok
   def clear(%User{id: user_id}) do
-    from(c in CartItem, where: c.user_id == ^user_id) |> Repo.delete_all()
-    :ok
+    {_count, lines} =
+      from(c in CartItem,
+        where: c.user_id == ^user_id,
+        select: {c.variant_id, c.quantity}
+      )
+      |> Repo.delete_all()
+
+    CartEvents.record(
+      user_id,
+      Enum.map(lines, fn {variant_id, quantity} ->
+        {variant_id, :removed, quantity}
+      end)
+    )
   end
 
   defp fetch_available_variant(variant_id) do
