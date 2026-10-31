@@ -190,7 +190,7 @@ defmodule Ysc.Merch.Cart do
       # event log can record how many units this click really added (the cap
       # can make that fewer than asked for).
       Repo.transaction(fn ->
-        lock_line(user.id, variant_id)
+        lock_cart(user.id)
         previous = line_quantity(user.id, variant_id)
 
         # One statement, so two requests adding the same variant at once both
@@ -241,7 +241,7 @@ defmodule Ysc.Merch.Cart do
 
       true ->
         Repo.transaction(fn ->
-          lock_line(user.id, variant_id)
+          lock_cart(user.id)
           previous = line_quantity(user.id, variant_id)
 
           {_count, items} =
@@ -278,12 +278,19 @@ defmodule Ysc.Merch.Cart do
   @spec remove(User.t(), String.t(), :removed | :purchased) :: :ok
   def remove(%User{id: user_id}, variant_id, reason \\ :removed)
       when is_binary(variant_id) and reason in [:removed, :purchased] do
-    {_count, quantities} =
-      from(c in CartItem,
-        where: c.user_id == ^user_id and c.variant_id == ^variant_id,
-        select: c.quantity
-      )
-      |> Repo.delete_all()
+    {:ok, quantities} =
+      Repo.transaction(fn ->
+        lock_cart(user_id)
+
+        {_count, quantities} =
+          from(c in CartItem,
+            where: c.user_id == ^user_id and c.variant_id == ^variant_id,
+            select: c.quantity
+          )
+          |> Repo.delete_all()
+
+        quantities
+      end)
 
     CartEvents.record(
       user_id,
@@ -294,12 +301,19 @@ defmodule Ysc.Merch.Cart do
   @doc "Empties the cart."
   @spec clear(User.t()) :: :ok
   def clear(%User{id: user_id}) do
-    {_count, lines} =
-      from(c in CartItem,
-        where: c.user_id == ^user_id,
-        select: {c.variant_id, c.quantity}
-      )
-      |> Repo.delete_all()
+    {:ok, lines} =
+      Repo.transaction(fn ->
+        lock_cart(user_id)
+
+        {_count, lines} =
+          from(c in CartItem,
+            where: c.user_id == ^user_id,
+            select: {c.variant_id, c.quantity}
+          )
+          |> Repo.delete_all()
+
+        lines
+      end)
 
     CartEvents.record(
       user_id,
@@ -325,12 +339,14 @@ defmodule Ysc.Merch.Cart do
     Ecto.Query.CastError -> {:error, :unavailable}
   end
 
-  # Serializes changes to one cart line until the transaction ends, so the
-  # previous quantity read below is still right when the write lands. A line
-  # that does not exist yet has no row to lock, hence an advisory lock.
-  defp lock_line(user_id, variant_id) do
+  # Serializes every change to one member's cart until the transaction ends,
+  # so the previous quantity read by `add/3` and `set_quantity/3` is still right
+  # when the write lands, and a concurrent remove or clear cannot slip in
+  # between. A line that does not exist yet has no row to lock, hence an
+  # advisory lock; it is per member so `clear/1` is covered too.
+  defp lock_cart(user_id) do
     Repo.query!("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
-      user_id <> variant_id
+      "merch_cart:" <> user_id
     ])
   end
 

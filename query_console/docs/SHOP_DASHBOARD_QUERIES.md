@@ -37,8 +37,10 @@ member removes the line or when the order is fulfilled. History comes from
 | `removed` | Lowering the quantity, removing the line, or setting it to 0 | units the cart shrank by |
 | `purchased` | Order fulfilled and the carted line is cleared | units that were in the line |
 
-It is a ledger of units: for any line, `added - removed - purchased` is what is
-currently in the cart. Timestamps have microsecond precision, so events from one
+When event writes succeed, it is a ledger of units: for any line,
+`added - removed - purchased` is what is currently in the cart. A failed write
+is logged and skipped rather than blocking the cart, so a missing event can make
+these totals slightly incomplete. Timestamps have microsecond precision, so events from one
 member can be ordered; events written in the same batch (`Cart.clear/1`) share a
 timestamp.
 
@@ -881,9 +883,9 @@ ORDER BY orders DESC
 ### 7.2 Orders that need attention
 
 Chart: table. This table should normally be empty. Thresholds: paid but not
-accepted by Printful for 30 minutes (since the order's last update), in
-production for 10 days, shipped past the delivery estimate, a checkout still
-`pending` after 24 hours (the sweeper should have canceled it).
+accepted by Printful for 30 minutes (since the order's last update), submitted
+or in production for 10 days, shipped past the delivery estimate, a checkout
+still `pending` after 24 hours (the sweeper should have canceled it).
 
 ```sql
 -- Orders needing attention
@@ -898,7 +900,7 @@ flagged AS (
       WHEN o.status IN ('paid', 'submitting') AND o.updated_at < o.now_utc - interval '30 minutes'
         THEN 'Paid, not accepted by Printful'
       WHEN o.status IN ('submitted', 'in_production') AND o.submitted_at < o.now_utc - interval '10 days'
-        THEN 'In production over 10 days'
+        THEN 'Submitted or in production over 10 days'
       WHEN o.status = 'shipped' AND o.delivery_estimate_max < o.now_utc::date
         THEN 'Shipped, past delivery estimate'
       WHEN o.status = 'pending' AND o.inserted_at < o.now_utc - interval '24 hours'
