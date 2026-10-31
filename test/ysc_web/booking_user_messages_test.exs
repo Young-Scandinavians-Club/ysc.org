@@ -125,7 +125,8 @@ defmodule YscWeb.BookingUserMessagesTest do
     clear_lake = BookingUserMessages.cabin_rules_receipt_reminder(:clear_lake)
 
     assert tahoe =~ "sheets, pillowcases, towels, and sleeping bags"
-    assert tahoe =~ "None are provided"
+    assert tahoe =~ "The cabin does not supply linens"
+    refute tahoe =~ "None are provided"
     refute tahoe =~ "comforters"
     refute tahoe =~ "tent"
 
