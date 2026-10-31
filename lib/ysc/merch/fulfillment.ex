@@ -210,7 +210,7 @@ defmodule Ysc.Merch.Fulfillment do
   end
 
   defp remove_ordered_variants_from_cart(%Order{user: %{} = user} = order) do
-    Enum.each(order.items, &Cart.remove(user, &1.variant_id))
+    Enum.each(order.items, &Cart.remove(user, &1.variant_id, :purchased))
   end
 
   defp remove_ordered_variants_from_cart(_), do: :ok

@@ -7,7 +7,7 @@ defmodule Ysc.Merch.FulfillmentTest do
   import Ysc.MerchFixtures
 
   alias Ysc.Ledgers.Payment
-  alias Ysc.Merch.{Cart, Fulfillment, Order, Orders}
+  alias Ysc.Merch.{Cart, CartEvent, Fulfillment, Order, Orders}
   alias Ysc.Printful.{ClientMock, Error}
   alias Ysc.StripeMock
   alias YscWeb.Workers.MerchSubmitOrder
@@ -326,6 +326,24 @@ defmodule Ysc.Merch.FulfillmentTest do
       assert [%{variant: %{id: id}}] = Cart.list(user)
       assert id == other.id
       refute Enum.any?(Cart.list(user), &(&1.variant.id == tee.id))
+    end
+
+    test "logs the carted lines it removes as purchased", %{
+      order: order,
+      user: user,
+      tee: tee
+    } do
+      printful_accepts()
+      {:ok, _} = Fulfillment.process_successful_payment(payment_intent(order))
+
+      assert [%{quantity: 2}] =
+               Repo.all(
+                 from(e in CartEvent,
+                   where:
+                     e.user_id == ^user.id and e.variant_id == ^tee.id and
+                       e.action == :purchased
+                 )
+               )
     end
 
     test "waits for Stripe to capture the payment", %{order: order} do

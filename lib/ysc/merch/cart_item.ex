@@ -36,6 +36,7 @@ defmodule Ysc.Merch.CartItem do
     |> unique_constraint([:user_id, :variant_id],
       name: :merch_cart_items_user_id_variant_id_index
     )
+    |> foreign_key_constraint(:user_id)
     |> foreign_key_constraint(:variant_id)
   end
 end
