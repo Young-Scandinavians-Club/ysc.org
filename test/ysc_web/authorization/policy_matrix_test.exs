@@ -106,10 +106,12 @@ defmodule YscWeb.Authorization.PolicyMatrixTest do
 
   # Schemas deliberately outside the policy: secrets that no role may read or
   # write through the UI, only the auth flows that issue and consume them,
-  # plus a schema that exists only in the test environment.
+  # an analytics log the cart writes and only the query console reads, plus a
+  # schema that exists only in the test environment.
   @excluded_schemas [
     Ysc.OAuth.AuthCode,
     Ysc.VerificationCode,
+    Ysc.Merch.CartEvent,
     Ysc.Ecto.DateKindSample
   ]
 
