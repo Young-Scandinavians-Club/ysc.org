@@ -1791,6 +1791,14 @@ defmodule YscWeb.EventDetailsLiveTest do
              )
 
       # One identity ticket is pre-filled as the buyer, so payment is the next step.
+      assert has_element?(view, "#checkout-heading", "Complete Your Purchase")
+
+      assert has_element?(
+               view,
+               "#checkout-timer-intro",
+               "Time remaining to complete purchase:"
+             )
+
       assert has_element?(
                view,
                "#checkout-timer-next-step",
@@ -1813,6 +1821,9 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert has_element?(view, "#payment-modal")
       assert has_element?(view, "#checkout-whos-going", "Who's going?")
+      assert has_element?(view, "#checkout-heading", "Finish ticket details")
+      refute has_element?(view, "#checkout-heading", "Complete Your Purchase")
+      refute has_element?(view, "#checkout-timer-intro", "to complete purchase")
 
       assert has_element?(
                view,
