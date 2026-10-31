@@ -133,6 +133,20 @@ defmodule Ysc.Merch.CartEventsTest do
     assert events(user_fixture()) == []
   end
 
+  test "adding for a member that does not exist is an error and logs nothing",
+       %{
+         variant: variant
+       } do
+    ghost = %Ysc.Accounts.User{id: Ecto.ULID.generate()}
+
+    assert {:error, %Ecto.Changeset{}} = Cart.add(ghost, variant.id, 1)
+    assert Repo.aggregate(CartEvent, :count) == 0
+  end
+
+  test "the explain query is an Ecto query" do
+    assert %Ecto.Query{} = CartEvents.ci_query_explain_query()
+  end
+
   test "a failed write is swallowed so the cart keeps working", %{user: user} do
     assert :ok = CartEvents.record(user.id, [{"not-a-ulid", :added, 1}])
     assert :ok = CartEvents.record(user.id, [])

@@ -33,7 +33,4 @@ defmodule Ysc.Merch.CartEvent do
 
     timestamps(updated_at: false)
   end
-
-  @doc "All cart event actions."
-  def actions, do: @actions
 end
