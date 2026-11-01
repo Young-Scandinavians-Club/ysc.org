@@ -173,6 +173,117 @@ defmodule YscWeb.UserTicketsLiveTest do
       refute html =~ "will be released"
       assert html =~ "Complete payment in"
       refute html =~ "Complete payment within"
+
+      assert has_element?(
+               view,
+               "#order-status-#{data.order.id}",
+               "Payment needed"
+             )
+
+      assert has_element?(
+               view,
+               "#resume-order-#{data.order.id}",
+               "Finish payment"
+             )
+
+      refute has_element?(
+               view,
+               "#resume-order-#{data.order.id}",
+               "Confirm free tickets"
+             )
+    end
+
+    test "pending free holds ask to confirm tickets, not pay", %{conn: conn} do
+      user = user_fixture()
+      event = event_fixture()
+
+      free_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "RSVP",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50
+        })
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: free_tier,
+          status: :pending
+        })
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/users/tickets")
+      render(view)
+
+      assert has_element?(view, "#order-status-#{order.id}", "Confirm tickets")
+      refute has_element?(view, "#order-status-#{order.id}", "Payment needed")
+
+      assert has_element?(
+               view,
+               "#pending-order-deadline-#{order.id}",
+               "Confirm your tickets in"
+             )
+
+      refute has_element?(
+               view,
+               "#pending-order-deadline-#{order.id}",
+               "Complete payment"
+             )
+
+      assert has_element?(
+               view,
+               "#resume-order-#{order.id}",
+               "Confirm free tickets"
+             )
+
+      refute has_element?(view, "#resume-order-#{order.id}", "Finish payment")
+    end
+
+    test "completed free orders say Confirmed and Total Free, not Paid", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      event = event_fixture()
+
+      free_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "RSVP",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50
+        })
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: free_tier,
+          status: :completed
+        })
+
+      loaded =
+        Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        |> Ysc.Repo.preload(:tickets)
+
+      Enum.each(loaded.tickets, fn ticket ->
+        ticket
+        |> Ecto.Changeset.change(status: :confirmed)
+        |> Ysc.Repo.update!()
+      end)
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/users/tickets")
+      render(view)
+
+      assert has_element?(view, "#order-status-#{order.id}", "Confirmed")
+      refute has_element?(view, "#order-status-#{order.id}", "Paid")
+      assert has_element?(view, "#order-total-label-#{order.id}", "Total")
+      refute has_element?(view, "#order-total-label-#{order.id}", "Total Paid")
+      assert has_element?(view, "#order-total-amount-#{order.id}", "Free")
     end
 
     test "cancel-order event shows error when order not found", %{conn: conn} do

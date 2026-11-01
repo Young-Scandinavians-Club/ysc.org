@@ -476,9 +476,14 @@ defmodule YscWeb.OrderConfirmationLive do
               "text-xs mb-5 type-eyebrow",
               if(refunded_view?, do: "text-red-700", else: "text-zinc-500")
             ]}>
-              {if refunded_view?,
-                do: "Payment & Refund Summary",
-                else: "Payment Summary"}
+              <%= cond do %>
+                <% refunded_view? -> %>
+                  Payment & Refund Summary
+                <% free_order?(@ticket_order) -> %>
+                  Order Summary
+                <% true -> %>
+                  Payment Summary
+              <% end %>
             </h3>
             <div class="space-y-3 text-sm">
               <div
@@ -564,9 +569,19 @@ defmodule YscWeb.OrderConfirmationLive do
                 "flex justify-between items-baseline border-t pt-4",
                 if(refunded_view?, do: "border-red-200", else: "border-zinc-200")
               ]}>
-                <span class="font-semibold text-zinc-900">Total Paid</span>
-                <span class="text-lg font-bold text-zinc-900 tabular-nums">
-                  {MoneyHelper.format_money!(@ticket_order.total_amount)}
+                <span
+                  id="order-confirmation-total-label"
+                  class="font-semibold text-zinc-900"
+                >
+                  {if free_order?(@ticket_order), do: "Total", else: "Total Paid"}
+                </span>
+                <span
+                  id="order-confirmation-total-amount"
+                  class="text-lg font-bold text-zinc-900 tabular-nums"
+                >
+                  {if free_order?(@ticket_order),
+                    do: "Free",
+                    else: MoneyHelper.format_money!(@ticket_order.total_amount)}
                 </span>
               </div>
               <%= if @refund_data && @refund_data.total_refunded do %>

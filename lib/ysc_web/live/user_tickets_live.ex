@@ -76,7 +76,11 @@ defmodule YscWeb.UserTicketsLive do
               <%!-- Event Header Section --%>
               <div class="p-8">
                 <div class="flex justify-between items-start mb-6">
-                  <.status_badge status={ticket_order.status} />
+                  <.status_badge
+                    id={"order-status-#{ticket_order.id}"}
+                    status={ticket_order.status}
+                    complimentary?={Display.complimentary_order?(ticket_order)}
+                  />
                   <p
                     class="text-xs text-zinc-500 text-right type-eyebrow"
                     title="Use this order number if you contact us about this purchase"
@@ -113,17 +117,26 @@ defmodule YscWeb.UserTicketsLive do
                   <div class="mt-6 pt-6 border-t border-zinc-100">
                     <div class="flex items-center gap-2 mb-4 text-sm text-amber-600">
                       <.icon name="hero-clock" class="w-4 h-4" />
-                      <span class="font-semibold">
-                        {payment_deadline_copy(ticket_order.expires_at)}
+                      <span
+                        id={"pending-order-deadline-#{ticket_order.id}"}
+                        class="font-semibold"
+                      >
+                        {payment_deadline_copy(
+                          ticket_order.expires_at,
+                          Display.complimentary_order?(ticket_order)
+                        )}
                       </span>
                     </div>
                     <div class="flex gap-2">
                       <.button
+                        id={"resume-order-#{ticket_order.id}"}
                         phx-click="resume-order"
                         phx-value-order-id={ticket_order.id}
                         class="flex-1"
                       >
-                        Finish payment
+                        {if Display.complimentary_order?(ticket_order),
+                          do: "Confirm free tickets",
+                          else: "Finish payment"}
                       </.button>
                       <.button
                         phx-click="cancel-order"
@@ -184,11 +197,21 @@ defmodule YscWeb.UserTicketsLive do
 
                   <div class="mt-8 flex justify-between items-center">
                     <div class="text-right">
-                      <p class="text-xs text-zinc-500 type-eyebrow">
-                        Total Paid
+                      <p
+                        id={"order-total-label-#{ticket_order.id}"}
+                        class="text-xs text-zinc-500 type-eyebrow"
+                      >
+                        {if Display.complimentary_order?(ticket_order),
+                          do: "Total",
+                          else: "Total Paid"}
                       </p>
-                      <p class="text-2xl text-zinc-900 type-title">
-                        {format_price(ticket_order.total_amount)}
+                      <p
+                        id={"order-total-amount-#{ticket_order.id}"}
+                        class="text-2xl text-zinc-900 type-title"
+                      >
+                        {if Display.complimentary_order?(ticket_order),
+                          do: "Free",
+                          else: format_price(ticket_order.total_amount)}
                       </p>
                     </div>
                     <div class="flex items-center gap-2">
@@ -440,37 +463,47 @@ defmodule YscWeb.UserTicketsLive do
 
   ## Helper Functions
 
+  attr :id, :string, required: true
+  attr :status, :atom, required: true
+  attr :complimentary?, :boolean, default: false
+
   defp status_badge(assigns) do
     ~H"""
-    <span class={[
-      "px-3 py-1 text-xs rounded-full ring-1 type-eyebrow",
-      case @status do
-        :pending -> "bg-amber-50 text-amber-700 ring-amber-100"
-        :completed -> "bg-green-50 text-green-700 ring-green-100"
-        :cancelled -> "bg-red-50 text-red-700 ring-red-100"
-        :expired -> "bg-zinc-50 text-zinc-700 ring-zinc-100"
-        _ -> "bg-zinc-50 text-zinc-700 ring-zinc-100"
-      end
-    ]}>
-      {order_status_label(@status)}
+    <span
+      id={@id}
+      class={[
+        "px-3 py-1 text-xs rounded-full ring-1 type-eyebrow",
+        case @status do
+          :pending -> "bg-amber-50 text-amber-700 ring-amber-100"
+          :completed -> "bg-green-50 text-green-700 ring-green-100"
+          :cancelled -> "bg-red-50 text-red-700 ring-red-100"
+          :expired -> "bg-zinc-50 text-zinc-700 ring-zinc-100"
+          _ -> "bg-zinc-50 text-zinc-700 ring-zinc-100"
+        end
+      ]}
+    >
+      {Display.order_status_label(@status, complimentary: @complimentary?)}
     </span>
     """
   end
-
-  defp order_status_label(status),
-    do: Ysc.Tickets.Display.order_status_label(status)
 
   defp format_date(datetime) do
     Timex.format!(datetime, "{Mshort} {D}, {YYYY}")
   end
 
-  defp payment_deadline_copy(expires_at) do
+  defp payment_deadline_copy(expires_at, complimentary?) do
     now = DateTime.utc_now()
 
     if DateTime.compare(now, expires_at) == :gt do
       "This checkout has expired. Start again if tickets are still available."
     else
-      "Complete payment in #{format_duration_remaining(DateTime.diff(expires_at, now))}"
+      duration = format_duration_remaining(DateTime.diff(expires_at, now))
+
+      if complimentary? do
+        "Confirm your tickets in #{duration}"
+      else
+        "Complete payment in #{duration}"
+      end
     end
   end
 

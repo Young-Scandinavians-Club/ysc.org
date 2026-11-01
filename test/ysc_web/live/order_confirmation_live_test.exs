@@ -517,9 +517,14 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "Free"
+      assert html =~ "Order Summary"
+      refute html =~ "Payment Summary"
+      assert has_element?(view, "#order-confirmation-payment-method", "Free")
+      assert has_element?(view, "#order-confirmation-total-label")
+      refute has_element?(view, "#order-confirmation-total-label", "Total Paid")
+      assert has_element?(view, "#order-confirmation-total-amount", "Free")
     end
   end
 
@@ -542,7 +547,8 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
       # Check that payment summary section exists
-      assert html =~ "Total" or html =~ "Payment"
+      assert html =~ "Total Paid"
+      assert html =~ "Payment Summary"
     end
 
     test "displays payment method", %{conn: conn} do

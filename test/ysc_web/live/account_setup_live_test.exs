@@ -183,6 +183,77 @@ defmodule YscWeb.AccountSetupLiveTest do
     {log_in_user(conn, user), user}
   end
 
+  defp unpaid_active_user_waiting_to_retry(conn) do
+    user = unpaid_active_user_needing_payment()
+
+    {:ok, _pm} =
+      Payments.insert_payment_method(%{
+        user_id: user.id,
+        provider: :stripe,
+        provider_id: "pm_#{System.unique_integer([:positive])}",
+        provider_customer_id: user.stripe_id,
+        type: :card,
+        provider_type: "card",
+        is_default: true
+      })
+
+    conn = log_in_user(conn, user)
+
+    {:ok, view, _html} =
+      live(conn, account_setup_path(user, %{"step" => "1"}))
+
+    assert has_element?(
+             view,
+             "#retry-membership-activation",
+             "Pay your membership dues"
+           )
+
+    {conn, view, user}
+  end
+
+  defp give_lapsed_membership(user) do
+    {:ok, _} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "migrated_#{user.id}",
+        stripe_status: "canceled",
+        name: "Membership Subscription",
+        ends_at: DateTime.add(DateTime.utc_now(), -30, :day)
+      })
+
+    user
+  end
+
+  defp stub_successful_membership_subscription(user) do
+    stripe_sub_id = "sub_retry_#{System.unique_integer([:positive])}"
+
+    stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+      {:ok,
+       Ysc.Stripe.SubscriptionFixtures.subscription(
+         id: stripe_sub_id,
+         customer: user.stripe_id,
+         status: "active"
+       )}
+    end)
+  end
+
+  defp stub_stripe_card_retrieve(user, pm_id) do
+    stub(Stripe.PaymentMethodMock, :retrieve, fn ^pm_id ->
+      {:ok,
+       %Stripe.PaymentMethod{
+         id: pm_id,
+         customer: user.stripe_id,
+         type: "card",
+         card: %Stripe.Card{
+           last4: "4242",
+           exp_month: 12,
+           exp_year: 2030,
+           brand: "visa"
+         }
+       }}
+    end)
+  end
+
   defp drain_emails do
     drain_emails([])
   end
@@ -1521,6 +1592,103 @@ defmodule YscWeb.AccountSetupLiveTest do
                live(conn, account_setup_path(user))
 
       assert approved_payment_success_email(drain_emails(), user)
+    end
+
+    test "Pay dues retry welcomes a first-time member after a failed mount charge",
+         %{conn: conn} do
+      set_swoosh_global()
+      {_conn, view, user} = unpaid_active_user_waiting_to_retry(conn)
+
+      stub_successful_membership_subscription(user)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               view
+               |> element("#retry-membership-activation")
+               |> render_click()
+
+      assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
+      assert approved_payment_success_email(drain_emails(), user)
+    end
+
+    test "Pay dues retry does not send the application-approved email to a returning member",
+         %{conn: conn} do
+      set_swoosh_global()
+      {_conn, view, user} = unpaid_active_user_waiting_to_retry(conn)
+      give_lapsed_membership(user)
+      assert Subscriptions.returning_member?(user)
+
+      stub_successful_membership_subscription(user)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               view
+               |> element("#retry-membership-activation")
+               |> render_click()
+
+      assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
+      refute approved_payment_success_email(drain_emails(), user)
+    end
+
+    test "Pay dues retry keeps the CTA when Stripe still cannot charge", %{
+      conn: conn
+    } do
+      set_swoosh_global()
+      {_conn, view, user} = unpaid_active_user_waiting_to_retry(conn)
+
+      view
+      |> element("#retry-membership-activation")
+      |> render_click()
+
+      assert has_element?(view, "#retry-membership-activation")
+      refute MembershipCache.get_active_membership(Accounts.get_user!(user.id))
+      refute approved_payment_success_email(drain_emails(), user)
+    end
+
+    test "saving a payment method on setup welcomes a first-time member", %{
+      conn: conn
+    } do
+      set_swoosh_global()
+      user = unpaid_active_user_needing_payment()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
+
+      pm_id = "pm_setup_activate_#{System.unique_integer([:positive])}"
+      stub_stripe_card_retrieve(user, pm_id)
+      stub_successful_membership_subscription(user)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               render_click(view, "payment-method-set", %{
+                 "payment_method_id" => pm_id
+               })
+
+      assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
+      assert approved_payment_success_email(drain_emails(), user)
+    end
+
+    test "saving a payment method on setup does not welcome a returning member",
+         %{conn: conn} do
+      set_swoosh_global()
+      user = unpaid_active_user_needing_payment()
+      give_lapsed_membership(user)
+      assert Subscriptions.returning_member?(user)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
+
+      pm_id = "pm_setup_returning_#{System.unique_integer([:positive])}"
+      stub_stripe_card_retrieve(user, pm_id)
+      stub_successful_membership_subscription(user)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               render_click(view, "payment-method-set", %{
+                 "payment_method_id" => pm_id
+               })
+
+      assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
+      refute approved_payment_success_email(drain_emails(), user)
     end
   end
 end

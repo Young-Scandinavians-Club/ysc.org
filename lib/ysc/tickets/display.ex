@@ -137,6 +137,14 @@ defmodule Ysc.Tickets.Display do
   defp count_noun(count, word), do: "#{count} #{word}s"
 
   @doc """
+  True when the order total is $0 (free RSVP, $0 tiers, or fully discounted).
+  """
+  def complimentary_order?(%{total_amount: %Money{} = total}),
+    do: Money.zero?(total)
+
+  def complimentary_order?(_), do: false
+
+  @doc """
   Member-facing label for an individual ticket's status.
   """
   def ticket_status_label(:confirmed), do: "Ready to use"
@@ -149,12 +157,25 @@ defmodule Ysc.Tickets.Display do
 
   @doc """
   Member-facing label for a ticket order's status.
-  """
-  def order_status_label(:pending), do: "Payment needed"
-  def order_status_label(:completed), do: "Paid"
-  def order_status_label(:expired), do: "Checkout expired"
-  def order_status_label(:cancelled), do: "Cancelled"
 
-  def order_status_label(status),
+  Pass `complimentary: true` for free / $0 holds so the badge does not
+  ask for payment.
+  """
+  def order_status_label(status, opts \\ [])
+
+  def order_status_label(:pending, opts) when is_list(opts) do
+    if complimentary_opt?(opts), do: "Confirm tickets", else: "Payment needed"
+  end
+
+  def order_status_label(:completed, opts) when is_list(opts) do
+    if complimentary_opt?(opts), do: "Confirmed", else: "Paid"
+  end
+
+  def order_status_label(:expired, _opts), do: "Checkout expired"
+  def order_status_label(:cancelled, _opts), do: "Cancelled"
+
+  def order_status_label(status, _opts),
     do: status |> to_string() |> String.capitalize()
+
+  defp complimentary_opt?(opts), do: Keyword.get(opts, :complimentary, false)
 end
