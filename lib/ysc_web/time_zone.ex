@@ -9,6 +9,11 @@ defmodule YscWeb.TimeZone do
   Use `at/2` and `at_utc/2` to turn a calendar date plus wall-clock time into
   a zoned `DateTime` (or UTC) without repeating `DateTime.new!/3` +
   `shift_zone!/2` at each call site.
+
+  Wall-clock times that fall on a DST boundary never raise: an ambiguous time
+  (clocks fall back, so it happens twice) resolves to the earlier instant and a
+  skipped time (clocks spring forward) resolves to the last instant before the
+  gap, matching `Ysc.Events.EventDateTime`.
   """
 
   @default "America/Los_Angeles"
@@ -72,7 +77,9 @@ defmodule YscWeb.TimeZone do
       #=> "America/Los_Angeles"
   """
   def at(%Date{} = date, %Time{} = time, timezone \\ default()) do
-    DateTime.new!(date, time, from_name(timezone))
+    date
+    |> NaiveDateTime.new!(time)
+    |> naive_to_zoned(from_name(timezone))
   end
 
   @doc """
@@ -128,7 +135,7 @@ defmodule YscWeb.TimeZone do
   def parse_datetime_local(value, timezone) when is_binary(value) do
     case NaiveDateTime.from_iso8601("#{value}:00") do
       {:ok, naive_dt} ->
-        local_dt = DateTime.from_naive!(naive_dt, from_name(timezone))
+        local_dt = naive_to_zoned(naive_dt, from_name(timezone))
         {:ok, DateTime.shift_zone!(local_dt, "Etc/UTC")}
 
       {:error, _} = error ->
@@ -137,4 +144,14 @@ defmodule YscWeb.TimeZone do
   end
 
   def parse_datetime_local(_, _), do: {:error, :invalid_format}
+
+  # DST boundaries: pick the earlier instant for an ambiguous wall time and the
+  # last instant before the gap for a skipped one, rather than raising.
+  defp naive_to_zoned(%NaiveDateTime{} = naive, timezone) do
+    case DateTime.from_naive(naive, timezone) do
+      {:ok, datetime} -> datetime
+      {:ambiguous, earlier, _later} -> earlier
+      {:gap, just_before, _just_after} -> just_before
+    end
+  end
 end
