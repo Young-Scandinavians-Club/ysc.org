@@ -79,13 +79,13 @@ defmodule Ysc.Merch.ShippingAddress do
     %{
       name: a.name,
       address1: a.address1,
-      address2: blank_to_nil(a.address2),
+      address2: Ysc.Text.blank_to_nil(a.address2),
       city: a.city,
       state_code: a.state_code,
       country_code: a.country_code,
       zip: a.zip,
-      phone: blank_to_nil(a.phone),
-      email: blank_to_nil(a.email)
+      phone: Ysc.Text.blank_to_nil(a.phone),
+      email: Ysc.Text.blank_to_nil(a.email)
     }
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Map.new()
@@ -98,13 +98,13 @@ defmodule Ysc.Merch.ShippingAddress do
     %{
       recipient_name: a.name,
       address1: a.address1,
-      address2: blank_to_nil(a.address2),
+      address2: Ysc.Text.blank_to_nil(a.address2),
       city: a.city,
       state_code: a.state_code,
       zip: a.zip,
       country_code: a.country_code,
-      phone: blank_to_nil(a.phone),
-      email: blank_to_nil(a.email)
+      phone: Ysc.Text.blank_to_nil(a.phone),
+      email: Ysc.Text.blank_to_nil(a.email)
     }
   end
 
@@ -195,13 +195,4 @@ defmodule Ysc.Merch.ShippingAddress do
 
   defp normalize_state(nil), do: nil
   defp normalize_state(state), do: state |> String.trim() |> String.upcase()
-
-  defp blank_to_nil(nil), do: nil
-
-  defp blank_to_nil(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
 end

@@ -210,7 +210,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
     quantity = parse_quantity(merged["quantity"])
     override_limits? = checkbox_enabled?(merged["override_limits"])
     skip_email? = not checkbox_enabled?(merged["send_email"])
-    notes = blank_to_nil(merged["admin_grant_notes"])
+    notes = Ysc.Text.blank_to_nil(merged["admin_grant_notes"])
 
     cond do
       is_nil(user_id) or user_id == "" ->
@@ -310,10 +310,6 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
 
   defp parse_quantity(value) when is_integer(value), do: value
   defp parse_quantity(_), do: nil
-
-  defp blank_to_nil(nil), do: nil
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(value), do: value
 
   defp checkbox_enabled?(value) do
     # normalize_value/2 returns a boolean for checkboxes ("true" -> true),

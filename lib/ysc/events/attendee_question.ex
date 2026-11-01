@@ -96,7 +96,7 @@ defmodule Ysc.Events.AttendeeQuestion do
     ])
     |> ensure_id()
     |> update_change(:label, &trim/1)
-    |> update_change(:help_text, &blank_to_nil/1)
+    |> update_change(:help_text, &Ysc.Text.blank_to_nil/1)
     |> validate_required([:label])
     |> validate_length(:label, max: 120)
     |> validate_length(:help_text, max: 500)
@@ -113,15 +113,6 @@ defmodule Ysc.Events.AttendeeQuestion do
 
   defp trim(value) when is_binary(value), do: String.trim(value)
   defp trim(value), do: value
-
-  defp blank_to_nil(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp blank_to_nil(value), do: value
 
   # `options_text` (textarea, one option per line) is the editing surface;
   # `options` is what is stored and rendered.

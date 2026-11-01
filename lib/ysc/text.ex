@@ -36,4 +36,37 @@ defmodule Ysc.Text do
   end
 
   def titleize(_, fallback), do: fallback
+
+  @doc """
+  Returns `nil` for `nil`, empty, or whitespace-only strings.
+
+  Trims binary values. Non-binaries other than `nil` are returned unchanged
+  so changeset `update_change/3` callbacks can pass the helper through.
+
+  ## Examples
+
+      iex> Ysc.Text.blank_to_nil(nil)
+      nil
+
+      iex> Ysc.Text.blank_to_nil("")
+      nil
+
+      iex> Ysc.Text.blank_to_nil("  ")
+      nil
+
+      iex> Ysc.Text.blank_to_nil(" hello ")
+      "hello"
+
+      iex> Ysc.Text.blank_to_nil(123)
+      123
+  """
+  def blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  def blank_to_nil(nil), do: nil
+  def blank_to_nil(value), do: value
 end

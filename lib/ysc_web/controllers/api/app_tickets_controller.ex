@@ -151,7 +151,10 @@ defmodule YscWeb.Api.AppTicketsController do
                {:event, event},
                {:tiers, selected_tiers},
                {:admin_grant_notes,
-                offline_note(payment_method, blank_to_nil(params["note"]))}
+                offline_note(
+                  payment_method,
+                  Ysc.Text.blank_to_nil(params["note"])
+                )}
                | offline_amount_opt(params["amount_collected_cents"])
              ]
            ) do
@@ -268,15 +271,4 @@ defmodule YscWeb.Api.AppTicketsController do
     do: [offline_amount_collected: Ysc.MoneyHelper.cents_to_money(cents, :USD)]
 
   defp offline_amount_opt(_), do: []
-
-  defp blank_to_nil(nil), do: nil
-
-  defp blank_to_nil(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp blank_to_nil(_), do: nil
 end

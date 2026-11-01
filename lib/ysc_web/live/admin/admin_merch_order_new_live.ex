@@ -268,7 +268,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
            option: option,
            purpose: String.trim(params["purpose"]),
            user_id: recipient_user_id(params, socket),
-           event_id: blank_to_nil(params["event_id"]),
+           event_id: Ysc.Text.blank_to_nil(params["event_id"]),
            estimated_cost: estimated_cost(estimate)
          }) do
       {:ok, order} ->
@@ -528,7 +528,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
     |> Enum.sort_by(fn {key, _} -> String.to_integer(key) end)
     |> Enum.map(fn {_key, line} ->
       %{
-        variant_id: blank_to_nil(line["variant_id"]),
+        variant_id: Ysc.Text.blank_to_nil(line["variant_id"]),
         quantity: parse_quantity(line["quantity"])
       }
     end)
@@ -540,9 +540,6 @@ defmodule YscWeb.AdminMerchOrderNewLive do
       _ -> nil
     end
   end
-
-  defp blank_to_nil(value) when value in [nil, ""], do: nil
-  defp blank_to_nil(value), do: value
 
   defp recipient_user_id(%{"recipient" => "self"}, socket),
     do: placing_admin(socket).id

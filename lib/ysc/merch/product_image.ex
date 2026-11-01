@@ -37,7 +37,7 @@ defmodule Ysc.Merch.ProductImage do
       :source,
       :source_image_url
     ])
-    |> update_change(:color, &blank_to_nil/1)
+    |> update_change(:color, &Ysc.Text.blank_to_nil/1)
     |> validate_required([:product_id, :image_id])
     |> validate_length(:color, max: 100)
     |> unique_constraint([:product_id, :image_id],
@@ -47,13 +47,4 @@ defmodule Ysc.Merch.ProductImage do
     |> foreign_key_constraint(:product_id)
     |> foreign_key_constraint(:image_id)
   end
-
-  defp blank_to_nil(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp blank_to_nil(value), do: value
 end

@@ -370,6 +370,68 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       assert Enum.any?(orders, &(&1.event_id == event.id))
     end
 
+    test "stores trimmed grant notes and drops whitespace-only notes", %{
+      socket: socket,
+      event: event,
+      member: member
+    } do
+      {:noreply, socket} =
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => member.id},
+          socket
+        )
+
+      {:noreply, _socket} =
+        TicketGrantForm.handle_event(
+          "save",
+          %{
+            "ticket_grant" => %{
+              "quantity" => "1",
+              "send_email" => "false",
+              "admin_grant_notes" => "  Paid cash at the door  "
+            }
+          },
+          socket
+        )
+
+      granted =
+        member.id
+        |> Ysc.Tickets.list_user_ticket_orders()
+        |> Enum.find(&(&1.event_id == event.id))
+
+      assert granted.admin_grant_notes == "Paid cash at the door"
+
+      other = user_fixture()
+
+      {:noreply, socket} =
+        TicketGrantForm.handle_event(
+          "select-user",
+          %{"id" => other.id},
+          socket
+        )
+
+      {:noreply, _socket} =
+        TicketGrantForm.handle_event(
+          "save",
+          %{
+            "ticket_grant" => %{
+              "quantity" => "1",
+              "send_email" => "false",
+              "admin_grant_notes" => "   "
+            }
+          },
+          socket
+        )
+
+      blank_order =
+        other.id
+        |> Ysc.Tickets.list_user_ticket_orders()
+        |> Enum.find(&(&1.event_id == event.id))
+
+      assert blank_order.admin_grant_notes == nil
+    end
+
     test "the single override checkbox bypasses capacity checks", %{
       event: event,
       admin: admin,

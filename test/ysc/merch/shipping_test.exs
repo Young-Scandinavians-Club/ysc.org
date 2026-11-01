@@ -81,6 +81,30 @@ defmodule Ysc.Merch.ShippingTest do
       assert recipient.state_code == "CA"
     end
 
+    test "recipient and order attrs trim present optional fields" do
+      address = %ShippingAddress{
+        name: "Ada Lovelace",
+        address1: "1 Market St",
+        address2: "  Apt 4  ",
+        city: "San Francisco",
+        state_code: "CA",
+        country_code: "US",
+        zip: "94105",
+        phone: "  415-555-0100  ",
+        email: "  ada@example.com  "
+      }
+
+      recipient = ShippingAddress.to_recipient(address)
+      assert recipient.address2 == "Apt 4"
+      assert recipient.phone == "415-555-0100"
+      assert recipient.email == "ada@example.com"
+
+      attrs = ShippingAddress.to_order_attrs(address)
+      assert attrs.address2 == "Apt 4"
+      assert attrs.phone == "415-555-0100"
+      assert attrs.email == "ada@example.com"
+    end
+
     test "display_lines omits a blank address2" do
       assert ShippingAddress.display_lines(address()) == [
                "1 Market St",

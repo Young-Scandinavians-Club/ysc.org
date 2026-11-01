@@ -4732,7 +4732,7 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   defp expense_item_to_attachment(item) do
-    s3_path = blank_to_nil(item.receipt_s3_path)
+    s3_path = Ysc.Text.blank_to_nil(item.receipt_s3_path)
     media = ExpenseReports.media_type_for_path(s3_path)
 
     %{
@@ -4755,7 +4755,7 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   defp income_item_to_attachment(item) do
-    s3_path = blank_to_nil(item.proof_s3_path)
+    s3_path = Ysc.Text.blank_to_nil(item.proof_s3_path)
     media = ExpenseReports.media_type_for_path(s3_path)
 
     %{
@@ -4777,15 +4777,6 @@ defmodule YscWeb.AdminMoneyLive do
     }
   end
 
-  defp blank_to_nil(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp blank_to_nil(_), do: nil
-
   defp compute_item_flags(expense_report) do
     today = Date.utc_today()
     inserted_date = DateTime.to_date(expense_report.inserted_at)
@@ -4803,7 +4794,7 @@ defmodule YscWeb.AdminMoneyLive do
         []
         |> maybe_flag(
           item.expense_type != "mileage" and
-            is_nil(blank_to_nil(item.receipt_s3_path)),
+            is_nil(Ysc.Text.blank_to_nil(item.receipt_s3_path)),
           :missing_receipt
         )
         |> maybe_flag(

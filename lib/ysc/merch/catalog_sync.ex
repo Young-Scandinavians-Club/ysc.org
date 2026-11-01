@@ -286,7 +286,7 @@ defmodule Ysc.Merch.CatalogSync do
           {{:ok, image_id}, cache} ->
             {[
                %{
-                 color: blank_to_nil(color),
+                 color: Ysc.Text.blank_to_nil(color),
                  image_id: image_id,
                  position: position,
                  url: url
@@ -307,9 +307,6 @@ defmodule Ysc.Merch.CatalogSync do
     |> Enum.map(&(&1["preview_url"] || &1["thumbnail_url"]))
     |> Enum.reject(&(&1 in [nil, ""]))
   end
-
-  defp blank_to_nil(color) when color in [nil, ""], do: nil
-  defp blank_to_nil(color), do: color
 
   # Mirrors Printful's photos into the product's gallery. Photos the club added
   # are never touched; Printful ones that are no longer offered are removed.
