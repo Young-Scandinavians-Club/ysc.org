@@ -1820,14 +1820,7 @@ defmodule YscWeb.AdminDashboardLive do
 
     now = DateTime.utc_now()
 
-    month_start = %DateTime{
-      now
-      | day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
+    month_start = Ysc.ReportingPeriods.start_of_month(now)
 
     total =
       Repo.one(

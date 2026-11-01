@@ -10,6 +10,7 @@ defmodule Ysc.Accounts do
   alias YscWeb.Authorization.Policy
   alias Ysc.Accounts.SignupApplication
   alias Ysc.Repo
+  alias Ysc.ReportingPeriods
 
   alias Ysc.Accounts.{
     Address,
@@ -5301,11 +5302,9 @@ defmodule Ysc.Accounts do
     current_net_new = current_count - current_losses
     prior_net_new = prior_count - prior_losses
 
-    # `prior_year_start` is already a UTC instant at Jan 1 00:00:00 of the
-    # prior calendar year (it's derived from `year_start`, itself built from
-    # `now`'s UTC date parts) — its `.year` is the label directly. Converting
-    # through `DateTime.shift_zone!/2` first would roll it back to Dec 31 in
-    # any zone west of UTC, mislabeling the prior year by one.
+    # `prior_year_start` is local (Pacific) midnight on Jan 1, expressed in UTC
+    # (08:00Z), so its UTC `.year` is already the label. Shifting it to a zone
+    # west of Pacific first would roll it back to Dec 31 and mislabel the year.
     prior_year_label = Integer.to_string(prior_year_start.year)
 
     change_percent =
@@ -5640,8 +5639,8 @@ defmodule Ysc.Accounts do
   New-user application counts for the admin dashboard.
 
   One query with filtered `COUNT`s instead of four sequential scans of `users`.
-  Windows match the previous LiveView implementation (UTC month/year bounds
-  from `now`).
+  Month/year bounds follow club-local (`America/Los_Angeles`) midnight; see
+  `Ysc.ReportingPeriods`.
   """
   def get_application_statistics(now \\ DateTime.utc_now()) do
     %{
@@ -5669,15 +5668,7 @@ defmodule Ysc.Accounts do
   `get_application_statistics/1`) not covered by either count here.
   """
   def get_application_outcome_stats_ytd(%DateTime{} = now \\ DateTime.utc_now()) do
-    year_start = %DateTime{
-      now
-      | month: 1,
-        day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
+    year_start = ReportingPeriods.start_of_year(now)
 
     from(u in User,
       where: u.inserted_at >= ^year_start,
@@ -5696,30 +5687,11 @@ defmodule Ysc.Accounts do
     do: round((current - previous) / previous * 100)
 
   defp application_statistics_query(%DateTime{} = now) do
-    month_start = %DateTime{
-      now
-      | day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
-
-    year_start = %DateTime{
-      now
-      | month: 1,
-        day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
-
-    last_month_start = Timex.shift(month_start, months: -1)
-    last_year_month_start = Timex.shift(month_start, years: -1)
-
-    last_year_month_end =
-      last_year_month_start |> Timex.shift(months: 1)
+    month_start = ReportingPeriods.start_of_month(now)
+    year_start = ReportingPeriods.start_of_year(now)
+    last_month_start = ReportingPeriods.start_of_month(now, -1)
+    last_year_month_start = ReportingPeriods.start_of_month(now, -12)
+    last_year_month_end = ReportingPeriods.start_of_month(now, -11)
 
     from(u in User,
       where: u.inserted_at >= ^last_year_month_start,
@@ -5883,17 +5855,7 @@ defmodule Ysc.Accounts do
   end
 
   defp membership_ytd_windows(%DateTime{} = now) do
-    year_start = %DateTime{
-      now
-      | month: 1,
-        day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
-
-    {year_start, now, Timex.shift(year_start, years: -1),
-     Timex.shift(now, years: -1)}
+    {ReportingPeriods.start_of_year(now), now,
+     ReportingPeriods.start_of_year(now, -1), Timex.shift(now, years: -1)}
   end
 end

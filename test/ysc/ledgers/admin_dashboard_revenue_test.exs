@@ -120,6 +120,27 @@ defmodule Ysc.Ledgers.AdminDashboardRevenueTest do
       assert Decimal.eq?(snapshot.ytd_total, Decimal.new(0))
       assert snapshot.sparkline == List.duplicate(Decimal.new(0), 7)
     end
+
+    test "keeps Pacific-evening entries in the local month and sparkline day" do
+      # 5:30pm PDT on Oct 31 is already Nov 1 in UTC.
+      now = ~U[2026-11-01 00:30:00Z]
+      membership = Ledgers.get_account_by_name("membership_revenue")
+
+      insert_entry!(membership, :credit, 40, ~U[2026-11-01 00:10:00Z])
+      insert_entry!(membership, :credit, 7, ~U[2026-10-30 23:00:00Z])
+      insert_entry!(membership, :credit, 3, ~U[2026-09-30 23:00:00Z])
+
+      snapshot = Ledgers.get_admin_dashboard_revenue(now)
+      totals = Map.fetch!(snapshot.totals_by_account_id, membership.id)
+
+      assert snapshot.bounds.month_start == ~U[2026-10-01 07:00:00Z]
+      assert Decimal.eq?(totals.current_month, Decimal.new(47))
+      assert Decimal.eq?(totals.prev_month, Decimal.new(3))
+
+      # Last sparkline slot is Oct 31 (Pacific); the Nov 1 UTC entry lands there.
+      assert List.last(snapshot.sparkline) |> Decimal.eq?(Decimal.new(40))
+      assert Enum.at(snapshot.sparkline, 5) |> Decimal.eq?(Decimal.new(7))
+    end
   end
 
   describe "ci_query_explain admin dashboard revenue queries" do
