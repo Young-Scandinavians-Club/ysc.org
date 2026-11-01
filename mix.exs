@@ -326,10 +326,14 @@ defmodule Ysc.MixProject do
       {:goth, "~> 1.4"},
       # 7.5.0: Atomic TokenBucket/LeakyBucket race (init atomic before ETS
       # insert); TokenBucket ETS remainder carry + deny retry-ms is real wait
-      # instead of flat 1000. We use default :fix_window (hit/3 scale+limit),
-      # not TokenBucket, so those patches are unused. mix hammer.install is
-      # unused (Igniter optional).
-      {:hammer, "~> 7.5"},
+      # instead of flat 1000. mix hammer.install is unused (Igniter optional).
+      # 7.5.1: SlidingWindow ETS denied hits are removed from the window
+      # (a client that keeps hitting after deny no longer extends its own
+      # block); concurrent same-microsecond hits get unique entries; empty-
+      # window deny returns {:deny, 1} instead of Enum.EmptyError. We use
+      # default :fix_window (hit/3 scale+limit), not SlidingWindow or
+      # TokenBucket, so those patches are unused. Pin the patched floor.
+      {:hammer, "~> 7.5.1"},
       # 1.5.5: CSS.scrub treats nested tags inside <style> as empty (parser can
       # pass a tree instead of a string); HTML5 also tightens meta http-equiv
       # and object data=. We use BasicHTML / TrixScrubber / strip_tags, not
