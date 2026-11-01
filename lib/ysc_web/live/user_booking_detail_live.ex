@@ -71,7 +71,11 @@ defmodule YscWeb.UserBookingDetailLive do
     # Verify authorization before cancellation
     case Policy.authorize(:booking_cancel, user, booking) do
       :ok ->
-        case Bookings.cancel_booking(booking, Date.utc_today(), reason) do
+        case Bookings.cancel_booking(
+               booking,
+               YscWeb.BookingActions.get_today_pst(),
+               reason
+             ) do
           {:ok, updated_booking, _refund_amount, :hold_payment_confirmed} ->
             updated_booking =
               Bookings.get_user_booking_for_member_detail(

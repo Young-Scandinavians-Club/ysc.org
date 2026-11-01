@@ -12,6 +12,9 @@ defmodule Ysc.ReportingPeriods do
 
   def timezone, do: @timezone
 
+  @doc "Today's local calendar date."
+  def today, do: local_date(DateTime.utc_now())
+
   @doc "Current local calendar date for the instant `now`."
   def local_date(%DateTime{} = now) do
     now |> DateTime.shift_zone!(@timezone) |> DateTime.to_date()

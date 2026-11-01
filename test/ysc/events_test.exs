@@ -3144,16 +3144,51 @@ defmodule Ysc.EventsTest do
       points = Events.get_event_sales_over_time(event.id)
       dates = Enum.map(points, & &1.date)
 
-      assert DateTime.to_date(day1) in dates
-      assert DateTime.to_date(day2) in dates
+      assert Ysc.ReportingPeriods.local_date(day1) in dates
+      assert Ysc.ReportingPeriods.local_date(day2) in dates
 
-      day1_point = Enum.find(points, &(&1.date == DateTime.to_date(day1)))
+      day1_point =
+        Enum.find(points, &(&1.date == Ysc.ReportingPeriods.local_date(day1)))
+
       assert day1_point.tickets_sold == 2
       assert Money.equal?(day1_point.revenue, Money.new(100, :USD))
 
-      day2_point = Enum.find(points, &(&1.date == DateTime.to_date(day2)))
+      day2_point =
+        Enum.find(points, &(&1.date == Ysc.ReportingPeriods.local_date(day2)))
+
       assert day2_point.tickets_sold == 1
       assert Money.equal?(day2_point.revenue, Money.new(50, :USD))
+    end
+
+    test "buckets sales by Pacific day, not UTC day", %{user: user} do
+      {:ok, event} = create_event_fixture()
+
+      {:ok, tier} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          price: Money.new(50, :USD)
+        })
+
+      expires_at =
+        DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
+
+      # 5:30pm PDT on Oct 31 is already Nov 1 in UTC.
+      %Ticket{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        inserted_at: ~U[2026-11-01 00:30:00Z],
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
+      dates =
+        event.id |> Events.get_event_sales_over_time() |> Enum.map(& &1.date)
+
+      assert ~D[2026-10-31] in dates
+      refute ~D[2026-11-01] in dates
     end
 
     test "returns an empty list for an event with no confirmed tickets and no sale window" do
