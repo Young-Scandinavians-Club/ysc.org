@@ -28,4 +28,25 @@ defmodule Ysc.TextTest do
       assert Text.titleize(%{}, "") == ""
     end
   end
+
+  describe "blank_to_nil/1" do
+    test "returns nil for nil, empty, and whitespace-only strings" do
+      assert Text.blank_to_nil(nil) == nil
+      assert Text.blank_to_nil("") == nil
+      assert Text.blank_to_nil("   ") == nil
+      assert Text.blank_to_nil("\t\n") == nil
+    end
+
+    test "trims surrounding whitespace on present strings" do
+      assert Text.blank_to_nil("hello") == "hello"
+      assert Text.blank_to_nil("  hello  ") == "hello"
+      assert Text.blank_to_nil(" Ste 200 ") == "Ste 200"
+    end
+
+    test "passes through non-string values" do
+      assert Text.blank_to_nil(123) == 123
+      assert Text.blank_to_nil(:ok) == :ok
+      assert Text.blank_to_nil(%{a: 1}) == %{a: 1}
+    end
+  end
 end

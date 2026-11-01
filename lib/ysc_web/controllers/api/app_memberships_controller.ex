@@ -124,7 +124,7 @@ defmodule YscWeb.Api.AppMembershipsController do
            Subscriptions.create_subscription_paid_out_of_band(member, plan.id,
              recorded_by_id: conn.assigns.current_user.id,
              payment_method: payment_method,
-             note: blank_to_nil(params["note"])
+             note: Ysc.Text.blank_to_nil(params["note"])
            ) do
       render(conn, :offline_subscription,
         subscription: subscription,
@@ -231,17 +231,6 @@ defmodule YscWeb.Api.AppMembershipsController do
       _ -> {:error, :invalid_offline_payment_method}
     end
   end
-
-  defp blank_to_nil(nil), do: nil
-
-  defp blank_to_nil(value) when is_binary(value) do
-    case String.trim(value) do
-      "" -> nil
-      trimmed -> trimmed
-    end
-  end
-
-  defp blank_to_nil(_), do: nil
 
   # Finding 52: bind subscribe to a freshly collected, customer-attached PM.
   defp validate_in_person_payment_method(

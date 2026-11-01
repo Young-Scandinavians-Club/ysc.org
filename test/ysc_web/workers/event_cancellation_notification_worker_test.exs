@@ -56,6 +56,19 @@ defmodule YscWeb.Workers.EventCancellationNotificationWorkerTest do
            ]
   end
 
+  test "new_for_event/3 trims padded first names", %{event: event} do
+    job =
+      EventCancellationNotificationWorker.new_for_event(
+        event,
+        [%{email: "padded@example.com", first_name: "  Astrid  "}],
+        ~U[2026-09-26 12:00:00Z]
+      )
+
+    assert job.changes.args["recipients"] == [
+             %{"email" => "padded@example.com", "first_name" => "Astrid"}
+           ]
+  end
+
   test "emails every snapshotted recipient of a cancelled event", %{
     event: event
   } do

@@ -60,6 +60,25 @@ defmodule Ysc.Events.AttendeeQuestionsTest do
                errors_on(changeset)
     end
 
+    test "blank and whitespace help_text become nil, present help_text is trimmed" do
+      blank =
+        AttendeeQuestion.changeset(
+          %AttendeeQuestion{},
+          question_attrs(%{"help_text" => "   "})
+        )
+
+      assert Ecto.Changeset.get_field(blank, :help_text) == nil
+
+      trimmed =
+        AttendeeQuestion.changeset(
+          %AttendeeQuestion{},
+          question_attrs(%{"help_text" => "  shown at checkout  "})
+        )
+
+      assert Ecto.Changeset.get_field(trimmed, :help_text) ==
+               "shown at checkout"
+    end
+
     test "number bounds must be ordered and only apply to numbers" do
       attrs = question_attrs(%{"type" => "number", "min" => "5", "max" => "2"})
       changeset = AttendeeQuestion.changeset(%AttendeeQuestion{}, attrs)

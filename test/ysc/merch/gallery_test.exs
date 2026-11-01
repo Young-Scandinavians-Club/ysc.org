@@ -311,6 +311,12 @@ defmodule Ysc.Merch.GalleryTest do
       assert {:ok, %ProductImage{color: nil}} =
                Merch.set_photo_color(mine.id, "")
 
+      assert {:ok, %ProductImage{color: nil}} =
+               Merch.set_photo_color(mine.id, "  ")
+
+      assert {:ok, %ProductImage{color: "Navy"}} =
+               Merch.set_photo_color(mine.id, "  Navy  ")
+
       assert {:error, :managed_by_printful} =
                Merch.set_photo_color(theirs.id, "White")
 
