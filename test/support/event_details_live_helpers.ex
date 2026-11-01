@@ -18,32 +18,19 @@ defmodule EventDetailsLiveHelpers do
   @doc """
   Builds event fixture attrs for an event that is live at the current Pacific time.
 
-  Brackets wall clock with start/end times on today's Pacific calendar date so CI
-  does not flake near midnight (Time.add/2 wrap) or at day boundaries.
+  The event spans all of today's Pacific calendar date (00:00:00 to 23:59:59).
+  Deriving start/end from the current wall clock (e.g. `now - 2h`) flakes on
+  DST change days, where that time can land in the repeated or skipped hour.
   """
   def live_pacific_event_fixture_attrs(overrides \\ %{}) do
-    pacific_now = DateTime.now!(@pacific_timezone)
-    today = DateTime.to_date(pacific_now)
-    now_time = DateTime.to_time(pacific_now)
-
-    {start_time, end_time} =
-      cond do
-        Time.compare(now_time, ~T[02:00:00]) == :lt ->
-          {~T[00:00:00], ~T[23:59:59]}
-
-        Time.compare(now_time, ~T[22:00:00]) != :lt ->
-          {~T[00:00:00], ~T[23:59:59]}
-
-        true ->
-          {Time.add(now_time, -2, :hour), Time.add(now_time, 2, :hour)}
-      end
+    today = @pacific_timezone |> DateTime.now!() |> DateTime.to_date()
 
     Map.merge(
       %{
         state: :published,
         start_date: DateTime.new!(today, ~T[00:00:00], "Etc/UTC"),
-        start_time: start_time,
-        end_time: end_time,
+        start_time: ~T[00:00:00],
+        end_time: ~T[23:59:59],
         published_at: DateTime.utc_now() |> DateTime.truncate(:second)
       },
       overrides

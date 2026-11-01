@@ -46,6 +46,20 @@ defmodule YscWeb.TimeZoneTest do
     end
   end
 
+  describe "at/3 on DST boundaries" do
+    test "resolves an ambiguous fall-back time to the earlier (PDT) instant" do
+      # 2026-11-01 01:30 happens twice in Pacific time.
+      assert TimeZone.at_utc(~D[2026-11-01], ~T[01:30:00]) ==
+               ~U[2026-11-01 08:30:00Z]
+    end
+
+    test "resolves a skipped spring-forward time to the instant before the gap" do
+      # 2026-03-08 02:30 never happens in Pacific time.
+      assert TimeZone.at_utc(~D[2026-03-08], ~T[02:30:00]) ==
+               ~U[2026-03-08 09:59:59.999999Z]
+    end
+  end
+
   describe "at_utc/3" do
     test "converts Pacific daylight time to UTC" do
       # June is PDT (UTC-7)
@@ -148,6 +162,14 @@ defmodule YscWeb.TimeZoneTest do
 
       assert {:ok, parsed} = TimeZone.parse_datetime_local(formatted)
       assert DateTime.compare(parsed, original) == :eq
+    end
+
+    test "does not raise on DST boundaries" do
+      assert {:ok, ~U[2026-11-01 08:30:00Z]} =
+               TimeZone.parse_datetime_local("2026-11-01T01:30")
+
+      assert {:ok, ~U[2026-03-08 09:59:59.999999Z]} =
+               TimeZone.parse_datetime_local("2026-03-08T02:30")
     end
 
     test "returns error for invalid or non-binary values" do
