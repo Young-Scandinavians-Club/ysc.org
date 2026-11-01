@@ -57,7 +57,7 @@ defmodule YscWeb.Emails.WelcomeEmail do
   end
 
   defp tahoe_season_copy do
-    today = Date.utc_today()
+    today = Ysc.ReportingPeriods.today()
     season = Season.for_date(:tahoe, today)
     buyout_allowed = Season.buyout_allowed_on_date?(:tahoe, today)
 

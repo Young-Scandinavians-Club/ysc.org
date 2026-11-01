@@ -1489,7 +1489,7 @@ defmodule Ysc.Accounts do
   """
   def assign_board_position(%User{} = user, position)
       when not is_nil(position) do
-    today = Date.utc_today()
+    today = ReportingPeriods.today()
 
     result =
       Repo.transaction(fn ->
@@ -1527,7 +1527,7 @@ defmodule Ysc.Accounts do
   `user.board_position`.
   """
   def remove_board_position(%User{} = user) do
-    today = Date.utc_today()
+    today = ReportingPeriods.today()
 
     result =
       Repo.transaction(fn ->

@@ -46,4 +46,9 @@ defmodule Ysc.ReportingPeriodsTest do
     assert ReportingPeriods.local_date(~U[2026-11-01 00:30:00Z]) ==
              ~D[2026-10-31]
   end
+
+  test "today/0 matches the Pacific date of the current instant" do
+    assert ReportingPeriods.today() ==
+             ReportingPeriods.local_date(DateTime.utc_now())
+  end
 end

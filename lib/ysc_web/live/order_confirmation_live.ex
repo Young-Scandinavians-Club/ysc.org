@@ -852,12 +852,17 @@ defmodule YscWeb.OrderConfirmationLive do
   end
 
   defp event_in_past?(event) do
-    today = Date.utc_today()
+    today = Ysc.ReportingPeriods.today()
 
     case event.start_date do
-      %DateTime{} = dt -> Date.compare(DateTime.to_date(dt), today) == :lt
-      %Date{} = date -> Date.compare(date, today) == :lt
-      _ -> false
+      %DateTime{} = dt ->
+        Date.compare(Ysc.ReportingPeriods.local_date(dt), today) == :lt
+
+      %Date{} = date ->
+        Date.compare(date, today) == :lt
+
+      _ ->
+        false
     end
   end
 end

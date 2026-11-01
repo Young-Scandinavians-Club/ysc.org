@@ -3815,11 +3815,11 @@ defmodule YscWeb.ExpenseReportLive do
 
   # Calculate date constraints for expense items (30 days back, no future dates)
   defp get_date_max do
-    Date.utc_today() |> Date.to_string()
+    Ysc.ReportingPeriods.today() |> Date.to_string()
   end
 
   defp get_date_min do
-    Date.utc_today()
+    Ysc.ReportingPeriods.today()
     |> Date.add(-30)
     |> Date.to_string()
   end
@@ -3827,7 +3827,7 @@ defmodule YscWeb.ExpenseReportLive do
   defp date_older_than_30_days?(date_string) when is_binary(date_string) do
     case Date.from_iso8601(date_string) do
       {:ok, date} ->
-        days_ago = Date.diff(Date.utc_today(), date)
+        days_ago = Date.diff(Ysc.ReportingPeriods.today(), date)
         days_ago > 30
 
       _ ->
@@ -3840,7 +3840,7 @@ defmodule YscWeb.ExpenseReportLive do
   defp date_close_to_30_day_limit?(date_string) when is_binary(date_string) do
     case Date.from_iso8601(date_string) do
       {:ok, date} ->
-        days_ago = Date.diff(Date.utc_today(), date)
+        days_ago = Date.diff(Ysc.ReportingPeriods.today(), date)
         days_ago >= 25 && days_ago <= 30
 
       _ ->
