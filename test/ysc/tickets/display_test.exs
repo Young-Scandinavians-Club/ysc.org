@@ -139,12 +139,35 @@ defmodule Ysc.Tickets.DisplayTest do
     end
   end
 
+  describe "complimentary_order?/1" do
+    test "true when the order total is zero" do
+      assert Display.complimentary_order?(%{total_amount: Money.new(0, :USD)})
+    end
+
+    test "false when the order has an amount due" do
+      refute Display.complimentary_order?(%{
+               total_amount: Money.new(2500, :USD)
+             })
+    end
+  end
+
   describe "order_status_label/1" do
     test "matches ticket order vocabulary used on My Tickets" do
       assert Display.order_status_label(:completed) == "Paid"
       assert Display.order_status_label(:pending) == "Payment needed"
       assert Display.order_status_label(:expired) == "Checkout expired"
       assert Display.order_status_label(:cancelled) == "Cancelled"
+    end
+
+    test "does not ask for payment on complimentary holds" do
+      assert Display.order_status_label(:pending, complimentary: true) ==
+               "Confirm tickets"
+
+      assert Display.order_status_label(:completed, complimentary: true) ==
+               "Confirmed"
+
+      refute Display.order_status_label(:pending, complimentary: true) =~
+               "Payment"
     end
   end
 
