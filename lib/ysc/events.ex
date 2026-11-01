@@ -2598,7 +2598,7 @@ defmodule Ysc.Events do
     window_dates =
       [window.start_date, window.end_date]
       |> Enum.reject(&is_nil/1)
-      |> Enum.map(&DateTime.to_date/1)
+      |> Enum.map(&Ysc.ReportingPeriods.local_date/1)
 
     case window_dates ++ Enum.map(rows, & &1.date) do
       [] ->

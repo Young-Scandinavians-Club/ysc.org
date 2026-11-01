@@ -1855,7 +1855,7 @@ defmodule YscWeb.AdminEventsNewLive do
   defp event_update_markers_from(event_updates) when is_list(event_updates) do
     event_updates
     |> Enum.filter(& &1.sent_at)
-    |> Enum.group_by(&DateTime.to_date(&1.sent_at))
+    |> Enum.group_by(&Ysc.ReportingPeriods.local_date(&1.sent_at))
   end
 
   defp sales_chart_max_revenue(points) do

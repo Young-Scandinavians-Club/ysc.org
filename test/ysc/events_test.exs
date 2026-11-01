@@ -3109,15 +3109,10 @@ defmodule Ysc.EventsTest do
       expires_at =
         DateTime.add(DateTime.utc_now(), 30, :day) |> DateTime.truncate(:second)
 
-      day1 =
-        DateTime.utc_now()
-        |> DateTime.add(-2, :day)
-        |> DateTime.truncate(:second)
-
-      day2 =
-        DateTime.utc_now()
-        |> DateTime.add(-1, :day)
-        |> DateTime.truncate(:second)
+      # Fixed midday-Pacific instants on distinct Pacific dates (independent of
+      # when the suite runs, including DST transition days).
+      day1 = ~U[2026-10-20 19:00:00Z]
+      day2 = ~U[2026-10-21 19:00:00Z]
 
       for _i <- 1..2 do
         %Ticket{
