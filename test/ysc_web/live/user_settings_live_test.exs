@@ -4,6 +4,7 @@ defmodule YscWeb.UserSettingsLiveTest do
   use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import Swoosh.TestAssertions
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
   import Ysc.EventsFixtures
@@ -3524,6 +3525,77 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(view, "#update-payment-method-modal")
     end
 
+    test "saving a payment method activates dues and welcomes a first-time member",
+         %{conn: conn} do
+      set_swoosh_global()
+      user = unpaid_active_user_without_membership("settings_welcome")
+      {view, pm_id} = mount_payment_method_and_stub_card(conn, user)
+
+      stub_successful_membership_subscription(user)
+
+      html =
+        render_click(view, "payment-method-set", %{
+          "payment_method_id" => pm_id
+        })
+
+      assert html =~ "Payment method saved and your membership is now active"
+      assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
+      assert approved_payment_success_email(drain_emails(), user)
+    end
+
+    test "saving a payment method activates dues but does not welcome a returning member",
+         %{conn: conn} do
+      set_swoosh_global()
+      user = unpaid_active_user_without_membership("settings_returning")
+      give_lapsed_membership(user)
+      assert Subscriptions.returning_member?(user)
+
+      {view, pm_id} = mount_payment_method_and_stub_card(conn, user)
+      stub_successful_membership_subscription(user)
+
+      html =
+        render_click(view, "payment-method-set", %{
+          "payment_method_id" => pm_id
+        })
+
+      assert html =~ "Payment method saved and your membership is now active"
+      assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
+      refute approved_payment_success_email(drain_emails(), user)
+    end
+
+    test "saving a payment method does not create a second Stripe subscription",
+         %{conn: conn} do
+      set_swoosh_global()
+      user = unpaid_active_user_without_membership("settings_already")
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_already_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      MembershipCache.invalidate_user(user.id)
+      {view, pm_id} = mount_payment_method_and_stub_card(conn, user)
+
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params, _opts ->
+        flunk(
+          "must not create a Stripe subscription for an already-active member"
+        )
+      end)
+
+      html =
+        render_click(view, "payment-method-set", %{
+          "payment_method_id" => pm_id
+        })
+
+      assert html =~ "Payment method saved and set as default"
+      refute html =~ "membership is now active"
+      refute approved_payment_success_email(drain_emails(), user)
+    end
+
     test "payments next page loads second page when user has many ledger payments",
          %{
            conn: conn
@@ -3642,6 +3714,87 @@ defmodule YscWeb.UserSettingsLiveTest do
       })
 
     Accounts.get_user!(user.id, [:subscriptions])
+  end
+
+  defp unpaid_active_user_without_membership(prefix) do
+    user = user_fixture(%{state: :active})
+
+    {:ok, user} =
+      user
+      |> Ecto.Changeset.change(%{
+        stripe_id: "cus_#{prefix}_#{System.unique_integer([:positive])}"
+      })
+      |> Repo.update()
+
+    MembershipCache.invalidate_user(user.id)
+    user
+  end
+
+  defp give_lapsed_membership(user) do
+    {:ok, _} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "migrated_#{user.id}",
+        stripe_status: "canceled",
+        name: "Membership Subscription",
+        ends_at: DateTime.add(DateTime.utc_now(), -30, :day)
+      })
+
+    user
+  end
+
+  defp mount_payment_method_and_stub_card(conn, user) do
+    pm_id = "pm_#{System.unique_integer([:positive])}"
+
+    stub(Stripe.PaymentMethodMock, :retrieve, fn ^pm_id ->
+      {:ok,
+       %Stripe.PaymentMethod{
+         id: pm_id,
+         customer: user.stripe_id,
+         type: "card",
+         card: %Stripe.Card{
+           last4: "4242",
+           exp_month: 12,
+           exp_year: 2030,
+           brand: "visa"
+         }
+       }}
+    end)
+
+    conn = log_in_user(conn, user)
+    {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+    render(view)
+    {view, pm_id}
+  end
+
+  defp stub_successful_membership_subscription(user) do
+    stripe_sub_id = "sub_settings_#{System.unique_integer([:positive])}"
+
+    stub(Stripe.SubscriptionMock, :create, fn _params, _opts ->
+      {:ok,
+       Ysc.Stripe.SubscriptionFixtures.subscription(
+         id: stripe_sub_id,
+         customer: user.stripe_id,
+         status: "active"
+       )}
+    end)
+  end
+
+  defp drain_emails(acc \\ []) do
+    receive do
+      {:email, email} -> drain_emails([email | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
+  defp approved_payment_success_email(emails, user) do
+    subject = YscWeb.Emails.ApplicationApprovedPaymentSuccess.get_subject()
+
+    Enum.find(emails, fn email ->
+      email.subject == subject and
+        Enum.any?(email.to, fn {_name, address} -> address == user.email end)
+    end)
   end
 
   defp active_user_with_default_payment_method(prefix) do
