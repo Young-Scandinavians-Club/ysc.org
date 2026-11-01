@@ -13,6 +13,7 @@ defmodule Ysc.Ledgers do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
+  alias Ysc.ReportingPeriods
   alias Ysc.Bookings.PropertyDisplay
   alias Ysc.Bookings.{Booking, Room}
   alias Ysc.Events.{Event, Ticket, TicketTier}
@@ -4679,7 +4680,8 @@ defmodule Ysc.Ledgers do
   Aggregates admin-dashboard revenue in SQL instead of loading ledger rows.
 
   Returns period totals grouped by revenue account, a YTD total, and a 7-day
-  UTC sparkline. Windows match the previous LiveView implementation.
+  sparkline. Month, year and sparkline-day boundaries follow club-local
+  (`America/Los_Angeles`) midnight, not UTC; see `Ysc.ReportingPeriods`.
   """
   def get_admin_dashboard_revenue(now \\ DateTime.utc_now()) do
     bounds = admin_dashboard_revenue_bounds(now)
@@ -4824,9 +4826,17 @@ defmodule Ysc.Ledgers do
       where: e.account_id in ^account_ids,
       where: e.inserted_at >= ^bounds.sparkline_start,
       where: e.inserted_at < ^bounds.now,
-      group_by: fragment("(?::date)", e.inserted_at),
+      group_by:
+        fragment(
+          "((? AT TIME ZONE 'UTC') AT TIME ZONE 'America/Los_Angeles')::date",
+          e.inserted_at
+        ),
       select: %{
-        day: fragment("(?::date)", e.inserted_at),
+        day:
+          fragment(
+            "((? AT TIME ZONE 'UTC') AT TIME ZONE 'America/Los_Angeles')::date",
+            e.inserted_at
+          ),
         total:
           sum(
             fragment(
@@ -4844,36 +4854,17 @@ defmodule Ysc.Ledgers do
   end
 
   defp admin_dashboard_revenue_bounds(%DateTime{} = now) do
-    month_start = %DateTime{
-      now
-      | day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
+    month_start = ReportingPeriods.start_of_month(now)
+    year_start = ReportingPeriods.start_of_year(now)
+    prev_month_start = ReportingPeriods.start_of_month(now, -1)
+    last_year_month_start = ReportingPeriods.start_of_month(now, -12)
+    last_year_month_end = ReportingPeriods.start_of_month(now, -11)
 
-    year_start = %DateTime{
-      now
-      | month: 1,
-        day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-        microsecond: {0, 0}
-    }
-
-    prev_month_start = Timex.shift(month_start, months: -1)
-    last_year_month_start = Timex.shift(month_start, years: -1)
-
-    last_year_month_end =
-      last_year_month_start |> Timex.shift(months: 1)
-
-    today_utc = DateTime.to_date(now)
-    sparkline_days = Enum.map(6..0//-1, &Date.add(today_utc, -&1))
+    today_local = ReportingPeriods.local_date(now)
+    sparkline_days = Enum.map(6..0//-1, &Date.add(today_local, -&1))
 
     sparkline_start =
-      DateTime.new!(List.first(sparkline_days), ~T[00:00:00], "Etc/UTC")
+      ReportingPeriods.local_midnight_utc(List.first(sparkline_days))
 
     earliest =
       [last_year_month_start, year_start, sparkline_start]
