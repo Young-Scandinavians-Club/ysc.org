@@ -167,13 +167,15 @@ defmodule Ysc.Events do
 
   Returns `nil` for invalid ULID values (e.g. crawler junk like `"images.php"`)
   instead of raising `Ecto.Query.CastError`.
+
+  Selects `Event.public_page_fields/0` so the event page never TOASTs
+  `raw_details` (Trix source). The page renders `rendered_details`.
   """
   def get_public_event(id) do
     case Ecto.ULID.cast(id) do
       {:ok, id} ->
-        from(e in Event,
-          where: e.id == ^id and e.state in ^@public_event_states
-        )
+        id
+        |> public_event_query()
         |> Repo.one()
 
       :error ->
@@ -183,12 +185,12 @@ defmodule Ysc.Events do
 
   @doc """
   Returns an event visible on public pages by reference id, or nil.
+
+  See `get_public_event/1` for the column set.
   """
   def get_public_event_by_reference(reference_id) do
-    from(e in Event,
-      where:
-        e.reference_id == ^reference_id and e.state in ^@public_event_states
-    )
+    reference_id
+    |> public_event_by_reference_query()
     |> Repo.one()
   end
 
@@ -227,9 +229,8 @@ defmodule Ysc.Events do
     if Authorization.can?(viewer, :event_read_unpublished) do
       case Ecto.ULID.cast(id) do
         {:ok, id} ->
-          from(e in Event,
-            where: e.id == ^id and e.state in ^@staff_preview_event_states
-          )
+          id
+          |> staff_preview_event_query()
           |> Repo.one()
 
         :error ->
@@ -240,13 +241,41 @@ defmodule Ysc.Events do
 
   defp get_staff_preview_event_by_reference(reference_id, viewer) do
     if Authorization.can?(viewer, :event_read_unpublished) do
-      from(e in Event,
-        where:
-          e.reference_id == ^reference_id and
-            e.state in ^@staff_preview_event_states
-      )
+      reference_id
+      |> staff_preview_event_by_reference_query()
       |> Repo.one()
     end
+  end
+
+  defp public_event_query(id) do
+    from(e in Event,
+      where: e.id == ^id and e.state in ^@public_event_states,
+      select: struct(e, ^Event.public_page_fields())
+    )
+  end
+
+  defp public_event_by_reference_query(reference_id) do
+    from(e in Event,
+      where:
+        e.reference_id == ^reference_id and e.state in ^@public_event_states,
+      select: struct(e, ^Event.public_page_fields())
+    )
+  end
+
+  defp staff_preview_event_query(id) do
+    from(e in Event,
+      where: e.id == ^id and e.state in ^@staff_preview_event_states,
+      select: struct(e, ^Event.public_page_fields())
+    )
+  end
+
+  defp staff_preview_event_by_reference_query(reference_id) do
+    from(e in Event,
+      where:
+        e.reference_id == ^reference_id and
+          e.state in ^@staff_preview_event_states,
+      select: struct(e, ^Event.public_page_fields())
+    )
   end
 
   @doc """
@@ -4273,6 +4302,21 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_event_for_check_in_query do
     event_for_check_in_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_public_event_query do
+    public_event_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_public_event_by_reference_query do
+    public_event_by_reference_query("EVT-CI")
+  end
+
+  @doc false
+  def ci_query_explain_staff_preview_event_query do
+    staff_preview_event_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false

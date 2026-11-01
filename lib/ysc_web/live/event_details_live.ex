@@ -6280,6 +6280,9 @@ defmodule YscWeb.EventDetailsLive do
   defp event_calendar_date(%Date{} = date), do: date
   defp event_calendar_date(_), do: nil
 
+  # Public page loads omit `raw_details` (Trix source) and keep
+  # `rendered_details`. The fallback is for full `%Event{}` structs such as
+  # EventUpdated broadcasts from the editor.
   defp event_body(event) do
     html =
       Map.get(event, :rendered_details) || Map.get(event, :raw_details) || ""
