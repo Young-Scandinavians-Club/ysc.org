@@ -170,6 +170,41 @@ defmodule YscWeb.EventDetailsQueryTest do
       # Before: preload + EventPricingCache batch_load_images (2). After: enrich only.
       assert query_count == 1
     end
+
+    test "dead render does not SELECT raw_details and still shows rendered body",
+         %{
+           conn: conn
+         } do
+      marker = "toast-#{System.unique_integer([:positive])}"
+
+      event =
+        event_fixture(%{
+          title: "Public Body Toast Event",
+          state: :published,
+          raw_details: "<p>raw #{marker}</p>",
+          rendered_details: "<p>rendered #{marker}</p>"
+        })
+
+      ticket_tier_fixture(%{event_id: event.id})
+
+      {html, raw_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/events/#{event.id}")
+            |> html_response(200)
+          end,
+          pattern: ~r/raw_details/i,
+          caller_pids: [self()]
+        )
+
+      # Before: get_public_event selected events.* including Trix source.
+      # After: public page fields omit raw_details; the article uses
+      # rendered_details.
+      assert raw_cols == 0
+      assert html =~ "rendered #{marker}"
+      refute html =~ "raw #{marker}"
+    end
   end
 
   describe "membership extras on first paint" do

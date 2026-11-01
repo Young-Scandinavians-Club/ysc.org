@@ -170,6 +170,16 @@ defmodule Ysc.Events.Event do
   @doc false
   def summary_fields, do: @summary_fields
 
+  # Public event page and staff preview on that layout.
+  # Includes `rendered_details` (scrubbed body HTML the page renders). Omits
+  # `raw_details` (Trix source) so Postgres does not detoast a second copy of
+  # the same body. The editor writes both columns together. Virtual fields are
+  # not columns and cannot be selected.
+  @doc false
+  def public_page_fields do
+    __schema__(:fields) -- [:raw_details | __schema__(:virtual_fields)]
+  end
+
   @publish_control_fields [:state, :published_at, :publish_at, :organizer_id]
 
   # Finding 70: tickets_tbd is a dedicated lifecycle flag (`Events.set_tickets_tbd/2`),

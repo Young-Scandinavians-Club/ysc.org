@@ -13,9 +13,10 @@ defmodule Ysc.Events.EventPricingCache do
 
   # Event-body HTML. The public list/card queries omit these columns, so the
   # cached pricing payload keyed by event id can be seeded body-less by list
-  # traffic. The event page passes a full `%Event{}` here and reads the body
-  # off the result, so always re-merge these from the caller's source event
-  # when it carries them (a slimmed list map simply won't, and stays slim).
+  # traffic. The event page passes a `%Event{}` with `rendered_details` (and
+  # `raw_details` only on EventUpdated full structs) and reads the body off
+  # the result, so always re-merge these from the caller's source event when
+  # it carries them (a slimmed list map simply won't, and stays slim).
   @source_body_fields [:raw_details, :rendered_details]
 
   def enrich_events(events) when is_list(events) do
