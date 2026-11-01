@@ -2495,19 +2495,30 @@ defmodule Ysc.Events do
           t.event_id == ^event_id and t.status == :confirmed and
             tt.type != :donation,
         group_by: [
-          fragment("date_trunc('day', ?)", t.inserted_at),
+          fragment(
+            "date_trunc('day', (? AT TIME ZONE 'UTC') AT TIME ZONE 'America/Los_Angeles')",
+            t.inserted_at
+          ),
           tt.id,
           tt.name
         ],
         select: %{
-          date: fragment("date_trunc('day', ?)", t.inserted_at),
+          date:
+            fragment(
+              "date_trunc('day', (? AT TIME ZONE 'UTC') AT TIME ZONE 'America/Los_Angeles')",
+              t.inserted_at
+            ),
           ticket_tier_id: tt.id,
           ticket_tier_name: tt.name,
           tickets_sold: count(t.id),
           gross: sum(fragment("(?.price).amount", tt)),
           discount_total: sum(fragment("(?.discount_amount).amount", t))
         },
-        order_by: fragment("date_trunc('day', ?)", t.inserted_at)
+        order_by:
+          fragment(
+            "date_trunc('day', (? AT TIME ZONE 'UTC') AT TIME ZONE 'America/Los_Angeles')",
+            t.inserted_at
+          )
       )
       |> Repo.all()
       |> Enum.group_by(&NaiveDateTime.to_date(&1.date))
@@ -2587,7 +2598,7 @@ defmodule Ysc.Events do
     window_dates =
       [window.start_date, window.end_date]
       |> Enum.reject(&is_nil/1)
-      |> Enum.map(&DateTime.to_date/1)
+      |> Enum.map(&Ysc.ReportingPeriods.local_date/1)
 
     case window_dates ++ Enum.map(rows, & &1.date) do
       [] ->

@@ -2678,7 +2678,7 @@ defmodule Ysc.AccountsTest do
       assert record.user_id == user.id
       assert record.position == :president
       assert record.ended_on == nil
-      assert record.started_on == Date.utc_today()
+      assert record.started_on == Ysc.ReportingPeriods.today()
     end
 
     test "assign_board_position syncs board volunteer billing for the household" do
@@ -2702,7 +2702,7 @@ defmodule Ysc.AccountsTest do
     test "assign_board_position when user already has a position closes old record and opens new one" do
       user = user_fixture()
       {:ok, user} = Accounts.assign_board_position(user, :president)
-      today = Date.utc_today()
+      today = Ysc.ReportingPeriods.today()
 
       assert {:ok, updated_user} =
                Accounts.assign_board_position(user, :treasurer)
@@ -2731,7 +2731,7 @@ defmodule Ysc.AccountsTest do
         })
         |> Repo.update()
 
-      today = Date.utc_today()
+      today = Ysc.ReportingPeriods.today()
 
       assert {:ok, updated_user} = Accounts.remove_board_position(user)
       assert updated_user.board_position == nil
@@ -2824,7 +2824,10 @@ defmodule Ysc.AccountsTest do
       history = Accounts.list_board_position_history(updated_user)
       assert length(history) == 2
       open = Enum.find(history, &is_nil(&1.ended_on))
-      closed = Enum.find(history, &(&1.ended_on == Date.utc_today()))
+
+      closed =
+        Enum.find(history, &(&1.ended_on == Ysc.ReportingPeriods.today()))
+
       assert open.position == :treasurer
       assert closed.position == :president
     end
@@ -2843,7 +2846,7 @@ defmodule Ysc.AccountsTest do
       history = Accounts.list_board_position_history(updated_user)
       assert length(history) == 1
       assert hd(history).position == :secretary
-      assert hd(history).ended_on == Date.utc_today()
+      assert hd(history).ended_on == Ysc.ReportingPeriods.today()
     end
   end
 
