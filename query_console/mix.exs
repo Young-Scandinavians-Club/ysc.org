@@ -170,6 +170,16 @@ defmodule QueryConsole.MixProject do
       # :params, :path_params, :form_multipart, or :aws_sigv4. Token
       # exchange expects 200 (no 303 follow). Pin the patched floor.
       {:req, "~> 0.7.5"},
+      # 0.26.2: EEF-CVE-2026-117680 (LOW) treats regex match-budget exhaustion
+      # as an indeterminate result instead of a non-match, so
+      # patternProperties cannot skip their subschema and `not`/`pattern`
+      # deny-lists cannot invert a false miss. Validation returns
+      # JSV.ValidationError with kind :indeterminate_pattern. minLength /
+      # maxLength count Unicode code points (spec), not grapheme clusters.
+      # We do not call JSV in app code; ReqLLM.Schema.validate/2 uses
+      # JSV.build!/1 + JSV.validate/2 for JSON-schema tool args. req_llm
+      # lists jsv ~> 0.11, so pin the patched floor.
+      {:jsv, "~> 0.26.2", override: true},
       {:lotus, "~> 1.3"},
       {:lotus_web, "~> 1.4"},
       {:cachex, "~> 4.0"},
