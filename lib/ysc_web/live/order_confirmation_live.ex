@@ -866,18 +866,13 @@ defmodule YscWeb.OrderConfirmationLive do
     end
   end
 
+  # Event `start_date` is a California calendar day stored as midnight UTC of
+  # that day. Compare the stored date as-is against Pacific today — shifting
+  # the DateTime to Pacific would make today's event look like yesterday.
   defp event_in_past?(event) do
-    today = Ysc.ReportingPeriods.today()
-
-    case event.start_date do
-      %DateTime{} = dt ->
-        Date.compare(Ysc.ReportingPeriods.local_date(dt), today) == :lt
-
-      %Date{} = date ->
-        Date.compare(date, today) == :lt
-
-      _ ->
-        false
+    case DateDisplay.calendar_date(event.start_date) do
+      %Date{} = date -> Date.compare(date, YscWeb.TimeZone.today()) == :lt
+      _ -> false
     end
   end
 end

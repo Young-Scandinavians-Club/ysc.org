@@ -250,6 +250,45 @@ defmodule YscWeb.OrderConfirmationLiveTest do
              )
     end
 
+    test "keeps upcoming copy when the event's stored calendar date is Pacific today",
+         %{conn: conn} do
+      user = create_user_with_membership(%{first_name: "Ingrid"})
+      event = create_event(%{})
+      tier = create_ticket_tier(event)
+      order = create_ticket_order(user, event)
+      _ticket = create_ticket(order, tier)
+
+      # Admin persists event days as midnight UTC of that calendar day.
+      # Shifting that DateTime to Pacific would make today look like yesterday.
+      pacific_today =
+        DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+      start_date =
+        DateTime.new!(pacific_today, ~T[00:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        event
+        |> Ecto.Changeset.change(%{start_date: start_date})
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(
+               view,
+               "#order-confirmation",
+               "See you at the event, Ingrid"
+             )
+
+      refute has_element?(
+               view,
+               "#order-confirmation",
+               "Hope you had a blast, Ingrid"
+             )
+    end
+
     test "shows upcoming copy when event start_date is in the future", %{
       conn: conn
     } do
