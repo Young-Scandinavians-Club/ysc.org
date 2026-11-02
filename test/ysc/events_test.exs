@@ -3186,6 +3186,29 @@ defmodule Ysc.EventsTest do
       refute ~D[2026-11-01] in dates
     end
 
+    test "zero-fills the chart from the Pacific date of the sale window, not UTC" do
+      {:ok, event} = create_event_fixture()
+
+      # 5:30pm PDT Oct 31 is already Nov 1 in UTC. The stored sale window is a
+      # real UTC instant (`:pacific_anchored_datetime`); the chart axis must
+      # still start on Oct 31.
+      {:ok, _tier} =
+        create_ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          start_date: ~U[2026-11-01 00:30:00Z],
+          end_date: ~U[2026-11-05 19:00:00Z]
+        })
+
+      points = Events.get_event_sales_over_time(event.id)
+      dates = Enum.map(points, & &1.date)
+
+      assert hd(dates) == ~D[2026-10-31]
+      refute hd(dates) == ~D[2026-11-01]
+      assert List.last(dates) == ~D[2026-11-05]
+      assert Enum.all?(points, &(&1.tickets_sold == 0))
+    end
+
     test "returns an empty list for an event with no confirmed tickets and no sale window" do
       {:ok, event} = create_event_fixture()
       assert Events.get_event_sales_over_time(event.id) == []
