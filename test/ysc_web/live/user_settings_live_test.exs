@@ -1567,6 +1567,9 @@ defmodule YscWeb.UserSettingsLiveTest do
       html = render(view)
 
       assert html =~ "Application pending review"
+      assert has_element?(view, "#membership-pending-heading")
+      assert html =~ "Your application is under review"
+      refute html =~ "Get Your YSC Membership"
       refute html =~ "Account Pending Approval"
       refute html =~ "approved account"
       assert html =~ "saved a payment method during setup"
@@ -1591,6 +1594,8 @@ defmodule YscWeb.UserSettingsLiveTest do
       html = render(view)
 
       assert has_element?(view, "#membership_form")
+      assert has_element?(view, "#membership-purchase-heading")
+      assert html =~ "Get Your YSC Membership"
 
       assert has_element?(
                view,
