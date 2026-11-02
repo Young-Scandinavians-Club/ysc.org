@@ -243,8 +243,13 @@ defmodule YscWeb.PageControllerTest do
       conn = get(conn, ~p"/pending-review")
 
       html = html_response(conn, 200)
-      assert html =~ "Account Pending Review"
-      assert html =~ "saved a payment method"
+      assert html =~ "Application Under Review"
+      refute html =~ "Account Pending Review"
+      assert html =~ "You haven't saved a payment method yet"
+      assert html =~ "Save a payment method"
+      assert html =~ "Membership starts:"
+      refute html =~ "Continue account setup"
+      refute html =~ "Activation:"
       assert conn.assigns.application_submitted_date != nil
       assert conn.assigns.time_delta =~ "ago"
     end
@@ -288,6 +293,9 @@ defmodule YscWeb.PageControllerTest do
 
       assert html =~ "You've saved a payment method"
       assert html =~ "we'll charge the payment method you saved"
+      assert html =~ "Membership starts:"
+      refute html =~ "Continue account setup"
+      refute html =~ "Activation:"
       refute html =~ "payment method will be charged"
     end
 

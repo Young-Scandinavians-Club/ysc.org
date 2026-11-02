@@ -49,10 +49,11 @@
           </p>
           <p>
             <.link
+              id="pending-review-save-payment-method"
               href={~p"/account/setup/#{@current_user.id}"}
               class="underline font-medium"
             >
-              Continue account setup
+              Save a payment method
             </.link>
           </p>
           <p>
@@ -88,10 +89,10 @@
           </span>
           <span class="min-w-0 pt-0.5">
             <%= if @has_payment_method do %>
-              <strong>Activation:</strong>
+              <strong>Membership starts:</strong>
               If approved, we'll charge the payment method you saved and turn on membership automatically — no extra steps.
             <% else %>
-              <strong>Activation:</strong>
+              <strong>Membership starts:</strong>
               If approved, you'll be prompted to pay your dues online. Once paid, you'll get full access to cabin bookings and member-only event tickets.
             <% end %>
           </span>

@@ -1036,12 +1036,27 @@ defmodule YscWeb.UserSettingsLive do
                 !@is_sub_account
             }>
               <div class="mb-6">
-                <h2 class="text-2xl text-zinc-900 type-title">
-                  Get Your YSC Membership
-                </h2>
-                <p class="text-zinc-500 mt-1">
-                  Enjoy exclusive events, cabin stays, and all membership benefits.
-                </p>
+                <%= if @user_is_active do %>
+                  <h2
+                    id="membership-purchase-heading"
+                    class="text-2xl text-zinc-900 type-title"
+                  >
+                    Get Your YSC Membership
+                  </h2>
+                  <p class="text-zinc-500 mt-1">
+                    Enjoy exclusive events, cabin stays, and all membership benefits.
+                  </p>
+                <% else %>
+                  <h2
+                    id="membership-pending-heading"
+                    class="text-2xl text-zinc-900 type-title"
+                  >
+                    Your application is under review
+                  </h2>
+                  <p class="text-zinc-500 mt-1">
+                    After the board approves you, you can pay dues here and start using member benefits.
+                  </p>
+                <% end %>
               </div>
 
               <div :if={@pending_family_invites != []} class="mb-6">

@@ -223,7 +223,7 @@ defmodule YscWeb.PageController do
         |> assign(:application_submitted_date, local_date)
         |> assign(:time_delta, days_ago)
         |> assign(:has_payment_method, has_payment_method)
-        |> assign(:page_title, "Account Pending Review")
+        |> assign(:page_title, "Application Under Review")
         |> render(:pending_review)
 
       :active ->
