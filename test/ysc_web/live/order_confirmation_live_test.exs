@@ -805,6 +805,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
+      assert has_element?(view, "#order-confirmation-summary")
       assert has_element?(view, "#order-confirmation-event", event.title)
     end
 

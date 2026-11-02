@@ -362,64 +362,59 @@ defmodule YscWeb.BookingCheckoutLive do
         <!-- Left Column: Booking Summary and Payment -->
         <div class="lg:col-span-8 space-y-6 min-w-0">
           <!-- Booking Summary: cover photo + hairline stat strip -->
-          <div
-            id="checkout-booking-summary"
-            class="bg-white rounded-xl border border-zinc-200 overflow-hidden"
-          >
-            <div class="h-40 bg-zinc-100 overflow-hidden">
+          <.stat_strip_card id="checkout-booking-summary" cover_class="h-40">
+            <:cover>
               <img
                 src={PropertyDisplay.thumbnail_path(@booking.property)}
                 alt={titleize(@booking.property) <> " Cabin"}
                 class="object-cover h-full w-full"
               />
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-200 border-t border-zinc-200">
-              <.labeled_value
-                id="checkout-summary-cabin"
-                label="Cabin"
-                class="bg-zinc-50 p-5"
-                value_class="text-base font-semibold text-zinc-900"
-              >
-                {titleize(@booking.property)} Cabin
-              </.labeled_value>
-              <.labeled_value
-                id="checkout-summary-dates"
-                label="Dates"
-                class="bg-zinc-50 p-5"
-                value_class="text-base font-semibold text-zinc-900"
-                detail_class="text-xs"
-              >
-                {format_date_short(@booking.checkin_date, @timezone)} — {format_date_short(
-                  @booking.checkout_date,
-                  @timezone
-                )}, {Calendar.strftime(@booking.checkout_date, "%Y")}
-                <:detail>
-                  {BookingDisplay.nights_label(
-                    Date.diff(@booking.checkout_date, @booking.checkin_date)
-                  )}
-                </:detail>
-              </.labeled_value>
-              <.labeled_value
-                id="checkout-summary-guests"
-                label="Guests"
-                class="bg-zinc-50 p-5"
-                value_class="text-base font-semibold text-zinc-900"
-                detail_class="text-xs"
-              >
-                {BookingDisplay.guests_label(
-                  @booking.guests_count,
-                  @booking.children_count
+            </:cover>
+            <.labeled_value
+              id="checkout-summary-cabin"
+              label="Cabin"
+              class="bg-zinc-50 p-5"
+              value_class="text-base font-semibold text-zinc-900"
+            >
+              {titleize(@booking.property)} Cabin
+            </.labeled_value>
+            <.labeled_value
+              id="checkout-summary-dates"
+              label="Dates"
+              class="bg-zinc-50 p-5"
+              value_class="text-base font-semibold text-zinc-900"
+              detail_class="text-xs"
+            >
+              {format_date_short(@booking.checkin_date, @timezone)} — {format_date_short(
+                @booking.checkout_date,
+                @timezone
+              )}, {Calendar.strftime(@booking.checkout_date, "%Y")}
+              <:detail>
+                {BookingDisplay.nights_label(
+                  Date.diff(@booking.checkout_date, @booking.checkin_date)
                 )}
-                <:detail :if={
-                  @booking.booking_mode == :room &&
-                    Ecto.assoc_loaded?(@booking.rooms) &&
-                    length(@booking.rooms) > 0
-                }>
-                  {Enum.map(@booking.rooms, & &1.name) |> Enum.join(", ")}
-                </:detail>
-              </.labeled_value>
-            </div>
-          </div>
+              </:detail>
+            </.labeled_value>
+            <.labeled_value
+              id="checkout-summary-guests"
+              label="Guests"
+              class="bg-zinc-50 p-5"
+              value_class="text-base font-semibold text-zinc-900"
+              detail_class="text-xs"
+            >
+              {BookingDisplay.guests_label(
+                @booking.guests_count,
+                @booking.children_count
+              )}
+              <:detail :if={
+                @booking.booking_mode == :room &&
+                  Ecto.assoc_loaded?(@booking.rooms) &&
+                  length(@booking.rooms) > 0
+              }>
+                {Enum.map(@booking.rooms, & &1.name) |> Enum.join(", ")}
+              </:detail>
+            </.labeled_value>
+          </.stat_strip_card>
           <.booking_guest_info_form
             :if={@checkout_step == :guest_info}
             id="guest-info-form"

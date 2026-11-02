@@ -74,6 +74,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ booking.reference_id
       assert html =~ "Back to home"
       assert has_element?(view, "#booking-receipt")
+      assert has_element?(view, "#booking-receipt-stay-details")
 
       assert has_element?(
                view,
@@ -177,6 +178,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ "Booking Cancelled"
       assert html =~ booking.reference_id
       assert has_element?(view, "#booking-receipt-header", "Booking Cancelled")
+      assert has_element?(view, "#booking-receipt-stay-details", "Cancelled")
+      assert has_element?(view, "#booking-receipt-stay-details.opacity-60")
     end
 
     test "displays guest information when booking guests exist", %{conn: conn} do

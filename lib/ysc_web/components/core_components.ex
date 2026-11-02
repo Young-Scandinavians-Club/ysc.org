@@ -4260,10 +4260,83 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Skeleton for the summary card on confirmation and checkout pages: a cover
-  photo above a hairline-divided strip of labelled stats. Mirrors the markup
-  built from `labeled_value/1` (`gap-px bg-zinc-200` strip, `bg-zinc-50 p-5`
-  cells).
+  Cover photo above a hairline-divided strip of labelled stats.
+
+  Used on ticket order confirmation, cabin booking receipt, and checkout.
+  Put the photo (or fallback) in `:cover` and `labeled_value/1` cells in
+  the inner block. Pair with `stat_strip_card_skeleton/1` for loading.
+
+  When `cancelled?` is true, the card is muted and a "Cancelled" overlay
+  sits on the cover — the booking receipt cancelled state.
+
+  ## Examples
+
+      <.stat_strip_card id="checkout-booking-summary" cover_class="h-40">
+        <:cover>
+          <img src={@thumbnail} alt="Tahoe Cabin" class="object-cover h-full w-full" />
+        </:cover>
+        <.labeled_value label="Cabin" class="bg-zinc-50 p-5">Tahoe Cabin</.labeled_value>
+      </.stat_strip_card>
+
+      <.stat_strip_card cancelled?>
+        <:cover>
+          <img src={@thumbnail} alt="Tahoe Cabin" class="object-cover h-full w-full" />
+        </:cover>
+        <.labeled_value label="Check-in" muted class="bg-zinc-50 p-5">Jun 1</.labeled_value>
+      </.stat_strip_card>
+  """
+  attr :id, :string, default: nil
+  attr :class, :any, default: nil
+  attr :cover_class, :any, default: "h-48", doc: "Height of the cover photo"
+
+  attr :cancelled?, :boolean,
+    default: false,
+    doc: "Muted chrome plus a Cancelled overlay on the cover"
+
+  slot :cover, required: true
+  slot :inner_block, required: true
+
+  def stat_strip_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "rounded-xl border overflow-hidden",
+        if(@cancelled?,
+          do: "bg-zinc-100 border-zinc-300 opacity-60",
+          else: "bg-white border-zinc-200"
+        ),
+        @class
+      ]}
+    >
+      <div class={[
+        "bg-zinc-100 relative overflow-hidden",
+        @cover_class,
+        @cancelled? && "opacity-50 grayscale"
+      ]}>
+        {render_slot(@cover)}
+        <div
+          :if={@cancelled?}
+          class="absolute inset-0 bg-red-500/20 flex items-center justify-center"
+        >
+          <div class="bg-white/90 rounded-lg px-6 py-3 shadow-lg">
+            <p class="text-red-700 font-bold text-lg">
+              Cancelled
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-200 border-t border-zinc-200">
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Skeleton for `stat_strip_card/1`: a cover photo above a hairline-divided
+  strip of labelled stats. Mirrors the markup built from `labeled_value/1`
+  (`gap-px bg-zinc-200` strip, `bg-zinc-50 p-5` cells).
 
   ## Examples
 
