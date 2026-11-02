@@ -22,8 +22,11 @@ admin_password =
     value ->
       value = String.trim(value)
 
-      if byte_size(value) < 16 or value == "change_me_in_production" do
-        raise "ADMIN_PASSWORD must be at least 16 characters and must not be the old placeholder."
+      # Same limits as User.registration_changeset/3 (72 characters and bytes
+      # at most), with a longer minimum for a full admin account.
+      if String.length(value) < 16 or String.length(value) > 72 or
+           byte_size(value) > 72 or value == "change_me_in_production" do
+        raise "ADMIN_PASSWORD must be 16-72 characters (72 bytes at most) and must not be the old placeholder."
       end
 
       value
@@ -126,18 +129,46 @@ admin_user =
             IO.puts("  ℹ️  Admin user already exists: admin@ysc.org")
             existing
           else
-            IO.puts(
-              :stderr,
-              "  ⚠️  Admin user seed failed (deploy continues): #{inspect(changeset.errors)}"
-            )
-
-            nil
+            # Never deploy without a usable admin account.
+            raise "Admin user seed failed: #{inspect(changeset.errors)}"
           end
       end
 
     existing_user ->
       IO.puts("  ℹ️  Admin user already exists: admin@ysc.org")
       existing_user
+  end
+
+# Earlier versions of this seed fell back to a public placeholder password. If
+# that password is still on the account, replace it with ADMIN_PASSWORD (which
+# also signs out any existing sessions) before the account is re-promoted.
+admin_user =
+  case admin_user do
+    %User{} = user ->
+      if User.valid_password?(user, "change_me_in_production") do
+        IO.puts("  🔑 Admin user still had the old placeholder password; rotating it")
+
+        {:ok, rotated} =
+          user
+          |> User.password_changeset(%{
+            password: admin_password,
+            password_confirmation: admin_password
+          })
+          |> Repo.update()
+
+        # Drop every login for the account. (Not Accounts.reset_user_password/2:
+        # it broadcasts through the Endpoint, which is not running here.)
+        user
+        |> Ysc.Accounts.UserToken.by_user_and_contexts_query(:all)
+        |> Repo.delete_all()
+
+        rotated
+      else
+        user
+      end
+
+    other ->
+      other
   end
 
 admin_user =

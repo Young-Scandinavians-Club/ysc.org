@@ -1676,7 +1676,7 @@ defmodule Ysc.Accounts do
 
   defp build_single_word_search(term, rank?) do
     lower_term = String.downcase(term)
-    prefix_like = "#{lower_term}%"
+    prefix_like = Ysc.Text.escape_like(lower_term) <> "%"
     contains_like = "%" <> Ysc.Text.escape_like(term) <> "%"
 
     query =
@@ -1733,8 +1733,8 @@ defmodule Ysc.Accounts do
     lower_w2 = String.downcase(w2)
     lower_term = String.downcase(term)
     contains_like = "%" <> Ysc.Text.escape_like(term) <> "%"
-    prefix_w1 = "#{lower_w1}%"
-    prefix_w2 = "#{lower_w2}%"
+    prefix_w1 = Ysc.Text.escape_like(lower_w1) <> "%"
+    prefix_w2 = Ysc.Text.escape_like(lower_w2) <> "%"
 
     query =
       from(u in User,
