@@ -387,80 +387,63 @@ defmodule YscWeb.BookingReceiptLive do
             </div>
           <% end %>
           <!-- Stay Details: cover photo + hairline stat strip -->
-          <div class={[
-            "rounded-xl border overflow-hidden",
-            if(@booking.status == :canceled,
-              do: "bg-zinc-100 border-zinc-300 opacity-60",
-              else: "bg-white border-zinc-200"
-            )
-          ]}>
-            <div class={[
-              "h-48 bg-zinc-100 relative overflow-hidden",
-              if(@booking.status == :canceled, do: "opacity-50 grayscale")
-            ]}>
+          <.stat_strip_card
+            id="booking-receipt-stay-details"
+            cancelled?={@booking.status == :canceled}
+          >
+            <:cover>
               <img
                 src={PropertyDisplay.thumbnail_path(@booking.property)}
                 alt={PropertyDisplay.full_name(@booking.property)}
                 class="w-full h-full object-cover"
               />
-              <%= if @booking.status == :canceled do %>
-                <div class="absolute inset-0 bg-red-500/20 flex items-center justify-center">
-                  <div class="bg-white/90 rounded-lg px-6 py-3 shadow-lg">
-                    <p class="text-red-700 font-bold text-lg">
-                      Cancelled
-                    </p>
-                  </div>
-                </div>
-              <% end %>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-200 border-t border-zinc-200">
-              <.labeled_value
-                label="Check-in"
-                class="bg-zinc-50 p-5"
-                muted={@booking.status == :canceled}
-                value_class={receipt_stat_value_class(@booking)}
-                detail_class="text-xs"
-                detail_id="booking-receipt-checkin-time"
-              >
-                {DateDisplay.format_date_long(@booking.checkin_date, "—")}
-                <:detail>
-                  After {BookingDisplay.checkin_time_label()}
-                </:detail>
-              </.labeled_value>
-              <.labeled_value
-                label="Check-out"
-                class="bg-zinc-50 p-5"
-                muted={@booking.status == :canceled}
-                value_class={receipt_stat_value_class(@booking)}
-                detail_class="text-xs"
-                detail_id="booking-receipt-checkout-time"
-              >
-                {DateDisplay.format_date_long(@booking.checkout_date, "—")}
-                <:detail>
-                  Before {BookingDisplay.checkout_time_label()}
-                </:detail>
-              </.labeled_value>
-              <.labeled_value
-                label={receipt_rooms_or_type_label(@booking)}
-                class="bg-zinc-50 p-5"
-                muted={@booking.status == :canceled}
-                value_class={receipt_stat_value_class(@booking)}
-                detail_class="text-xs"
-                value_id="receipt-booking-type"
-              >
-                {receipt_rooms_or_type_value(@booking)}
-                <:detail>
-                  {BookingDisplay.nights_label(
-                    Date.diff(@booking.checkout_date, @booking.checkin_date),
-                    capitalize: true
-                  )}
-                  <%= if @booking.booking_mode != :buyout do %>
-                    · {BookingDisplay.guest_headcount_label(@booking)}
-                  <% end %>
-                </:detail>
-              </.labeled_value>
-            </div>
-          </div>
+            </:cover>
+            <.labeled_value
+              label="Check-in"
+              class="bg-zinc-50 p-5"
+              muted={@booking.status == :canceled}
+              value_class={receipt_stat_value_class(@booking)}
+              detail_class="text-xs"
+              detail_id="booking-receipt-checkin-time"
+            >
+              {DateDisplay.format_date_long(@booking.checkin_date, "—")}
+              <:detail>
+                After {BookingDisplay.checkin_time_label()}
+              </:detail>
+            </.labeled_value>
+            <.labeled_value
+              label="Check-out"
+              class="bg-zinc-50 p-5"
+              muted={@booking.status == :canceled}
+              value_class={receipt_stat_value_class(@booking)}
+              detail_class="text-xs"
+              detail_id="booking-receipt-checkout-time"
+            >
+              {DateDisplay.format_date_long(@booking.checkout_date, "—")}
+              <:detail>
+                Before {BookingDisplay.checkout_time_label()}
+              </:detail>
+            </.labeled_value>
+            <.labeled_value
+              label={receipt_rooms_or_type_label(@booking)}
+              class="bg-zinc-50 p-5"
+              muted={@booking.status == :canceled}
+              value_class={receipt_stat_value_class(@booking)}
+              detail_class="text-xs"
+              value_id="receipt-booking-type"
+            >
+              {receipt_rooms_or_type_value(@booking)}
+              <:detail>
+                {BookingDisplay.nights_label(
+                  Date.diff(@booking.checkout_date, @booking.checkin_date),
+                  capitalize: true
+                )}
+                <%= if @booking.booking_mode != :buyout do %>
+                  · {BookingDisplay.guest_headcount_label(@booking)}
+                <% end %>
+              </:detail>
+            </.labeled_value>
+          </.stat_strip_card>
           <!-- Guest Information (if booking guests exist) -->
           <%= if Ecto.assoc_loaded?(@booking.booking_guests) && length(@booking.booking_guests) > 0 do %>
             <section id="booking-receipt-guests">

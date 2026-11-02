@@ -202,8 +202,8 @@ defmodule YscWeb.OrderConfirmationLive do
         <!-- Left Column: Event + Tickets -->
         <div class="lg:col-span-8 space-y-10 min-w-0">
           <!-- Event Summary: cover photo + hairline stat strip -->
-          <div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-            <div class="h-48 bg-zinc-100 relative overflow-hidden">
+          <.stat_strip_card id="order-confirmation-summary">
+            <:cover>
               <%= if @event.cover_image do %>
                 <.live_component
                   id={"order-confirmation-event-cover-#{@event.id}"}
@@ -222,42 +222,40 @@ defmodule YscWeb.OrderConfirmationLive do
                   />
                 </div>
               <% end %>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-zinc-200 border-t border-zinc-200">
-              <.labeled_value
-                id="order-confirmation-event"
-                label="Event"
-                class="bg-zinc-50 p-5"
-                value_class="text-base font-semibold text-zinc-900"
-              >
-                {@event.title}
-              </.labeled_value>
-              <.labeled_value
-                id="order-confirmation-when"
-                label="Date & Time"
-                class="bg-zinc-50 p-5"
-                value_class="text-base font-semibold text-zinc-900"
-                detail_class="text-xs"
-              >
-                {DateDisplay.format_date_long(@event.start_date, "TBD")}
-                <:detail>
-                  {DateTimeFormatter.format_time(@event.start_time) || "Time TBD"}
-                </:detail>
-              </.labeled_value>
-              <.labeled_value
-                id="order-confirmation-location"
-                label="Location"
-                class="bg-zinc-50 p-5"
-                value_class="text-base font-semibold text-zinc-900"
-                detail_class="text-xs"
-              >
-                {@event.location_name || "TBD"}
-                <:detail :if={@event.address}>
-                  {@event.address}
-                </:detail>
-              </.labeled_value>
-            </div>
-          </div>
+            </:cover>
+            <.labeled_value
+              id="order-confirmation-event"
+              label="Event"
+              class="bg-zinc-50 p-5"
+              value_class="text-base font-semibold text-zinc-900"
+            >
+              {@event.title}
+            </.labeled_value>
+            <.labeled_value
+              id="order-confirmation-when"
+              label="Date & Time"
+              class="bg-zinc-50 p-5"
+              value_class="text-base font-semibold text-zinc-900"
+              detail_class="text-xs"
+            >
+              {DateDisplay.format_date_long(@event.start_date, "TBD")}
+              <:detail>
+                {DateTimeFormatter.format_time(@event.start_time) || "Time TBD"}
+              </:detail>
+            </.labeled_value>
+            <.labeled_value
+              id="order-confirmation-location"
+              label="Location"
+              class="bg-zinc-50 p-5"
+              value_class="text-base font-semibold text-zinc-900"
+              detail_class="text-xs"
+            >
+              {@event.location_name || "TBD"}
+              <:detail :if={@event.address}>
+                {@event.address}
+              </:detail>
+            </.labeled_value>
+          </.stat_strip_card>
           <!-- Tickets: heading on the canvas, one unified list -->
           <section id="order-confirmation-items-section">
             <div class="flex items-center justify-between mb-4">

@@ -95,6 +95,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "Complete Your Booking"
       assert html =~ "Booking Summary"
       assert html =~ "What Happens Next?"
+      assert has_element?(view, "#checkout-booking-summary")
+      assert has_element?(view, "#checkout-summary-cabin")
       assert has_element?(view, "#checkout-next-steps")
       assert has_element?(view, "#checkout-next-steps-step-1")
       assert has_element?(view, "#checkout-next-steps-step-4")
