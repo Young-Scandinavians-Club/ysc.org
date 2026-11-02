@@ -31,6 +31,11 @@ defmodule YscWeb.Api.AppTicketsController do
   fail silently: the response includes `warnings`, computed before the sale
   via `BookingLocker.capacity_warnings/2`, so the app can show the seller
   what they're about to exceed.
+
+  Finding 99: quantity is still bounded. `bypass_guards` skips capacity, and
+  pending tickets count as sold, so an unbounded `tiers` map would let a
+  volunteer lock the event (and insert unbounded ticket rows) before Stripe
+  runs. Per-tier and per-order caps live on `Ysc.Tickets`.
   """
   use YscWeb, :controller
 
@@ -117,6 +122,11 @@ defmodule YscWeb.Api.AppTicketsController do
   Capacity and sale-window guards are bypassed here the same way as
   `create_payment_intent/2` — see this module's moduledoc. Donation tiers
   are rejected, matching `create_payment_intent/2`.
+
+  Finding 99: quantities are still capped (`Tickets.max_door_sale_quantity_per_tier/0`
+  per tier, `Tickets.max_door_sale_tickets/0` across the order). Door sales
+  may exceed remaining capacity, but a volunteer must not be able to insert
+  unbounded pending tickets that count as sold until the 5-minute timeout.
   """
   def grant_offline_order(
         conn,
@@ -193,14 +203,28 @@ defmodule YscWeb.Api.AppTicketsController do
   end
 
   defp parse_ticket_selections(tiers) do
-    Enum.reduce_while(tiers, {:ok, %{}}, fn {tier_id, quantity}, {:ok, acc} ->
+    max_each = Tickets.max_door_sale_quantity_per_tier()
+    max_total = Tickets.max_door_sale_tickets()
+
+    Enum.reduce_while(tiers, {:ok, %{}, 0}, fn {tier_id, quantity},
+                                               {:ok, acc, total} ->
       with {:ok, cast_id} <- Ecto.ULID.cast(tier_id),
            true <- is_integer(quantity) and quantity > 0 do
-        {:cont, {:ok, Map.put(acc, cast_id, quantity)}}
+        new_total = total + quantity
+
+        if quantity > max_each or new_total > max_total do
+          {:halt, {:error, :ticket_quantity_exceeds_limit}}
+        else
+          {:cont, {:ok, Map.put(acc, cast_id, quantity), new_total}}
+        end
       else
         _ -> {:halt, {:error, :invalid_ticket_selection}}
       end
     end)
+    |> case do
+      {:ok, selections, _total} -> {:ok, selections}
+      {:error, _} = error -> error
+    end
   end
 
   defp load_selected_tiers(event_id, selections) do
