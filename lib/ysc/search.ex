@@ -50,7 +50,7 @@ defmodule Ysc.Search do
 
   def global_search(search_term, opts)
       when is_binary(search_term) and search_term != "" and is_list(opts) do
-    search_like = "%#{search_term}%"
+    search_like = "%" <> Ysc.Text.escape_like(search_term) <> "%"
     limit = Keyword.get(opts, :limit, 5)
     include_full_admin_categories? = Keyword.get(opts, :role) != :volunteer
 
@@ -148,7 +148,7 @@ defmodule Ysc.Search do
   end
 
   defp search_users_query(search_term, limit) do
-    phone_like = "%#{search_term}%"
+    phone_like = "%" <> Ysc.Text.escape_like(search_term) <> "%"
 
     from(u in User,
       where:
@@ -170,7 +170,7 @@ defmodule Ysc.Search do
 
   defp search_bookings_query(search_term, search_like, limit) do
     user_query = search_user_preload_query()
-    phone_like = "%#{search_term}%"
+    phone_like = "%" <> Ysc.Text.escape_like(search_term) <> "%"
 
     from(b in Booking,
       join: u in assoc(b, :user),

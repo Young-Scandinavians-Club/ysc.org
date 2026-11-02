@@ -135,10 +135,33 @@ defmodule YscWeb.OAuthControllerTest do
       conn =
         conn
         |> log_in_user(admin)
+        |> put_req_header("referer", "http://localhost:4001/some/page")
         |> get(logout_path())
 
       assert redirected_to(conn, 302) == @post_logout_redirect_uri
       refute get_session(conn, :user_token)
+    end
+
+    test "without Fetch Metadata, refuses a signed-in logout not referred by the client app",
+         %{conn: conn} do
+      admin = user_fixture(%{role: :admin, state: :active})
+
+      for referer <- [
+            nil,
+            "https://evil.example/page",
+            "http://localhost:9999/x"
+          ] do
+        conn =
+          conn
+          |> log_in_user(admin)
+          |> then(fn c ->
+            if referer, do: put_req_header(c, "referer", referer), else: c
+          end)
+          |> get(logout_path())
+
+        assert response(conn, 403)
+        assert get_session(conn, :user_token)
+      end
     end
 
     test "ignores subresource requests so other sites can't force a sign-out",

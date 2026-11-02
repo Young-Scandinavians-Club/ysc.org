@@ -342,6 +342,121 @@ defmodule YscWeb.AuthControllerTest do
     end
   end
 
+  describe "callback/2 - provider email verification" do
+    defp google_auth_with_verified_flag(email, flag) do
+      auth = build_oauth_auth(email)
+
+      %{
+        auth
+        | extra: %Ueberauth.Auth.Extra{
+            raw_info: %{user: %{"email" => email, "email_verified" => flag}}
+          }
+      }
+    end
+
+    test "refuses a Google email that Google has not verified", %{conn: conn} do
+      user = user_fixture(%{state: "active", email: "unverified@example.com"})
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(
+          :ueberauth_auth,
+          google_auth_with_verified_flag(user.email, false)
+        )
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "not verified"
+      refute get_session(conn, :user_token)
+    end
+
+    test "refuses a Google payload that omits the verification flag", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: "active", email: "noflag@example.com"})
+
+      auth = %{
+        build_oauth_auth(user.email)
+        | extra: %Ueberauth.Auth.Extra{
+            raw_info: %{user: %{"email" => user.email}}
+          }
+      }
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+      refute get_session(conn, :user_token)
+    end
+
+    test "does not grant reauth for an unverified Google email", %{conn: conn} do
+      user =
+        user_fixture(%{state: "active", email: "reauth-unverified@example.com"})
+
+      conn =
+        reauth_callback(
+          conn,
+          user,
+          google_auth_with_verified_flag(user.email, false)
+        )
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "not verified"
+      refute get_session(conn, :reauth_verified_at)
+      refute get_session(conn, :reauth_mode)
+    end
+
+    test "grants reauth for a verified Google email (control)", %{conn: conn} do
+      user =
+        user_fixture(%{state: "active", email: "reauth-verified@example.com"})
+
+      conn =
+        reauth_callback(
+          conn,
+          user,
+          google_auth_with_verified_flag(user.email, true)
+        )
+
+      assert get_session(conn, :reauth_verified_at)
+    end
+
+    # Signed-in session mid-reauth, so only the verification check can stop it.
+    defp reauth_callback(conn, user, auth) do
+      token = Ysc.Accounts.generate_user_session_token(user)
+
+      conn
+      |> init_test_session(%{
+        user_token: token,
+        reauth_mode: true,
+        reauth_return_to: "/users/settings"
+      })
+      |> fetch_flash()
+      |> assign(:ueberauth_auth, auth)
+      |> AuthController.callback(%{})
+    end
+
+    test "accepts a verified Google email", %{conn: conn} do
+      user = user_fixture(%{state: "active", email: "verified@example.com"})
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(
+          :ueberauth_auth,
+          google_auth_with_verified_flag(user.email, true)
+        )
+        |> AuthController.callback(%{})
+
+      assert get_session(conn, :user_token)
+    end
+  end
+
   describe "callback/2 - rejected or inactive users" do
     test "rejects login for rejected user", %{conn: conn} do
       user = user_fixture(%{state: "rejected", email: "rejected@example.com"})

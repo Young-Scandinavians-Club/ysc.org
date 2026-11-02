@@ -506,7 +506,7 @@ defmodule Ysc.Events do
   end
 
   defp fuzzy_search_event(search_term) do
-    search_like = "%#{search_term}%"
+    search_like = "%" <> Ysc.Text.escape_like(search_term) <> "%"
 
     from(e in Event,
       left_join: u in assoc(e, :organizer),
@@ -1798,7 +1798,11 @@ defmodule Ysc.Events do
         where(query, [e], e.state == ^state)
 
       {:title, title}, query ->
-        where(query, [e], ilike(e.title, ^"%#{title}%"))
+        where(
+          query,
+          [e],
+          ilike(e.title, ^("%" <> Ysc.Text.escape_like(title) <> "%"))
+        )
 
       _other, query ->
         query

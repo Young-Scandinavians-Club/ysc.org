@@ -136,6 +136,19 @@ defmodule Ysc.Agendas do
   def update_agenda_item_position(event_id, agenda_item, new_index) do
     %AgendaItem{} = agenda_item
 
+    # Same cross-event guard as move_agenda_item_to_agenda/4: an item may only
+    # be reordered through the event that owns its agenda.
+    agenda_item = preload_agenda_item_event(agenda_item)
+
+    if agenda_item.agenda && agenda_item.agenda.event_id != event_id do
+      {:error, :wrong_event}
+    else
+      do_update_agenda_item_position(event_id, agenda_item, new_index)
+    end
+  end
+
+  @dialyzer {:nowarn_function, do_update_agenda_item_position: 3}
+  defp do_update_agenda_item_position(event_id, agenda_item, new_index) do
     Ecto.Multi.new()
     |> multi_reposition(
       :new,

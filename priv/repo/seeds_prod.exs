@@ -11,6 +11,27 @@
 # - Default pricing rules for all booking modes
 # - Default refund policies and rules
 
+# Fail the whole seed (and so the Fly release_command / deploy) when the admin
+# password is missing. There is deliberately no fallback value: this repo is
+# public, so any default would be a known password for a full admin account.
+admin_password =
+  case System.get_env("ADMIN_PASSWORD") do
+    nil ->
+      raise "ADMIN_PASSWORD is not set. Set it with `fly secrets set ADMIN_PASSWORD=...` before seeding."
+
+    value ->
+      value = String.trim(value)
+
+      # Same limits as User.registration_changeset/3 (72 characters and bytes
+      # at most), with a longer minimum for a full admin account.
+      if String.length(value) < 16 or String.length(value) > 72 or
+           byte_size(value) > 72 or value == "change_me_in_production" do
+        raise "ADMIN_PASSWORD must be 16-72 characters (72 bytes at most) and must not be the old placeholder."
+      end
+
+      value
+  end
+
 alias Ysc.Repo
 alias Ysc.Accounts.User
 alias Ysc.Settings
@@ -53,8 +74,7 @@ admin_user =
       admin_changeset =
         User.registration_changeset(%User{}, %{
           email: "admin@ysc.org",
-          password:
-            System.get_env("ADMIN_PASSWORD") || "change_me_in_production",
+          password: admin_password,
           first_name: "Admin",
           last_name: "User",
           phone_number: "+14159009009",
@@ -109,18 +129,46 @@ admin_user =
             IO.puts("  ℹ️  Admin user already exists: admin@ysc.org")
             existing
           else
-            IO.puts(
-              :stderr,
-              "  ⚠️  Admin user seed failed (deploy continues): #{inspect(changeset.errors)}"
-            )
-
-            nil
+            # Never deploy without a usable admin account.
+            raise "Admin user seed failed: #{inspect(changeset.errors)}"
           end
       end
 
     existing_user ->
       IO.puts("  ℹ️  Admin user already exists: admin@ysc.org")
       existing_user
+  end
+
+# Earlier versions of this seed fell back to a public placeholder password. If
+# that password is still on the account, replace it with ADMIN_PASSWORD (which
+# also signs out any existing sessions) before the account is re-promoted.
+admin_user =
+  case admin_user do
+    %User{} = user ->
+      if User.valid_password?(user, "change_me_in_production") do
+        IO.puts("  🔑 Admin user still had the old placeholder password; rotating it")
+
+        {:ok, rotated} =
+          user
+          |> User.password_changeset(%{
+            password: admin_password,
+            password_confirmation: admin_password
+          })
+          |> Repo.update()
+
+        # Drop every login for the account. (Not Accounts.reset_user_password/2:
+        # it broadcasts through the Endpoint, which is not running here.)
+        user
+        |> Ysc.Accounts.UserToken.by_user_and_contexts_query(:all)
+        |> Repo.delete_all()
+
+        rotated
+      else
+        user
+      end
+
+    other ->
+      other
   end
 
 admin_user =
@@ -942,8 +990,4 @@ IO.puts("   - Pricing rules: Tahoe and Clear Lake")
 
 IO.puts(
   "   - Refund policies: Tahoe (buyout, room) and Clear Lake (buyout, day)"
-)
-
-IO.puts(
-  "\n⚠️  Note: Make sure to set ADMIN_PASSWORD environment variable in production!"
 )

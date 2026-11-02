@@ -132,6 +132,10 @@ defmodule YscWeb.Router do
     plug YscWeb.Plugs.PrintfulWebhookRateLimitPlug
   end
 
+  pipeline :health_check_rate_limit do
+    plug YscWeb.Plugs.HealthCheckRateLimitPlug
+  end
+
   pipeline :mobile_api do
     plug :accepts, ["json"]
     plug YscWeb.Plugs.MobileAPIAuth
@@ -236,7 +240,6 @@ defmodule YscWeb.Router do
     get "/choir", PageController, :choir
 
     get "/up", UpController, :index
-    get "/up/dbs", UpController, :databases
 
     live_session :mount_site_settings,
       session: {YscWeb.ClientIP, :live_session, []},
@@ -278,6 +281,13 @@ defmodule YscWeb.Router do
       live "/bookings/:booking_id/change", BookingChangeLive, :index
       live "/bookings/:booking_id/receipt", BookingReceiptLive, :index
     end
+  end
+
+  # Runs a query on the shared Repo pool, so it is rate limited per IP.
+  scope "/", YscWeb do
+    pipe_through [:health_check_rate_limit, :browser]
+
+    get "/up/dbs", UpController, :databases
   end
 
   # Other scopes may use custom stacks.

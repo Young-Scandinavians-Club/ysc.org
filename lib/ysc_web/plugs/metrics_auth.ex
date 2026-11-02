@@ -47,13 +47,18 @@ defmodule YscWeb.Plugs.MetricsAuth do
       (a == 192 and b == 168)
   end
 
-  # IPv6: ::1 (loopback), fe80::/10 (link-local), fc00::/7 (ULA), fdaa::/16 (Fly internal)
-  defp private_ip?({a, b, c, d, e, f, g, h}) do
-    (a == 0 and b == 0 and c == 0 and d == 0 and e == 0 and f == 0 and g == 0 and
-       h == 1) or
-      (a == 0xFE80 and band(b, 0xC000) == 0) or
-      (a == 0xFC00 or a == 0xFD00) or
-      (a == 0xFDA0 and b >= 0)
+  # IPv4-mapped IPv6 (::ffff:a.b.c.d) is judged by the embedded IPv4 address.
+  defp private_ip?({0, 0, 0, 0, 0, 0xFFFF, hi, lo}) do
+    private_ip?({hi >>> 8, band(hi, 0xFF), lo >>> 8, band(lo, 0xFF)})
+  end
+
+  # IPv6: ::1 (loopback), fe80::/10 (link-local), fc00::/7 (unique local, which
+  # includes Fly's private network fdaa::/16). The prefix is compared on the
+  # first 16-bit group: fe80::/10 keeps its top 10 bits, fc00::/7 its top 7.
+  defp private_ip?({0, 0, 0, 0, 0, 0, 0, 1}), do: true
+
+  defp private_ip?({a, _b, _c, _d, _e, _f, _g, _h}) do
+    band(a, 0xFFC0) == 0xFE80 or band(a, 0xFE00) == 0xFC00
   end
 
   defp private_ip?(_), do: false

@@ -383,7 +383,7 @@ defmodule Ysc.Posts do
   end
 
   defp fuzzy_search_posts(search_term) do
-    search_like = "%#{search_term}%"
+    search_like = "%" <> Ysc.Text.escape_like(search_term) <> "%"
 
     from(p in Post,
       left_join: u in assoc(p, :author),

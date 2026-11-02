@@ -19,7 +19,8 @@ defmodule QueryConsoleWeb.AuthController do
     code_verifier = get_session(conn, :oauth_code_verifier)
 
     cond do
-      is_nil(expected_state) or state != expected_state ->
+      not (is_binary(state) and is_binary(expected_state) and
+               Plug.Crypto.secure_compare(state, expected_state)) ->
         conn
         |> put_flash(:error, "Invalid OAuth state")
         |> redirect(to: ~p"/auth/ysc")

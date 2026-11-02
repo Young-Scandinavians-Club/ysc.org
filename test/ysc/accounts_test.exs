@@ -1116,6 +1116,20 @@ defmodule Ysc.AccountsTest do
       results = Accounts.search_users("John", limit: 10)
       assert length(results) <= 10
     end
+
+    test "treats LIKE wildcards in the query literally" do
+      user =
+        user_fixture(%{
+          first_name: "Wild",
+          last_name: "Card",
+          phone_number: "+14159098268"
+        })
+
+      assert Accounts.search_users("%%") == []
+      assert Accounts.search_users("W_ld") == []
+      refute Enum.any?(Accounts.search_users("%d"), &(&1.id == user.id))
+      assert Enum.any?(Accounts.search_users("Wild"), &(&1.id == user.id))
+    end
   end
 
   describe "list_event_notification_recipients/0" do
@@ -1266,6 +1280,26 @@ defmodule Ysc.AccountsTest do
   end
 
   describe "list_paginated_users/2" do
+    test "admin search treats % and _ literally in name prefix patterns" do
+      user_fixture(%{
+        first_name: "Pct",
+        last_name: "Literal",
+        phone_number: unique_user_phone()
+      })
+
+      params = %{page: 1, page_size: 10}
+
+      for term <- ["%", "_", "P_t", "% Literal"] do
+        assert {:ok, {users, _meta}} =
+                 Accounts.list_paginated_users(params, term)
+
+        assert users == [], "expected no matches for #{inspect(term)}"
+      end
+
+      assert {:ok, {[_ | _], _meta}} =
+               Accounts.list_paginated_users(params, "Pct")
+    end
+
     test "returns paginated users" do
       _user1 = user_fixture(%{phone_number: "+14159098268"})
       _user2 = user_fixture(%{phone_number: "+14159098269"})

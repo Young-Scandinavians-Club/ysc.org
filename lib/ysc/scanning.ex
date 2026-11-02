@@ -1083,7 +1083,7 @@ defmodule Ysc.Scanning do
   defp filter_checkin_search(query, search) when search in [nil, ""], do: query
 
   defp filter_checkin_search(query, search) do
-    search_term = "%#{search}%"
+    search_term = "%" <> Ysc.Text.escape_like(search) <> "%"
 
     where(
       query,
@@ -1400,7 +1400,7 @@ defmodule Ysc.Scanning do
     if trimmed == "" do
       query
     else
-      term = "%#{trimmed}%"
+      term = "%" <> Ysc.Text.escape_like(trimmed) <> "%"
 
       where(
         query,

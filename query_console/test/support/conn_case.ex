@@ -32,5 +32,6 @@ defmodule QueryConsoleWeb.ConnCase do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_id, user.id)
+    |> Plug.Conn.put_session(:authenticated_at, System.os_time(:second))
   end
 end

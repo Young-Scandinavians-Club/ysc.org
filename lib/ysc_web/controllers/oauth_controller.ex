@@ -60,9 +60,9 @@ defmodule YscWeb.OAuthController do
   Works whether or not a YSC session is present (idempotent).
   """
   def logout(conn, params) do
-    with :ok <- ensure_top_level_navigation(conn),
-         {:ok, post_logout_redirect_uri} <-
-           OAuth.validate_logout_request(params) do
+    with {:ok, post_logout_redirect_uri} <-
+           OAuth.validate_logout_request(params),
+         :ok <- ensure_top_level_navigation(conn, post_logout_redirect_uri) do
       do_logout(conn, post_logout_redirect_uri)
     else
       {:error, :subresource_request} ->
@@ -86,13 +86,43 @@ defmodule YscWeb.OAuthController do
 
   # Browsers send `Sec-Fetch-Dest: document` for top-level navigations and
   # something else (`image`, `iframe`, `empty`, ...) for subresource loads.
-  # Clients that send no Fetch Metadata header are not browsers we can classify,
-  # so they are allowed.
-  defp ensure_top_level_navigation(conn) do
+  #
+  # Browsers that predate Fetch Metadata send no such header, which would let
+  # any page sign them out with an `<img>` tag. For those, a signed-in user is
+  # only logged out when the request was referred from the client app itself
+  # (the origin of its allowlisted post-logout URL); a missing or foreign
+  # Referer is refused. With no session there is nothing to log out.
+  defp ensure_top_level_navigation(conn, post_logout_redirect_uri) do
     case get_req_header(conn, "sec-fetch-dest") do
-      [] -> :ok
-      ["document"] -> :ok
-      _ -> {:error, :subresource_request}
+      ["document"] ->
+        :ok
+
+      [] ->
+        if signed_in?(conn) and
+             not referred_from?(conn, post_logout_redirect_uri) do
+          {:error, :subresource_request}
+        else
+          :ok
+        end
+
+      _ ->
+        {:error, :subresource_request}
+    end
+  end
+
+  defp signed_in?(conn) do
+    not is_nil(conn.assigns[:real_current_user] || conn.assigns[:current_user])
+  end
+
+  defp referred_from?(conn, post_logout_redirect_uri) do
+    with [referer | _] <- get_req_header(conn, "referer"),
+         %URI{scheme: scheme, host: host, port: port} when is_binary(host) <-
+           URI.parse(referer),
+         %URI{scheme: ^scheme, host: ^host, port: ^port} <-
+           URI.parse(post_logout_redirect_uri) do
+      true
+    else
+      _ -> false
     end
   end
 

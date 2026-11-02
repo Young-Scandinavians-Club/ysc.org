@@ -96,7 +96,7 @@ defmodule Ysc.Events.Picker do
   end
 
   defp search_query(query, cutoff, limit) do
-    like = "%" <> escape_like(String.trim(query)) <> "%"
+    like = "%" <> Ysc.Text.escape_like(String.trim(query)) <> "%"
     term = String.trim(query)
 
     visible_events()
@@ -127,8 +127,6 @@ defmodule Ysc.Events.Picker do
       state: e.state
     })
   end
-
-  defp escape_like(term), do: String.replace(term, ~r/([\\%_])/, "\\\\\\1")
 
   @doc false
   def ci_query_explain_query, do: search_query("happy", today_start(), 10)

@@ -21,6 +21,7 @@ defmodule Ysc.HammerUpgradeTest do
   alias Ysc.AuthRateLimit
   alias Ysc.EmailVerificationRateLimit
   alias Ysc.FlowrouteWebhookRateLimit
+  alias Ysc.HealthCheckRateLimit
   alias Ysc.MobileAPIRateLimit
   alias Ysc.NewsletterRateLimit
   alias Ysc.PrintfulWebhookRateLimit
@@ -36,6 +37,7 @@ defmodule Ysc.HammerUpgradeTest do
     FlowrouteWebhookRateLimit,
     AdminHelpRateLimit,
     PrintfulWebhookRateLimit,
+    HealthCheckRateLimit,
     RegistrationRateLimit
   ]
 

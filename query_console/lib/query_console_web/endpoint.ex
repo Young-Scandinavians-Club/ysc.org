@@ -1,13 +1,15 @@
 defmodule QueryConsoleWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :query_console
 
-  # The session will be stored in the cookie and signed,
-  # this means its contents can be read but not tampered with.
-  # Set :encryption_salt if you would also like to encrypt it.
+  # The session is stored in the cookie, signed and encrypted so its contents
+  # can neither be read nor tampered with. Plug's cookie store has no
+  # server-side expiry, so the session age is enforced in
+  # QueryConsoleWeb.UserAuth (`authenticated_at`).
   @base_session_options [
     store: :cookie,
     key: "_query_console_key",
     signing_salt: "CwUCRRhf",
+    encryption_salt: "pV6mJ3sXq8Yd1NwKzT5uRb0aHc9LfEoG",
     same_site: "Lax",
     http_only: true
   ]
