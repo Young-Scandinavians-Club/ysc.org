@@ -8,24 +8,26 @@ defmodule Ysc.SeedsProdTest do
   alias Ysc.Repo
 
   @seeds Path.expand("../../priv/repo/seeds_prod.exs", __DIR__)
+  @env_keys ["ADMIN_PASSWORD", "ENVIRONMENT", "APP_ENV", "FLY_APP_NAME"]
 
   setup do
-    original = System.get_env("ADMIN_PASSWORD")
+    originals = Map.new(@env_keys, &{&1, System.get_env(&1)})
 
     on_exit(fn ->
-      if original,
-        do: System.put_env("ADMIN_PASSWORD", original),
-        else: System.delete_env("ADMIN_PASSWORD")
+      Enum.each(originals, fn {key, value} ->
+        if value,
+          do: System.put_env(key, value),
+          else: System.delete_env(key)
+      end)
     end)
 
+    clear_seed_env()
     :ok
   end
 
   test "aborts the seed (and so the deploy) when ADMIN_PASSWORD is unset" do
-    System.delete_env("ADMIN_PASSWORD")
-
     assert_raise RuntimeError, ~r/ADMIN_PASSWORD is not set/, fn ->
-      Code.eval_file(@seeds)
+      capture_io(fn -> Code.eval_file(@seeds) end)
     end
   end
 
@@ -34,7 +36,7 @@ defmodule Ysc.SeedsProdTest do
       System.put_env("ADMIN_PASSWORD", value)
 
       assert_raise RuntimeError, ~r/ADMIN_PASSWORD must be/, fn ->
-        Code.eval_file(@seeds)
+        capture_io(fn -> Code.eval_file(@seeds) end)
       end
     end
   end
@@ -85,6 +87,65 @@ defmodule Ysc.SeedsProdTest do
       refute User.valid_password?(reloaded, @new_password)
     end
 
-    defp capture_io(fun), do: ExUnit.CaptureIO.capture_io(fun)
+    test "continues when ADMIN_PASSWORD is unset if the admin password is not the placeholder" do
+      admin =
+        user_fixture(%{
+          email: "admin@ysc.org",
+          password: "some-other-long-password-9",
+          role: :admin,
+          state: :active
+        })
+
+      capture_io(fn -> Code.eval_file(@seeds) end)
+
+      reloaded = Repo.get!(User, admin.id)
+      assert User.valid_password?(reloaded, "some-other-long-password-9")
+      assert reloaded.role == :admin
+    end
+
+    test "aborts production seed when the leftover placeholder is on the account and ADMIN_PASSWORD is unset" do
+      user_fixture(%{
+        email: "admin@ysc.org",
+        password: "change_me_in_production",
+        role: :admin,
+        state: :active
+      })
+
+      assert_raise RuntimeError, ~r/ADMIN_PASSWORD is not set/, fn ->
+        capture_io(fn -> Code.eval_file(@seeds) end)
+      end
+    end
+
+    test "sandbox continues when ADMIN_PASSWORD is unset and the leftover placeholder is still on the account" do
+      admin =
+        user_fixture(%{
+          email: "admin@ysc.org",
+          password: "change_me_in_production",
+          role: :admin,
+          state: :active
+        })
+
+      System.put_env("ENVIRONMENT", "sandbox")
+
+      stderr =
+        capture_io(:stderr, fn ->
+          capture_io(fn -> Code.eval_file(@seeds) end)
+        end)
+
+      reloaded = Repo.get!(User, admin.id)
+      assert User.valid_password?(reloaded, "change_me_in_production")
+      assert reloaded.role == :admin
+      assert stderr =~ "old public placeholder password"
+      assert stderr =~ "ysc-sandbox"
+    end
+  end
+
+  defp capture_io(fun) when is_function(fun, 0),
+    do: ExUnit.CaptureIO.capture_io(fun)
+
+  defp capture_io(device, fun), do: ExUnit.CaptureIO.capture_io(device, fun)
+
+  defp clear_seed_env do
+    Enum.each(@env_keys, &System.delete_env/1)
   end
 end

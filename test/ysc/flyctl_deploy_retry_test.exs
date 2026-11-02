@@ -122,6 +122,15 @@ defmodule Ysc.FlyctlDeployRetryTest do
     assert script =~ "vendor/blurhash"
   end
 
+  test "retry script does not retry ADMIN_PASSWORD seed failures" do
+    script = File.read!(@script)
+
+    assert script =~ "ADMIN_PASSWORD is not set"
+    assert script =~ "FLYCTL_DEPLOY_NON_RETRYABLE_EXIT"
+    assert script =~ "non-retryable deploy error"
+    assert script =~ "41493327897"
+  end
+
   test "flyctl_deploy_retry.sh --self-test" do
     {output, status} =
       System.cmd(@script, ["--self-test"], stderr_to_stdout: true)
