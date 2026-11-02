@@ -11,6 +11,7 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Subscriptions
+  alias Ysc.Tickets
 
   defp member_with_active_membership do
     Ysc.Ledgers.ensure_basic_accounts()
@@ -283,8 +284,67 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
                json_response(response, 422)
     end
 
+    # Finding 99: bypass_guards skips capacity, so quantity must still be capped.
+    test "rejects a per-tier quantity above the door-sale cap", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => Tickets.max_door_sale_quantity_per_tier() + 1}
+        })
+
+      assert %{
+               "error" =>
+                 "each ticket quantity must be between 1 and 25, and the order cannot exceed 50 tickets"
+             } = json_response(response, 422)
+    end
+
+    test "rejects a combined quantity above the door-sale order cap", %{
+      conn: conn
+    } do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      general =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "General Finding 99",
+          price: Money.new(50, :USD)
+        })
+
+      vip =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "VIP Finding 99",
+          price: Money.new(100, :USD)
+        })
+
+      student =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Student Finding 99",
+          price: Money.new(25, :USD)
+        })
+
+      # 20 + 20 + 20 = 60, each under the per-tier cap of 25.
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{general.id => 20, vip.id => 20, student.id => 20}
+        })
+
+      assert %{
+               "error" =>
+                 "each ticket quantity must be between 1 and 25, and the order cannot exceed 50 tickets"
+             } = json_response(response, 422)
+    end
+
     # Finding 48: donation values are cents in BookingLocker but this API
-    # documents quantity — refuse rather than charge $0.50 for `50`.
+    # documents quantity — refuse rather than charge $0.10 for `10`.
+    # Quantity 50 would now hit Finding 99's door-sale cap first.
     test "rejects donation tiers instead of treating quantity as cents", %{
       conn: conn
     } do
@@ -309,7 +369,7 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       response =
         post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
           "member_id" => member.id,
-          "tiers" => %{paid.id => 1, donation.id => 50}
+          "tiers" => %{paid.id => 1, donation.id => 10}
         })
 
       assert %{
@@ -818,7 +878,7 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       response =
         post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
           "member_id" => member.id,
-          "tiers" => %{paid.id => 1, donation.id => 50}
+          "tiers" => %{paid.id => 1, donation.id => 10}
         })
 
       assert json_response(response, 422)

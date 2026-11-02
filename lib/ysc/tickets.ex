@@ -40,9 +40,21 @@ defmodule Ysc.Tickets do
 
   @payment_timeout_minutes 5
 
+  # Finding 99: door-sale (`bypass_guards: true`) skips capacity, so pending
+  # tickets would otherwise be unbounded. Caps match in-person reality (a
+  # single member at the door) and merch's per-line max of 25.
+  @max_door_sale_quantity_per_tier 25
+  @max_door_sale_tickets 50
+
   # Two-arg advisory lock namespace so ticket checkout serialization cannot
   # collide with merch (`8_233_202`) or unrelated app locks.
   @checkout_advisory_lock_namespace 8_233_203
+
+  @doc "Per-tier quantity cap for door-sale (`bypass_guards`) ticket orders."
+  def max_door_sale_quantity_per_tier, do: @max_door_sale_quantity_per_tier
+
+  @doc "Total ticket cap across tiers for door-sale (`bypass_guards`) orders."
+  def max_door_sale_tickets, do: @max_door_sale_tickets
 
   ## Ticket Order Management
 
@@ -76,6 +88,9 @@ defmodule Ysc.Tickets do
   - `{:error, :member_only_not_eligible}` if the selection includes member-only tiers the buyer's plan can't purchase
   - `{:error, :member_only_limit_exceeded}` if the selection exceeds the buyer's per-event member-only ticket limit
   - `{:error, :checkout_payment_in_progress}` when another pending checkout has in-flight payment
+  - `{:error, :ticket_quantity_exceeds_limit}` when `:bypass_guards` is set
+    and a quantity exceeds `max_door_sale_quantity_per_tier/0` or the order
+    exceeds `max_door_sale_tickets/0` (Finding 99)
 
   ## Options
 
@@ -83,7 +98,7 @@ defmodule Ysc.Tickets do
       `Ysc.Tickets.BookingLocker.atomic_booking/4` — see its doc for what
       this relaxes and why (the admin/volunteer mobile app's door sales).
       Membership and member-only-tier eligibility are unaffected regardless
-      of this option.
+      of this option. Door-sale quantity is still capped (Finding 99).
     * `:user` - `%User{}` already loaded for `user_id`. Skips the membership
       lookup when the struct is the same user; subscriptions are preloaded
       only if membership still needs them.
@@ -106,6 +121,8 @@ defmodule Ysc.Tickets do
     case membership_user(user_id, opts) do
       {:ok, user} ->
         with :ok <-
+               validate_door_sale_quantities(ticket_selections, opts),
+             :ok <-
                validate_member_only_selection(
                  user,
                  event_id,
@@ -2999,6 +3016,38 @@ defmodule Ysc.Tickets do
         end
     end
   end
+
+  # Finding 99: door sales may exceed remaining capacity, but a volunteer
+  # must not be able to mint unbounded pending ticket rows in one request.
+  defp validate_door_sale_quantities(ticket_selections, opts)
+       when is_map(ticket_selections) and is_list(opts) do
+    if Keyword.get(opts, :bypass_guards, false) do
+      quantities = Map.values(ticket_selections)
+
+      cond do
+        quantities == [] ->
+          :ok
+
+        Enum.any?(quantities, &(not door_sale_quantity_per_tier?(&1))) ->
+          {:error, :ticket_quantity_exceeds_limit}
+
+        Enum.sum(quantities) > @max_door_sale_tickets ->
+          {:error, :ticket_quantity_exceeds_limit}
+
+        true ->
+          :ok
+      end
+    else
+      :ok
+    end
+  end
+
+  defp door_sale_quantity_per_tier?(quantity)
+       when is_integer(quantity) and quantity > 0 and
+              quantity <= @max_door_sale_quantity_per_tier,
+       do: true
+
+  defp door_sale_quantity_per_tier?(_), do: false
 
   defp membership_user(user_id, opts) do
     case Keyword.get(opts, :user) do

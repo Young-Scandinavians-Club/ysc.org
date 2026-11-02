@@ -93,6 +93,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 96 (MEDIUM)   Event Tickets-tab leftover `validate-capacity`/`save-capacity` forwarded the full event param map into `update_event_editor/3`, persisting client `rendered_details` without TrixScrubber. Public `/feeds/events.atom` emits that HTML unsanitized.
   Finding 97 (HIGH)     OAuth reauth resume tokens (`reauth_resume`) were encrypted but not bound to the initiating user. `UserAuth.log_in_user/6` always starts a 5-minute `reauth_verified_at` grace window, so a member who minted a token (email/phone/password intent) could send another signed-in member `/users/settings?reauth_resume=…` during that window. Phone changes to non-US/CA numbers skip OTP and persist immediately, including `profile_params` (name/DOB).
   Finding 98 (MEDIUM)   Volunteer dashboard magic search (`Ysc.Search.global_search/2`) had no role filter, so typing on `/admin` returned cabin bookings (member name, property, stay dates, reference) and user emails. Users and Bookings are full-admin-only (`ensure_full_admin`); clicking through was blocked, but the dropdown already disclosed the data. Same class as Finding 76.
+  Finding 99 (MEDIUM)   Volunteer door-sale `POST /api/v1/app/events/:id/tickets/payment_intent` accepted unbounded `tiers` quantities while `bypass_guards: true` skipped capacity. Pending tickets count as sold, so one JSON body could insert unbounded ticket rows and lock the event until the 5-minute timeout (repeatable).
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -2955,7 +2956,9 @@ defmodule YscWeb.SecurityAuditTest do
         |> put_req_header("authorization", "Bearer #{token}")
         |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
           "member_id" => member.id,
-          "tiers" => %{donation.id => 50}
+          # Within the Finding 99 door-sale cap so this hits the donation
+          # refuse path, not the quantity cap. 10 as cents would be $0.10.
+          "tiers" => %{donation.id => 10}
         })
 
       assert %{
@@ -6910,6 +6913,91 @@ defmodule YscWeb.SecurityAuditTest do
       assert html =~ booking.reference_id
       assert has_element?(view, "#admin-search-bookings")
       assert html =~ "Finding98Admin"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 99 (MEDIUM): Door-sale quantity must be capped under bypass_guards
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 99: app door-sale quantity is capped" do
+    import Ysc.EventsFixtures
+
+    test "volunteer cannot create a huge pending order via payment_intent" do
+      volunteer = user_fixture(%{role: :volunteer})
+      token = Accounts.generate_user_mobile_token(volunteer)
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 99",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 10
+        })
+
+      over_limit = Tickets.max_door_sale_quantity_per_tier() + 1
+
+      conn =
+        build_conn()
+        |> put_req_header("accept", "application/json")
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => over_limit}
+        })
+
+      assert %{"error" => error} = json_response(conn, 422)
+      assert error =~ "#{Tickets.max_door_sale_quantity_per_tier()}"
+      assert error =~ "#{Tickets.max_door_sale_tickets()}"
+
+      assert from(to in Ysc.Tickets.TicketOrder,
+               where: to.user_id == ^member.id and to.event_id == ^event.id
+             )
+             |> Repo.all() == []
+
+      assert from(t in Ysc.Events.Ticket,
+               where: t.ticket_tier_id == ^tier.id
+             )
+             |> Repo.all() == []
+    end
+
+    test "create_ticket_order refuses unbounded bypass_guards quantities" do
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 99 context",
+          type: :paid,
+          price: Money.new(25, :USD)
+        })
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.create_ticket_order(
+                 member.id,
+                 event.id,
+                 %{tier.id => Tickets.max_door_sale_quantity_per_tier() + 1},
+                 bypass_guards: true
+               )
     end
   end
 
