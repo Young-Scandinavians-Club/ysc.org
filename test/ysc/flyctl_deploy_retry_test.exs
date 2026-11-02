@@ -126,9 +126,11 @@ defmodule Ysc.FlyctlDeployRetryTest do
     script = File.read!(@script)
 
     assert script =~ "ADMIN_PASSWORD is not set"
+    assert script =~ "ADMIN_PASSWORD must be"
     assert script =~ "FLYCTL_DEPLOY_NON_RETRYABLE_EXIT"
     assert script =~ "non-retryable deploy error"
     assert script =~ "41493327897"
+    assert script =~ "41521592559"
   end
 
   test "flyctl_deploy_retry.sh --self-test" do

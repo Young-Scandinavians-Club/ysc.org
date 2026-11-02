@@ -117,26 +117,69 @@ defmodule Ysc.SeedsProdTest do
     end
 
     test "sandbox continues when ADMIN_PASSWORD is unset and the leftover placeholder is still on the account" do
-      admin =
-        user_fixture(%{
-          email: "admin@ysc.org",
-          password: "change_me_in_production",
-          role: :admin,
-          state: :active
-        })
-
+      admin = placeholder_admin_fixture()
       System.put_env("ENVIRONMENT", "sandbox")
 
-      stderr =
-        capture_io(:stderr, fn ->
-          capture_io(fn -> Code.eval_file(@seeds) end)
-        end)
+      stderr = seed_sandbox_placeholder_warning()
 
       reloaded = Repo.get!(User, admin.id)
       assert User.valid_password?(reloaded, "change_me_in_production")
       assert reloaded.role == :admin
       assert stderr =~ "old public placeholder password"
       assert stderr =~ "ysc-sandbox"
+    end
+
+    test "sandbox continues when ADMIN_PASSWORD is the leftover placeholder" do
+      admin = placeholder_admin_fixture()
+      System.put_env("ENVIRONMENT", "sandbox")
+      System.put_env("ADMIN_PASSWORD", "change_me_in_production")
+
+      stderr = seed_sandbox_placeholder_warning()
+
+      reloaded = Repo.get!(User, admin.id)
+      assert User.valid_password?(reloaded, "change_me_in_production")
+      assert reloaded.role == :admin
+      assert stderr =~ "old public placeholder password"
+    end
+
+    test "sandbox continues when ADMIN_PASSWORD is too short and the leftover placeholder is still on the account" do
+      admin = placeholder_admin_fixture()
+      System.put_env("ENVIRONMENT", "sandbox")
+      System.put_env("ADMIN_PASSWORD", "short")
+
+      stderr = seed_sandbox_placeholder_warning()
+
+      reloaded = Repo.get!(User, admin.id)
+      assert User.valid_password?(reloaded, "change_me_in_production")
+      assert reloaded.role == :admin
+      assert stderr =~ "old public placeholder password"
+    end
+
+    test "aborts production seed when the leftover placeholder is on the account and ADMIN_PASSWORD is unusable" do
+      placeholder_admin_fixture()
+      System.put_env("ADMIN_PASSWORD", "change_me_in_production")
+
+      assert_raise RuntimeError, ~r/ADMIN_PASSWORD must be/, fn ->
+        capture_io(fn -> Code.eval_file(@seeds) end)
+      end
+    end
+
+    test "continues when ADMIN_PASSWORD is unusable if the admin password is not the placeholder" do
+      admin =
+        user_fixture(%{
+          email: "admin@ysc.org",
+          password: "some-other-long-password-9",
+          role: :admin,
+          state: :active
+        })
+
+      System.put_env("ADMIN_PASSWORD", "change_me_in_production")
+
+      capture_io(fn -> Code.eval_file(@seeds) end)
+
+      reloaded = Repo.get!(User, admin.id)
+      assert User.valid_password?(reloaded, "some-other-long-password-9")
+      refute User.valid_password?(reloaded, "change_me_in_production")
     end
   end
 
@@ -147,5 +190,20 @@ defmodule Ysc.SeedsProdTest do
 
   defp clear_seed_env do
     Enum.each(@env_keys, &System.delete_env/1)
+  end
+
+  defp placeholder_admin_fixture do
+    user_fixture(%{
+      email: "admin@ysc.org",
+      password: "change_me_in_production",
+      role: :admin,
+      state: :active
+    })
+  end
+
+  defp seed_sandbox_placeholder_warning do
+    capture_io(:stderr, fn ->
+      capture_io(fn -> Code.eval_file(@seeds) end)
+    end)
   end
 end

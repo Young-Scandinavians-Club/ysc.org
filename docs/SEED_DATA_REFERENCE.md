@@ -363,7 +363,7 @@ mix run priv/repo/seeds_prod.exs
 ```
 
 **Production seeds create**:
-- Admin user with the password from `ADMIN_PASSWORD` (required when creating the account or rotating the old public placeholder; at least 16 chars). Subsequent deploys of an already-seeded app continue without the secret if the account no longer uses the placeholder. Production still fails the Fly release command when a password is needed and the secret is missing. Sandbox deploys (`ENVIRONMENT=sandbox`) warn and continue if the leftover placeholder is still present, so a missing `ysc-sandbox` Fly secret cannot block every main-branch deploy.
+- Admin user with the password from `ADMIN_PASSWORD` (required when creating the account or rotating the old public placeholder; at least 16 chars, and not the old public placeholder). Subsequent deploys of an already-seeded app continue without the secret if the account no longer uses the placeholder. Production still fails the Fly release command when a password is needed and the secret is missing or unusable. Sandbox deploys (`ENVIRONMENT=sandbox`) warn and continue if the leftover placeholder is still present, so a missing or placeholder `ysc-sandbox` Fly secret cannot block every main-branch deploy.
 - Essential site settings
 - No test data
 

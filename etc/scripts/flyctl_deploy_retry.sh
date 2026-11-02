@@ -27,10 +27,12 @@
 # (v2.53.0/v2.53.1, runs 41118049812 and 41131633952).
 #
 # Application-level release_command failures are not Fly blips. #1787 made
-# seeds_prod.exs raise when ADMIN_PASSWORD was unset; ysc-sandbox had no
-# such secret, so Deploy app sandbox (run 41493327897 / job 125453870611)
-# retried the same RuntimeError four times. Those seed errors must fail
-# the wrapper immediately.
+# seeds_prod.exs raise when ADMIN_PASSWORD was unset or the old placeholder;
+# ysc-sandbox then failed Deploy app sandbox twice:
+# - run 41493327897 / job 125453870611: ADMIN_PASSWORD is not set
+# - run 41521592559 / job 125549668612: ADMIN_PASSWORD must be 16-72...
+# flyctl retried the same RuntimeError four times. Those seed errors must
+# fail the wrapper immediately.
 #
 # Usage:
 #   ./etc/scripts/flyctl_deploy_retry.sh \
@@ -238,6 +240,20 @@ self_test() {
   rm -rf "${tmp}"
   if [ "${n}" -ne 1 ]; then
     echo "flyctl_deploy_retry.sh: expected 1 ADMIN_PASSWORD attempt, got ${n}" >&2
+    return 1
+  fi
+
+  tmp="$(mktemp -d)"
+  FLYCTL_DEPLOY_CMD="echo attempt >>'${tmp}/n'; echo '** (RuntimeError) ADMIN_PASSWORD must be 16-72 characters (72 bytes at most) and must not be the old placeholder.'; false"
+  if FLYCTL_DEPLOY_CMD="${FLYCTL_DEPLOY_CMD}" retry 5 0 deploy_image >/dev/null; then
+    rm -rf "${tmp}"
+    echo "flyctl_deploy_retry.sh: expected ADMIN_PASSWORD must-be seed error to fail" >&2
+    return 1
+  fi
+  n="$(wc -l <"${tmp}/n" | tr -d ' ')"
+  rm -rf "${tmp}"
+  if [ "${n}" -ne 1 ]; then
+    echo "flyctl_deploy_retry.sh: expected 1 ADMIN_PASSWORD must-be attempt, got ${n}" >&2
     return 1
   fi
 
