@@ -11,10 +11,28 @@
 # - Default pricing rules for all booking modes
 # - Default refund policies and rules
 
-# Fail the whole seed (and so the Fly release_command / deploy) when the admin
-# password is missing. There is deliberately no fallback value: this repo is
+# ADMIN_PASSWORD is required when creating admin@ysc.org or rotating the old
+# public placeholder. There is deliberately no fallback value: this repo is
 # public, so any default would be a known password for a full admin account.
-admin_password =
+#
+# Do not require the secret at file load. ysc-sandbox already has an admin
+# and no Fly secret, so the previous raise aborted every release_command
+# (run 41493327897, four flyctl retries of the same RuntimeError).
+#
+# Production still fails closed: a missing/invalid secret raises when a
+# password is actually needed. Sandbox (ENVIRONMENT=sandbox / APP_ENV /
+# FLY_APP_NAME=ysc-sandbox) warns and continues if the leftover placeholder
+# is still on the account, so a missing secret cannot block main-branch
+# sandbox deploys. Set `fly secrets set ADMIN_PASSWORD=... -a ysc-sandbox`
+# to rotate it.
+
+sandbox_deploy? = fn ->
+  System.get_env("FLY_APP_NAME") == "ysc-sandbox" or
+    System.get_env("ENVIRONMENT") == "sandbox" or
+    System.get_env("APP_ENV") == "sandbox"
+end
+
+fetch_admin_password! = fn ->
   case System.get_env("ADMIN_PASSWORD") do
     nil ->
       raise "ADMIN_PASSWORD is not set. Set it with `fly secrets set ADMIN_PASSWORD=...` before seeding."
@@ -31,6 +49,7 @@ admin_password =
 
       value
   end
+end
 
 alias Ysc.Repo
 alias Ysc.Accounts.User
@@ -74,7 +93,7 @@ admin_user =
       admin_changeset =
         User.registration_changeset(%User{}, %{
           email: "admin@ysc.org",
-          password: admin_password,
+          password: fetch_admin_password!.(),
           first_name: "Admin",
           last_name: "User",
           phone_number: "+14159009009",
@@ -146,23 +165,38 @@ admin_user =
   case admin_user do
     %User{} = user ->
       if User.valid_password?(user, "change_me_in_production") do
-        IO.puts("  🔑 Admin user still had the old placeholder password; rotating it")
+        cond do
+          is_nil(System.get_env("ADMIN_PASSWORD")) and sandbox_deploy?.() ->
+            IO.puts(
+              :stderr,
+              "  ⚠️  admin@ysc.org still has the old public placeholder password. Set ADMIN_PASSWORD on ysc-sandbox (`fly secrets set ADMIN_PASSWORD=... -a ysc-sandbox`) to rotate it. Continuing because this is a sandbox deploy."
+            )
 
-        {:ok, rotated} =
-          user
-          |> User.password_changeset(%{
-            password: admin_password,
-            password_confirmation: admin_password
-          })
-          |> Repo.update()
+            user
 
-        # Drop every login for the account. (Not Accounts.reset_user_password/2:
-        # it broadcasts through the Endpoint, which is not running here.)
-        user
-        |> Ysc.Accounts.UserToken.by_user_and_contexts_query(:all)
-        |> Repo.delete_all()
+          true ->
+            admin_password = fetch_admin_password!.()
 
-        rotated
+            IO.puts(
+              "  🔑 Admin user still had the old placeholder password; rotating it"
+            )
+
+            {:ok, rotated} =
+              user
+              |> User.password_changeset(%{
+                password: admin_password,
+                password_confirmation: admin_password
+              })
+              |> Repo.update()
+
+            # Drop every login for the account. (Not Accounts.reset_user_password/2:
+            # it broadcasts through the Endpoint, which is not running here.)
+            user
+            |> Ysc.Accounts.UserToken.by_user_and_contexts_query(:all)
+            |> Repo.delete_all()
+
+            rotated
+        end
       else
         user
       end

@@ -26,6 +26,12 @@
 # mix.exs, which path-deps vendor/blurhash the console image does not have
 # (v2.53.0/v2.53.1, runs 41118049812 and 41131633952).
 #
+# Application-level release_command failures are not Fly blips. #1787 made
+# seeds_prod.exs raise when ADMIN_PASSWORD was unset; ysc-sandbox had no
+# such secret, so Deploy app sandbox (run 41493327897 / job 125453870611)
+# retried the same RuntimeError four times. Those seed errors must fail
+# the wrapper immediately.
+#
 # Usage:
 #   ./etc/scripts/flyctl_deploy_retry.sh \
 #     --image registry.fly.io/ysc-sandbox:version \
@@ -50,6 +56,8 @@ set -euo pipefail
 
 FLYCTL_DEPLOY_ATTEMPTS="${FLYCTL_DEPLOY_ATTEMPTS:-4}"
 FLYCTL_DEPLOY_RETRY_DELAY_SECONDS="${FLYCTL_DEPLOY_RETRY_DELAY_SECONDS:-30}"
+# Distinct from flyctl's own exits so retry() can fail fast.
+FLYCTL_DEPLOY_NON_RETRYABLE_EXIT=99
 
 DEPLOY_ARGS=()
 
@@ -59,8 +67,14 @@ retry() {
   local seconds="${1}"
   shift
   local attempt_num=1
+  local status
 
   until "$@"; do
+    status=$?
+    if [ "${status}" -eq "${FLYCTL_DEPLOY_NON_RETRYABLE_EXIT}" ]; then
+      echo "flyctl_deploy_retry.sh: non-retryable deploy error; not retrying" >&2
+      return 1
+    fi
     if [ "${attempt_num}" -eq "${max_attempts}" ]; then
       echo "flyctl_deploy_retry.sh: attempt ${attempt_num} failed and there are no more attempts left" >&2
       return 1
@@ -100,18 +114,37 @@ format_deploy_cmd() {
   printf '\n'
 }
 
+non_retryable_deploy_output() {
+  grep -Eq "ADMIN_PASSWORD is not set|ADMIN_PASSWORD must be" "${1}"
+}
+
 deploy_image() {
-  local argv
+  local argv output_file status
+  output_file="$(mktemp)"
+  set +e +o pipefail
   if [ -n "${FLYCTL_DEPLOY_CMD:-}" ]; then
-    bash -c "${FLYCTL_DEPLOY_CMD}"
-    return
+    bash -c "${FLYCTL_DEPLOY_CMD}" 2>&1 | tee "${output_file}"
+    status="${PIPESTATUS[0]}"
+  else
+    if ! command -v flyctl >/dev/null 2>&1; then
+      set -e -o pipefail
+      rm -f "${output_file}"
+      echo "flyctl_deploy_retry.sh: flyctl not found; cannot deploy" >&2
+      return 1
+    fi
+    deploy_argv argv
+    "${argv[@]}" 2>&1 | tee "${output_file}"
+    status="${PIPESTATUS[0]}"
   fi
-  if ! command -v flyctl >/dev/null 2>&1; then
-    echo "flyctl_deploy_retry.sh: flyctl not found; cannot deploy" >&2
-    return 1
+  set -e -o pipefail
+
+  if [ "${status}" -ne 0 ] && non_retryable_deploy_output "${output_file}"; then
+    echo "flyctl_deploy_retry.sh: seed error is not a transient Fly failure; not retrying" >&2
+    rm -f "${output_file}"
+    return "${FLYCTL_DEPLOY_NON_RETRYABLE_EXIT}"
   fi
-  deploy_argv argv
-  "${argv[@]}"
+  rm -f "${output_file}"
+  return "${status}"
 }
 
 self_test() {
@@ -191,6 +224,20 @@ self_test() {
 
   if FLYCTL_DEPLOY_CMD="false" retry 2 0 deploy_image; then
     echo "flyctl_deploy_retry.sh: expected exhausted retries to fail" >&2
+    return 1
+  fi
+
+  tmp="$(mktemp -d)"
+  FLYCTL_DEPLOY_CMD="echo attempt >>'${tmp}/n'; echo '** (RuntimeError) ADMIN_PASSWORD is not set. Set it with fly secrets set ADMIN_PASSWORD=... before seeding.'; false"
+  if FLYCTL_DEPLOY_CMD="${FLYCTL_DEPLOY_CMD}" retry 5 0 deploy_image >/dev/null; then
+    rm -rf "${tmp}"
+    echo "flyctl_deploy_retry.sh: expected ADMIN_PASSWORD seed error to fail" >&2
+    return 1
+  fi
+  n="$(wc -l <"${tmp}/n" | tr -d ' ')"
+  rm -rf "${tmp}"
+  if [ "${n}" -ne 1 ]; then
+    echo "flyctl_deploy_retry.sh: expected 1 ADMIN_PASSWORD attempt, got ${n}" >&2
     return 1
   fi
 
