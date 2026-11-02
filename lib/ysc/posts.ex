@@ -15,15 +15,15 @@ defmodule Ysc.Posts do
   alias YscWeb.Authorization
 
   # Home / news cards: title, preview/excerpt, reading time, author identity,
-  # cover. Omits `deleted_on`. Author skips hashed_password / bios / Stripe
-  # ids that `preload([{:author, :current_avatar}, :featured_image])` would
-  # SELECT. Keep `raw_body` so cards without `preview_text` still excerpt.
+  # cover. Omits `deleted_on` and `raw_body` (Trix source). Author skips
+  # hashed_password / bios / Stripe ids that
+  # `preload([{:author, :current_avatar}, :featured_image])` would SELECT.
+  # Keep `rendered_body` so cards without `preview_text` still excerpt.
   @public_post_card_fields [
     :id,
     :title,
     :url_name,
     :preview_text,
-    :raw_body,
     :rendered_body,
     :published_on,
     :board_position_at_publish,
@@ -39,7 +39,6 @@ defmodule Ysc.Posts do
     :title,
     :url_name,
     :preview_text,
-    :raw_body,
     :rendered_body,
     :published_on,
     :inserted_at,
@@ -146,14 +145,31 @@ defmodule Ysc.Posts do
   end
 
   @doc """
+  Slim author and featured-image preloads for the public post page.
+
+  Omits `hashed_password`, bios, and unused image columns that a default
+  `Repo.preload([{:author, :current_avatar}, :featured_image])` would SELECT.
+  """
+  def public_page_preloads do
+    [
+      author: public_post_author_query(),
+      featured_image: public_post_image_query()
+    ]
+  end
+
+  @doc """
   Returns a published post by id for public pages, or nil if missing or not published.
 
   Returns `nil` for invalid ULID values instead of raising `Ecto.Query.CastError`.
+
+  Selects `Post.public_page_fields/0` so the post page never TOASTs
+  `raw_body` (Trix source). The page renders `rendered_body`.
   """
   def get_public_post(id, preloads \\ []) do
     case Ecto.ULID.cast(id) do
       {:ok, id} ->
-        from(p in Post, where: p.id == ^id and p.state == :published)
+        id
+        |> public_post_query()
         |> Repo.one()
         |> preload_public_post(preloads)
 
@@ -164,9 +180,12 @@ defmodule Ysc.Posts do
 
   @doc """
   Returns a published post by url_name for public pages, or nil if missing or not published.
+
+  See `get_public_post/2` for the column set.
   """
   def get_public_post_by_url_name(url_name, preloads \\ []) do
-    from(p in Post, where: p.url_name == ^url_name and p.state == :published)
+    url_name
+    |> public_post_by_url_name_query()
     |> Repo.one()
     |> preload_public_post(preloads)
   end
@@ -178,6 +197,8 @@ defmodule Ysc.Posts do
 
   Published posts are visible to everyone. Admins and volunteers may also preview
   draft posts on the public page layout.
+
+  See `get_public_post/2` for the column set.
   """
   def get_post_for_page(id, viewer, preloads \\ []) do
     case get_public_post(id, preloads) do
@@ -208,9 +229,8 @@ defmodule Ysc.Posts do
     if Authorization.can?(viewer, :post_read_unpublished) do
       case Ecto.ULID.cast(id) do
         {:ok, id} ->
-          from(p in Post,
-            where: p.id == ^id and p.state in ^@staff_preview_post_states
-          )
+          id
+          |> staff_preview_post_query()
           |> Repo.one()
           |> preload_public_post(preloads)
 
@@ -222,13 +242,39 @@ defmodule Ysc.Posts do
 
   defp get_staff_preview_post_by_url_name(url_name, viewer, preloads) do
     if Authorization.can?(viewer, :post_read_unpublished) do
-      from(p in Post,
-        where:
-          p.url_name == ^url_name and p.state in ^@staff_preview_post_states
-      )
+      url_name
+      |> staff_preview_post_by_url_name_query()
       |> Repo.one()
       |> preload_public_post(preloads)
     end
+  end
+
+  defp public_post_query(id) do
+    from(p in Post,
+      where: p.id == ^id and p.state == :published,
+      select: struct(p, ^Post.public_page_fields())
+    )
+  end
+
+  defp public_post_by_url_name_query(url_name) do
+    from(p in Post,
+      where: p.url_name == ^url_name and p.state == :published,
+      select: struct(p, ^Post.public_page_fields())
+    )
+  end
+
+  defp staff_preview_post_query(id) do
+    from(p in Post,
+      where: p.id == ^id and p.state in ^@staff_preview_post_states,
+      select: struct(p, ^Post.public_page_fields())
+    )
+  end
+
+  defp staff_preview_post_by_url_name_query(url_name) do
+    from(p in Post,
+      where: p.url_name == ^url_name and p.state in ^@staff_preview_post_states,
+      select: struct(p, ^Post.public_page_fields())
+    )
   end
 
   defp preload_public_post(nil, _preloads), do: nil
@@ -307,8 +353,8 @@ defmodule Ysc.Posts do
   @doc """
   Published posts for Atom feeds: includes featured posts, newest first by publish time.
 
-  Keeps `rendered_body` for entry HTML and `raw_body` for summary fallback.
-  Omits cover images and author columns the feed never renders.
+  Keeps `rendered_body` for entry HTML and summary fallback. Omits `raw_body`
+  (Trix source), cover images, and author columns the feed never renders.
   """
   def list_recent_published_posts_for_feed(limit \\ 50) do
     from(p in Post,
@@ -571,8 +617,7 @@ defmodule Ysc.Posts do
     raw = Map.get(params, "raw_body") || Map.get(params, :raw_body)
 
     if is_binary(raw) do
-      rendered =
-        HtmlSanitizeEx.Scrubber.scrub(raw, HtmlSanitizeEx.Scrubber.BasicHTML)
+      rendered = HtmlSanitizeEx.Scrubber.scrub(raw, Ysc.TrixScrubber)
 
       params
       |> Map.put("rendered_body", rendered)
@@ -838,6 +883,26 @@ defmodule Ysc.Posts do
       ],
       limit: ^limit
     )
+  end
+
+  @doc false
+  def ci_query_explain_public_post_query do
+    public_post_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_public_post_by_url_name_query do
+    public_post_by_url_name_query("ci-post")
+  end
+
+  @doc false
+  def ci_query_explain_staff_preview_post_query do
+    staff_preview_post_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_staff_preview_post_by_url_name_query do
+    staff_preview_post_by_url_name_query("ci-post")
   end
 
   @doc false

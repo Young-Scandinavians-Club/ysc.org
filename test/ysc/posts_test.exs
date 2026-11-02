@@ -53,6 +53,19 @@ defmodule Ysc.PostsTest do
       assert post.rendered_body =~ "Hello"
       refute post.rendered_body =~ "<script"
     end
+
+    test "keeps Trix figure attachments in rendered_body", %{author: author} do
+      attrs = %{
+        "title" => "Trix figure post",
+        "url_name" => "trix-figure-#{System.unique_integer([:positive])}",
+        "raw_body" =>
+          ~s(<figure class="attachment"><img src="https://cdn.example.com/a.png" alt="A"></figure>)
+      }
+
+      assert {:ok, %Post{} = post} = Posts.create_post(attrs, author)
+      assert post.rendered_body =~ "figure"
+      assert post.rendered_body =~ "src=\"https://cdn.example.com/a.png\""
+    end
   end
 
   describe "list_posts_by_ids/2" do
@@ -936,7 +949,32 @@ defmodule Ysc.PostsTest do
       assert is_nil(result.author.hashed_password)
       assert Ecto.assoc_loaded?(result.author.current_avatar)
       assert Ecto.assoc_loaded?(result.featured_image)
+      assert is_nil(result.raw_body)
       assert fat_cols == 0
+    end
+
+    test "omits raw_body from the listing SELECT", %{author: author} do
+      {:ok, _featured} =
+        Posts.create_post(
+          %{
+            "title" => "Featured toast",
+            "raw_body" => "<p>Should not be selected on cards.</p>",
+            "url_name" => "featured-toast-post",
+            "state" => "published",
+            "featured_post" => true,
+            "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+          },
+          author
+        )
+
+      {_result, raw_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Posts.get_featured_post_for_listing() end,
+          pattern: ~r/raw_body/i,
+          caller_pids: [self()]
+        )
+
+      assert raw_cols == 0
     end
   end
 
@@ -971,7 +1009,32 @@ defmodule Ysc.PostsTest do
       assert listed.author.first_name
       assert is_nil(listed.author.hashed_password)
       refute Ecto.assoc_loaded?(listed.featured_image)
+      assert is_nil(listed.raw_body)
       assert fat_cols == 0
+    end
+
+    test "omits raw_body from the feed SELECT", %{author: author} do
+      {:ok, _post} =
+        Posts.create_post(
+          %{
+            "title" => "Feed toast",
+            "preview_text" => "Summary",
+            "raw_body" => "<p>Should not be selected.</p>",
+            "url_name" => "feed-toast-slim",
+            "state" => "published",
+            "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+          },
+          author
+        )
+
+      {_posts, raw_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Posts.list_recent_published_posts_for_feed(10) end,
+          pattern: ~r/raw_body/i,
+          caller_pids: [self()]
+        )
+
+      assert raw_cols == 0
     end
   end
 

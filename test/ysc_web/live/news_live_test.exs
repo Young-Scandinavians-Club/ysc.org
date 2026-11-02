@@ -444,10 +444,15 @@ defmodule YscWeb.NewsLiveTest do
         create_post(%{
           title: "Rendered Body Post",
           raw_body: "<p>short</p>",
-          rendered_body: long_html,
           preview_text: nil,
           featured_post: true
         })
+
+      # Editor changesets derive rendered_body from raw_body. Bypass that so
+      # this case can prove reading time prefers the stored HTML column.
+      post
+      |> Ecto.Changeset.change(%{rendered_body: long_html})
+      |> Repo.update!()
 
       {:ok, view, _html} = live(conn, ~p"/news")
       render_news_async(view)

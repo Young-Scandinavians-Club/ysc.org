@@ -59,18 +59,30 @@ defmodule YscWeb.PlainTextTest do
   end
 
   describe "from_post/1" do
-    test "prefers preview_text over raw_body" do
+    test "prefers preview_text over rendered_body and raw_body" do
       post = %Post{
         preview_text: "<p>Preview</p>",
+        rendered_body: "<p>Rendered</p>",
         raw_body: "<p>Body</p>"
       }
 
       assert PlainText.from_post(post) == "Preview"
     end
 
-    test "falls back to raw_body when preview_text is nil" do
+    test "falls back to rendered_body when preview_text is nil" do
       post = %Post{
         preview_text: nil,
+        rendered_body: "<p>From rendered</p>",
+        raw_body: "<p>From raw</p>"
+      }
+
+      assert PlainText.from_post(post) == "From rendered"
+    end
+
+    test "falls back to raw_body when preview_text and rendered_body are blank" do
+      post = %Post{
+        preview_text: nil,
+        rendered_body: "",
         raw_body: "<p>From body</p>"
       }
 
@@ -78,7 +90,7 @@ defmodule YscWeb.PlainTextTest do
     end
 
     test "returns empty string for whitespace-only preview with no body" do
-      post = %{preview_text: "   \n  ", raw_body: nil}
+      post = %{preview_text: "   \n  ", rendered_body: nil, raw_body: nil}
       assert PlainText.from_post(post) == ""
     end
   end

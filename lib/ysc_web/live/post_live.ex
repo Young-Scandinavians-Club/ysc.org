@@ -107,7 +107,7 @@ defmodule YscWeb.PostLive do
             phx-hook="GLightboxHook"
             phx-update="ignore"
           >
-            {raw(Scrubber.scrub(@post.raw_body || "", Ysc.TrixScrubber))}
+            {raw(post_body(@post))}
           </div>
         </article>
       </div>
@@ -202,7 +202,7 @@ defmodule YscWeb.PostLive do
 
   @impl true
   def mount(%{"id" => id} = _params, _session, socket) do
-    preloads = [{:author, :current_avatar}, :featured_image]
+    preloads = Posts.public_page_preloads()
     viewer = socket.assigns.current_user
 
     # Load post synchronously - essential for SEO (title, content, image).
@@ -367,6 +367,14 @@ defmodule YscWeb.PostLive do
     else
       assign(socket, form: form)
     end
+  end
+
+  # Public page loads omit `raw_body` (Trix source) and keep
+  # `rendered_body`. The fallback is for full `%Post{}` structs such as
+  # fixtures that only set `raw_body`.
+  defp post_body(post) do
+    html = Map.get(post, :rendered_body) || Map.get(post, :raw_body) || ""
+    Scrubber.scrub(html, Ysc.TrixScrubber)
   end
 
   defp post_date(%Post{published_on: nil} = post), do: post.inserted_at

@@ -77,4 +77,60 @@ defmodule YscWeb.PostLiveQueryTest do
       assert query_count == 1
     end
   end
+
+  describe "body TOAST and author secrets" do
+    test "dead render does not SELECT raw_body and still shows rendered body",
+         %{
+           conn: conn
+         } do
+      marker = "toast-#{System.unique_integer([:positive])}"
+      author = user_fixture()
+
+      post =
+        post_fixture(author, %{
+          title: "Public Body Toast Post",
+          raw_body: "<p>raw #{marker}</p>"
+        })
+
+      post
+      |> Ecto.Changeset.change(%{rendered_body: "<p>rendered #{marker}</p>"})
+      |> Repo.update!()
+
+      {html, raw_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/posts/#{post.id}")
+            |> html_response(200)
+          end,
+          pattern: ~r/raw_body/i,
+          caller_pids: [self()]
+        )
+
+      # Before: get_public_post selected posts.* including Trix source.
+      # After: public page fields omit raw_body; the article uses
+      # rendered_body.
+      assert raw_cols == 0
+      assert html =~ "rendered #{marker}"
+      refute html =~ "raw #{marker}"
+    end
+
+    test "dead render does not SELECT author secrets", %{conn: conn} do
+      author = user_fixture()
+      post = post_fixture(author, %{title: "Slim Author Post"})
+
+      {_html, secret_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/posts/#{post.id}")
+            |> html_response(200)
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert secret_cols == 0
+    end
+  end
 end

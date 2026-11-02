@@ -47,15 +47,15 @@ defmodule YscWeb.Feeds.AtomFeedTest do
       refute xml =~ "<br>"
     end
 
-    test "summary falls back to raw_body when preview_text is absent" do
-      marker = "from raw body#{System.unique_integer()}"
+    test "summary falls back to rendered_body when preview_text is absent" do
+      marker = "from rendered body#{System.unique_integer()}"
 
       post = %Post{
         id: Ecto.ULID.generate(),
-        url_name: "raw-body-preview",
-        title: "Raw Body Post",
+        url_name: "rendered-body-preview",
+        title: "Rendered Body Post",
         preview_text: nil,
-        raw_body: "<p>#{marker}</p>",
+        raw_body: nil,
         rendered_body: "<p>#{marker}</p>",
         updated_at: DateTime.utc_now() |> DateTime.truncate(:second),
         published_on: DateTime.utc_now() |> DateTime.truncate(:second)
@@ -113,7 +113,7 @@ defmodule YscWeb.Feeds.AtomFeedTest do
         title: "Empty Preview Post",
         preview_text: "   ",
         raw_body: nil,
-        rendered_body: "<p>Rendered only</p>",
+        rendered_body: "   ",
         updated_at: DateTime.utc_now() |> DateTime.truncate(:second),
         published_on: DateTime.utc_now() |> DateTime.truncate(:second)
       }

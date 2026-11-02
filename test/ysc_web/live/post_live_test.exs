@@ -283,6 +283,22 @@ defmodule YscWeb.PostLiveTest do
       assert html =~ "This is the main content of the article."
     end
 
+    test "keeps Trix figure attachments from rendered_body", %{conn: conn} do
+      post =
+        create_post(%{
+          title: "Inline photo",
+          raw_body:
+            ~s(<p>Lead</p><figure class="attachment"><img src="https://cdn.example.com/a.png" alt="A"></figure>)
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
+      article_html = view |> element("#article-body") |> render()
+
+      assert article_html =~ "Lead"
+      assert article_html =~ "figure"
+      assert article_html =~ "src=\"https://cdn.example.com/a.png\""
+    end
+
     test "sanitizes stored post HTML before rendering (no script or inline handlers)",
          %{
            conn: conn

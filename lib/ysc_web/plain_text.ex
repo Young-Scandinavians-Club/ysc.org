@@ -43,21 +43,28 @@ defmodule YscWeb.PlainText do
   end
 
   @doc """
-  Plain-text preview for a post, preferring `preview_text` over `raw_body`.
-  """
-  def from_post(%Post{preview_text: preview_text, raw_body: raw_body}) do
-    cond do
-      present?(preview_text) -> from_html(preview_text)
-      present?(raw_body) -> from_html(raw_body)
-      true -> ""
-    end
-  end
+  Plain-text preview for a post.
 
-  def from_post(%{preview_text: preview_text, raw_body: raw_body}) do
+  Prefers `preview_text`, then `rendered_body` (public page / cards / feed),
+  then `raw_body` for full structs that still carry Trix source.
+  """
+  def from_post(%Post{} = post), do: from_post_fields(post)
+
+  def from_post(post) when is_map(post), do: from_post_fields(post)
+
+  defp from_post_fields(post) do
     cond do
-      present?(preview_text) -> from_html(preview_text)
-      present?(raw_body) -> from_html(raw_body)
-      true -> ""
+      present?(Map.get(post, :preview_text)) ->
+        from_html(Map.get(post, :preview_text))
+
+      present?(Map.get(post, :rendered_body)) ->
+        from_html(Map.get(post, :rendered_body))
+
+      present?(Map.get(post, :raw_body)) ->
+        from_html(Map.get(post, :raw_body))
+
+      true ->
+        ""
     end
   end
 
