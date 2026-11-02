@@ -139,7 +139,7 @@ defmodule Ysc.Media do
 
     query =
       if search && search != "" do
-        search_pattern = "%#{search}%"
+        search_pattern = "%" <> Ysc.Text.escape_like(search) <> "%"
 
         from i in query,
           where:

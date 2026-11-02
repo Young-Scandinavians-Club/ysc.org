@@ -69,4 +69,18 @@ defmodule Ysc.Text do
 
   def blank_to_nil(nil), do: nil
   def blank_to_nil(value), do: value
+
+  @doc """
+  Escapes `%`, `_` and `\\` so user input matches literally inside a `LIKE` /
+  `ILIKE` pattern.
+
+  Without this a query such as `"%_"` matches every row, which turns a name
+  search into a directory dump.
+
+      iex> Ysc.Text.escape_like("50%_off")
+      "50\\\\%\\\\_off"
+  """
+  def escape_like(term) when is_binary(term) do
+    String.replace(term, ~r/([\\%_])/, "\\\\\\1")
+  end
 end

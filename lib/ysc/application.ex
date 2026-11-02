@@ -90,6 +90,8 @@ defmodule Ysc.Application do
         # FlowRoute webhook routes (token brute-force protection)
         {Ysc.FlowrouteWebhookRateLimit, [clean_period: :timer.minutes(1)]},
         {Ysc.PrintfulWebhookRateLimit, [clean_period: :timer.minutes(1)]},
+        # Public `/up/dbs` health check (runs a Repo query per request)
+        {Ysc.HealthCheckRateLimit, [clean_period: :timer.minutes(1)]},
         # Admin help LLM (guide finder + step clarifier)
         {Ysc.AdminHelpRateLimit, [clean_period: :timer.minutes(1)]},
         # Start Apple Wallet certificate manager

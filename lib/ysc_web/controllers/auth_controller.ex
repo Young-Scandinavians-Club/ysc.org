@@ -36,21 +36,34 @@ defmodule YscWeb.AuthController do
     email = extract_email(auth)
     image_url = extract_image(auth)
 
-    if email do
-      if get_session(conn, :reauth_mode) do
+    cond do
+      is_nil(email) ->
+        conn
+        |> UserAuth.clear_reauth_session()
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "Unable to retrieve email from your account. Please email #{Ysc.EmailConfig.contact_email()} for help.",
+          title: "Authentication"
+        )
+        |> redirect(to: ~p"/users/log-in")
+
+      not provider_email_verified?(auth) ->
+        # An unverified address proves nothing about mailbox ownership, so it
+        # must never be matched to an existing account.
+        conn
+        |> UserAuth.clear_reauth_session()
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "Your #{String.capitalize(to_string(auth.provider))} email address is not verified. Verify it with #{String.capitalize(to_string(auth.provider))} or sign in another way.",
+          title: "Authentication"
+        )
+        |> redirect(to: ~p"/users/log-in")
+
+      get_session(conn, :reauth_mode) ->
         handle_oauth_reauth(conn, email)
-      else
+
+      true ->
         handle_oauth_success(conn, email, auth.provider, image_url)
-      end
-    else
-      conn
-      |> UserAuth.clear_reauth_session()
-      |> YscWeb.Flash.put_toast(
-        :error,
-        "Unable to retrieve email from your account. Please email #{Ysc.EmailConfig.contact_email()} for help.",
-        title: "Authentication"
-      )
-      |> redirect(to: ~p"/users/log-in")
     end
   end
 
@@ -67,6 +80,24 @@ defmodule YscWeb.AuthController do
   end
 
   # Private helper functions
+
+  # Google's userinfo payload carries `email_verified` (v3) / `verified_email`
+  # (v2); an address Google has not verified (for example an unconfirmed
+  # external address on a Google account) must not log anyone in. Facebook only
+  # releases confirmed email addresses. Auth structs with no raw Google payload
+  # (never produced by the real strategy) are not rejected.
+  defp provider_email_verified?(%Ueberauth.Auth{
+         provider: :google,
+         extra: %{raw_info: %{user: %{} = user}}
+       }) do
+    truthy?(user["email_verified"]) or truthy?(user["verified_email"])
+  end
+
+  defp provider_email_verified?(_auth), do: true
+
+  defp truthy?(true), do: true
+  defp truthy?("true"), do: true
+  defp truthy?(_), do: false
 
   defp handle_oauth_reauth(conn, oauth_email) do
     return_to = get_session(conn, :reauth_return_to) || "/"

@@ -11,6 +11,24 @@
 # - Default pricing rules for all booking modes
 # - Default refund policies and rules
 
+# Fail the whole seed (and so the Fly release_command / deploy) when the admin
+# password is missing. There is deliberately no fallback value: this repo is
+# public, so any default would be a known password for a full admin account.
+admin_password =
+  case System.get_env("ADMIN_PASSWORD") do
+    nil ->
+      raise "ADMIN_PASSWORD is not set. Set it with `fly secrets set ADMIN_PASSWORD=...` before seeding."
+
+    value ->
+      value = String.trim(value)
+
+      if byte_size(value) < 16 or value == "change_me_in_production" do
+        raise "ADMIN_PASSWORD must be at least 16 characters and must not be the old placeholder."
+      end
+
+      value
+  end
+
 alias Ysc.Repo
 alias Ysc.Accounts.User
 alias Ysc.Settings
@@ -53,8 +71,7 @@ admin_user =
       admin_changeset =
         User.registration_changeset(%User{}, %{
           email: "admin@ysc.org",
-          password:
-            System.get_env("ADMIN_PASSWORD") || "change_me_in_production",
+          password: admin_password,
           first_name: "Admin",
           last_name: "User",
           phone_number: "+14159009009",
@@ -942,8 +959,4 @@ IO.puts("   - Pricing rules: Tahoe and Clear Lake")
 
 IO.puts(
   "   - Refund policies: Tahoe (buyout, room) and Clear Lake (buyout, day)"
-)
-
-IO.puts(
-  "\n⚠️  Note: Make sure to set ADMIN_PASSWORD environment variable in production!"
 )

@@ -363,7 +363,7 @@ mix run priv/repo/seeds_prod.exs
 ```
 
 **Production seeds create**:
-- Admin user with environment-based password
+- Admin user with the password from `ADMIN_PASSWORD` (required, at least 16 chars; the seed raises and the deploy fails if it is unset)
 - Essential site settings
 - No test data
 

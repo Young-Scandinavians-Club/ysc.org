@@ -108,13 +108,62 @@ defmodule YscWeb.Plugs.MetricsAuthTest do
     end
 
     test "allows Fly internal IPv6 (fdaa::/16)" do
-      # fdaa:0:0:0:0:0:0:0:1
       conn =
         conn(:get, "/metrics")
-        |> Map.put(:remote_ip, {0xFDA0, 0, 0, 0, 0, 0, 0, 1})
+        |> Map.put(:remote_ip, {0xFDAA, 0x0DB8, 0, 1, 0, 0, 0, 1})
         |> MetricsAuth.call([])
 
       refute conn.halted
+    end
+
+    test "allows the whole fc00::/7 unique-local range and fe80::/10 link-local" do
+      for ip <- [
+            {0xFC00, 0, 0, 0, 0, 0, 0, 1},
+            {0xFDFF, 1, 2, 3, 4, 5, 6, 7},
+            {0xFE80, 0, 0, 0, 0, 0, 0, 1},
+            {0xFEBF, 0, 0, 0, 0, 0, 0, 1}
+          ] do
+        conn =
+          conn(:get, "/metrics")
+          |> Map.put(:remote_ip, ip)
+          |> MetricsAuth.call([])
+
+        refute conn.halted, "expected #{inspect(ip)} to be allowed"
+      end
+    end
+
+    test "returns 404 for public IPv6 and addresses just outside the private ranges" do
+      for ip <- [
+            {0x2001, 0x0DB8, 0, 0, 0, 0, 0, 1},
+            {0xFB00, 0, 0, 0, 0, 0, 0, 1},
+            {0xFE00, 0, 0, 0, 0, 0, 0, 1},
+            {0xFEC0, 0, 0, 0, 0, 0, 0, 1},
+            {0, 0, 0, 0, 0, 0, 0, 2}
+          ] do
+        conn =
+          conn(:get, "/metrics")
+          |> Map.put(:remote_ip, ip)
+          |> MetricsAuth.call([])
+
+        assert conn.halted, "expected #{inspect(ip)} to be blocked"
+        assert conn.status == 404
+      end
+    end
+
+    test "judges IPv4-mapped IPv6 by the embedded IPv4 address" do
+      private =
+        conn(:get, "/metrics")
+        |> Map.put(:remote_ip, {0, 0, 0, 0, 0, 0xFFFF, 0x0A01, 0x0203})
+        |> MetricsAuth.call([])
+
+      refute private.halted
+
+      public =
+        conn(:get, "/metrics")
+        |> Map.put(:remote_ip, {0, 0, 0, 0, 0, 0xFFFF, 0x0808, 0x0808})
+        |> MetricsAuth.call([])
+
+      assert public.halted
     end
 
     test "returns 404 and halts for public IPv4" do

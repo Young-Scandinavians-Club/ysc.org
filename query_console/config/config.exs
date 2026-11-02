@@ -28,6 +28,10 @@ config :query_console,
 # from the driver and load/dump themselves.
 config :query_console, QueryConsole.AnalyticsRepo, types: QueryConsole.PostgrexTypes
 
+# Console sessions expire after this many seconds and must pass through YSC SSO
+# again, which re-checks the user's role and state there.
+config :query_console, session_ttl_seconds: 4 * 60 * 60
+
 # Configures the endpoint
 config :query_console, QueryConsoleWeb.Endpoint,
   url: [host: "localhost"],
@@ -48,6 +52,18 @@ config :lotus,
   },
   unique_names: false,
   read_only: true,
+  # Credential-bearing tables and columns are never queryable, even by admins:
+  # a leaked or misused console session must not yield reusable secrets.
+  table_visibility: %{
+    default: [
+      deny: ["users_tokens", "verification_codes", "oauth_auth_codes", "user_passkeys"]
+    ]
+  },
+  column_visibility: %{
+    default: [
+      {"hashed_password", :omit}
+    ]
+  },
   cache: %{
     adapter: Lotus.Cache.ETS,
     profiles: %{

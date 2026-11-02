@@ -49,4 +49,14 @@ defmodule Ysc.TextTest do
       assert Text.blank_to_nil(%{a: 1}) == %{a: 1}
     end
   end
+
+  describe "escape_like/1" do
+    test "escapes LIKE wildcards and the escape character" do
+      assert Ysc.Text.escape_like("50%_off\\") == "50\\%\\_off\\\\"
+    end
+
+    test "leaves ordinary text untouched" do
+      assert Ysc.Text.escape_like("Jane O'Neil") == "Jane O'Neil"
+    end
+  end
 end

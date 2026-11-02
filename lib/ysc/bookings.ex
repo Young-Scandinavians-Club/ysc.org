@@ -865,7 +865,7 @@ defmodule Ysc.Bookings do
   end
 
   defp fuzzy_search_booking(search_term) do
-    search_like = "%#{search_term}%"
+    search_like = "%" <> Ysc.Text.escape_like(search_term) <> "%"
 
     from(b in Booking,
       left_join: u in assoc(b, :user),

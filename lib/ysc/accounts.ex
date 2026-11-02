@@ -532,7 +532,7 @@ defmodule Ysc.Accounts do
   def search_users_query(query, opts \\ []) when is_binary(query) do
     limit = Keyword.get(opts, :limit, 10)
     state = Keyword.get(opts, :state, :active)
-    search_term = "%#{query}%"
+    search_term = "%" <> Ysc.Text.escape_like(query) <> "%"
 
     from(u in User,
       where: u.state == ^state,
@@ -1677,7 +1677,7 @@ defmodule Ysc.Accounts do
   defp build_single_word_search(term, rank?) do
     lower_term = String.downcase(term)
     prefix_like = "#{lower_term}%"
-    contains_like = "%#{term}%"
+    contains_like = "%" <> Ysc.Text.escape_like(term) <> "%"
 
     query =
       from(u in User,
@@ -1732,7 +1732,7 @@ defmodule Ysc.Accounts do
     lower_w1 = String.downcase(w1)
     lower_w2 = String.downcase(w2)
     lower_term = String.downcase(term)
-    contains_like = "%#{term}%"
+    contains_like = "%" <> Ysc.Text.escape_like(term) <> "%"
     prefix_w1 = "#{lower_w1}%"
     prefix_w2 = "#{lower_w2}%"
 

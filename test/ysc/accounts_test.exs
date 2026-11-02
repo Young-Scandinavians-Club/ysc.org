@@ -1116,6 +1116,20 @@ defmodule Ysc.AccountsTest do
       results = Accounts.search_users("John", limit: 10)
       assert length(results) <= 10
     end
+
+    test "treats LIKE wildcards in the query literally" do
+      user =
+        user_fixture(%{
+          first_name: "Wild",
+          last_name: "Card",
+          phone_number: "+14159098268"
+        })
+
+      assert Accounts.search_users("%%") == []
+      assert Accounts.search_users("W_ld") == []
+      refute Enum.any?(Accounts.search_users("%d"), &(&1.id == user.id))
+      assert Enum.any?(Accounts.search_users("Wild"), &(&1.id == user.id))
+    end
   end
 
   describe "list_event_notification_recipients/0" do

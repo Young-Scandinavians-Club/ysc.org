@@ -318,6 +318,39 @@ defmodule Ysc.AgendasTest do
       updated = Agendas.get_agenda_item!(item1.id)
       assert updated.position == 1
     end
+
+    test "refuses to reposition an item from another event", %{event: event} do
+      {:ok, foreign_event} =
+        Events.create_event(%{
+          title: "Foreign Item Position #{System.unique_integer([:positive])}",
+          state: "draft",
+          organizer_id: event.organizer_id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              40,
+              :day
+            )
+        })
+
+      {:ok, foreign_agenda} =
+        Agendas.create_agenda(foreign_event, %{title: "Foreign Day"})
+
+      {:ok, first} =
+        Agendas.create_agenda_item(foreign_event.id, foreign_agenda, %{
+          title: "First"
+        })
+
+      {:ok, _second} =
+        Agendas.create_agenda_item(foreign_event.id, foreign_agenda, %{
+          title: "Second"
+        })
+
+      assert {:error, :wrong_event} =
+               Agendas.update_agenda_item_position(event.id, first, 1)
+
+      assert Agendas.get_agenda_item!(first.id).position == first.position
+    end
   end
 
   describe "move_agenda_item_to_agenda/4" do
