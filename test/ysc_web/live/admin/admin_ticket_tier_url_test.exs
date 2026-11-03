@@ -273,6 +273,97 @@ defmodule YscWeb.AdminTicketTierUrlTest do
     end
   end
 
+  describe "unsaved-changes tracking" do
+    test "the modal's cancel command asks the form and leaves closing to the server",
+         %{conn: conn, event: event, tier: tier} do
+      {:ok, view, _html} = live(conn, "#{tickets_path(event)}?tier=#{tier.id}")
+
+      [cancel] =
+        view
+        |> element("#edit-ticket-tier-modal")
+        |> render()
+        |> LazyHTML.from_fragment()
+        |> LazyHTML.attribute("data-cancel")
+
+      # Pushes request-close to the form...
+      assert cancel =~ "request-close"
+      assert cancel =~ "#tier-form-#{event.id}"
+
+      # ...and does not also hide the modal, which would bury the discard prompt.
+      refute cancel =~ "phx-remove"
+    end
+
+    test "picking a sale date counts as an edit", %{
+      conn: conn,
+      event: event,
+      tier: tier
+    } do
+      {:ok, view, _html} = live(conn, "#{tickets_path(event)}?tier=#{tier.id}")
+      refute has_element?(view, "#tier-form-unsaved")
+
+      # What the date picker sends the LiveView when a date is committed.
+      send(
+        view.pid,
+        {:updated_event,
+         %{
+           id: "sales_start",
+           start_date: Date.utc_today(),
+           end_date: nil,
+           form: nil
+         }}
+      )
+
+      render(view)
+      assert has_element?(view, "#tier-form-unsaved")
+      assert has_element?(view, ~s(#tier-form-#{event.id}[data-dirty="true"]))
+    end
+
+    test "other date pickers don't touch the form", %{
+      conn: conn,
+      event: event,
+      tier: tier
+    } do
+      {:ok, view, _html} = live(conn, "#{tickets_path(event)}?tier=#{tier.id}")
+
+      send(
+        view.pid,
+        {:updated_event,
+         %{id: "event_date", start_date: nil, end_date: nil, form: nil}}
+      )
+
+      render(view)
+      refute has_element?(view, "#tier-form-unsaved")
+    end
+
+    test "copying questions that are all already present isn't an edit", %{
+      conn: conn,
+      event: event
+    } do
+      questions = [%{"label" => "Dietary restrictions", "type" => "text"}]
+
+      source =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Adults",
+          attendee_questions: questions
+        })
+
+      target =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Kids",
+          attendee_questions: questions
+        })
+
+      {:ok, view, _html} =
+        live(conn, "#{tickets_path(event)}?tier=#{target.id}")
+
+      view |> element("#copy-questions-#{source.id}") |> render_click()
+
+      refute has_element?(view, "#tier-form-unsaved")
+    end
+  end
+
   # The URL must not change while the discard prompt is up.
   defp assert_patched_stays(view, tier, event) do
     refute_patched(view, tickets_path(event))

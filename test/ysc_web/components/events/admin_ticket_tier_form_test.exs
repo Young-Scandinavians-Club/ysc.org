@@ -440,6 +440,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierFormTest do
 
       paid = render_form(%{event_id: tier.event_id, ticket_tier: tier})
       assert Enum.count(LazyHTML.query(paid, "#ticket_tier_price")) == 1
+
+      # ...inside the two-column grid it shares with the name.
+      assert paid
+             |> LazyHTML.query(
+               ~s(div[class*="grid-cols-[minmax"] #ticket_tier_price)
+             )
+             |> Enum.count() == 1
     end
 
     test "editing labels the submit button 'Save changes' and keeps actions sticky" do

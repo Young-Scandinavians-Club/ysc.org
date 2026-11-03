@@ -41,6 +41,11 @@ defmodule YscWeb.CoreComponents do
         This is another modal.
       </.modal>
 
+  By default a cancel (X, Escape, backdrop click) also hides the modal on the
+  client straight after `:on_cancel` runs. Set `server_close` when the server
+  must decide: cancel then only runs `:on_cancel`, and the modal stays until the
+  server removes it, so it can decline (e.g. to ask before discarding edits).
+
   """
   attr :id, :string, required: true
   attr :show, :boolean, default: false
@@ -48,6 +53,7 @@ defmodule YscWeb.CoreComponents do
   attr :fill_viewport, :boolean, default: false
   attr :max_width, :string, default: "max-w-3xl"
   attr :on_cancel, JS, default: %JS{}
+  attr :server_close, :boolean, default: false
   attr :z_index, :string, default: "z-200"
   attr :panel_class, :any, default: nil
 
@@ -67,7 +73,9 @@ defmodule YscWeb.CoreComponents do
       phx-hook="ModalSheet"
       phx-mounted={@show && show_modal(@id)}
       phx-remove={hide_modal(@id)}
-      data-cancel={JS.exec(@on_cancel, "phx-remove")}
+      data-cancel={
+        if @server_close, do: @on_cancel, else: JS.exec(@on_cancel, "phx-remove")
+      }
       class={"relative #{@z_index} hidden"}
     >
       <%!-- No aria-hidden on backdrop: dialog has aria-modal="true"; avoids blocking focus/hidden violation --%>

@@ -200,7 +200,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
           <.switch
             field={@form[:member_only]}
             label="Member-only tier"
-            description="Single members get 1 ticket per event (across all member-only tiers). Family and Lifetime members have no limit. Everyone else can't buy this tier."
+            description="Single members get 1 ticket per event (across all member-only tiers). Family and Lifetime members have no member-only limit, but the limit per member below still applies to them. Everyone else can't buy this tier."
           />
 
           <div class="w-full sm:w-56">
@@ -643,6 +643,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
   end
 
   @impl true
+  def update(%{mark_dirty: true}, socket), do: {:ok, mark_dirty(socket)}
+
   def update(assigns, socket) do
     # Only create a new changeset if we don't already have one in the socket
     changeset =
@@ -758,7 +760,11 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
           |> Enum.reject(&MapSet.member?(existing_labels, &1.label))
           |> Enum.map(&%{&1 | id: AttendeeQuestion.generate_id()})
 
-        {:noreply, append_questions(socket, copies)}
+        # Everything on that tier is already here: nothing changed, so don't
+        # raise the unsaved-changes prompt.
+        if copies == [],
+          do: {:noreply, socket},
+          else: {:noreply, append_questions(socket, copies)}
     end
   end
 

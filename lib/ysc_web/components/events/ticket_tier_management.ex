@@ -454,6 +454,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         id="add-ticket-tier-modal"
         show
         on_cancel={request_close_form(@event_id)}
+        server_close
       >
         <.live_component
           id={"ticket-tier-form-#{@event_id}"}
@@ -470,6 +471,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         id="edit-ticket-tier-modal"
         show
         on_cancel={request_close_form(@event_id)}
+        server_close
       >
         <.live_component
           :if={@editing_ticket_tier}

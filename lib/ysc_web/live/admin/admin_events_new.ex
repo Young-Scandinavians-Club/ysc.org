@@ -24,6 +24,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias Ysc.Events.Agenda
   alias Ysc.Agendas
   alias YscWeb.AdminEventsLive.CancellationRefundModal
+  alias YscWeb.AdminEventsLive.TicketTierForm
   alias YscWeb.AdminEventsLive.TicketTierManagement
   alias YscWeb.Components.Events.CommunicationTimeline
   alias YscWeb.Emails.EventUpdateNotification
@@ -2102,7 +2103,11 @@ defmodule YscWeb.AdminEventsNewLive do
               {:error, "You do not have permission to edit ticket tiers."}
 
             true ->
-              {:ok, Events.get_ticket_tier!(id)}
+              # The tier can be deleted between the list query and this load.
+              case Events.get_ticket_tier(id) do
+                nil -> {:error, "That ticket tier doesn't exist on this event."}
+                tier -> {:ok, tier}
+              end
           end
       end
 
@@ -2123,6 +2128,19 @@ defmodule YscWeb.AdminEventsNewLive do
           replace: true
         )
     end
+  end
+
+  defp mark_tier_form_dirty(socket) do
+    form_id =
+      case socket.assigns[:tier_modal] do
+        :new -> "ticket-tier-form-#{socket.assigns.event.id}"
+        %{id: tier_id} -> "edit-ticket-tier-form-#{tier_id}"
+        _ -> nil
+      end
+
+    if form_id, do: send_update(TicketTierForm, id: form_id, mark_dirty: true)
+
+    socket
   end
 
   # Compatibility for clients that loaded the former EmailPreview handshake.
@@ -3224,8 +3242,16 @@ defmodule YscWeb.AdminEventsNewLive do
     {:noreply, socket}
   end
 
-  # Ticket-tier sale date pickers (and any other date pickers) send the same
-  # message shape; ignore them here so they do not overwrite event dates.
+  # A sale date picked in the ticket tier form changes only the picker's own
+  # assigns and a hidden input, so no phx-change fires; tell the form it has
+  # unsaved edits so closing or reloading asks first.
+  def handle_info({:updated_event, %{id: id}}, socket)
+      when id in ["sales_start", "sale_ends"] do
+    {:noreply, mark_tier_form_dirty(socket)}
+  end
+
+  # Any other date picker sends the same message shape; ignore it here so it
+  # does not overwrite event dates.
   def handle_info({:updated_event, _data}, socket), do: {:noreply, socket}
 
   @impl true
