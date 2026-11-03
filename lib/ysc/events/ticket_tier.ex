@@ -35,6 +35,10 @@ defmodule Ysc.Events.TicketTier do
     # See `Ysc.Events.MemberOnlyTickets` for the per-plan rules.
     field :member_only, :boolean, default: false
 
+    # Max tickets of this tier one buyer may hold per event (nil = no limit).
+    # See `Ysc.Events.TierPurchaseLimits`.
+    field :max_per_buyer, :integer
+
     # Sale window: real UTC instants picked in the admin UI as Pacific days
     field :start_date, Ysc.Ecto.DateKind, kind: :pacific_anchored_datetime
     field :end_date, Ysc.Ecto.DateKind, kind: :pacific_anchored_datetime
@@ -67,6 +71,7 @@ defmodule Ysc.Events.TicketTier do
       :price,
       :requires_registration,
       :member_only,
+      :max_per_buyer,
       :start_date,
       :end_date,
       :event_id,
@@ -87,6 +92,8 @@ defmodule Ysc.Events.TicketTier do
     |> enforce_free_price()
     |> validate_required_price()
     |> validate_quantity()
+    |> validate_number(:max_per_buyer, greater_than: 0)
+    |> check_constraint(:max_per_buyer, name: :max_per_buyer_positive)
     |> validate_datetime_order()
     |> validate_money(:price)
     |> optimistic_lock(:lock_version)

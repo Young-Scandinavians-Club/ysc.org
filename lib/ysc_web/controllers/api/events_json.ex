@@ -61,6 +61,7 @@ defmodule YscWeb.Api.EventsJSON do
         available:
           t.quantity && t.quantity - Map.get(t, :sold_tickets_count, 0),
         requires_registration: t.requires_registration,
+        max_per_buyer: Map.get(t, :max_per_buyer),
         start_date: t.start_date && DateTime.to_iso8601(t.start_date),
         end_date: t.end_date && DateTime.to_iso8601(t.end_date)
       }

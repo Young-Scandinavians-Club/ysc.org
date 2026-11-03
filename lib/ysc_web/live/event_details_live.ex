@@ -17,6 +17,7 @@ defmodule YscWeb.EventDetailsLive do
     DateTimeFormatter,
     EventPricingCache,
     MemberOnlyTickets,
+    TierPurchaseLimits,
     PricingDisplay,
     TicketTierHelpers
   }
@@ -1775,6 +1776,11 @@ defmodule YscWeb.EventDetailsLive do
                               @ticket_tiers,
                               @member_only_ticket_limit,
                               @member_only_tickets_owned
+                            ) &&
+                            tier_limit_can_add?(
+                              ticket_tier,
+                              @selected_tickets,
+                              @user_tickets
                             ) %>
                         <button
                           type="button"
@@ -1858,6 +1864,25 @@ defmodule YscWeb.EventDetailsLive do
                         class="w-4 h-4 inline me-1"
                       />
                       {member_only_blocked_msg}
+                    </p>
+                  </div>
+
+                  <% tier_limit_note =
+                    tier_limit_note(ticket_tier, @selected_tickets, @user_tickets) %>
+                  <div
+                    :if={!is_donation && tier_limit_note}
+                    id={"tier-limit-#{ticket_tier.id}"}
+                    class="mt-2"
+                  >
+                    <p class={[
+                      "text-sm px-3 py-2 rounded-md border",
+                      if(elem(tier_limit_note, 0) == :reached,
+                        do: "text-amber-700 bg-amber-50 border-amber-200",
+                        else: "text-zinc-600 bg-zinc-50 border-zinc-200"
+                      )
+                    ]}>
+                      <.icon name="hero-hashtag" class="w-4 h-4 inline me-1" />
+                      {elem(tier_limit_note, 1)}
                     </p>
                   </div>
 
@@ -3111,6 +3136,49 @@ defmodule YscWeb.EventDetailsLive do
       limit,
       owned
     )
+  end
+
+  # Tickets of `tier_id` the viewer already holds (confirmed) for this event.
+  defp tier_tickets_owned(user_tickets, tier_id) when is_list(user_tickets) do
+    Enum.count(user_tickets, &(&1.ticket_tier_id == tier_id))
+  end
+
+  defp tier_tickets_owned(_, _), do: 0
+
+  # Whether the viewer may add one more ticket under the tier's `max_per_buyer`.
+  defp tier_limit_can_add?(tier, selected_tickets, user_tickets) do
+    TierPurchaseLimits.can_add?(
+      tier,
+      selected_tickets,
+      tier_tickets_owned(user_tickets, tier.id)
+    )
+  end
+
+  # `{:reached | :info, text}` describing the tier's per-buyer limit, or nil
+  # when the tier has none.
+  defp tier_limit_note(tier, selected_tickets, user_tickets) do
+    case TierPurchaseLimits.limit(tier) do
+      nil ->
+        nil
+
+      limit ->
+        owned = tier_tickets_owned(user_tickets, tier.id)
+        noun = if limit == 1, do: "ticket", else: "tickets"
+
+        cond do
+          not TierPurchaseLimits.can_add?(tier, selected_tickets, owned) ->
+            {:reached,
+             "You've reached the limit of #{limit} #{noun} per member for this ticket type."}
+
+          owned > 0 ->
+            {:info,
+             "Limit of #{limit} #{noun} per member for this ticket type. You already have #{owned}."}
+
+          true ->
+            {:info,
+             "Limit of #{limit} #{noun} per member for this ticket type."}
+        end
+    end
   end
 
   # Explains why a member-only tier is blocked, or nil when it isn't blocked.
@@ -6029,6 +6097,11 @@ defmodule YscWeb.EventDetailsLive do
              socket.assigns.ticket_tiers,
              socket.assigns.member_only_ticket_limit,
              socket.assigns.member_only_tickets_owned
+           ) &&
+           tier_limit_can_add?(
+             ticket_tier,
+             socket.assigns.selected_tickets,
+             socket.assigns.user_tickets
            ) do
         new_quantity = current_quantity + 1
 
@@ -6138,6 +6211,16 @@ defmodule YscWeb.EventDetailsLive do
            :error,
            "Your membership includes one members-only ticket per event. Please reduce your members-only selection and try again.",
            title: "Members-only tickets"
+         )
+         |> assign(:show_ticket_modal, false)}
+
+      {:error, :tier_purchase_limit_exceeded} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "One or more of the ticket types you picked has a per-member limit that your selection exceeds. Please reduce your selection and try again.",
+           title: "Ticket limit"
          )
          |> assign(:show_ticket_modal, false)}
 

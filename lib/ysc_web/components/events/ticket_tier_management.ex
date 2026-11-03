@@ -105,6 +105,14 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     >
                       <.icon name="hero-lock-closed" class="w-3 h-3" /> Member only
                     </.badge>
+                    <.badge
+                      :if={ticket_tier.max_per_buyer && !is_donation}
+                      type="yellow"
+                      class="inline-flex items-center gap-1 text-xs font-bold! rounded-full! px-2 py-0.5 me-0 type-eyebrow"
+                    >
+                      <.icon name="hero-hashtag" class="w-3 h-3" />
+                      Limit {ticket_tier.max_per_buyer} per member
+                    </.badge>
                   </div>
                   <p
                     :if={ticket_tier.description}
