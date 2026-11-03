@@ -148,6 +148,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
               form={@form}
               start_date_field={@form[:start_date]}
               min={Date.utc_today()}
+              max={@event_start_date}
               required={false}
               timezone="America/Los_Angeles"
             />
@@ -157,6 +158,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
               form={@form}
               start_date_field={@form[:end_date]}
               min={sale_end_min_date(@form[:start_date].value)}
+              max={@event_start_date}
               required={false}
               timezone="America/Los_Angeles"
               end_of_day?={true}
@@ -634,6 +636,9 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
      |> assign_new(:dialog_id, fn -> nil end)
      |> assign_new(:admin_role, fn -> nil end)
      |> assign_copyable_tiers()
+     |> assign_new(:event_start_date, fn ->
+       event_start_date(socket.assigns[:event_id] || assigns[:event_id])
+     end)
      |> assign_new(:retained_price, fn ->
        case assigns[:ticket_tier] do
          %{type: type, price: price} ->
@@ -924,6 +929,16 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
   defp format_money(%Money{} = value) do
     case Ysc.MoneyHelper.format_money(value) do
       {:ok, money} -> money
+      _ -> nil
+    end
+  end
+
+  # Sales close when the event starts, so the event's start day is the latest
+  # selectable sale date. nil (no cap) when the event has no start date yet.
+  defp event_start_date(event_id) do
+    case Ysc.Events.get_event(event_id) do
+      %{start_date: %DateTime{} = start_date} -> DateTime.to_date(start_date)
+      %{start_date: %Date{} = start_date} -> start_date
       _ -> nil
     end
   end

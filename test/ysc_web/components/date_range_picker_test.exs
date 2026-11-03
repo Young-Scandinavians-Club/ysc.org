@@ -258,6 +258,64 @@ defmodule YscWeb.Components.DateRangePickerTest do
     end
   end
 
+  describe "single-date picker for ticket sale dates (allow_saturdays: true)" do
+    @sale_saturday ~D[2026-08-15]
+    @event_start ~D[2026-08-22]
+
+    defp sale_assigns(overrides \\ %{}) do
+      base_assigns(%{
+        id: "sale_ends",
+        is_range?: false,
+        form: %{},
+        timezone: "America/Los_Angeles",
+        allow_saturdays: true,
+        max: @event_start
+      })
+      |> Map.merge(overrides)
+    end
+
+    test "allows picking a Saturday as the sale date" do
+      socket = init_socket(sale_assigns())
+
+      {:noreply, socket} =
+        DateRangePicker.handle_event("open-calendar", %{}, socket)
+
+      {:noreply, socket} =
+        DateRangePicker.handle_event(
+          "pick-date",
+          %{"date" => iso_date(@sale_saturday)},
+          socket
+        )
+
+      assert DateTime.to_date(socket.assigns.range_start) == @sale_saturday
+    end
+
+    test "allows the event start day as the last sale date but nothing after" do
+      socket = init_socket(sale_assigns())
+
+      {:noreply, socket} =
+        DateRangePicker.handle_event("open-calendar", %{}, socket)
+
+      {:noreply, after_start} =
+        DateRangePicker.handle_event(
+          "pick-date",
+          %{"date" => iso_date(Date.add(@event_start, 1))},
+          socket
+        )
+
+      assert after_start.assigns.range_start == nil
+
+      {:noreply, on_start} =
+        DateRangePicker.handle_event(
+          "pick-date",
+          %{"date" => iso_date(@event_start)},
+          socket
+        )
+
+      assert DateTime.to_date(on_start.assigns.range_start) == @event_start
+    end
+  end
+
   describe "Tahoe weekend rule (allow_saturdays: false)" do
     @friday ~D[2026-08-07]
     @saturday ~D[2026-08-08]
