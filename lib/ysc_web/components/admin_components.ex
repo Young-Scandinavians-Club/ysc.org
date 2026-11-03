@@ -40,8 +40,15 @@ defmodule YscWeb.AdminComponents do
   attr(:required, :boolean, default: false)
   attr(:readonly, :boolean, default: false)
   attr(:min, :any, default: @min_date, doc: "the earliest date that can be set")
+  attr(:max, :any, default: nil, doc: "the latest date that can be set")
   attr(:errors, :list, default: [])
   attr(:form, :any)
+
+  attr(:allow_saturdays, :boolean,
+    default: true,
+    doc:
+      "Saturday restrictions are a Tahoe booking rule; standalone date fields (e.g. ticket sale dates) allow every day"
+  )
 
   attr(:timezone, :string,
     default: "Etc/UTC",
@@ -67,6 +74,8 @@ defmodule YscWeb.AdminComponents do
       readonly={@readonly}
       is_range?={false}
       min={@min}
+      max={@max}
+      allow_saturdays={@allow_saturdays}
       timezone={@timezone}
       end_of_day?={@end_of_day?}
     />
