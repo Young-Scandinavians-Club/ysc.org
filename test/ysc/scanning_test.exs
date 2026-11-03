@@ -1845,6 +1845,21 @@ defmodule Ysc.ScanningTest do
       assert results == []
     end
 
+    test "treats LIKE wildcards in the query literally", %{
+      event: event,
+      buyer: buyer
+    } do
+      # Without escape_like/1, "%" dumps every confirmed attendee at the door.
+      assert Scanning.list_event_checkin_tickets(event.id, "%") == []
+      assert Scanning.list_event_checkin_tickets(event.id, "_") == []
+      assert Scanning.list_event_checkin_tickets(event.id, "%%") == []
+
+      assert length(
+               Scanning.list_event_checkin_tickets(event.id, buyer.first_name)
+             ) ==
+               1
+    end
+
     test "sorts pending tickets before checked-in tickets", %{
       event: event,
       order: order
@@ -2592,6 +2607,36 @@ defmodule Ysc.ScanningTest do
                session.id,
                "NoSuchPersonXYZ#{unique}"
              ) == []
+    end
+
+    test "treats LIKE wildcards in the query literally", %{session: session} do
+      unique = System.unique_integer([:positive])
+
+      user =
+        user_fixture(%{
+          first_name: "Wildtarget#{unique}",
+          last_name: "Member"
+        })
+
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      assert Scanning.search_users_for_checkin(session.id, "%") == []
+      assert Scanning.search_users_for_checkin(session.id, "_") == []
+      assert Scanning.search_users_for_checkin(session.id, "%%") == []
+
+      assert [%{user: found}] =
+               Scanning.search_users_for_checkin(
+                 session.id,
+                 "Wildtarget#{unique}"
+               )
+
+      assert found.id == user.id
     end
   end
 

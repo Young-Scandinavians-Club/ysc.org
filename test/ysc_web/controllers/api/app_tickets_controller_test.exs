@@ -970,6 +970,69 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
       assert length(warnings) == 2
     end
 
+    # Finding 99: offline grants skip capacity and confirm immediately, so
+    # parse_ticket_selections/1 is the only quantity cap. Over-cap would mint
+    # confirmed tickets rather than pending holds.
+    test "rejects a per-tier quantity above the door-sale cap", %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => Tickets.max_door_sale_quantity_per_tier() + 1}
+        })
+
+      assert %{
+               "error" =>
+                 "each ticket quantity must be between 1 and 25, and the order cannot exceed 50 tickets"
+             } = json_response(response, 422)
+
+      assert Ysc.Tickets.list_user_ticket_orders(member.id) == []
+      assert Ysc.Events.list_tickets_for_user(member.id) == []
+    end
+
+    test "rejects a combined quantity above the door-sale order cap", %{
+      conn: conn
+    } do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      general =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "General Finding 99 offline"
+        })
+
+      vip =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "VIP Finding 99 offline"
+        })
+
+      student =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Student Finding 99 offline"
+        })
+
+      # 20 + 20 + 20 = 60, each under the per-tier cap of 25.
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{general.id => 20, vip.id => 20, student.id => 20}
+        })
+
+      assert %{
+               "error" =>
+                 "each ticket quantity must be between 1 and 25, and the order cannot exceed 50 tickets"
+             } = json_response(response, 422)
+
+      assert Ysc.Tickets.list_user_ticket_orders(member.id) == []
+      assert Ysc.Events.list_tickets_for_user(member.id) == []
+    end
+
     test "rejects a volunteer, including a self-grant", %{conn: conn} do
       volunteer = user_fixture(%{role: :volunteer})
       event = event_fixture()
