@@ -38,11 +38,19 @@ const ProductLightbox = {
             if (e.pointerType === "mouse" || !e.isPrimary) return;
             if (!e.target.closest("[data-photo-swipe]")) return;
             this.swipe = { id: e.pointerId, x: e.clientX, y: e.clientY };
+            // Listen on the document so a pen lifted outside the gallery still ends the swipe.
+            document.addEventListener("pointerup", this.onPointerUp);
+            document.addEventListener("pointercancel", this.onPointerCancel);
+        };
+        this.endSwipe = () => {
+            this.swipe = null;
+            document.removeEventListener("pointerup", this.onPointerUp);
+            document.removeEventListener("pointercancel", this.onPointerCancel);
         };
         this.onPointerUp = (e) => {
             const start = this.swipe;
             if (!start || start.id !== e.pointerId) return;
-            this.swipe = null;
+            this.endSwipe();
 
             const dx = e.clientX - start.x;
             const dy = e.clientY - start.y;
@@ -54,8 +62,8 @@ const ProductLightbox = {
             setTimeout(() => (this.suppressClick = false), 0);
             this.pushEvent(dx < 0 ? "next_photo" : "prev_photo", {});
         };
-        this.onPointerCancel = () => {
-            this.swipe = null;
+        this.onPointerCancel = (e) => {
+            if (this.swipe && this.swipe.id === e.pointerId) this.endSwipe();
         };
         this.onClickCapture = (e) => {
             if (!this.suppressClick) return;
@@ -63,10 +71,8 @@ const ProductLightbox = {
             e.stopPropagation();
         };
         this.el.addEventListener("pointerdown", this.onPointerDown);
-        this.el.addEventListener("pointerup", this.onPointerUp);
-        this.el.addEventListener("pointercancel", this.onPointerCancel);
         this.el.addEventListener("click", this.onClickCapture, true);
-        this.lastIndex = this.el.dataset.index;
+        this.lastReveal = this.revealKey();
 
         loadStylesheet("glightbox-css", GLIGHTBOX_CSS);
         try {
@@ -77,9 +83,15 @@ const ProductLightbox = {
     },
 
     updated() {
-        if (this.el.dataset.index === this.lastIndex) return;
-        this.lastIndex = this.el.dataset.index;
+        // Re-reveal when the photo or the photo set changes (e.g. a new colour at index 0).
+        const key = this.revealKey();
+        if (key === this.lastReveal) return;
+        this.lastReveal = key;
         this.revealCurrentThumb();
+    },
+
+    revealKey() {
+        return `${this.el.dataset.index}|${this.el.dataset.slides}`;
     },
 
     // Scroll the thumbnail strip (not the page) so the current thumbnail is visible.
@@ -96,13 +108,15 @@ const ProductLightbox = {
         else if (thumbBox.right > stripBox.right) delta = thumbBox.right - stripBox.right;
         if (delta !== 0) {
             strip.scrollBy({ left: delta, behavior: reduced ? "auto" : "smooth" });
+        } else {
+            // Already visible: stop any smooth scroll from an earlier selection.
+            strip.scrollTo({ left: strip.scrollLeft, behavior: "auto" });
         }
     },
 
     destroyed() {
         this.el.removeEventListener("pointerdown", this.onPointerDown);
-        this.el.removeEventListener("pointerup", this.onPointerUp);
-        this.el.removeEventListener("pointercancel", this.onPointerCancel);
+        this.endSwipe();
         this.el.removeEventListener("click", this.onClickCapture, true);
         this.el.removeEventListener("click", this.onClick);
         this.el.removeEventListener("keydown", this.onKeydown);

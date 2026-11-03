@@ -447,7 +447,7 @@ defmodule YscWeb.ShopProductLive do
               data-lightbox-open
               data-photo-swipe
               aria-label={"View #{@product.name} photos full screen"}
-              class="cursor-zoom-in touch-pan-y rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+              class="cursor-zoom-in touch-pan-y touch-pinch-zoom rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             >
               <.shop_image
                 id={"product-photo-#{(@current_photo && @current_photo.id) || "none"}"}
