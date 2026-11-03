@@ -445,8 +445,9 @@ defmodule YscWeb.ShopProductLive do
               role="button"
               tabindex="0"
               data-lightbox-open
+              data-photo-swipe
               aria-label={"View #{@product.name} photos full screen"}
-              class="cursor-zoom-in rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+              class="cursor-zoom-in touch-pan-y touch-pinch-zoom rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
             >
               <.shop_image
                 id={"product-photo-#{(@current_photo && @current_photo.id) || "none"}"}
@@ -496,7 +497,7 @@ defmodule YscWeb.ShopProductLive do
           <ul
             :if={@photo_count > 1}
             id="photo-thumbs"
-            class="-m-1 flex gap-3 overflow-x-auto p-1"
+            class="-m-1 flex gap-3 overflow-x-auto overscroll-x-contain p-1"
             aria-label="Product photos"
           >
             <li :for={{photo, index} <- Enum.with_index(@gallery)} class="shrink-0">
