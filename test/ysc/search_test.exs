@@ -221,6 +221,28 @@ defmodule Ysc.SearchTest do
       assert Map.has_key?(result, :bookings)
     end
 
+    test "treats LIKE wildcards in the query literally", %{
+      event: event,
+      post: post,
+      user: user,
+      booking: booking,
+      ticket: ticket
+    } do
+      # Without escape_like/1, "%" / "_" dump every events/posts/users/bookings
+      # /tickets row (PII in the admin magic-search dropdown).
+      for wildcard <- ["%", "_", "%%"] do
+        result = Search.global_search(wildcard)
+        refute Enum.any?(result.events, &(&1.id == event.id))
+        refute Enum.any?(result.posts, &(&1.id == post.id))
+        refute Enum.any?(result.users, &(&1.id == user.id))
+        refute Enum.any?(result.bookings, &(&1.id == booking.id))
+        refute Enum.any?(result.tickets, &(&1.id == ticket.id))
+      end
+
+      by_title = Search.global_search("Searchable Event")
+      assert Enum.any?(by_title.events, &(&1.id == event.id))
+    end
+
     test "does not SELECT password hashes, bios, event HTML, post HTML, or ticket tiers",
          %{
            event: event,
