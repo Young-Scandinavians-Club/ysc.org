@@ -62,6 +62,10 @@ defmodule YscWeb.Emails.Notifier do
     "volunteer_board_notification" => YscWeb.Emails.VolunteerBoardNotification,
     "contact_form_board_notification" =>
       YscWeb.Emails.ContactFormBoardNotification,
+    "post_comment_board_notification" =>
+      YscWeb.Emails.PostCommentBoardNotification,
+    "post_comment_reply_notification" =>
+      YscWeb.Emails.PostCommentReplyNotification,
     "outage_notification" => YscWeb.Emails.OutageNotification,
     "membership_payment_failure" => YscWeb.Emails.MembershipPaymentFailure,
     "membership_payment_confirmation" =>

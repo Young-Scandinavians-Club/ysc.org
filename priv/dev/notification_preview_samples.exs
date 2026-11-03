@@ -374,6 +374,23 @@
       submitted_at: "Dec 1, 2026 at 10:00 AM",
       message: "I have a question about cabin booking for new members."
     },
+    "post_comment_board_notification" => %{
+      post_title: "Midsummer Picnic Recap",
+      author_name: "Astrid Berg",
+      author_email: "astrid@example.com",
+      comment_text: "Thanks for organizing, the photos are wonderful!",
+      reply: false,
+      comment_url:
+        "http://localhost:4000/posts/midsummer-recap#comments-preview",
+      submitted_at: "June 22, 2026 at 09:15 AM PDT"
+    },
+    "post_comment_reply_notification" => %{
+      first_name: "Astrid",
+      post_title: "Midsummer Picnic Recap",
+      replier_name: "Erik Hansen",
+      reply_text: "Agreed, the photos turned out great!",
+      comment_url: "http://localhost:4000/posts/midsummer-recap#comments-preview"
+    },
     "email_changed" => %{
       first_name: "Astrid",
       new_email: "astrid.new@example.com"
@@ -790,12 +807,27 @@
         carrier: "USPS",
         service: "Priority Mail",
         tracking_number: "9400111899223197428490",
-        tracking_url: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223197428490",
+        tracking_url:
+          "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223197428490",
         reshipment: false
       },
       items: [
-        %{name: "Club Tee", variant: "Black · M", quantity: 2, unit_price: "$25.00", line_total: "$50.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
-        %{name: "Logo Sticker", variant: nil, quantity: 3, unit_price: "$3.50", line_total: "$10.50", thumbnail: nil}
+        %{
+          name: "Club Tee",
+          variant: "Black · M",
+          quantity: 2,
+          unit_price: "$25.00",
+          line_total: "$50.00",
+          thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"
+        },
+        %{
+          name: "Logo Sticker",
+          variant: nil,
+          quantity: 3,
+          unit_price: "$3.50",
+          line_total: "$10.50",
+          thumbnail: nil
+        }
       ],
       delivery_estimate: "Oct 26–29",
       ship_to: %{
@@ -813,8 +845,22 @@
       ],
       order: %{reference_id: "MRC-PREVIEW-123"},
       items: [
-        %{name: "Club Tee", variant: "Black · M", quantity: 2, unit_price: "$25.00", line_total: "$50.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
-        %{name: "Logo Sticker", variant: nil, quantity: 3, unit_price: "$3.50", line_total: "$10.50", thumbnail: nil}
+        %{
+          name: "Club Tee",
+          variant: "Black · M",
+          quantity: 2,
+          unit_price: "$25.00",
+          line_total: "$50.00",
+          thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"
+        },
+        %{
+          name: "Logo Sticker",
+          variant: nil,
+          quantity: 3,
+          unit_price: "$3.50",
+          line_total: "$10.50",
+          thumbnail: nil
+        }
       ],
       order_url: "http://localhost:4000/shop/orders/preview"
     },
@@ -828,8 +874,22 @@
       who: "Astrid Berg (astrid@example.com)",
       amount_paid: "$66.45",
       items: [
-        %{name: "Club Tee", variant: "Black · M", quantity: 2, unit_price: "$25.00", line_total: "$50.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
-        %{name: "Logo Sticker", variant: nil, quantity: 3, unit_price: "$3.50", line_total: "$10.50", thumbnail: nil}
+        %{
+          name: "Club Tee",
+          variant: "Black · M",
+          quantity: 2,
+          unit_price: "$25.00",
+          line_total: "$50.00",
+          thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"
+        },
+        %{
+          name: "Logo Sticker",
+          variant: nil,
+          quantity: 3,
+          unit_price: "$3.50",
+          line_total: "$10.50",
+          thumbnail: nil
+        }
       ],
       admin_url: "http://localhost:4000/admin/merch"
     },
@@ -846,8 +906,22 @@
       },
       address_lines: ["123 Market St", "San Francisco, CA 94105"],
       items: [
-        %{name: "Club Tee", variant: "Black · M", quantity: 5, unit_price: "$25.00", line_total: "$125.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
-        %{name: "Logo Sticker", variant: nil, quantity: 20, unit_price: "$3.50", line_total: "$70.00", thumbnail: nil}
+        %{
+          name: "Club Tee",
+          variant: "Black · M",
+          quantity: 5,
+          unit_price: "$25.00",
+          line_total: "$125.00",
+          thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"
+        },
+        %{
+          name: "Logo Sticker",
+          variant: nil,
+          quantity: 20,
+          unit_price: "$3.50",
+          line_total: "$70.00",
+          thumbnail: nil
+        }
       ],
       estimated_cost: "$118.40",
       purpose: "Happy hour giveaways, October 24",
@@ -866,8 +940,22 @@
         ordered_at: "Oct 14, 2026 at 10:00 AM PDT"
       },
       items: [
-        %{name: "Club Tee", variant: "Black · M", quantity: 2, unit_price: "$25.00", line_total: "$50.00", thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"},
-        %{name: "Logo Sticker", variant: nil, quantity: 3, unit_price: "$3.50", line_total: "$10.50", thumbnail: nil}
+        %{
+          name: "Club Tee",
+          variant: "Black · M",
+          quantity: 2,
+          unit_price: "$25.00",
+          line_total: "$50.00",
+          thumbnail: "http://localhost:4000/images/tahoe-cabin-feature.jpg"
+        },
+        %{
+          name: "Logo Sticker",
+          variant: nil,
+          quantity: 3,
+          unit_price: "$3.50",
+          line_total: "$10.50",
+          thumbnail: nil
+        }
       ],
       subtotal: "$60.50",
       shipping: "$5.95",
@@ -1011,7 +1099,8 @@
       first_name: "Astrid",
       reference_id: "MRC-PREVIEW-123",
       carrier: "USPS",
-      tracking_url: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223197428490",
+      tracking_url:
+        "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899223197428490",
       delivery_estimate: "Oct 26–29"
     },
     "merch_order_update" => %{
