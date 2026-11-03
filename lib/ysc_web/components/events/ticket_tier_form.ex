@@ -141,6 +141,22 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
             />
           </div>
 
+          <div class="w-full sm:w-56">
+            <.input
+              type="number"
+              label="Limit per member"
+              field={@form[:max_per_buyer]}
+              min="1"
+              step="1"
+              placeholder="No limit"
+            />
+            <p class="mt-1 text-xs text-zinc-500">
+              The most tickets of this tier one member can buy for the event,
+              counting any they already bought. Use it for guest tickets, e.g. 1
+              for "one guest (+1)".
+            </p>
+          </div>
+
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <.date_picker
               id="sales_start"
@@ -883,6 +899,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         :end_date,
         :requires_registration,
         :member_only,
+        :max_per_buyer,
         :event_id
       ])
 
@@ -1035,6 +1052,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
     if donation_type?(params["type"]) do
       params
       |> Map.put("quantity", nil)
+      |> Map.put("max_per_buyer", nil)
       |> Map.put("start_date", nil)
       |> Map.put("end_date", nil)
     else

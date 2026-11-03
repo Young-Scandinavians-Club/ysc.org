@@ -27,6 +27,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Events.TicketTier
   alias Ysc.Events.TicketTierHelpers
   alias Ysc.Events.MemberOnlyTickets
+  alias Ysc.Events.TierPurchaseLimits
   alias Ysc.Events.Event
   alias Ysc.Events.EventDateTime
   alias Ysc.Accounts
@@ -87,6 +88,7 @@ defmodule Ysc.Tickets do
   - `{:error, :membership_required}` if user doesn't have active membership
   - `{:error, :member_only_not_eligible}` if the selection includes member-only tiers the buyer's plan can't purchase
   - `{:error, :member_only_limit_exceeded}` if the selection exceeds the buyer's per-event member-only ticket limit
+  - `{:error, :tier_purchase_limit_exceeded}` if the selection (plus tickets already held) exceeds a tier's per-buyer limit (`max_per_buyer`)
   - `{:error, :checkout_payment_in_progress}` when another pending checkout has in-flight payment
   - `{:error, :ticket_quantity_exceeds_limit}` when `:bypass_guards` is set
     and a quantity exceeds `max_door_sale_quantity_per_tier/0` or the order
@@ -122,12 +124,20 @@ defmodule Ysc.Tickets do
       {:ok, user} ->
         with :ok <-
                validate_door_sale_quantities(ticket_selections, opts),
+             ticket_tiers = selection_tier_attrs(ticket_selections, opts),
              :ok <-
                validate_member_only_selection(
                  user,
                  event_id,
                  ticket_selections,
-                 opts
+                 ticket_tiers
+               ),
+             :ok <-
+               validate_tier_purchase_limits(
+                 user,
+                 event_id,
+                 ticket_selections,
+                 ticket_tiers
                ),
              {:ok, ticket_order} <-
                create_ticket_order_locked(
@@ -3102,14 +3112,18 @@ defmodule Ysc.Tickets do
 
   # Enforces the "member only" ticket-tier rules for this checkout.
   #
-  # Loads only `id` / `member_only` / `type` for the selected tiers (PK lookup,
-  # no sold-count aggregation). The owned-ticket COUNT runs only when a
+  # `ticket_tiers` carries only `id` / `member_only` / `max_per_buyer` / `type`
+  # for the selected tiers (see `selection_tier_attrs/2`: PK lookup, no
+  # sold-count aggregation). The owned-ticket COUNT runs only when a
   # finite per-event limit applies — Single members buying a member-only
   # tier. Family/lifetime (unlimited) and regular-tier checkouts skip it.
   # See `Ysc.Events.MemberOnlyTickets` for the per-plan rules.
-  defp validate_member_only_selection(user, event_id, ticket_selections, opts) do
-    ticket_tiers = member_only_tier_attrs(ticket_selections, opts)
-
+  defp validate_member_only_selection(
+         user,
+         event_id,
+         ticket_selections,
+         ticket_tiers
+       ) do
     if MemberOnlyTickets.any_member_only?(ticket_tiers) do
       plan_type = MembershipCache.get_membership_plan_type(user)
       limit = MemberOnlyTickets.event_limit(plan_type)
@@ -3132,7 +3146,7 @@ defmodule Ysc.Tickets do
     end
   end
 
-  defp member_only_tier_attrs(ticket_selections, opts) do
+  defp selection_tier_attrs(ticket_selections, opts) do
     selected_ids = Map.keys(ticket_selections)
 
     case member_only_attrs_from_preloaded_tiers(opts, selected_ids) do
@@ -3152,7 +3166,14 @@ defmodule Ysc.Tickets do
         attrs =
           Enum.flat_map(tiers, fn tier ->
             if MapSet.member?(selected, tier.id) do
-              [%{id: tier.id, member_only: tier.member_only, type: tier.type}]
+              [
+                %{
+                  id: tier.id,
+                  member_only: tier.member_only,
+                  max_per_buyer: tier.max_per_buyer,
+                  type: tier.type
+                }
+              ]
             else
               []
             end
@@ -3192,6 +3213,46 @@ defmodule Ysc.Tickets do
           t.status == :confirmed and tt.member_only == true and
           tt.type != :donation,
       select: count(t.id)
+    )
+  end
+
+  # Enforces per-tier `max_per_buyer` limits for this checkout: tickets the
+  # buyer already holds (confirmed) for the tier plus the selected quantity may
+  # not exceed the limit. The owned-ticket COUNT only runs when a selected tier
+  # actually has a limit. See `Ysc.Events.TierPurchaseLimits`.
+  defp validate_tier_purchase_limits(
+         user,
+         event_id,
+         ticket_selections,
+         ticket_tiers
+       ) do
+    if TierPurchaseLimits.any_limited?(ticket_tiers) do
+      owned_by_tier =
+        user.id
+        |> owned_tickets_by_tier_query(
+          event_id,
+          TierPurchaseLimits.limited_tier_ids(ticket_tiers)
+        )
+        |> Repo.all()
+        |> Map.new()
+
+      TierPurchaseLimits.validate_selection(
+        ticket_selections,
+        ticket_tiers,
+        owned_by_tier
+      )
+    else
+      :ok
+    end
+  end
+
+  defp owned_tickets_by_tier_query(user_id, event_id, tier_ids) do
+    from(t in Ticket,
+      where:
+        t.user_id == ^user_id and t.event_id == ^event_id and
+          t.status == :confirmed and t.ticket_tier_id in ^tier_ids,
+      group_by: t.ticket_tier_id,
+      select: {t.ticket_tier_id, count(t.id)}
     )
   end
 
@@ -3958,6 +4019,12 @@ defmodule Ysc.Tickets do
   def ci_query_explain_owned_member_only_tickets_count_query do
     ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
     owned_member_only_tickets_count_query(ulid, ulid)
+  end
+
+  @doc false
+  def ci_query_explain_owned_tickets_by_tier_query do
+    ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
+    owned_tickets_by_tier_query(ulid, ulid, [ulid])
   end
 
   @doc false
