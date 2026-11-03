@@ -53,6 +53,19 @@ defmodule Ysc.PostsTest do
       assert post.rendered_body =~ "Hello"
       refute post.rendered_body =~ "<script"
     end
+
+    test "keeps Trix figure attachments in rendered_body", %{author: author} do
+      attrs = %{
+        "title" => "Figure Post",
+        "url_name" => "figure-post-#{System.unique_integer([:positive])}",
+        "raw_body" =>
+          ~s(<p>Hello</p><figure class="attachment"><img src="https://example.com/x.jpg" alt="x"></figure>)
+      }
+
+      assert {:ok, %Post{} = post} = Posts.create_post(attrs, author)
+      assert post.rendered_body =~ "<figure"
+      assert post.rendered_body =~ "<img"
+    end
   end
 
   describe "list_posts_by_ids/2" do
@@ -660,6 +673,35 @@ defmodule Ysc.PostsTest do
       assert Ecto.assoc_loaded?(listed.featured_image)
       assert fat_cols == 0
     end
+
+    test "omits raw_body from the card SELECT", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Card toast",
+            "preview_text" => "Card preview",
+            "raw_body" => "<p>Full article that must not be selected.</p>",
+            "url_name" => "card-toast-#{System.unique_integer([:positive])}",
+            "state" => "published",
+            "featured_post" => false,
+            "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+          },
+          author
+        )
+
+      {posts, raw_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Posts.list_posts(10) end,
+          pattern: ~r/raw_body/i,
+          caller_pids: [self()]
+        )
+
+      listed = Enum.find(posts, &(&1.id == post.id))
+      assert listed
+      assert is_nil(listed.raw_body)
+      assert listed.rendered_body
+      assert raw_cols == 0
+    end
   end
 
   describe "count_published_posts/0" do
@@ -972,6 +1014,34 @@ defmodule Ysc.PostsTest do
       assert is_nil(listed.author.hashed_password)
       refute Ecto.assoc_loaded?(listed.featured_image)
       assert fat_cols == 0
+    end
+
+    test "omits raw_body from the feed SELECT", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Feed toast",
+            "preview_text" => "Feed summary",
+            "raw_body" => "<p>Feed HTML body.</p>",
+            "url_name" => "feed-toast-#{System.unique_integer([:positive])}",
+            "state" => "published",
+            "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+          },
+          author
+        )
+
+      {posts, raw_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Posts.list_recent_published_posts_for_feed(10) end,
+          pattern: ~r/raw_body/i,
+          caller_pids: [self()]
+        )
+
+      listed = Enum.find(posts, &(&1.id == post.id))
+      assert listed
+      assert is_nil(listed.raw_body)
+      assert listed.rendered_body
+      assert raw_cols == 0
     end
   end
 
@@ -1430,7 +1500,7 @@ defmodule Ysc.PostsTest do
   end
 
   describe "public post page access (#353)" do
-    test "get_public_post/2 returns only published posts", %{author: author} do
+    test "get_public_post/1 returns only published posts", %{author: author} do
       {:ok, draft} =
         Posts.create_post(
           %{
@@ -1458,12 +1528,12 @@ defmodule Ysc.PostsTest do
       assert id == published.id
     end
 
-    test "get_public_post/2 returns nil for invalid ULID values" do
+    test "get_public_post/1 returns nil for invalid ULID values" do
       assert Posts.get_public_post("images.php") == nil
       assert Posts.get_public_post("invalid-id") == nil
     end
 
-    test "get_post_for_page/3 returns nil for invalid ULID values" do
+    test "get_post_for_page/2 returns nil for invalid ULID values" do
       admin = user_fixture(%{role: :admin})
       volunteer = user_fixture(%{role: :volunteer})
 
@@ -1475,7 +1545,7 @@ defmodule Ysc.PostsTest do
       assert Posts.get_post_for_page("invalid-id", volunteer) == nil
     end
 
-    test "get_post_for_page/3 hides drafts from members but allows staff preview",
+    test "get_post_for_page/2 hides drafts from members but allows staff preview",
          %{
            author: author,
            regular_user: member
@@ -1501,7 +1571,7 @@ defmodule Ysc.PostsTest do
       assert id == draft.id
     end
 
-    test "get_post_for_page_by_url_name/3 mirrors id-based access rules", %{
+    test "get_post_for_page_by_url_name/2 mirrors id-based access rules", %{
       author: author,
       regular_user: member
     } do

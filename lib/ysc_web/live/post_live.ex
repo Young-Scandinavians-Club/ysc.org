@@ -107,7 +107,7 @@ defmodule YscWeb.PostLive do
             phx-hook="GLightboxHook"
             phx-update="ignore"
           >
-            {raw(Scrubber.scrub(@post.raw_body || "", Ysc.TrixScrubber))}
+            {raw(post_body(@post))}
           </div>
         </article>
       </div>
@@ -202,12 +202,11 @@ defmodule YscWeb.PostLive do
 
   @impl true
   def mount(%{"id" => id} = _params, _session, socket) do
-    preloads = [{:author, :current_avatar}, :featured_image]
     viewer = socket.assigns.current_user
 
     # Load post synchronously - essential for SEO (title, content, image).
     # Cache briefly so the connected mount reuses the dead-render fetch.
-    post = fetch_post_for_mount(id, viewer, preloads)
+    post = fetch_post_for_mount(id, viewer)
 
     case post do
       nil ->
@@ -250,20 +249,20 @@ defmodule YscWeb.PostLive do
     end
   end
 
-  defp fetch_post_for_mount(id, viewer, preloads) do
+  defp fetch_post_for_mount(id, viewer) do
     Ysc.PublicContentCache.fetch_post_page(
       post_mount_cache_key(id, viewer),
-      fn -> load_post_for_page(id, viewer, preloads) end
+      fn -> load_post_for_page(id, viewer) end
     )
   end
 
-  defp load_post_for_page(id, viewer, preloads) do
+  defp load_post_for_page(id, viewer) do
     case Ecto.ULID.cast(id) do
       {:ok, ulid_id} ->
-        Posts.get_post_for_page(ulid_id, viewer, preloads)
+        Posts.get_post_for_page(ulid_id, viewer)
 
       :error ->
-        Posts.get_post_for_page_by_url_name(id, viewer, preloads)
+        Posts.get_post_for_page_by_url_name(id, viewer)
     end
   end
 
@@ -371,6 +370,13 @@ defmodule YscWeb.PostLive do
 
   defp post_date(%Post{published_on: nil} = post), do: post.inserted_at
   defp post_date(%Post{} = post), do: post.published_on
+
+  # Public page loads omit `raw_body` (Trix source) and keep `rendered_body`.
+  # The fallback is for full `%Post{}` structs such as editor previews.
+  defp post_body(post) do
+    html = Map.get(post, :rendered_body) || Map.get(post, :raw_body) || ""
+    Scrubber.scrub(html, Ysc.TrixScrubber)
+  end
 
   defp comment_is_reply(%Comment{comment_id: nil}), do: false
   defp comment_is_reply(%Comment{}), do: true
