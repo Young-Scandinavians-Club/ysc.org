@@ -359,4 +359,117 @@ defmodule YscWeb.AdminEventsLive.TicketTierFormTest do
                "Collects first name, last name, and email for every ticket"
     end
   end
+
+  describe "form layout" do
+    defp render_form(extra \\ %{}) do
+      event = event_fixture()
+
+      html =
+        render_component(
+          TicketTierForm,
+          Map.merge(%{id: "tier-form", event_id: event.id}, extra)
+        )
+
+      LazyHTML.from_fragment(html)
+    end
+
+    test "groups purchase restrictions under their own section" do
+      doc = render_form()
+
+      # Member-only and the per-member limit sit together, apart from availability
+      assert doc
+             |> LazyHTML.query("#tier-who-can-buy #ticket_tier_member_only")
+             |> Enum.count() == 1
+
+      assert doc
+             |> LazyHTML.query("#tier-who-can-buy #ticket_tier_max_per_buyer")
+             |> Enum.count() == 1
+
+      assert doc
+             |> LazyHTML.query("#tier-availability #ticket_tier_member_only")
+             |> Enum.empty?()
+    end
+
+    test "boolean options render as switches wired to their helper text" do
+      doc = render_form()
+
+      switches = LazyHTML.query(doc, ~s(input[type="checkbox"][role="switch"]))
+
+      ids =
+        switches |> Enum.flat_map(&LazyHTML.attribute(&1, "id")) |> Enum.sort()
+
+      assert ids == [
+               "ticket_tier_member_only",
+               "ticket_tier_requires_registration",
+               "ticket_tier_unlimited_quantity"
+             ]
+
+      member_only = LazyHTML.query(doc, "#ticket_tier_member_only")
+
+      assert LazyHTML.attribute(member_only, "aria-describedby") == [
+               "ticket_tier_member_only-description"
+             ]
+
+      assert Enum.count(
+               LazyHTML.query(doc, "#ticket_tier_member_only-description")
+             ) == 1
+    end
+
+    test "the per-member limit input is described by its help text" do
+      doc = render_form()
+
+      input = LazyHTML.query(doc, "#ticket_tier_max_per_buyer")
+
+      assert LazyHTML.attribute(input, "aria-describedby") == [
+               "max-per-buyer-help"
+             ]
+
+      assert Enum.count(LazyHTML.query(doc, "#max-per-buyer-help")) == 1
+    end
+
+    test "name and price share a row only for paid tiers" do
+      free = render_form()
+      assert Enum.empty?(LazyHTML.query(free, "#ticket_tier_price"))
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event_fixture().id,
+          type: :paid,
+          price: Money.new(1500, :USD)
+        })
+
+      paid = render_form(%{event_id: tier.event_id, ticket_tier: tier})
+      assert Enum.count(LazyHTML.query(paid, "#ticket_tier_price")) == 1
+    end
+
+    test "editing labels the submit button 'Save changes' and keeps actions sticky" do
+      tier = ticket_tier_fixture(%{event_id: event_fixture().id})
+      doc = render_form(%{event_id: tier.event_id, ticket_tier: tier})
+
+      assert doc
+             |> LazyHTML.query(~s(#tier-form-actions button[type="submit"]))
+             |> LazyHTML.text() =~ "Save changes"
+
+      assert [class] =
+               doc
+               |> LazyHTML.query("#tier-form-actions")
+               |> LazyHTML.attribute("class")
+
+      assert class =~ "sticky"
+    end
+
+    test "donation tiers hide availability and purchase restrictions" do
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event_fixture().id,
+          type: :donation,
+          price: nil
+        })
+
+      doc = render_form(%{event_id: tier.event_id, ticket_tier: tier})
+
+      assert Enum.empty?(LazyHTML.query(doc, "#tier-availability"))
+      assert Enum.empty?(LazyHTML.query(doc, "#tier-who-can-buy"))
+    end
+  end
 end

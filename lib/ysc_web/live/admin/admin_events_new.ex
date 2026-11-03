@@ -887,6 +887,8 @@ defmodule YscWeb.AdminEventsNewLive do
                 event={@event}
                 current_user={@current_user}
                 admin_role={@admin_role}
+                list_params={@list_params}
+                tier_modal={@tier_modal}
               />
             </div>
           </div>
@@ -1502,7 +1504,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     socket =
       if connected_remount? do
-        assign(socket, :list_params, Map.drop(params, ["id"]))
+        assign(socket, :list_params, Map.drop(params, ["id", "tier"]))
       else
         assign_event_loading_shell(socket, params, id)
       end
@@ -1538,7 +1540,8 @@ defmodule YscWeb.AdminEventsNewLive do
 
     socket =
       socket
-      |> assign(:list_params, Map.drop(params, ["id"]))
+      |> assign(:list_params, Map.drop(params, ["id", "tier"]))
+      |> assign(:tier_param, params["tier"])
       |> then(fn socket ->
         if connected?(socket) do
           socket
@@ -1561,7 +1564,8 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_params(params, _uri, socket) do
     socket =
       socket
-      |> assign(:list_params, Map.drop(params, ["id"]))
+      |> assign(:list_params, Map.drop(params, ["id", "tier"]))
+      |> assign(:tier_param, params["tier"])
       |> maybe_refresh_tab_data()
 
     {:noreply, socket}
@@ -1649,10 +1653,11 @@ defmodule YscWeb.AdminEventsNewLive do
   defp assign_event_loading_shell(socket, params, id) do
     socket
     |> assign(:loading_event?, true)
+    |> assign(:tier_modal, nil)
     |> assign(:event, %Event{id: id, state: :draft, title: ""})
     |> assign(:active_page, :events)
     |> assign(:page_title, "Event")
-    |> assign(:list_params, Map.drop(params, ["id"]))
+    |> assign(:list_params, Map.drop(params, ["id", "tier"]))
     |> assign(:event_title, "")
     |> assign(:state, :draft)
     |> assign(:pacific_today, pacific_today())
@@ -2038,6 +2043,9 @@ defmodule YscWeb.AdminEventsNewLive do
             :edit ->
               assign_edit_tab_data(socket, event)
 
+            :tickets ->
+              assign_tier_modal(socket, event)
+
             :statistics ->
               # Finding 76: per-report rows (submitter, purpose, status, amount)
               # are treasurer-only. Volunteers still get aggregate cost KPIs.
@@ -2058,6 +2066,62 @@ defmodule YscWeb.AdminEventsNewLive do
       end
     else
       socket
+    end
+  end
+
+  # Resolves `?tier=new|<tier id>` into the tier modal the Tickets tab shows.
+  # The URL is untrusted: a missing tier, one from another event, or one the
+  # admin may not touch closes the modal and drops the param (with a toast), so
+  # a pasted link can never open a form the admin couldn't open from the UI.
+  defp assign_tier_modal(socket, event) do
+    role = socket.assigns[:admin_role]
+
+    resolved =
+      case socket.assigns[:tier_param] do
+        nil ->
+          {:ok, nil}
+
+        "new" ->
+          if can?(role, :ticket_tier_create),
+            do: {:ok, :new},
+            else: {:error, "You do not have permission to add ticket tiers."}
+
+        id ->
+          # Matching against this event's own tiers keeps the raw URL value
+          # out of the query and rejects tiers that belong to another event.
+          listed? =
+            event.id
+            |> Events.list_ticket_tiers_for_event()
+            |> Enum.any?(&(&1.id == id))
+
+          cond do
+            not listed? ->
+              {:error, "That ticket tier doesn't exist on this event."}
+
+            cannot?(role, :ticket_tier_update) ->
+              {:error, "You do not have permission to edit ticket tiers."}
+
+            true ->
+              {:ok, Events.get_ticket_tier!(id)}
+          end
+      end
+
+    case resolved do
+      {:ok, modal} ->
+        assign(socket, :tier_modal, modal)
+
+      {:error, message} ->
+        socket
+        |> assign(:tier_modal, nil)
+        |> YscWeb.Flash.put_toast(:error, message, title: "Ticket tier")
+        |> push_patch(
+          to:
+            TicketTierManagement.tickets_path(
+              event.id,
+              socket.assigns.list_params
+            ),
+          replace: true
+        )
     end
   end
 

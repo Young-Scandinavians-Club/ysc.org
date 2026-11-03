@@ -36,8 +36,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
             <.button
               :if={can?(@admin_role, :ticket_tier_create)}
               id={"add-ticket-tier-btn-#{@event_id}"}
-              phx-click="open-add-ticket-tier-modal"
-              phx-target={@myself}
+              patch={tickets_path(@event_id, @list_params, "new")}
               class="w-full sm:w-auto"
             >
               <.icon name="hero-plus" class="w-5 h-5" /> Add Ticket Tier
@@ -247,9 +246,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       :if={can?(@admin_role, :ticket_tier_update)}
                       id={"ticket-tier-actions-#{ticket_tier.id}-edit"}
                       icon="hero-pencil-square"
-                      phx-click="edit-ticket-tier"
-                      phx-value-id={ticket_tier.id}
-                      phx-target={@myself}
+                      patch={tickets_path(@event_id, @list_params, ticket_tier.id)}
                     >
                       Edit tier
                     </.dropdown_menu_item>
@@ -456,13 +453,14 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         :if={@show_add_modal}
         id="add-ticket-tier-modal"
         show
-        on_cancel={JS.push("close-add-ticket-tier-modal", target: @myself)}
+        on_cancel={request_close_form(@event_id)}
       >
         <.live_component
           id={"ticket-tier-form-#{@event_id}"}
           module={YscWeb.AdminEventsLive.TicketTierForm}
           event_id={@event_id}
           dialog_id="add-ticket-tier-modal"
+          close_path={tickets_path(@event_id, @list_params)}
           admin_role={@admin_role}
         />
       </.modal>
@@ -471,7 +469,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         :if={@show_edit_modal}
         id="edit-ticket-tier-modal"
         show
-        on_cancel={JS.push("close-edit-ticket-tier-modal", target: @myself)}
+        on_cancel={request_close_form(@event_id)}
       >
         <.live_component
           :if={@editing_ticket_tier}
@@ -480,6 +478,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           event_id={@event_id}
           ticket_tier={@editing_ticket_tier}
           dialog_id="edit-ticket-tier-modal"
+          close_path={tickets_path(@event_id, @list_params)}
           admin_role={@admin_role}
         />
       </.modal>
@@ -524,7 +523,35 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @reservation_update_keys [:id, :reservation_epoch, :close_reserve_modal]
   @grant_update_keys [:id, :grant_epoch, :close_grant_modal, :grant_success]
-  @parent_passthrough_keys [:id, :event_id, :event, :current_user, :admin_role]
+  @parent_passthrough_keys [
+    :id,
+    :event_id,
+    :event,
+    :current_user,
+    :admin_role,
+    :list_params,
+    :tier_modal
+  ]
+
+  @doc """
+  Path of the tickets tab, optionally with a tier modal open.
+
+  The tier modal is addressed by the `tier` query param (`new`, or a tier id) so
+  it can be linked to and survives a reload. Other tab params are preserved.
+  """
+  def tickets_path(event_id, list_params, tier \\ nil) do
+    query =
+      (list_params || %{})
+      |> Map.drop(["tier"])
+      |> then(&if tier, do: Map.put(&1, "tier", tier), else: &1)
+
+    ~p"/admin/events/#{event_id}/tickets?#{query}"
+  end
+
+  # Closing goes through the form so it can ask before discarding edits.
+  defp request_close_form(event_id) do
+    JS.push("request-close", target: "#tier-form-#{event_id}")
+  end
 
   @impl true
   def mount(socket) do
@@ -533,7 +560,11 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @impl true
   def update(incoming_assigns, socket) do
-    socket = assign_new(socket, :admin_role, fn -> nil end)
+    socket =
+      socket
+      |> assign_new(:admin_role, fn -> nil end)
+      |> assign_new(:list_params, fn -> %{} end)
+
     close_reserve_modal = Map.get(incoming_assigns, :close_reserve_modal, false)
     close_grant_modal = Map.get(incoming_assigns, :close_grant_modal, false)
     grant_success = Map.get(incoming_assigns, :grant_success)
@@ -572,7 +603,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
               :reserving_tier,
               :show_grant_modal,
               :granting_tier,
-              :editing_ticket_tier
+              :editing_ticket_tier,
+              :list_params
             ])
             |> Map.merge(incoming_assigns)
 
@@ -608,8 +640,6 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           socket
           |> assign(:show_reserve_modal, false)
           |> assign(:reserving_tier, nil)
-          |> assign(:show_add_modal, false)
-          |> assign(:show_edit_modal, false)
 
         Map.has_key?(incoming_assigns, :grant_epoch) ->
           refresh_ticket_data(socket)
@@ -650,7 +680,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           )
       end
 
-    {:ok, socket}
+    {:ok, apply_tier_modal(socket, incoming_assigns)}
   end
 
   # One line naming what each ticket of the tier is asked, e.g.
@@ -760,9 +790,35 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         current_user -> assign(socket, :current_user, current_user)
       end
 
-    case Map.get(incoming_assigns, :admin_role) do
+    socket =
+      case Map.get(incoming_assigns, :admin_role) do
+        nil -> socket
+        admin_role -> assign(socket, :admin_role, admin_role)
+      end
+
+    case Map.get(incoming_assigns, :list_params) do
       nil -> socket
-      admin_role -> assign(socket, :admin_role, admin_role)
+      list_params -> assign(socket, :list_params, list_params)
+    end
+  end
+
+  # The URL is the source of truth for which tier modal is open: the parent
+  # resolves `?tier=` (permissions, ownership) into `tier_modal`.
+  defp apply_tier_modal(socket, incoming_assigns) do
+    if Map.has_key?(incoming_assigns, :tier_modal) do
+      {show_add?, show_edit?, tier} =
+        case incoming_assigns.tier_modal do
+          :new -> {true, false, nil}
+          %{id: _} = tier -> {false, true, tier}
+          _ -> {false, false, nil}
+        end
+
+      socket
+      |> assign(:show_add_modal, show_add?)
+      |> assign(:show_edit_modal, show_edit?)
+      |> assign(:editing_ticket_tier, tier)
+    else
+      socket
     end
   end
 
@@ -771,34 +827,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     if cannot?(socket.assigns[:admin_role], :ticket_tier_create) do
       {:noreply, deny_full_admin(socket, "Add Ticket Tier")}
     else
-      {:noreply, assign(socket, :show_add_modal, true)}
+      {:noreply, push_patch(socket, to: tier_path(socket, "new"))}
     end
-  end
-
-  @impl true
-  def handle_event("close-add-ticket-tier-modal", _params, socket) do
-    {:noreply, assign(socket, :show_add_modal, false)}
-  end
-
-  @impl true
-  def handle_event("close-edit-ticket-tier-modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:show_edit_modal, false)
-     |> assign(:editing_ticket_tier, nil)}
-  end
-
-  @impl true
-  def handle_event("close-modal", _params, socket) do
-    # Refresh the ticket tier list when modal closes (in case a new tier was added or updated)
-    ticket_tiers = Events.list_ticket_tiers_for_event(socket.assigns.event_id)
-
-    {:noreply,
-     socket
-     |> assign(:show_add_modal, false)
-     |> assign(:show_edit_modal, false)
-     |> assign(:editing_ticket_tier, nil)
-     |> assign(:ticket_tiers, ticket_tiers)}
   end
 
   @impl true
@@ -806,12 +836,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     if cannot?(socket.assigns[:admin_role], :ticket_tier_update) do
       {:noreply, deny_full_admin(socket, "Edit Ticket Tier")}
     else
-      ticket_tier = Events.get_ticket_tier!(id)
-
-      {:noreply,
-       socket
-       |> assign(:show_edit_modal, true)
-       |> assign(:editing_ticket_tier, ticket_tier)}
+      {:noreply, push_patch(socket, to: tier_path(socket, id))}
     end
   end
 
@@ -1159,6 +1184,10 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
          |> assign(:granting_tier, ticket_tier)}
       end
     end
+  end
+
+  defp tier_path(socket, tier) do
+    tickets_path(socket.assigns.event_id, socket.assigns[:list_params], tier)
   end
 
   defp deny_full_admin(socket, title) do

@@ -706,6 +706,91 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Renders a form-bound on/off switch for a boolean field.
+
+  Unlike `toggle/1`, which is driven by server state, this is a real checkbox
+  (with the hidden `"false"` companion `<.input type="checkbox">` uses), so it
+  submits with the form. The optional `description` is wired to the checkbox
+  through `aria-describedby`.
+
+  ## Examples
+
+      <.switch
+        field={@form[:member_only]}
+        label="Member-only tier"
+        description="Only members can buy this tier."
+      />
+  """
+  attr :field, Phoenix.HTML.FormField, required: true
+  attr :label, :string, required: true
+  attr :description, :string, default: nil
+
+  attr :class, :string,
+    default: nil,
+    doc: "Additional classes for the wrapper label"
+
+  attr :rest, :global, include: ~w(phx-change phx-target disabled)
+
+  def switch(assigns) do
+    field = assigns.field
+
+    assigns =
+      assigns
+      |> assign(:id, field.id)
+      |> assign(:name, field.name)
+      |> assign(
+        :checked,
+        Phoenix.HTML.Form.normalize_value("checkbox", field.value)
+      )
+      |> assign(:errors, Enum.map(field.errors, &translate_error/1))
+
+    ~H"""
+    <div>
+      <label class={[
+        "flex cursor-pointer items-start justify-between gap-4 py-1",
+        @class
+      ]}>
+        <span class="flex min-w-0 flex-col gap-0.5">
+          <span class="text-sm font-medium leading-6 text-zinc-900">
+            {@label}
+          </span>
+          <span
+            :if={@description}
+            id={"#{@id}-description"}
+            class="text-xs text-zinc-500"
+          >
+            {@description}
+          </span>
+        </span>
+        <input type="hidden" name={@name} value="false" />
+        <input
+          type="checkbox"
+          role="switch"
+          id={@id}
+          name={@name}
+          value="true"
+          checked={@checked}
+          aria-describedby={@description && "#{@id}-description"}
+          class="peer sr-only"
+          {@rest}
+        />
+        <span
+          aria-hidden="true"
+          class={[
+            "relative mt-0.5 h-6 w-11 shrink-0 rounded-full bg-zinc-300 transition-colors",
+            "peer-checked:bg-blue-600",
+            "peer-focus-visible:ring-2 peer-focus-visible:ring-zinc-600 peer-focus-visible:ring-offset-2",
+            "after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:content-['']",
+            "peer-checked:after:translate-x-5"
+          ]}
+        />
+      </label>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </div>
+    """
+  end
+
+  @doc """
   Renders an input with label and error messages.
 
   A `Phoenix.HTML.FormField` may be passed as argument,
