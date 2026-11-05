@@ -722,7 +722,8 @@ defmodule Ysc.Posts do
          %Post{state: :published} <- get_post(post_id) do
       Repo.transaction(add_comment_to_post_multi(corrected_params))
       |> case do
-        {:ok, %{new_comment: comment}} ->
+        {:ok, %{new_comment: comment, updated_post: post}} ->
+          Ysc.Posts.CommentNotifications.notify(post, comment, author)
           {:ok, comment} |> broadcast_change("new_comment")
 
         {:error, _, changeset, _} ->

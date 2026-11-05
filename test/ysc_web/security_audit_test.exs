@@ -6999,6 +6999,62 @@ defmodule YscWeb.SecurityAuditTest do
                  bypass_guards: true
                )
     end
+
+    test "create_ticket_order refuses a combined quantity above the door-sale order cap under bypass_guards" do
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      general =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 99 combined",
+          type: :paid,
+          price: Money.new(25, :USD)
+        })
+
+      vip =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "VIP Finding 99 combined",
+          type: :paid,
+          price: Money.new(40, :USD)
+        })
+
+      student =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Student Finding 99 combined",
+          type: :paid,
+          price: Money.new(15, :USD)
+        })
+
+      # 20 + 20 + 20 = 60, each under the per-tier cap of 25. Defense in depth
+      # if a future caller skips parse_ticket_selections/1 (as offline grants do).
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.create_ticket_order(
+                 member.id,
+                 event.id,
+                 %{general.id => 20, vip.id => 20, student.id => 20},
+                 bypass_guards: true
+               )
+
+      assert from(to in Ysc.Tickets.TicketOrder,
+               where: to.user_id == ^member.id and to.event_id == ^event.id
+             )
+             |> Repo.all() == []
+
+      assert from(t in Ysc.Events.Ticket,
+               where: t.ticket_tier_id in ^[general.id, vip.id, student.id]
+             )
+             |> Repo.all() == []
+    end
   end
 
   defp unique_swedish_mobile do

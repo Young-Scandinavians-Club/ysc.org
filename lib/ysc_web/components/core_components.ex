@@ -41,6 +41,11 @@ defmodule YscWeb.CoreComponents do
         This is another modal.
       </.modal>
 
+  By default a cancel (X, Escape, backdrop click) also hides the modal on the
+  client straight after `:on_cancel` runs. Set `server_close` when the server
+  must decide: cancel then only runs `:on_cancel`, and the modal stays until the
+  server removes it, so it can decline (e.g. to ask before discarding edits).
+
   """
   attr :id, :string, required: true
   attr :show, :boolean, default: false
@@ -48,6 +53,7 @@ defmodule YscWeb.CoreComponents do
   attr :fill_viewport, :boolean, default: false
   attr :max_width, :string, default: "max-w-3xl"
   attr :on_cancel, JS, default: %JS{}
+  attr :server_close, :boolean, default: false
   attr :z_index, :string, default: "z-200"
   attr :panel_class, :any, default: nil
 
@@ -67,7 +73,9 @@ defmodule YscWeb.CoreComponents do
       phx-hook="ModalSheet"
       phx-mounted={@show && show_modal(@id)}
       phx-remove={hide_modal(@id)}
-      data-cancel={JS.exec(@on_cancel, "phx-remove")}
+      data-cancel={
+        if @server_close, do: @on_cancel, else: JS.exec(@on_cancel, "phx-remove")
+      }
       class={"relative #{@z_index} hidden"}
     >
       <%!-- No aria-hidden on backdrop: dialog has aria-modal="true"; avoids blocking focus/hidden violation --%>
@@ -702,6 +710,91 @@ defmodule YscWeb.CoreComponents do
         ></span>
       </span>
     </label>
+    """
+  end
+
+  @doc """
+  Renders a form-bound on/off switch for a boolean field.
+
+  Unlike `toggle/1`, which is driven by server state, this is a real checkbox
+  (with the hidden `"false"` companion `<.input type="checkbox">` uses), so it
+  submits with the form. The optional `description` is wired to the checkbox
+  through `aria-describedby`.
+
+  ## Examples
+
+      <.switch
+        field={@form[:member_only]}
+        label="Member-only tier"
+        description="Only members can buy this tier."
+      />
+  """
+  attr :field, Phoenix.HTML.FormField, required: true
+  attr :label, :string, required: true
+  attr :description, :string, default: nil
+
+  attr :class, :string,
+    default: nil,
+    doc: "Additional classes for the wrapper label"
+
+  attr :rest, :global, include: ~w(phx-change phx-target disabled)
+
+  def switch(assigns) do
+    field = assigns.field
+
+    assigns =
+      assigns
+      |> assign(:id, field.id)
+      |> assign(:name, field.name)
+      |> assign(
+        :checked,
+        Phoenix.HTML.Form.normalize_value("checkbox", field.value)
+      )
+      |> assign(:errors, Enum.map(field.errors, &translate_error/1))
+
+    ~H"""
+    <div>
+      <label class={[
+        "flex cursor-pointer items-start justify-between gap-4 py-1",
+        @class
+      ]}>
+        <span class="flex min-w-0 flex-col gap-0.5">
+          <span class="text-sm font-medium leading-6 text-zinc-900">
+            {@label}
+          </span>
+          <span
+            :if={@description}
+            id={"#{@id}-description"}
+            class="text-xs text-zinc-500"
+          >
+            {@description}
+          </span>
+        </span>
+        <input type="hidden" name={@name} value="false" />
+        <input
+          type="checkbox"
+          role="switch"
+          id={@id}
+          name={@name}
+          value="true"
+          checked={@checked}
+          aria-describedby={@description && "#{@id}-description"}
+          class="peer sr-only"
+          {@rest}
+        />
+        <span
+          aria-hidden="true"
+          class={[
+            "relative mt-0.5 h-6 w-11 shrink-0 rounded-full bg-zinc-300 transition-colors",
+            "peer-checked:bg-blue-600",
+            "peer-focus-visible:ring-2 peer-focus-visible:ring-zinc-600 peer-focus-visible:ring-offset-2",
+            "after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:content-['']",
+            "peer-checked:after:translate-x-5"
+          ]}
+        />
+      </label>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </div>
     """
   end
 

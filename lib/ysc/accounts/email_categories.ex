@@ -64,6 +64,9 @@ defmodule Ysc.Accounts.EmailCategories do
     "conduct_violation_board_notification" => :account,
     "volunteer_board_notification" => :account,
     "contact_form_board_notification" => :account,
+    "post_comment_board_notification" => :account,
+    # Member-facing reply alert for article comments
+    "post_comment_reply_notification" => :account,
     "expense_report_treasurer_notification" => :account,
     "newsletter_stats_snapshot" => :account,
     # Event notifications (can be disabled)

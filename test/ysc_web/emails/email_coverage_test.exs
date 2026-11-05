@@ -27,6 +27,8 @@ defmodule YscWeb.Emails.EmailCoverageTest do
     MembershipEnded,
     MembershipRenewalSuccess,
     OutageNotification,
+    PostCommentBoardNotification,
+    PostCommentReplyNotification,
     BookingCancellationCabinMasterNotification,
     BookingCancellationTreasurerNotification,
     BookingCheckinReminder,
@@ -110,6 +112,83 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       assert AccountSetupVerification.get_template_name() ==
                "account_setup_verification"
+    end
+  end
+
+  describe "PostCommentBoardNotification" do
+    test "renders the comment, author and link, escaping markup" do
+      author = user_fixture()
+
+      post = %Ysc.Posts.Post{title: "Midsummer Recap", url_name: "midsummer"}
+
+      comment = %Ysc.Posts.Comment{
+        id: "01ABC",
+        text: "Hello <script>alert(1)</script>",
+        comment_id: nil,
+        inserted_at: ~U[2024-12-01 18:00:00Z]
+      }
+
+      data =
+        PostCommentBoardNotification.prepare_email_data(post, comment, author)
+
+      assert data.comment_url =~ "/posts/midsummer#comments-01ABC"
+      refute data.reply
+
+      html = PostCommentBoardNotification.render(data)
+      assert html =~ "/posts/midsummer#comments-01ABC"
+      assert html =~ "Midsummer Recap"
+      refute html =~ "<script>alert(1)</script>"
+
+      assert PostCommentBoardNotification.get_template_name() ==
+               "post_comment_board_notification"
+
+      assert PostCommentBoardNotification.get_subject(post) =~
+               "Midsummer Recap"
+    end
+
+    test "labels replies" do
+      author = user_fixture()
+      post = %Ysc.Posts.Post{title: "T", url_name: "t"}
+
+      comment = %Ysc.Posts.Comment{
+        id: "01ABC",
+        text: "re",
+        comment_id: "01XYZ",
+        inserted_at: ~U[2024-12-01 18:00:00Z]
+      }
+
+      data =
+        PostCommentBoardNotification.prepare_email_data(post, comment, author)
+
+      assert data.reply
+      assert PostCommentBoardNotification.render(data) =~ "New Reply"
+    end
+  end
+
+  describe "PostCommentReplyNotification" do
+    test "renders the reply, replier and link" do
+      parent_author = user_fixture(%{first_name: "Greta"})
+      replier = user_fixture()
+      post = %Ysc.Posts.Post{title: "Midsummer Recap", url_name: "midsummer"}
+      reply = %Ysc.Posts.Comment{id: "01REPLY", text: "Nice <b>one</b>"}
+
+      data =
+        PostCommentReplyNotification.prepare_email_data(
+          post,
+          reply,
+          replier,
+          parent_author
+        )
+
+      html = PostCommentReplyNotification.render(data)
+      assert html =~ "Greta"
+      assert html =~ "/posts/midsummer#comments-01REPLY"
+      refute html =~ "<b>one</b>"
+
+      assert PostCommentReplyNotification.get_template_name() ==
+               "post_comment_reply_notification"
+
+      assert PostCommentReplyNotification.get_subject(post) =~ "Midsummer Recap"
     end
   end
 

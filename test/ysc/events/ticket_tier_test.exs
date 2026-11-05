@@ -260,6 +260,38 @@ defmodule Ysc.Events.TicketTierTest do
       assert cs.valid?
     end
 
+    test "max_per_buyer is optional, casts blanks to nil and must be positive",
+         %{event_id: event_id} do
+      base = %{"name" => "Guest", "type" => "free", "event_id" => event_id}
+
+      cs = TicketTier.changeset(%TicketTier{}, base)
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :max_per_buyer) == nil
+
+      cs =
+        TicketTier.changeset(%TicketTier{}, Map.put(base, "max_per_buyer", ""))
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :max_per_buyer) == nil
+
+      cs =
+        TicketTier.changeset(%TicketTier{}, Map.put(base, "max_per_buyer", "1"))
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :max_per_buyer) == 1
+
+      for bad <- ["0", "-2"] do
+        cs =
+          TicketTier.changeset(
+            %TicketTier{},
+            Map.put(base, "max_per_buyer", bad)
+          )
+
+        refute cs.valid?
+        assert %{max_per_buyer: [_]} = errors_on(cs)
+      end
+    end
+
     test "member_only defaults to false and casts from params", %{
       event_id: event_id
     } do

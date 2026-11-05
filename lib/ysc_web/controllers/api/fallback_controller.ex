@@ -68,6 +68,8 @@ defmodule YscWeb.Api.FallbackController do
       "this ticket is members-only and needs a Single, Family, or Lifetime membership",
     member_only_limit_exceeded:
       "this membership includes one members-only ticket per event",
+    tier_purchase_limit_exceeded:
+      "this ticket type has a per-member limit that the selection exceeds",
     invalid_plan: "invalid membership plan",
     invalid_offline_payment_method:
       "payment_method must be one of: cash, check, other",

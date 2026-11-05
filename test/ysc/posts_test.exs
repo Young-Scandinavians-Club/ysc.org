@@ -5,6 +5,7 @@ defmodule Ysc.PostsTest do
   use Ysc.DataCase, async: true
 
   import Ysc.AccountsFixtures
+  import Swoosh.TestAssertions
 
   alias Ysc.Posts
   alias Ysc.Posts.{Post, Comment}
@@ -729,6 +730,163 @@ defmodule Ysc.PostsTest do
         )
 
       assert Posts.count_published_posts() >= 1
+    end
+  end
+
+  describe "add_comment_to_post/2 board notification" do
+    setup %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Midsummer Recap",
+            "body" => "Body",
+            "url_name" => "midsummer-recap",
+            "state" => "published"
+          },
+          author
+        )
+
+      %{post: post}
+    end
+
+    test "emails the board a link to the comment", %{
+      post: post,
+      regular_user: user
+    } do
+      {:ok, comment} =
+        Posts.add_comment_to_post(
+          %{"post_id" => post.id, "text" => "Loved the photos"},
+          user
+        )
+
+      link = "/posts/midsummer-recap#comments-#{comment.id}"
+
+      assert_email_sent(fn email ->
+        assert Enum.any?(email.to, fn {_name, addr} ->
+                 addr == Ysc.EmailConfig.board_email()
+               end)
+
+        assert email.subject =~ "Midsummer Recap"
+        assert email.html_body =~ link
+        assert email.html_body =~ "Loved the photos"
+      end)
+    end
+
+    test "does not email the board when the comment is rejected", %{
+      post: post,
+      regular_user: user
+    } do
+      assert {:error, %Ecto.Changeset{}} =
+               Posts.add_comment_to_post(
+                 %{"post_id" => post.id, "text" => ""},
+                 user
+               )
+
+      assert_no_email_sent()
+    end
+  end
+
+  defp drain_emails(acc \\ []) do
+    receive do
+      {:email, email} -> drain_emails([email | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
+  defp sent_to?(email, address),
+    do: Enum.any?(email.to, fn {_name, addr} -> addr == address end)
+
+  describe "add_comment_to_post/2 reply notification" do
+    setup %{author: author, regular_user: commenter} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Midsummer Recap",
+            "body" => "Body",
+            "url_name" => "midsummer-recap-reply",
+            "state" => "published"
+          },
+          author
+        )
+
+      {:ok, root} =
+        Posts.add_comment_to_post(
+          %{"post_id" => post.id, "text" => "First!"},
+          commenter
+        )
+
+      drain_emails()
+      %{post: post, root: root, commenter: commenter}
+    end
+
+    test "emails the owner of the root comment a link to the reply", %{
+      post: post,
+      root: root,
+      commenter: commenter
+    } do
+      replier = user_fixture()
+
+      {:ok, reply} =
+        Posts.add_comment_to_post(
+          %{
+            "post_id" => post.id,
+            "text" => "Welcome!",
+            "comment_id" => root.id
+          },
+          replier
+        )
+
+      emails = drain_emails()
+      assert length(emails) == 2
+
+      email = Enum.find(emails, &sent_to?(&1, commenter.email))
+      assert email.subject =~ "reply to your comment"
+      assert email.html_body =~ "#comments-#{reply.id}"
+      assert email.html_body =~ "Welcome!"
+      assert Enum.any?(emails, &sent_to?(&1, Ysc.EmailConfig.board_email()))
+    end
+
+    test "does not email someone who replies to themselves", %{
+      post: post,
+      root: root,
+      commenter: commenter
+    } do
+      {:ok, _} =
+        Posts.add_comment_to_post(
+          %{"post_id" => post.id, "text" => "Also me", "comment_id" => root.id},
+          commenter
+        )
+
+      refute Enum.any?(drain_emails(), &sent_to?(&1, commenter.email))
+    end
+
+    test "ignores a comment_id from another article", %{
+      author: author,
+      root: root
+    } do
+      {:ok, other_post} =
+        Posts.create_post(
+          %{
+            "title" => "Other",
+            "body" => "Body",
+            "url_name" => "other-article",
+            "state" => "published"
+          },
+          author
+        )
+
+      {:ok, _} =
+        Posts.add_comment_to_post(
+          %{
+            "post_id" => other_post.id,
+            "text" => "Cross-post",
+            "comment_id" => root.id
+          },
+          user_fixture()
+        )
+
+      refute Enum.any?(drain_emails(), &(&1.subject =~ "reply to your comment"))
     end
   end
 

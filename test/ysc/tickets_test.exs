@@ -4135,6 +4135,169 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "create_ticket_order/3 per-buyer tier limits (max_per_buyer)" do
+    setup do
+      ctx = tickets_setup()
+
+      {:ok, member_tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Member",
+          type: :paid,
+          price: Money.new(20, :USD),
+          quantity: 50,
+          member_only: true,
+          event_id: ctx.event.id
+        })
+
+      {:ok, guest_tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Guest (+1)",
+          type: :paid,
+          price: Money.new(30, :USD),
+          quantity: 50,
+          max_per_buyer: 1,
+          event_id: ctx.event.id
+        })
+
+      Map.merge(ctx, %{member_tier: member_tier, guest_tier: guest_tier})
+    end
+
+    defp confirm_order_tickets!(order) do
+      order
+      |> Ysc.Repo.preload(:tickets)
+      |> Map.fetch!(:tickets)
+      |> Enum.each(fn ticket ->
+        ticket
+        |> Ecto.Changeset.change(status: :confirmed)
+        |> Ysc.Repo.update!()
+      end)
+    end
+
+    test "member can buy member tickets plus one guest ticket", %{
+      user: user,
+      event: event,
+      member_tier: member,
+      guest_tier: guest
+    } do
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 member.id => 3,
+                 guest.id => 1
+               })
+    end
+
+    test "rejects more than the limit in a single order", %{
+      user: user,
+      event: event,
+      guest_tier: guest
+    } do
+      assert {:error, :tier_purchase_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{guest.id => 2})
+    end
+
+    test "counts confirmed tickets already held against the limit", %{
+      user: user,
+      event: event,
+      guest_tier: guest
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{guest.id => 1})
+
+      confirm_order_tickets!(order)
+
+      assert {:error, :tier_purchase_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{guest.id => 1})
+    end
+
+    test "a higher limit allows topping up to it", %{
+      user: user,
+      event: event,
+      guest_tier: guest
+    } do
+      {:ok, _} = Events.update_ticket_tier(guest, %{max_per_buyer: 3})
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{guest.id => 2})
+
+      confirm_order_tickets!(order)
+
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{guest.id => 1})
+
+      assert {:error, :tier_purchase_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{guest.id => 2})
+    end
+
+    test "pending tickets do not consume the limit", %{
+      user: user,
+      event: event,
+      guest_tier: guest
+    } do
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: guest.id,
+        status: :pending,
+        expires_at:
+          DateTime.utc_now()
+          |> DateTime.add(1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{guest.id => 1})
+    end
+
+    test "other buyers are not affected by someone else's tickets", %{
+      user: user,
+      event: event,
+      guest_tier: guest
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{guest.id => 1})
+
+      confirm_order_tickets!(order)
+
+      other = give_plan_membership(user_fixture_unique(), :family)
+
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(other.id, event.id, %{guest.id => 1})
+    end
+
+    test "tiers without a limit are never restricted", %{
+      user: user,
+      event: event,
+      member_tier: member
+    } do
+      assert {:ok, _order} =
+               Tickets.create_ticket_order(user.id, event.id, %{member.id => 5})
+    end
+
+    test "bypass_guards does not skip the per-buyer limit", %{
+      user: user,
+      event: event,
+      guest_tier: guest
+    } do
+      assert {:error, :tier_purchase_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{guest.id => 2},
+                 bypass_guards: true
+               )
+    end
+
+    test "preloaded tiers still enforce the limit", %{
+      user: user,
+      event: event,
+      guest_tier: guest
+    } do
+      assert {:error, :tier_purchase_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{guest.id => 2},
+                 tiers: [guest]
+               )
+    end
+  end
+
   describe "ci_query_explain_* query builders" do
     test "ci_query_explain_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} = Tickets.ci_query_explain_query()
@@ -4173,6 +4336,11 @@ defmodule Ysc.TicketsTest do
     test "ci_query_explain_ticket_order_for_confirmation_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Tickets.ci_query_explain_ticket_order_for_confirmation_query()
+    end
+
+    test "owned_tickets_by_tier_query is exposed" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_owned_tickets_by_tier_query()
     end
   end
 end

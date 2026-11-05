@@ -1428,6 +1428,7 @@ defmodule Ysc.Events do
           tt.quantity,
           tt.requires_registration,
           tt.member_only,
+          tt.max_per_buyer,
           tt.start_date,
           tt.end_date,
           tt.event_id,
@@ -1444,6 +1445,7 @@ defmodule Ysc.Events do
           quantity: tt.quantity,
           requires_registration: tt.requires_registration,
           member_only: tt.member_only,
+          max_per_buyer: tt.max_per_buyer,
           start_date: tt.start_date,
           end_date: tt.end_date,
           event_id: tt.event_id,
@@ -1816,7 +1818,8 @@ defmodule Ysc.Events do
   # Ticket Tier Management Functions
 
   @doc """
-  Fields needed to apply member-only purchase rules: id, member_only, type.
+  Fields needed to apply purchase rules (member-only plan rules and per-buyer
+  ticket limits): id, member_only, max_per_buyer, type.
 
   Does not join tickets or compute sold counts — checkout availability is
   enforced separately by `Ysc.Tickets.BookingLocker`.
@@ -1836,7 +1839,12 @@ defmodule Ysc.Events do
   defp ticket_tier_member_only_attrs_query(tier_ids) do
     from(tt in TicketTier,
       where: tt.id in ^tier_ids,
-      select: %{id: tt.id, member_only: tt.member_only, type: tt.type}
+      select: %{
+        id: tt.id,
+        member_only: tt.member_only,
+        max_per_buyer: tt.max_per_buyer,
+        type: tt.type
+      }
     )
   end
 
@@ -1858,6 +1866,7 @@ defmodule Ysc.Events do
         tt.requires_registration,
         tt.attendee_questions,
         tt.member_only,
+        tt.max_per_buyer,
         tt.start_date,
         tt.end_date,
         tt.event_id,
@@ -1875,6 +1884,7 @@ defmodule Ysc.Events do
         requires_registration: tt.requires_registration,
         attendee_questions: tt.attendee_questions,
         member_only: tt.member_only,
+        max_per_buyer: tt.max_per_buyer,
         start_date: tt.start_date,
         end_date: tt.end_date,
         event_id: tt.event_id,

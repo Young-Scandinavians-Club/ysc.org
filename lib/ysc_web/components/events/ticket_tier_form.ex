@@ -13,9 +13,19 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       assigns
       |> assign(:tier_type, to_string(assigns.form[:type].value))
       |> assign_new(:dialog_id, fn -> nil end)
+      |> assign_new(:dirty?, fn -> false end)
+      |> assign_new(:confirm_discard?, fn -> false end)
 
     ~H"""
-    <div id={"#{@event_id}-ticket-tier-form"}>
+    <%!--
+    The hook warns before a reload or tab close while there are unsaved edits.
+    The id must not start with a digit: Modal close pushes to it by selector.
+    --%>
+    <div
+      id={"tier-form-#{@event_id}"}
+      phx-hook="UnsavedChangesGuard"
+      data-dirty={to_string(@dirty?)}
+    >
       <div class="mb-5">
         <h2 class="text-lg text-zinc-900 type-subhead">
           {if assigns[:ticket_tier], do: "Edit ticket tier", else: "New ticket tier"}
@@ -84,22 +94,27 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
           </.error>
         </div>
 
-        <.input type="text" label="Name" field={@form[:name]} required />
+        <div class={[
+          "grid grid-cols-1 gap-x-4 gap-y-5",
+          paid_type?(@tier_type) && "sm:grid-cols-[minmax(0,1fr)_11rem]"
+        ]}>
+          <.input type="text" label="Name" field={@form[:name]} required />
 
-        <.input
-          :if={paid_type?(@tier_type)}
-          type="text"
-          label="Price"
-          field={@form[:price]}
-          placeholder="0.00"
-          phx-hook="MoneyInput"
-          value={format_money(@form[:price].value)}
-          required
-        >
-          <div class="text-zinc-800">
-            $
-          </div>
-        </.input>
+          <.input
+            :if={paid_type?(@tier_type)}
+            type="text"
+            label="Price"
+            field={@form[:price]}
+            placeholder="0.00"
+            phx-hook="MoneyInput"
+            value={format_money(@form[:price].value)}
+            required
+          >
+            <div class="text-zinc-800">
+              $
+            </div>
+          </.input>
+        </div>
 
         <.input
           type="textarea"
@@ -132,12 +147,12 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
             <div :if={!@form[:unlimited_quantity].value} class="w-full sm:w-40">
               <.input type="number" label="Quantity" field={@form[:quantity]} />
             </div>
-            <.input
-              type="checkbox"
-              label="Unlimited quantity"
+            <.switch
               field={@form[:unlimited_quantity]}
+              label="Unlimited quantity"
               phx-change="toggle_quantity_limit"
               phx-target={@myself}
+              class="sm:pb-1"
             />
           </div>
 
@@ -148,6 +163,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
               form={@form}
               start_date_field={@form[:start_date]}
               min={Date.utc_today()}
+              max={@event_start_date}
               required={false}
               timezone="America/Los_Angeles"
             />
@@ -157,6 +173,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
               form={@form}
               start_date_field={@form[:end_date]}
               min={sale_end_min_date(@form[:start_date].value)}
+              max={@event_start_date}
               required={false}
               timezone="America/Los_Angeles"
               end_of_day?={true}
@@ -165,41 +182,42 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
           <p class="text-xs text-zinc-500">
             Leave blank to start selling now. Sales close when the event starts.
           </p>
+        </section>
 
-          <div>
-            <label class="flex items-start gap-3 text-sm leading-6 text-zinc-700">
-              <input
-                type="hidden"
-                name={@form[:member_only].name}
-                value="false"
-              />
-              <input
-                type="checkbox"
-                id={@form[:member_only].id}
-                name={@form[:member_only].name}
-                value="true"
-                checked={
-                  Phoenix.HTML.Form.normalize_value(
-                    "checkbox",
-                    @form[:member_only].value
-                  )
-                }
-                class="mt-1 rounded-sm border-zinc-300 text-zinc-900 focus:ring-0"
-              />
-              <span class="flex flex-col gap-0.5">
-                <span class="font-medium text-zinc-900">Member-only tier</span>
-                <span class="text-xs text-zinc-500">
-                  Single members get 1 ticket per event (across all member-only
-                  tiers). Family and Lifetime members have no limit. Everyone
-                  else can't buy this tier.
-                </span>
-              </span>
-            </label>
-            <.error :for={
-              msg <- Enum.map(@form[:member_only].errors, &translate_error(&1))
-            }>
-              {msg}
-            </.error>
+        <section
+          :if={!donation_type?(@tier_type)}
+          id="tier-who-can-buy"
+          aria-labelledby="tier-who-can-buy-heading"
+          class="space-y-4 border-t border-zinc-100 pt-5"
+        >
+          <h3
+            id="tier-who-can-buy-heading"
+            class="text-sm text-zinc-900 type-subhead"
+          >
+            Who can buy
+          </h3>
+
+          <.switch
+            field={@form[:member_only]}
+            label="Member-only tier"
+            description="Single members get 1 ticket per event (across all member-only tiers). Family and Lifetime members have no member-only limit, but the limit per member below still applies to them. Everyone else can't buy this tier."
+          />
+
+          <div class="w-full sm:w-56">
+            <.input
+              type="number"
+              label="Limit per member"
+              field={@form[:max_per_buyer]}
+              min="1"
+              step="1"
+              placeholder="No limit"
+              aria-describedby="max-per-buyer-help"
+            />
+            <p id="max-per-buyer-help" class="mt-1 text-xs text-zinc-500">
+              The most tickets of this tier one member can buy for the event,
+              counting any they already bought. Use it for guest tickets, e.g. 1
+              for "one guest (+1)".
+            </p>
           </div>
         </section>
 
@@ -222,23 +240,75 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
           />
         </section>
 
-        <div class="flex justify-end gap-2 border-t border-zinc-100 pt-4">
-          <.button
-            :if={@dialog_id}
-            type="button"
-            variant="outline"
-            color="zinc"
-            phx-click={JS.exec("data-cancel", to: "##{@dialog_id}")}
+        <%!-- Sticky so Save stays reachable however far the form has scrolled;
+             the negative margins bleed it to the modal panel's edges. --%>
+        <div
+          id="tier-form-actions"
+          class="sticky bottom-0 z-10 -mx-6 -mb-6 border-t border-zinc-100 bg-white px-6 py-4 sm:-mx-8 sm:-mb-8 sm:px-8"
+        >
+          <div
+            :if={@confirm_discard?}
+            id="tier-form-discard-confirm"
+            role="alertdialog"
+            aria-labelledby="tier-form-discard-title"
+            class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
           >
-            Cancel
-          </.button>
-          <.button type="submit" phx-disable-with="Saving...">
-            <%= if assigns[:ticket_tier] do %>
-              <.icon name="hero-pencil" /> Update Ticket Tier
-            <% else %>
-              <.icon name="hero-plus" /> Add Ticket Tier
-            <% end %>
-          </.button>
+            <p id="tier-form-discard-title" class="text-sm text-zinc-700">
+              <span class="font-semibold text-zinc-900">Discard your changes?</span>
+              This tier hasn't been saved.
+            </p>
+            <div class="flex justify-end gap-2">
+              <.button
+                id="tier-form-keep-editing"
+                type="button"
+                variant="outline"
+                color="zinc"
+                phx-click="keep-editing"
+                phx-target={@myself}
+                phx-mounted={JS.focus()}
+              >
+                Keep editing
+              </.button>
+              <.button
+                id="tier-form-discard"
+                type="button"
+                color="red"
+                phx-click="discard"
+                phx-target={@myself}
+              >
+                Discard
+              </.button>
+            </div>
+          </div>
+
+          <div :if={!@confirm_discard?} class="flex items-center justify-end gap-2">
+            <span
+              :if={@dirty?}
+              id="tier-form-unsaved"
+              class="mr-auto flex items-center gap-1.5 text-xs text-zinc-500"
+            >
+              <span
+                class="h-1.5 w-1.5 rounded-full bg-amber-500"
+                aria-hidden="true"
+              /> Unsaved changes
+            </span>
+            <.button
+              :if={@dialog_id}
+              type="button"
+              variant="outline"
+              color="zinc"
+              phx-click={JS.exec("data-cancel", to: "##{@dialog_id}")}
+            >
+              Cancel
+            </.button>
+            <.button type="submit" phx-disable-with="Saving...">
+              <%= if assigns[:ticket_tier] do %>
+                <.icon name="hero-check" /> Save changes
+              <% else %>
+                <.icon name="hero-plus" /> Add Ticket Tier
+              <% end %>
+            </.button>
+          </div>
         </div>
       </.form>
     </div>
@@ -303,48 +373,20 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         id="attendee-info-section"
         class={["mt-4 space-y-4", !@open? && "hidden"]}
       >
-        <label class="flex items-start gap-3 text-sm leading-6 text-zinc-700">
-          <input
-            type="hidden"
-            name={@form[:requires_registration].name}
-            value="false"
+        <div>
+          <.switch
+            field={@form[:requires_registration]}
+            label="Ask for each guest's name and email"
+            description="Collects first name, last name, and email for every ticket, not just the buyer's."
           />
-          <input
-            type="checkbox"
-            id={@form[:requires_registration].id}
-            name={@form[:requires_registration].name}
-            value="true"
-            checked={
-              Phoenix.HTML.Form.normalize_value(
-                "checkbox",
-                @form[:requires_registration].value
-              )
-            }
-            class="mt-1 rounded-sm border-zinc-300 text-zinc-900 focus:ring-0"
-          />
-          <span class="flex flex-col gap-0.5">
-            <span class="font-medium text-zinc-900">
-              Ask for each guest's name and email
-            </span>
-            <span class="text-xs text-zinc-500">
-              Collects first name, last name, and email for every ticket, not
-              just the buyer's.
-            </span>
-            <span
-              :if={@asks_child_age?}
-              id="attendee-info-name-only-hint"
-              class="text-xs text-zinc-500"
-            >
-              This tier asks for a child's age, so it collects a name only, no email.
-            </span>
-          </span>
-        </label>
-        <.error :for={
-          msg <-
-            Enum.map(@form[:requires_registration].errors, &translate_error(&1))
-        }>
-          {msg}
-        </.error>
+          <p
+            :if={@asks_child_age?}
+            id="attendee-info-name-only-hint"
+            class="mt-1 text-xs text-zinc-500"
+          >
+            This tier asks for a child's age, so it collects a name only, no email.
+          </p>
+        </div>
 
         <div class="space-y-3 border-t border-zinc-100 pt-4">
           <div>
@@ -601,6 +643,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
   end
 
   @impl true
+  def update(%{mark_dirty: true}, socket), do: {:ok, mark_dirty(socket)}
+
   def update(assigns, socket) do
     # Only create a new changeset if we don't already have one in the socket
     changeset =
@@ -633,7 +677,15 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
      |> assign(assigns)
      |> assign_new(:dialog_id, fn -> nil end)
      |> assign_new(:admin_role, fn -> nil end)
+     |> assign_new(:dirty?, fn -> false end)
+     |> assign_new(:confirm_discard?, fn -> false end)
+     |> assign_new(:close_path, fn ->
+       ~p"/admin/events/#{socket.assigns[:event_id] || assigns[:event_id]}/tickets"
+     end)
      |> assign_copyable_tiers()
+     |> assign_new(:event_start_date, fn ->
+       event_start_date(socket.assigns[:event_id] || assigns[:event_id])
+     end)
      |> assign_new(:retained_price, fn ->
        case assigns[:ticket_tier] do
          %{type: type, price: price} ->
@@ -660,6 +712,22 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
   end
 
   @impl true
+  def handle_event("request-close", _params, socket) do
+    if socket.assigns.dirty? do
+      {:noreply, assign(socket, :confirm_discard?, true)}
+    else
+      {:noreply, push_patch(socket, to: socket.assigns.close_path)}
+    end
+  end
+
+  def handle_event("keep-editing", _params, socket) do
+    {:noreply, assign(socket, :confirm_discard?, false)}
+  end
+
+  def handle_event("discard", _params, socket) do
+    {:noreply, push_patch(socket, to: socket.assigns.close_path)}
+  end
+
   def handle_event("add-question", %{"preset" => preset_key}, socket) do
     attrs =
       case Enum.find(AttendeeQuestion.presets(), &(&1.key == preset_key)) do
@@ -692,7 +760,11 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
           |> Enum.reject(&MapSet.member?(existing_labels, &1.label))
           |> Enum.map(&%{&1 | id: AttendeeQuestion.generate_id()})
 
-        {:noreply, append_questions(socket, copies)}
+        # Everything on that tier is already here: nothing changed, so don't
+        # raise the unsaved-changes prompt.
+        if copies == [],
+          do: {:noreply, socket},
+          else: {:noreply, append_questions(socket, copies)}
     end
   end
 
@@ -721,7 +793,10 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       |> Map.put(:action, :validate)
 
     {:noreply,
-     socket |> assign(:retained_price, retained_price) |> assign_form(changeset)}
+     socket
+     |> assign(:retained_price, retained_price)
+     |> mark_dirty()
+     |> assign_form(changeset)}
   end
 
   @impl true
@@ -762,7 +837,10 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       |> Map.put(:action, :validate)
 
     {:noreply,
-     socket |> assign(:retained_price, retained_price) |> assign_form(changeset)}
+     socket
+     |> assign(:retained_price, retained_price)
+     |> mark_dirty()
+     |> assign_form(changeset)}
   end
 
   @impl true
@@ -824,9 +902,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
            title: "Ticket tier"
          )
          |> assign_form(changeset)
-         |> push_navigate(
-           to: ~p"/admin/events/#{socket.assigns.event_id}/tickets"
-         )}
+         |> push_navigate(to: socket.assigns.close_path)}
 
       {:error, changeset} ->
         {:noreply, socket |> assign_form(changeset)}
@@ -842,7 +918,14 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
       |> Ecto.Changeset.put_embed(:attendee_questions, existing ++ questions)
       |> Map.put(:action, :validate)
 
-    assign_form(socket, changeset)
+    socket |> mark_dirty() |> assign_form(changeset)
+  end
+
+  # Any edit counts, even one later reverted: asking once too often is cheaper
+  # than silently losing a half-built tier. Typing again dismisses a pending
+  # discard prompt.
+  defp mark_dirty(socket) do
+    socket |> assign(:dirty?, true) |> assign(:confirm_discard?, false)
   end
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
@@ -878,6 +961,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         :end_date,
         :requires_registration,
         :member_only,
+        :max_per_buyer,
         :event_id
       ])
 
@@ -924,6 +1008,16 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
   defp format_money(%Money{} = value) do
     case Ysc.MoneyHelper.format_money(value) do
       {:ok, money} -> money
+      _ -> nil
+    end
+  end
+
+  # Sales close when the event starts, so the event's start day is the latest
+  # selectable sale date. nil (no cap) when the event has no start date yet.
+  defp event_start_date(event_id) do
+    case Ysc.Events.get_event(event_id) do
+      %{start_date: %DateTime{} = start_date} -> DateTime.to_date(start_date)
+      %{start_date: %Date{} = start_date} -> start_date
       _ -> nil
     end
   end
@@ -1020,6 +1114,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
     if donation_type?(params["type"]) do
       params
       |> Map.put("quantity", nil)
+      |> Map.put("max_per_buyer", nil)
       |> Map.put("start_date", nil)
       |> Map.put("end_date", nil)
     else
