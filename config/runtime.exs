@@ -103,10 +103,13 @@ config :ysc, :emails,
   tahoe_email: System.get_env("EMAIL_TAHOE") || "tahoe@ysc.org",
   clear_lake_email: System.get_env("EMAIL_CLEAR_LAKE") || "cl@ysc.org"
 
-# OpenRouter — optional; powers admin help guide finder and step clarifier
+# OpenRouter — optional; powers admin help guide finder and step clarifier,
+# and the multimodal event poster review (needs a vision-capable model).
 config :ysc, :open_router,
   api_key: System.get_env("OPENROUTER_API_KEY"),
   model: System.get_env("OPENROUTER_MODEL") || "deepseek/deepseek-v4-flash",
+  vision_model:
+    System.get_env("OPENROUTER_VISION_MODEL") || "google/gemini-2.5-flash",
   referer: System.get_env("OPENROUTER_REFERER")
 
 # ## Apple Wallet Configuration

@@ -19,7 +19,10 @@ defmodule YscWeb.AdminEventsNewLive do
   alias YscWeb.Admin.EditingPresence
   alias YscWeb.AdminBadgeHelpers
   alias YscWeb.AdminCheckInPaths
+  alias Ysc.Media
   alias Ysc.Media.Image
+  alias Ysc.Media.PosterQuality
+  alias Ysc.Media.PosterReview
 
   alias Ysc.Events.Agenda
   alias Ysc.Agendas
@@ -27,6 +30,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias YscWeb.AdminEventsLive.TicketTierForm
   alias YscWeb.AdminEventsLive.TicketTierManagement
   alias YscWeb.Components.Events.CommunicationTimeline
+  alias YscWeb.Components.Events.PosterQualityNotice
   alias YscWeb.Emails.EventUpdateNotification
   alias YscWeb.Sms.Segment
 
@@ -427,6 +431,10 @@ defmodule YscWeb.AdminEventsNewLive do
                 id={:event_cover}
                 user_id={@current_user.id}
                 image_id={@form[:image_id].value}
+              />
+              <PosterQualityNotice.poster_quality_notice
+                issues={@cover_issues}
+                review={@cover_review}
               />
             </.admin_form_section>
 
@@ -1594,6 +1602,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     socket
     |> assign(:event, event)
+    |> assign_cover_check(event.image_id)
     |> assign(:active_page, :events)
     |> assign(:capacity_form, to_form(capacity_changeset))
     |> assign(:page_title, event.title)
@@ -1656,6 +1665,8 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:loading_event?, true)
     |> assign(:tier_modal, nil)
     |> assign(:event, %Event{id: id, state: :draft, title: ""})
+    |> assign(:cover_issues, [])
+    |> assign(:cover_review, nil)
     |> assign(:active_page, :events)
     |> assign(:page_title, "Event")
     |> assign(:list_params, Map.drop(params, ["id", "tier"]))
@@ -1681,6 +1692,43 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:check_in_path, nil)
     |> assign(:editors, [])
   end
+
+  # Warns (never blocks) when the cover image will look bad in its 16:9 frame.
+  # Pixel checks are instant and run whenever the cover is loaded. The LLM
+  # review costs money, so it only runs when the admin picks or uploads a new
+  # cover (`review?: true`), asynchronously, and is advisory only.
+  defp assign_cover_check(socket, image_id, opts \\ []) do
+    image = cover_image(image_id)
+
+    issues =
+      case PosterQuality.assess(image) do
+        {:measured, issues} -> issues
+        :unmeasured -> []
+      end
+
+    socket =
+      socket
+      |> cancel_async(:poster_review)
+      |> assign(:cover_check_image_id, image && image.id)
+      |> assign(:cover_issues, issues)
+      |> assign(:cover_review, nil)
+
+    if Keyword.get(opts, :review?, false) and image != nil and
+         PosterReview.available?() do
+      socket
+      |> assign(:cover_review, :running)
+      |> start_async(:poster_review, fn ->
+        {image.id, PosterReview.review(image)}
+      end)
+    else
+      socket
+    end
+  end
+
+  defp cover_image(image_id) when is_binary(image_id) and image_id != "",
+    do: Media.fetch_image(image_id)
+
+  defp cover_image(_image_id), do: nil
 
   defp assign_updates_tab_defaults(socket) do
     dev_routes? = Application.get_env(:ysc, :dev_routes, false)
@@ -2261,6 +2309,11 @@ defmodule YscWeb.AdminEventsNewLive do
   @impl true
   def handle_event("clear-cover-image", _, socket) do
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("dismiss-cover-review", _, socket) do
+    {:noreply, assign(socket, :cover_review, nil)}
   end
 
   @impl true
@@ -3052,6 +3105,30 @@ defmodule YscWeb.AdminEventsNewLive do
     {:noreply, assign(socket, :statistics_loading?, false)}
   end
 
+  # The cover may have changed while the review ran; only the result for the
+  # image currently being checked (the one the picker shows) is kept.
+  def handle_async(:poster_review, {:ok, {image_id, result}}, socket) do
+    checked_image_id = socket.assigns[:cover_check_image_id]
+
+    review =
+      case result do
+        {:ok, [_ | _] = findings} when image_id == checked_image_id -> findings
+        _ -> nil
+      end
+
+    {:noreply, assign(socket, :cover_review, review)}
+  end
+
+  def handle_async(:poster_review, {:exit, {:shutdown, :cancel}}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_async(:poster_review, {:exit, reason}, socket) do
+    Ysc.Logging.warning("Poster review crashed: #{inspect(reason)}")
+
+    {:noreply, assign(socket, :cover_review, nil)}
+  end
+
   @impl true
   def handle_info(
         {YscWeb.AdminEventsLive.ScheduleEventForm,
@@ -3123,6 +3200,15 @@ defmodule YscWeb.AdminEventsNewLive do
       ) do
     if event.id == socket.assigns[:event].id do
       changeset = Event.changeset(event, %{})
+
+      # Another editor may have swapped the cover. Unchanged covers (including
+      # echoes of our own save) are left alone so a running review isn't cancelled.
+      socket =
+        if event.image_id != socket.assigns.event.image_id do
+          assign_cover_check(socket, event.image_id)
+        else
+          socket
+        end
 
       {:noreply,
        socket
@@ -3266,7 +3352,12 @@ defmodule YscWeb.AdminEventsNewLive do
          ) do
       {:ok, event} ->
         changeset = Event.changeset(event, %{"image_id" => nil})
-        {:noreply, assign_form(socket, changeset) |> assign(:event, event)}
+
+        {:noreply,
+         socket
+         |> assign_form(changeset)
+         |> assign(:event, event)
+         |> assign_cover_check(event.image_id)}
 
       {:error, _} ->
         reloaded_event = Events.get_event!(socket.assigns[:event].id)
@@ -3276,13 +3367,21 @@ defmodule YscWeb.AdminEventsNewLive do
              ) do
           {:ok, event} ->
             changeset = Event.changeset(event, %{"image_id" => nil})
-            {:noreply, assign_form(socket, changeset) |> assign(:event, event)}
+
+            {:noreply,
+             socket
+             |> assign_form(changeset)
+             |> assign(:event, event)
+             |> assign_cover_check(event.image_id)}
 
           {:error, _} ->
             changeset = Event.changeset(reloaded_event, %{"image_id" => nil})
 
             {:noreply,
-             assign_form(socket, changeset) |> assign(:event, reloaded_event)}
+             socket
+             |> assign_form(changeset)
+             |> assign(:event, reloaded_event)
+             |> assign_cover_check(nil)}
         end
     end
   end
@@ -3309,7 +3408,10 @@ defmodule YscWeb.AdminEventsNewLive do
       end
 
     {:noreply,
-     socket |> assign_form(changeset) |> assign(:event, updated_event)}
+     socket
+     |> assign_form(changeset)
+     |> assign(:event, updated_event)
+     |> assign_cover_check(image_id, review?: true)}
   end
 
   def handle_info({YscWeb.TrixImagePickerComponent, id, image}, socket) do
