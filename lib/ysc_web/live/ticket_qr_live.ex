@@ -1,4 +1,11 @@
 defmodule YscWeb.TicketQrLive do
+  @moduledoc """
+  Shows event tickets as QR codes with "Add to wallet" buttons.
+
+  Signed-in members open their own tickets by order or event. Everyone else
+  (volunteers, guests a member bought a ticket for) opens `/t/:token` from their
+  ticket email, which needs no account; see `Ysc.Tickets.AccessToken`.
+  """
   use YscWeb, :live_view
 
   require Ysc.Logging
@@ -6,6 +13,7 @@ defmodule YscWeb.TicketQrLive do
   alias Ysc.Tickets
   alias Ysc.Events.TicketTierHelpers
   alias Ysc.Scanning.QrToken
+  alias Ysc.Tickets.AccessToken
   alias Ysc.AppleWallet
   alias Ysc.GoogleWallet
   alias Ysc.Events.DateTimeFormatter
@@ -22,6 +30,7 @@ defmodule YscWeb.TicketQrLive do
       <%!-- Header bar --%>
       <div class="flex items-center gap-3 px-4 pt-safe-top py-4 border-b border-white/10">
         <.link
+          :if={!@public?}
           id="back-link"
           navigate={@return_to}
           class="flex items-center justify-center w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 active:bg-white/30 transition-colors shrink-0"
@@ -146,13 +155,19 @@ defmodule YscWeb.TicketQrLive do
               <p class="text-lg font-semibold text-white mb-1">
                 Could not load tickets
               </p>
-              <p class="text-sm text-zinc-400">Please go back and try again.</p>
-              <.link
-                navigate={@return_to}
-                class="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors"
-              >
-                <.icon name="hero-arrow-left" class="w-4 h-4" /> Go back
-              </.link>
+              <%= if @public? do %>
+                <p id="public-ticket-error" class="text-sm text-zinc-300">
+                  {@public_error_message}
+                </p>
+              <% else %>
+                <p class="text-sm text-zinc-400">Please go back and try again.</p>
+                <.link
+                  navigate={@return_to}
+                  class="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors"
+                >
+                  <.icon name="hero-arrow-left" class="w-4 h-4" /> Go back
+                </.link>
+              <% end %>
             </div>
           <% true -> %>
             <%!-- Slider --%>
@@ -209,9 +224,7 @@ defmodule YscWeb.TicketQrLive do
                         <%!-- Fixed-height wallet row: platform detection must not expand the card --%>
                         <div class="flex flex-col items-center justify-center gap-2 mt-4 min-h-14">
                           <%= if @apple_wallet_enabled? && @wallet_platform in [:apple_only, :both] do %>
-                            <.add_to_wallet_button href={
-                              ~p"/wallet/tickets/#{ticket.id}"
-                            } />
+                            <.add_to_wallet_button href={ticket.apple_href} />
                           <% end %>
                           <%= if @google_wallet_enabled? &&
                                 @wallet_platform in [:google_only, :both] &&
@@ -308,27 +321,29 @@ defmodule YscWeb.TicketQrLive do
 
             <%!-- Order reference: 14px, zinc-300 on zinc-900 (~5.5:1) --%>
             <div class="mt-8 text-center px-4">
-              <%= if @order_id do %>
-                <p class="text-sm text-zinc-300">
-                  Order number&nbsp;<span class="font-mono font-semibold text-white">{@order_reference}</span>
-                </p>
-                <.link
-                  id="confirmation-link"
-                  navigate={~p"/orders/#{@order_id}/confirmation"}
-                  class="mt-2 inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
-                >
-                  View order & receipt
-                  <.icon name="hero-arrow-right" class="w-4 h-4" />
-                </.link>
-              <% else %>
-                <.link
-                  id="all-orders-link"
-                  navigate={~p"/users/tickets"}
-                  class="inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
-                >
-                  View all your tickets
-                  <.icon name="hero-arrow-right" class="w-4 h-4" />
-                </.link>
+              <%= cond do %>
+                <% @public? -> %>
+                <% @order_id -> %>
+                  <p class="text-sm text-zinc-300">
+                    Order number&nbsp;<span class="font-mono font-semibold text-white">{@order_reference}</span>
+                  </p>
+                  <.link
+                    id="confirmation-link"
+                    navigate={~p"/orders/#{@order_id}/confirmation"}
+                    class="mt-2 inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
+                  >
+                    View order & receipt
+                    <.icon name="hero-arrow-right" class="w-4 h-4" />
+                  </.link>
+                <% true -> %>
+                  <.link
+                    id="all-orders-link"
+                    navigate={~p"/users/tickets"}
+                    class="inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
+                  >
+                    View all your tickets
+                    <.icon name="hero-arrow-right" class="w-4 h-4" />
+                  </.link>
               <% end %>
             </div>
         <% end %>
@@ -347,69 +362,79 @@ defmodule YscWeb.TicketQrLive do
   @impl true
   def mount(%{"order_id" => order_id} = params, _session, socket) do
     user = socket.assigns.current_user
-    return_to = safe_return_to(Map.get(params, "return_to"))
 
     socket =
       socket
-      |> assign(:return_to, return_to)
-      |> assign(:page_title, "Your event tickets")
-      |> assign(:loading, true)
-      |> assign(:load_error, false)
-      |> assign(:event, nil)
-      |> assign(:tickets, [])
-      |> assign(:ticket_count, 0)
-      |> assign(:order_id, nil)
-      |> assign(:order_reference, nil)
-      |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
-      |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
-      |> assign(:google_wallet_ticket_urls, %{})
-      |> assign(:wallet_platform, WalletPlatform.from_socket(socket))
-
-    socket =
-      if connected?(socket) do
-        start_async(socket, :load_ticket_data, fn ->
-          load_ticket_data(user.id, order_id)
-        end)
-      else
-        socket
-      end
+      |> assign_defaults(safe_return_to(Map.get(params, "return_to")))
+      |> start_load(fn -> load_ticket_data(user.id, order_id) end)
 
     {:ok, socket}
   end
 
   def mount(%{"event_id" => event_id} = params, _session, socket) do
     user = socket.assigns.current_user
-    return_to = safe_return_to(Map.get(params, "return_to"))
 
     socket =
       socket
-      |> assign(:return_to, return_to)
-      |> assign(:page_title, "Your event tickets")
-      |> assign(:loading, true)
-      |> assign(:load_error, false)
-      |> assign(:event, nil)
-      |> assign(:tickets, [])
-      |> assign(:ticket_count, 0)
-      |> assign(:order_id, nil)
-      |> assign(:order_reference, nil)
-      |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
-      |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
-      |> assign(:google_wallet_ticket_urls, %{})
-      |> assign(:wallet_platform, WalletPlatform.from_socket(socket))
-
-    socket =
-      if connected?(socket) do
-        start_async(socket, :load_ticket_data, fn ->
-          load_event_ticket_data(user.id, event_id)
-        end)
-      else
-        socket
-      end
+      |> assign_defaults(safe_return_to(Map.get(params, "return_to")))
+      |> start_load(fn -> load_event_ticket_data(user.id, event_id) end)
 
     {:ok, socket}
   end
 
+  # Opened from a ticket email: the signed token is the only credential, so this
+  # works without a login (and for guests who have no account at all).
+  def mount(%{"token" => token}, _session, socket) do
+    socket =
+      socket
+      |> assign_defaults(~p"/")
+      |> assign(:public?, true)
+      |> start_load(fn -> load_public_ticket_data(token) end)
+
+    {:ok, socket}
+  end
+
+  defp assign_defaults(socket, return_to) do
+    socket
+    |> assign(:return_to, return_to)
+    |> assign(:page_title, "Your event tickets")
+    |> assign(:public?, false)
+    |> assign(:public_error_message, nil)
+    |> assign(:loading, true)
+    |> assign(:load_error, false)
+    |> assign(:event, nil)
+    |> assign(:tickets, [])
+    |> assign(:ticket_count, 0)
+    |> assign(:order_id, nil)
+    |> assign(:order_reference, nil)
+    |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
+    |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
+    |> assign(:google_wallet_ticket_urls, %{})
+    |> assign(:wallet_platform, WalletPlatform.from_socket(socket))
+  end
+
+  defp start_load(socket, loader) do
+    if connected?(socket) do
+      start_async(socket, :load_ticket_data, loader)
+    else
+      socket
+    end
+  end
+
   @impl true
+  def handle_async(
+        :load_ticket_data,
+        {:ok, reason},
+        %{assigns: %{public?: true}} = socket
+      )
+      when reason in [:not_found, :no_confirmed_tickets] do
+    {:noreply,
+     socket
+     |> assign(:loading, false)
+     |> assign(:load_error, true)
+     |> assign(:public_error_message, public_error_message(reason))}
+  end
+
   def handle_async(:load_ticket_data, {:ok, :not_found}, socket) do
     {:noreply,
      socket
@@ -430,8 +455,10 @@ defmodule YscWeb.TicketQrLive do
   def handle_async(:load_ticket_data, {:ok, data}, socket) do
     google_wallet_urls =
       if socket.assigns.google_wallet_enabled? do
-        user_id = socket.assigns.current_user.id
-        generate_google_wallet_ticket_urls(data.tickets, user_id)
+        generate_google_wallet_ticket_urls(
+          data.tickets,
+          wallet_owner(socket)
+        )
       else
         %{}
       end
@@ -496,37 +523,51 @@ defmodule YscWeb.TicketQrLive do
   end
 
   defp load_ticket_data(user_id, order_id) do
-    case Tickets.get_user_ticket_order_for_qr(user_id, order_id) do
-      nil ->
+    user_id
+    |> Tickets.get_user_ticket_order_for_qr(order_id)
+    |> order_ticket_data(:member)
+  end
+
+  defp load_public_ticket_data(token) do
+    case AccessToken.verify(token) do
+      {:ok, payload} ->
+        payload
+        |> Tickets.get_ticket_order_for_access()
+        |> order_ticket_data(:public)
+
+      {:error, :invalid} ->
         :not_found
+    end
+  end
 
-      order ->
-        confirmed_tickets =
-          order.tickets
-          |> Enum.filter(&(&1.status == :confirmed))
-          |> tickets_for_qr_display()
+  defp order_ticket_data(nil, _mode), do: :not_found
 
-        if confirmed_tickets == [] do
-          :no_confirmed_tickets
-        else
-          event = order.event
+  defp order_ticket_data(order, mode) do
+    confirmed_tickets =
+      order.tickets
+      |> Enum.filter(&(&1.status == :confirmed))
+      |> tickets_for_qr_display(mode)
 
-          %{
-            event: %{
-              title: event.title,
-              start_date: event.start_date,
-              start_time: event.start_time,
-              end_time: event.end_time,
-              end_date: event.end_date,
-              location_name: event.location_name,
-              address: event.address
-            },
-            order_id: order.id,
-            order_reference: order.reference_id,
-            tickets: confirmed_tickets,
-            ticket_count: length(confirmed_tickets)
-          }
-        end
+    if confirmed_tickets == [] do
+      :no_confirmed_tickets
+    else
+      event = order.event
+
+      %{
+        event: %{
+          title: event.title,
+          start_date: event.start_date,
+          start_time: event.start_time,
+          end_time: event.end_time,
+          end_date: event.end_date,
+          location_name: event.location_name,
+          address: event.address
+        },
+        order_id: if(mode == :member, do: order.id),
+        order_reference: order.reference_id,
+        tickets: confirmed_tickets,
+        ticket_count: length(confirmed_tickets)
+      }
     end
   end
 
@@ -534,13 +575,26 @@ defmodule YscWeb.TicketQrLive do
     "This doesn't include tickets for check-in. Donations and unconfirmed tickets can't be used at the door."
   end
 
-  defp tickets_for_qr_display(tickets) do
-    tickets
-    |> Enum.filter(&TicketTierHelpers.check_in_ticket?/1)
-    |> Enum.map(&ticket_to_qr_card/1)
+  defp public_error_message(:not_found) do
+    "This ticket link isn't valid. Open the link from your ticket email again, or write to info@ysc.org and we'll help."
   end
 
-  defp ticket_to_qr_card(ticket) do
+  defp public_error_message(:no_confirmed_tickets) do
+    "None of these tickets can be used at the door. They may have been cancelled or refunded. Write to info@ysc.org if that looks wrong."
+  end
+
+  # Google Wallet loads tickets by owner; the public page has already
+  # authorized every ticket it shows via the signed token.
+  defp wallet_owner(%{assigns: %{public?: true}}), do: :any
+  defp wallet_owner(socket), do: socket.assigns.current_user.id
+
+  defp tickets_for_qr_display(tickets, mode \\ :member) do
+    tickets
+    |> Enum.filter(&TicketTierHelpers.check_in_ticket?/1)
+    |> Enum.map(&ticket_to_qr_card(&1, mode))
+  end
+
+  defp ticket_to_qr_card(ticket, mode) do
     holder =
       case ticket do
         %{registration: %{first_name: first, last_name: last}}
@@ -556,9 +610,15 @@ defmodule YscWeb.TicketQrLive do
       reference_id: ticket.reference_id,
       tier_name: ticket.ticket_tier.name,
       holder_name: holder,
-      qr_token: QrToken.sign_ticket(ticket.id)
+      qr_token: QrToken.sign_ticket(ticket.id),
+      apple_href: apple_wallet_href(ticket, mode)
     }
   end
+
+  defp apple_wallet_href(ticket, :member), do: ~p"/wallet/tickets/#{ticket.id}"
+
+  defp apple_wallet_href(ticket, :public),
+    do: ~p"/t/#{AccessToken.sign_ticket(ticket.id)}/apple"
 
   defp safe_return_to(path)
        when is_binary(path) and byte_size(path) > 0 do
@@ -578,10 +638,10 @@ defmodule YscWeb.TicketQrLive do
     end
   end
 
-  defp generate_google_wallet_ticket_urls(tickets, user_id) do
+  defp generate_google_wallet_ticket_urls(tickets, owner) do
     ticket_ids = Enum.map(tickets, & &1.id)
 
-    case GoogleWallet.generate_ticket_save_urls(ticket_ids, user_id) do
+    case GoogleWallet.generate_ticket_save_urls(ticket_ids, owner) do
       {:error, :not_configured} ->
         %{}
 

@@ -71,6 +71,9 @@ defmodule Ysc.AppleWallet do
   @doc """
   Generates an Apple Wallet event ticket pass for a given ticket.
 
+  Pass `user_id` to require that the user owns the ticket, or `:any` when the
+  caller has already authorized access (e.g. a verified `Ysc.Tickets.AccessToken`).
+
   Returns `{:ok, binary}` where binary is the .pkpass file contents,
   or `{:error, reason}`.
   """
@@ -171,8 +174,7 @@ defmodule Ysc.AppleWallet do
 
   defp ticket_for_wallet_query(ticket_id, user_id) do
     from(t in Ticket,
-      where:
-        t.id == ^ticket_id and t.user_id == ^user_id and t.status == :confirmed,
+      where: t.id == ^ticket_id and t.status == :confirmed,
       select: struct(t, ^@wallet_ticket_fields),
       preload: [
         ticket_tier: ^wallet_ticket_tier_query(),
@@ -180,7 +182,11 @@ defmodule Ysc.AppleWallet do
         event: ^wallet_event_query()
       ]
     )
+    |> owned_by(user_id)
   end
+
+  defp owned_by(query, :any), do: query
+  defp owned_by(query, user_id), do: where(query, [t], t.user_id == ^user_id)
 
   defp wallet_event_query do
     from(e in Event,

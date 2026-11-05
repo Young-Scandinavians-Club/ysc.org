@@ -1020,6 +1020,7 @@
       payment_date: "Jun 1, 2026 at 10:00 AM",
       payment_method: "Credit Card ending in 4242",
       paid_in_person: false,
+      granted: false,
       total_amount: "$100.00",
       gross_total: "$100.00",
       total_discount: "$0.00",
@@ -1042,7 +1043,42 @@
           status: :confirmed
         }
       ],
-      tickets_qr_url: "http://localhost:4000/tickets/preview/qr"
+      ticket_cards: [
+        %{
+          reference_id: "TKT-001",
+          ticket_tier_name: "General Admission",
+          holder_name: "Astrid Lindgren",
+          qr_image_url: "http://localhost:4000/images/ysc_logo.png",
+          ticket_url: "http://localhost:4000/t/preview",
+          apple_wallet_url: "http://localhost:4000/t/preview/apple",
+          google_wallet_url: "http://localhost:4000/t/preview/google"
+        }
+      ],
+      tickets_qr_url: "http://localhost:4000/t/preview"
+    },
+    "ticket_recipient_notification" => %{
+      first_name: "Astrid",
+      purchaser_name: "Erik Johansson",
+      ticket_count: 1,
+      event: %{
+        title: "Midsummer Picnic",
+        location_name: "Golden Gate Park",
+        address: "123 Main St, San Francisco, CA",
+        age_restriction: 21
+      },
+      event_date_time: "Jun 21, 2026 at 2:00 PM",
+      event_url: "http://localhost:4000/events/preview",
+      ticket_cards: [
+        %{
+          reference_id: "TKT-001",
+          ticket_tier_name: "General Admission",
+          holder_name: "Astrid Lindgren",
+          qr_image_url: "http://localhost:4000/images/ysc_logo.png",
+          ticket_url: "http://localhost:4000/t/preview",
+          apple_wallet_url: "http://localhost:4000/t/preview/apple",
+          google_wallet_url: "http://localhost:4000/t/preview/google"
+        }
+      ]
     },
     "ticket_reservation_created" => %{
       first_name: "Astrid",
