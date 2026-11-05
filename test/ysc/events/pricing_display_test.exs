@@ -87,6 +87,21 @@ defmodule Ysc.Events.PricingDisplayTest do
              } = PricingDisplay.from_tiers([expensive, cheap])
     end
 
+    test "multiple paid tiers with the same price show the exact price" do
+      a = %TicketTier{type: :paid, price: Money.new(20, :USD)}
+      b = %TicketTier{type: :paid, price: Money.new(20, :USD)}
+
+      assert %{display_text: "$20.00", has_free_tiers: false} =
+               PricingDisplay.from_tiers([a, b])
+    end
+
+    test "equal paid prices with different decimal scales show the exact price" do
+      a = %TicketTier{type: :paid, price: Money.new(:USD, Decimal.new("20"))}
+      b = %TicketTier{type: :paid, price: Money.new(:USD, Decimal.new("20.00"))}
+
+      assert %{display_text: "$20.00"} = PricingDisplay.from_tiers([a, b])
+    end
+
     test "paid tiers with string type are included" do
       tier = %TicketTier{type: "paid", price: Money.new(15, :USD)}
       assert PricingDisplay.from_tiers([tier]).display_text == "$15.00"

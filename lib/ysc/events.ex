@@ -286,8 +286,12 @@ defmodule Ysc.Events do
   """
   def get_event_for_tv_poster(id) do
     case id |> event_for_tv_poster_query() |> Repo.one() do
-      nil -> nil
-      %Event{} = event -> Ysc.Events.EventPricingCache.enrich_event(event)
+      nil ->
+        nil
+
+      %Event{} = event ->
+        [event] = put_tv_poster_selling_fast([event])
+        Ysc.Events.EventPricingCache.enrich_event(event)
     end
   end
 
@@ -303,7 +307,46 @@ defmodule Ysc.Events do
   def list_tv_poster_events do
     tv_poster_events_query()
     |> Repo.all()
+    |> put_tv_poster_selling_fast()
     |> Ysc.Events.EventPricingCache.enrich_events()
+  end
+
+  # The pricing cache is shared with the public list, which seeds entries that
+  # carry `selling_fast` while other paths seed entries without it. The poster
+  # shows a "Selling fast" badge (and hashes it to decide whether to re-upload),
+  # so reading it from the cache made the poster flip between the two states.
+  # Compute it from the database here and set it on the source events:
+  # `EventPricingCache` always prefers the caller's value over a cached one.
+  defp put_tv_poster_selling_fast([]), do: []
+
+  defp put_tv_poster_selling_fast(events) do
+    selling_fast_ids =
+      events
+      |> Enum.map(& &1.id)
+      |> tv_poster_selling_fast_query()
+      |> Repo.all()
+      |> MapSet.new()
+
+    Enum.map(events, fn event ->
+      Map.put(event, :selling_fast, MapSet.member?(selling_fast_ids, event.id))
+    end)
+  end
+
+  # Same rule as `event_selling_fast?/1` and the public list badge: at least 5
+  # confirmed, non-donation tickets sold in the last 3 days.
+  defp tv_poster_selling_fast_query(event_ids) do
+    three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
+
+    from(t in Ticket,
+      join: tt in TicketTier,
+      on: t.ticket_tier_id == tt.id and tt.type != :donation,
+      where: t.event_id in ^event_ids,
+      where: t.status == :confirmed,
+      where: t.inserted_at >= ^three_days_ago,
+      group_by: t.event_id,
+      having: count(t.id) >= 5,
+      select: t.event_id
+    )
   end
 
   defp event_for_tv_poster_query(id) do
@@ -4351,6 +4394,11 @@ defmodule Ysc.Events do
 
   @doc false
   def ci_query_explain_tv_poster_events_query, do: tv_poster_events_query()
+
+  @doc false
+  def ci_query_explain_tv_poster_selling_fast_query do
+    tv_poster_selling_fast_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
+  end
 
   @doc false
   def ci_query_explain_list_events_paginated_query do
