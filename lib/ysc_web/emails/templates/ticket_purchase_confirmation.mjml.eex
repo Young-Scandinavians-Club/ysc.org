@@ -11,8 +11,38 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Hej <%= @first_name %>, </mj-text>
     <mj-spacer height="24px"></mj-spacer>
+    <%!-- Jobs queued before QR cards existed lack these assigns; keep them renderable. --%>
+    <%= if assigns[:granted] do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> YSC has issued you tickets for the event below. Your tickets are ready, and you can show them at the door straight from this email. </mj-text>
+    <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Thank you for your ticket purchase! Your order has been confirmed and your tickets are ready. </mj-text>
+    <% end %>
     <mj-spacer height="24px"></mj-spacer>
+    <!-- Ticket QR codes -->
+    <%= if assigns[:ticket_cards] not in [nil, []] do %>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Your tickets for check-in </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Show the QR code at the door, or add the ticket to your phone's wallet. No sign-in needed. </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <%= for card <- assigns[:ticket_cards] do %>
+    <mj-divider border-width="1px" border-color="#e5e7eb" padding="8px 0px 16px 0px"></mj-divider>
+    <mj-text align="center" font-size="18px" line-height="1.4" padding="0px" font-weight="bold"><%= card.ticket_tier_name %></mj-text>
+    <%= if card.holder_name do %>
+    <mj-text align="center" font-size="16px" line-height="1.4" padding="4px 0px 0px 0px" color="#4B5563"><%= card.holder_name %></mj-text>
+    <% end %>
+    <mj-image src="<%= card.qr_image_url %>" alt="Check-in QR code for ticket <%= card.reference_id %>" width="200px" padding="16px 0px 8px 0px" href="<%= card.ticket_url %>"></mj-image>
+    <mj-text align="center" font-size="14px" line-height="1.4" padding="0px 0px 12px 0px" color="#6B7280">
+      Ticket <span style="font-family: monospace; font-weight: 600;"><%= card.reference_id %></span>
+    </mj-text>
+    <%= if card.apple_wallet_url do %>
+    <mj-button href="<%= card.apple_wallet_url %>" inner-padding="12px 16px" width="240px" background-color="#000000" color="#ffffff" align="center" font-size="16px" border-radius="6px" padding="4px 0px">Add to Apple Wallet</mj-button>
+    <% end %>
+    <%= if card.google_wallet_url do %>
+    <mj-button href="<%= card.google_wallet_url %>" inner-padding="12px 16px" width="240px" background-color="#ffffff" color="#1f1f1f" border="1px solid #747775" align="center" font-size="16px" border-radius="6px" padding="4px 0px">Add to Google Wallet</mj-button>
+    <% end %>
+    <% end %>
+    <mj-spacer height="12px"></mj-spacer>
+    <% end %>
     <!-- Event Details -->
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Event Details </mj-text>
     <mj-spacer height="12px"></mj-spacer>
@@ -41,7 +71,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">See event details → </mj-button>
     <mj-spacer height="4px"></mj-spacer>
-    <mj-button href="<%= @tickets_qr_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#18181b" color="#ffffff" align="center" font-size="18px" border-radius="4px">🎫 View tickets for check-in</mj-button>
+    <mj-button href="<%= @tickets_qr_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#18181b" color="#ffffff" align="center" font-size="18px" border-radius="4px">🎫 View all tickets</mj-button>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Event Agenda -->
     <%= if @agenda && length(@agenda) > 0 do %>
@@ -186,7 +216,7 @@
       <strong>What's Next?</strong>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • At the event, show the tickets on your phone (use the button above) so staff can check you in </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • At the event, show the tickets on your phone (the QR codes above, or the ticket in your wallet) so staff can check you in </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • You'll receive a reminder email 24 hours before the event </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • If you have any questions, reply to this email or write to us at <a href="mailto:info@ysc.org">info@ysc.org</a> </mj-text>
     <mj-spacer height="36px"></mj-spacer>

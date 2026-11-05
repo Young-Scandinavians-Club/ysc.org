@@ -91,8 +91,9 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
             id={"#{@form[:send_email].id}-description"}
             class="pl-8 text-sm text-zinc-500"
           >
-            Emails the member their confirmed tickets right away. Turn off for silent
-            imports or in-person grants.
+            Emails the member their confirmed tickets right away, with a QR code
+            and Apple/Google Wallet buttons that work without signing in. Turn off
+            for silent imports or in-person grants.
           </p>
         </div>
 

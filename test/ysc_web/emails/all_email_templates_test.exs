@@ -29,6 +29,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     ConductViolationConfirmation,
     ConductViolationBoardNotification,
     TicketPurchaseConfirmation,
+    TicketRecipientNotification,
     TicketReservationCreated,
     TicketOrderRefund,
     BookingConfirmation,
@@ -262,6 +263,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         payment_date: "Dec 1, 2024 at 10:00 AM",
         payment_method: "Credit Card ending in 1234",
         paid_in_person: false,
+        granted: false,
         total_amount: "$100.00",
         gross_total: "$100.00",
         total_discount: "$0.00",
@@ -284,16 +286,67 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
             status: :confirmed
           }
         ],
-        tickets_qr_url: "https://example.com/tickets/order-123/qr"
+        ticket_cards: [
+          %{
+            reference_id: "TKT-001",
+            ticket_tier_name: "General Admission",
+            holder_name: "Test Guest",
+            qr_image_url: "https://example.com/t/tok-1/qr.png",
+            ticket_url: "https://example.com/t/tok-1",
+            apple_wallet_url: "https://example.com/t/tok-1/apple",
+            google_wallet_url: "https://example.com/t/tok-1/google"
+          }
+        ],
+        tickets_qr_url: "https://example.com/t/order-token"
       }
 
       html = TicketPurchaseConfirmation.render(assigns)
       assert is_binary(html)
       assert String.length(html) > 0
       assert html =~ assigns.tickets_qr_url
+      assert html =~ "https://example.com/t/tok-1/qr.png"
+      assert html =~ "https://example.com/t/tok-1/apple"
+      assert html =~ "https://example.com/t/tok-1/google"
 
       assert TicketPurchaseConfirmation.get_template_name() ==
                "ticket_purchase_confirmation"
+    end
+
+    test "TicketRecipientNotification renders" do
+      assigns = %{
+        first_name: "Guest",
+        purchaser_name: "Pat Member",
+        ticket_count: 1,
+        event: %{
+          title: "Test Event",
+          location_name: "Test Location",
+          address: "123 Test St",
+          age_restriction: nil
+        },
+        event_date_time: "Dec 1, 2024 at 10:00 AM",
+        event_url: "https://example.com/events/123",
+        tickets_qr_url: "https://example.com/t/tok-1",
+        ticket_cards: [
+          %{
+            reference_id: "TKT-001",
+            ticket_tier_name: "Volunteer",
+            holder_name: "Guest Person",
+            qr_image_url: "https://example.com/t/tok-1/qr.png",
+            ticket_url: "https://example.com/t/tok-1",
+            apple_wallet_url: false,
+            google_wallet_url: "https://example.com/t/tok-1/google"
+          }
+        ]
+      }
+
+      html = TicketRecipientNotification.render(assigns)
+      assert html =~ "Pat Member"
+      assert html =~ "https://example.com/t/tok-1/qr.png"
+      assert html =~ "https://example.com/t/tok-1/google"
+      refute html =~ "Add to Apple Wallet"
+
+      assert TicketRecipientNotification.get_template_name() ==
+               "ticket_recipient_notification"
     end
 
     test "TicketReservationCreated renders", %{user: user} do
@@ -1239,6 +1292,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         "conduct_violation_board_notification" =>
           ConductViolationBoardNotification,
         "ticket_purchase_confirmation" => TicketPurchaseConfirmation,
+        "ticket_recipient_notification" => TicketRecipientNotification,
         "ticket_reservation_created" => TicketReservationCreated,
         "ticket_order_refund" => TicketOrderRefund,
         "booking_confirmation" => BookingConfirmation,

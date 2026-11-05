@@ -71,6 +71,8 @@ defmodule Ysc.Accounts.EmailCategories do
     "newsletter_stats_snapshot" => :account,
     # Event notifications (can be disabled)
     "ticket_purchase_confirmation" => :account,
+    # Sent to non-members a ticket was bought for; no user preferences apply.
+    "ticket_recipient_notification" => :account,
     "ticket_reservation_created" => :account,
     "ticket_order_refund" => :account,
     "merch_order_confirmation" => :account,

@@ -556,8 +556,18 @@ defmodule YscWeb.Router do
     end
   end
 
+  # Ticket QR images are fetched by email clients and image proxies, which
+  # send arbitrary Accept headers and no cookies, so skip the browser pipeline.
+  scope "/", YscWeb do
+    get "/t/:token/qr.png", PublicTicketController, :qr_image
+  end
+
   scope "/", YscWeb do
     pipe_through [:browser]
+
+    # Sign-in-free ticket access from ticket emails (signed token in the URL).
+    get "/t/:token/apple", PublicTicketController, :apple
+    get "/t/:token/google", PublicTicketController, :google
 
     delete "/users/log-out", UserSessionController, :delete
     post "/users/log-out", UserSessionController, :delete_with_redirect
@@ -570,6 +580,7 @@ defmodule YscWeb.Router do
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
       ] do
+      live "/t/:token", TicketQrLive, :public
       live "/shop", ShopLive, :index
       live "/shop/products/:id", ShopProductLive, :show
 

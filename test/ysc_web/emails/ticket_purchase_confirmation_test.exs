@@ -71,7 +71,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
 
       assert data.event.title == ticket_order.event.title
       assert data.event_url =~ ticket_order.event.id
-      assert data.tickets_qr_url =~ ticket_order.id
+      assert data.tickets_qr_url =~ "/t/"
       assert data.ticket_order.reference_id == ticket_order.reference_id
       assert data.total_amount =~ "$"
       assert data.purchase_date =~ "20"
@@ -682,8 +682,11 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       id = Ecto.ULID.generate()
       assert YscWeb.Emails.Helpers.event_url(id) =~ "/events/#{id}"
 
-      assert TicketPurchaseConfirmation.tickets_qr_url(id) =~
-               "/tickets/#{id}/qr"
+      # Opens without signing in, so it is a signed token link, not the
+      # login-gated /tickets/:id/qr page.
+      url = TicketPurchaseConfirmation.tickets_qr_url(id)
+      assert url =~ "/t/"
+      refute url =~ "/tickets/"
     end
   end
 

@@ -85,9 +85,10 @@ defmodule Ysc.GoogleWallet do
   @doc """
   Generates a Google Wallet save URL for an event ticket.
 
-  Loads the ticket (must be confirmed and belong to the given user), builds the
-  EventTicketClass and EventTicketObject payloads, signs a JWT, and returns the
-  save URL.
+  Loads the ticket (must be confirmed and belong to the given user, or pass
+  `:any` as `user_id` when the caller has already authorized access, e.g. via a
+  verified `Ysc.Tickets.AccessToken`), builds the EventTicketClass and
+  EventTicketObject payloads, signs a JWT, and returns the save URL.
 
   Returns `{:ok, url}` or `{:error, :not_configured | :not_found | reason}`.
   """
@@ -257,8 +258,7 @@ defmodule Ysc.GoogleWallet do
 
   defp tickets_for_wallet_query(ticket_ids, user_id) do
     from(t in Ticket,
-      where:
-        t.id in ^ticket_ids and t.user_id == ^user_id and t.status == :confirmed,
+      where: t.id in ^ticket_ids and t.status == :confirmed,
       select: struct(t, ^@wallet_ticket_fields),
       preload: [
         ticket_tier: ^wallet_ticket_tier_query(),
@@ -266,7 +266,11 @@ defmodule Ysc.GoogleWallet do
         event: ^wallet_event_query()
       ]
     )
+    |> owned_by(user_id)
   end
+
+  defp owned_by(query, :any), do: query
+  defp owned_by(query, user_id), do: where(query, [t], t.user_id == ^user_id)
 
   defp wallet_event_query do
     from(e in Event,
