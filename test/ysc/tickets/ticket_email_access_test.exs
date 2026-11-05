@@ -254,7 +254,9 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
       html = TicketRecipientNotification.render(data)
       assert html =~ "Pat Purchaser"
       assert html =~ card.qr_image_url
-      refute html =~ "Open your ticket"
+      # Text fallback link for clients that block the images
+      assert html =~ ~s(href="#{card.ticket_url}")
+      assert html =~ "see the QR code"
     end
   end
 

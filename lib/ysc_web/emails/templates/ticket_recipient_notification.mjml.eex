@@ -32,6 +32,7 @@
     <%= if card.google_wallet_url do %>
     <mj-image href="<%= card.google_wallet_url %>" src="<%= google_wallet_badge_url() %>" alt="Add to Google Wallet" width="175px" padding="4px 0px" align="center"></mj-image>
     <% end %>
+    <mj-text align="center" font-size="14px" line-height="1.4" padding="8px 0px 0px 0px" color="#6B7280">Can't see the QR code or buttons? <a href="<%= card.ticket_url %>" style="color: #1447e6;">Open your ticket</a></mj-text>
     <% end %>
     <mj-spacer height="12px"></mj-spacer>
     <mj-spacer height="24px"></mj-spacer>

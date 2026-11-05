@@ -307,6 +307,11 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert html =~ "https://example.com/t/tok-1/qr.png"
       assert html =~ "https://example.com/t/tok-1/apple"
       assert html =~ "/images/email/add_to_apple_wallet.png"
+      # Text fallback for clients that block remote images
+      assert html =~ "Can&#39;t see the QR code" or
+               html =~ "Can't see the QR code"
+
+      assert html =~ ~s(href="https://example.com/t/tok-1")
       assert html =~ "/images/email/add_to_google_wallet.png"
       assert html =~ "https://example.com/t/tok-1/google"
 
@@ -347,6 +352,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       # Official Google badge image, not a generic button; Apple's is hidden
       assert html =~ "/images/email/add_to_google_wallet.png"
       refute html =~ "add_to_apple_wallet.png"
+      assert html =~ ~s(href="https://example.com/t/tok-1")
+      assert html =~ "Open your ticket"
 
       assert TicketRecipientNotification.get_template_name() ==
                "ticket_recipient_notification"
