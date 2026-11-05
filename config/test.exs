@@ -208,6 +208,14 @@ config :ysc, :flowroute,
 
 config :ysc, :flowroute_force_noop, true
 
+# Twilio SMS (international) for tests: no-op unless a test overrides it
+config :ysc, :twilio,
+  account_sid: "ACtest00000000000000000000000000",
+  auth_token: "test_twilio_auth_token",
+  sender: "YSC"
+
+config :ysc, :twilio_force_noop, true
+
 # Enables `Application.put_env(:ysc, :flowroute_test_raise, ...)` in SMS tests only.
 config :ysc, :flowroute_test_inject_enabled, true
 

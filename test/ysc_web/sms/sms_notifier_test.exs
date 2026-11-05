@@ -73,6 +73,19 @@ defmodule YscWeb.Sms.SmsNotifierTest do
   end
 
   describe "phone number validation" do
+    test "accepts valid Nordic numbers (delivered via Twilio)" do
+      for number <- ["+46701234567", "+4741234567", "+4520123456"] do
+        assert {:ok, _job} =
+                 Notifier.schedule_sms(
+                   number,
+                   "test_key_#{System.unique_integer()}",
+                   "booking_checkin_reminder",
+                   %{},
+                   nil
+                 )
+      end
+    end
+
     test "validates 11-digit North American format" do
       # Invalid formats
       invalid_numbers = [
@@ -82,8 +95,10 @@ defmodule YscWeb.Sms.SmsNotifierTest do
         "1415900900",
         # Too long
         "214159009001",
-        # Non-US number
-        "+46123456789",
+        # Region with no SMS provider (Germany)
+        "+4915112345678",
+        # Nordic prefix, but not a valid Swedish number
+        "+46123",
         ""
       ]
 
