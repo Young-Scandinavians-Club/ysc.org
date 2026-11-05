@@ -183,6 +183,9 @@ waitForSentry().then((available) => {
                 /Resident credentials or empty 'allowCredentials' lists are not supported/,
                 // Thrown by browser extensions (Safari/Chrome) injected into the page, not by our code
                 /Invalid call to runtime\.sendMessage\(\)\. Tab not found/,
+                // JS-to-native bridge rejections from injected scripts (Sentry's
+                // default list only covers MethodName:simulateEvent)
+                /^Non-Error promise rejection captured with value: Object Not Found Matching Id:\d+, MethodName:\w+, ParamCount:\d+$/,
             ],
             denyUrls: [
                 /^safari-(web-)?extension:\/\//i,
@@ -190,7 +193,10 @@ waitForSentry().then((available) => {
                 /^moz-extension:\/\//i,
             ],
             beforeSend(event) {
-                if (isExpectedWebAuthnOrVideoNotAllowed(event)) {
+                if (
+                    isExpectedWebAuthnOrVideoNotAllowed(event) ||
+                    isInjectedScriptStackOverflow(event)
+                ) {
                     return null;
                 }
                 return event;
@@ -237,6 +243,21 @@ function isExpectedWebAuthnOrVideoNotAllowed(event) {
                 haystack
             );
         });
+    });
+}
+
+// The Google app's iOS in-app browser injects a hit-testing script that recurses
+// until the stack overflows. The message is generic, so match on its frames.
+function isInjectedScriptStackOverflow(event) {
+    const exceptions = event?.exception?.values || [];
+
+    return exceptions.some((ex) => {
+        if (!/Maximum call stack size exceeded/i.test(ex.value || "")) return false;
+
+        const frames = ex.stacktrace?.frames || [];
+        return frames.some((frame) =>
+            /^(?:findTopmostVisibleElement|isOpaqueElement)$/.test(frame.function || "")
+        );
     });
 }
 
