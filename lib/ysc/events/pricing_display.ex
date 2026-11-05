@@ -60,7 +60,10 @@ defmodule Ysc.Events.PricingDisplay do
           Enum.min_by(paid_tiers, & &1.price.amount, fn -> nil end)
 
         display_text =
-          if Enum.all?(paid_tiers, &Decimal.equal?(&1.price.amount, lowest_price.price.amount)) do
+          if Enum.all?(
+               paid_tiers,
+               &Decimal.equal?(&1.price.amount, lowest_price.price.amount)
+             ) do
             MoneyHelper.format_price(lowest_price.price)
           else
             "From #{MoneyHelper.format_price(lowest_price.price)}"
