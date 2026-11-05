@@ -144,11 +144,34 @@ defmodule Ysc.Media.PosterReviewTest do
       assert {:error, :rate_limited} = PosterReview.review(image())
     end
 
-    test "returns :not_configured without an API key" do
+    test "returns :not_configured without an API key, before downloading" do
       Application.put_env(:ysc, :open_router, api_key: "")
-      serve_image()
+      test_pid = self()
+
+      Req.Test.stub(PosterReview, fn conn ->
+        send(test_pid, :fetched)
+        Plug.Conn.send_resp(conn, 200, @png)
+      end)
 
       assert {:error, :not_configured} = PosterReview.review(image())
+      refute_received :fetched
+    end
+
+    test "does not follow redirects" do
+      test_pid = self()
+
+      Req.Test.stub(PosterReview, fn conn ->
+        send(test_pid, {:fetched, conn.request_path})
+
+        conn
+        |> Plug.Conn.put_resp_header("location", "https://elsewhere.test/x.png")
+        |> Plug.Conn.send_resp(302, "")
+      end)
+
+      assert {:error, :download_failed} = PosterReview.review(image())
+      assert_received {:fetched, "/optimized.png"}
+      refute_received {:fetched, "/x.png"}
+      refute_received {:chat, _, _}
     end
 
     test "errors when the image has no path" do

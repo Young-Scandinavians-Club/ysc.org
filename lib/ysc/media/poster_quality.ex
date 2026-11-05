@@ -13,9 +13,8 @@ defmodule Ysc.Media.PosterQuality do
 
   alias Ysc.Media.Image
 
-  @target_ratio 16 / 9
   # Relative tolerance around 16:9, so 1.78:1 and slightly trimmed exports pass.
-  @ratio_tolerance 0.02
+  @ratio_tolerance_percent 2
   @min_width 1280
   @min_height 720
   @recommended_width 1920
@@ -64,7 +63,9 @@ defmodule Ysc.Media.PosterQuality do
   @doc "True when the dimensions are within tolerance of a 16:9 frame."
   @spec sixteen_by_nine?(pos_integer(), pos_integer()) :: boolean()
   def sixteen_by_nine?(width, height) do
-    abs(width / height - @target_ratio) / @target_ratio <= @ratio_tolerance
+    # Within @ratio_tolerance_percent of 16:9 (inclusive), in exact integer
+    # arithmetic: |w/h - 16/9| / (16/9) <= p/100  <=>  |9w - 16h| * 100 <= 16h * p
+    abs(9 * width - 16 * height) * 100 <= 16 * height * @ratio_tolerance_percent
   end
 
   @doc "True when the image is smaller than the minimum poster size."

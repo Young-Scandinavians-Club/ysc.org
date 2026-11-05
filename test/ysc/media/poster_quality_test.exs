@@ -19,6 +19,14 @@ defmodule Ysc.Media.PosterQualityTest do
       assert PosterQuality.check(1920, 1070) == []
     end
 
+    test "the 2% tolerance is inclusive and exact at the boundary" do
+      # 4080×2250 is exactly 2% off 16:9; float division would reject it.
+      assert PosterQuality.check(4080, 2250) == []
+      assert [{:aspect_ratio, _}] = PosterQuality.check(4081, 2250)
+      assert PosterQuality.check(3920, 2250) == []
+      assert [{:aspect_ratio, _}] = PosterQuality.check(3919, 2250)
+    end
+
     test "flags 4:3, 3:2, square and portrait images as not 16:9" do
       for {w, h} <- [{2000, 1500}, {3000, 2000}, {2000, 2000}, {1080, 1920}] do
         assert {:aspect_ratio, %{width: w, height: h}} in PosterQuality.check(

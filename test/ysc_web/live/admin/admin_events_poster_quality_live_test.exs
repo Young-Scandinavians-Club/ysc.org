@@ -135,6 +135,32 @@ defmodule YscWeb.AdminEventsPosterQualityLiveTest do
     end
   end
 
+  describe "cover changed by someone else" do
+    defp broadcast_cover(view, event, image_id) do
+      updated = %{Ysc.Events.get_event!(event.id) | image_id: image_id}
+
+      send(
+        view.pid,
+        {Ysc.Events, %Ysc.MessagePassingEvents.EventUpdated{event: updated}}
+      )
+
+      render(view)
+    end
+
+    test "refreshes the warnings for the new cover", ctx do
+      {event, view} =
+        edit_event(ctx.conn, ctx.admin, %{image_id: poster(1920, 1080).id})
+
+      refute has_element?(view, "#cover-image-quality")
+
+      broadcast_cover(view, event, poster(800, 600).id)
+      assert has_element?(view, "#cover-image-quality-aspect_ratio")
+
+      broadcast_cover(view, event, poster(1920, 1080).id)
+      refute has_element?(view, "#cover-image-quality")
+    end
+  end
+
   describe "automated photo check" do
     setup do
       Application.put_env(:ysc, :open_router,
@@ -195,6 +221,17 @@ defmodule YscWeb.AdminEventsPosterQualityLiveTest do
 
       refute has_element?(view, "#cover-image-quality-review")
       assert Ysc.Events.get_event!(event.id).image_id == image.id
+    end
+
+    test "an echo of our own save does not cancel the running review", ctx do
+      {event, view} = edit_event(ctx.conn, ctx.admin)
+      image = poster(1920, 1080)
+
+      pick_cover(view, image)
+      broadcast_cover(view, event, image.id)
+      render_async(view)
+
+      assert has_element?(view, "#cover-image-quality-review-embedded_text")
     end
 
     test "drops the review when the cover is cleared", ctx do

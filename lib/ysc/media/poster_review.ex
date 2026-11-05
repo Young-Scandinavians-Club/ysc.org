@@ -118,7 +118,8 @@ defmodule Ysc.Media.PosterReview do
   """
   @spec review(struct()) :: {:ok, [finding()]} | {:error, term()}
   def review(%MediaImage{} = image) do
-    with url when is_binary(url) <- MediaImage.display_path(image),
+    with :ok <- check_configured(),
+         url when is_binary(url) <- MediaImage.display_path(image),
          {:ok, bytes} <- download(url),
          {:ok, data_url} <- to_data_url(bytes),
          {:ok, raw} <- OpenRouter.chat(messages(data_url), model: model()),
@@ -128,6 +129,11 @@ defmodule Ysc.Media.PosterReview do
       nil -> {:error, :no_image_path}
       {:error, _reason} = error -> error
     end
+  end
+
+  # Fail before downloading anything when there is no API key to call with.
+  defp check_configured do
+    if available?(), do: :ok, else: {:error, :not_configured}
   end
 
   @doc """
@@ -204,8 +210,9 @@ defmodule Ysc.Media.PosterReview do
   end
 
   defp download(url) do
+    # No redirects: UrlFetchGuard only vets the initial URL.
     req_opts =
-      [receive_timeout: 20_000, max_redirects: 3, decode_body: false]
+      [receive_timeout: 20_000, max_redirects: 0, decode_body: false]
       |> Keyword.merge(
         Application.get_env(:ysc, :poster_review_req_options, [])
       )

@@ -1709,6 +1709,7 @@ defmodule YscWeb.AdminEventsNewLive do
     socket =
       socket
       |> cancel_async(:poster_review)
+      |> assign(:cover_check_image_id, image && image.id)
       |> assign(:cover_issues, issues)
       |> assign(:cover_review, nil)
 
@@ -3104,14 +3105,14 @@ defmodule YscWeb.AdminEventsNewLive do
     {:noreply, assign(socket, :statistics_loading?, false)}
   end
 
-  # The cover may have changed while the review ran; only the current cover's
-  # result is shown.
+  # The cover may have changed while the review ran; only the result for the
+  # image currently being checked (the one the picker shows) is kept.
   def handle_async(:poster_review, {:ok, {image_id, result}}, socket) do
-    current_image_id = socket.assigns.event && socket.assigns.event.image_id
+    checked_image_id = socket.assigns[:cover_check_image_id]
 
     review =
       case result do
-        {:ok, [_ | _] = findings} when image_id == current_image_id -> findings
+        {:ok, [_ | _] = findings} when image_id == checked_image_id -> findings
         _ -> nil
       end
 
@@ -3199,6 +3200,15 @@ defmodule YscWeb.AdminEventsNewLive do
       ) do
     if event.id == socket.assigns[:event].id do
       changeset = Event.changeset(event, %{})
+
+      # Another editor may have swapped the cover. Unchanged covers (including
+      # echoes of our own save) are left alone so a running review isn't cancelled.
+      socket =
+        if event.image_id != socket.assigns.event.image_id do
+          assign_cover_check(socket, event.image_id)
+        else
+          socket
+        end
 
       {:noreply,
        socket
@@ -3371,7 +3381,7 @@ defmodule YscWeb.AdminEventsNewLive do
              socket
              |> assign_form(changeset)
              |> assign(:event, reloaded_event)
-             |> assign_cover_check(reloaded_event.image_id)}
+             |> assign_cover_check(nil)}
         end
     end
   end
@@ -3401,9 +3411,7 @@ defmodule YscWeb.AdminEventsNewLive do
      socket
      |> assign_form(changeset)
      |> assign(:event, updated_event)
-     |> assign_cover_check(updated_event.image_id,
-       review?: updated_event.image_id == image_id
-     )}
+     |> assign_cover_check(image_id, review?: true)}
   end
 
   def handle_info({YscWeb.TrixImagePickerComponent, id, image}, socket) do
