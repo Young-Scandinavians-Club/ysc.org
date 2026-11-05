@@ -254,7 +254,7 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
       html = TicketRecipientNotification.render(data)
       assert html =~ "Pat Purchaser"
       assert html =~ card.qr_image_url
-      assert html =~ data.tickets_qr_url
+      refute html =~ "Open your ticket"
     end
   end
 

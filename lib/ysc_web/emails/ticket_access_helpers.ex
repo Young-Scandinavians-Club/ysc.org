@@ -30,12 +30,6 @@ defmodule YscWeb.Emails.TicketAccessHelpers do
     do: absolute_url("/t/" <> AccessToken.sign_order(order_id))
 
   @doc """
-  Public link to the given tickets only.
-  """
-  def tickets_url(ticket_ids),
-    do: absolute_url("/t/" <> AccessToken.sign_tickets(ticket_ids))
-
-  @doc """
   The official "Add to Apple Wallet" badge as a PNG; mail clients don't render
   the SVG the web app uses.
   """

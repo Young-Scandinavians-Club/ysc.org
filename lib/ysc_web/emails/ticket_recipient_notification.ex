@@ -65,8 +65,6 @@ defmodule YscWeb.Emails.TicketRecipientNotification do
       event_date_time:
         format_event_start_datetime(event.start_date, event.start_time, "TBD"),
       event_url: event_url(event.id),
-      tickets_qr_url:
-        TicketAccessHelpers.tickets_url(Enum.map(tickets, & &1.id)),
       ticket_cards: TicketAccessHelpers.ticket_cards(tickets)
     }
   end

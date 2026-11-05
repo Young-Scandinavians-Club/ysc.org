@@ -327,7 +327,6 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         },
         event_date_time: "Dec 1, 2024 at 10:00 AM",
         event_url: "https://example.com/events/123",
-        tickets_qr_url: "https://example.com/t/tok-1",
         ticket_cards: [
           %{
             reference_id: "TKT-001",

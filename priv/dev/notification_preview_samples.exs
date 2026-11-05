@@ -1068,7 +1068,6 @@
       },
       event_date_time: "Jun 21, 2026 at 2:00 PM",
       event_url: "http://localhost:4000/events/preview",
-      tickets_qr_url: "http://localhost:4000/t/preview",
       ticket_cards: [
         %{
           reference_id: "TKT-001",
