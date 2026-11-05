@@ -36,6 +36,19 @@ defmodule YscWeb.Emails.TicketAccessHelpers do
     do: absolute_url("/t/" <> AccessToken.sign_tickets(ticket_ids))
 
   @doc """
+  The official "Add to Apple Wallet" badge as a PNG; mail clients don't render
+  the SVG the web app uses.
+  """
+  def apple_wallet_badge_url,
+    do: absolute_url("/images/email/add_to_apple_wallet.png")
+
+  @doc """
+  The official "Add to Google Wallet" badge as a PNG.
+  """
+  def google_wallet_badge_url,
+    do: absolute_url("/images/email/add_to_google_wallet.png")
+
+  @doc """
   Maps the tickets that can be used at the door to the per-ticket email data:
   holder, QR image and wallet links.
 

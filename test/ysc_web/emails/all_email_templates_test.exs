@@ -306,6 +306,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert html =~ assigns.tickets_qr_url
       assert html =~ "https://example.com/t/tok-1/qr.png"
       assert html =~ "https://example.com/t/tok-1/apple"
+      assert html =~ "/images/email/add_to_apple_wallet.png"
+      assert html =~ "/images/email/add_to_google_wallet.png"
       assert html =~ "https://example.com/t/tok-1/google"
 
       assert TicketPurchaseConfirmation.get_template_name() ==
@@ -343,7 +345,9 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert html =~ "Pat Member"
       assert html =~ "https://example.com/t/tok-1/qr.png"
       assert html =~ "https://example.com/t/tok-1/google"
-      refute html =~ "Add to Apple Wallet"
+      # Official Google badge image, not a generic button; Apple's is hidden
+      assert html =~ "/images/email/add_to_google_wallet.png"
+      refute html =~ "add_to_apple_wallet.png"
 
       assert TicketRecipientNotification.get_template_name() ==
                "ticket_recipient_notification"

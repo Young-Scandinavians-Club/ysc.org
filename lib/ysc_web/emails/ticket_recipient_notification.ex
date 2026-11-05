@@ -7,6 +7,10 @@ defmodule YscWeb.Emails.TicketRecipientNotification do
   and the QR code and wallet buttons, none of which need a sign-in. The
   purchaser keeps receiving the full confirmation covering every ticket.
   """
+  # Imported before `use MjmlEEx`, which compiles the template at that point.
+  import YscWeb.Emails.TicketAccessHelpers,
+    only: [apple_wallet_badge_url: 0, google_wallet_badge_url: 0]
+
   use MjmlEEx,
     mjml_template: "templates/ticket_recipient_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout

@@ -4,6 +4,10 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
 
   Sends a confirmation email to users after successful ticket purchase.
   """
+  # Imported before `use MjmlEEx`, which compiles the template at that point.
+  import YscWeb.Emails.TicketAccessHelpers,
+    only: [apple_wallet_badge_url: 0, google_wallet_badge_url: 0]
+
   use MjmlEEx,
     mjml_template: "templates/ticket_purchase_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout

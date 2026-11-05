@@ -27,10 +27,10 @@
       Ticket <span style="font-family: monospace; font-weight: 600;"><%= card.reference_id %></span>
     </mj-text>
     <%= if card.apple_wallet_url do %>
-    <mj-button href="<%= card.apple_wallet_url %>" inner-padding="12px 16px" width="240px" background-color="#000000" color="#ffffff" align="center" font-size="16px" border-radius="6px" padding="4px 0px">Add to Apple Wallet</mj-button>
+    <mj-image href="<%= card.apple_wallet_url %>" src="<%= apple_wallet_badge_url() %>" alt="Add to Apple Wallet" width="155px" padding="4px 0px" align="center"></mj-image>
     <% end %>
     <%= if card.google_wallet_url do %>
-    <mj-button href="<%= card.google_wallet_url %>" inner-padding="12px 16px" width="240px" background-color="#ffffff" color="#1f1f1f" border="1px solid #747775" align="center" font-size="16px" border-radius="6px" padding="4px 0px">Add to Google Wallet</mj-button>
+    <mj-image href="<%= card.google_wallet_url %>" src="<%= google_wallet_badge_url() %>" alt="Add to Google Wallet" width="175px" padding="4px 0px" align="center"></mj-image>
     <% end %>
     <% end %>
     <mj-spacer height="12px"></mj-spacer>
