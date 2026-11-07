@@ -113,7 +113,7 @@ defmodule Ysc.HtmlSanitizeExUpgradeTest do
       plain_text = File.read!(@plain_text)
 
       assert trix =~ "HtmlSanitizeEx.ScrubberCompiler"
-      assert post =~ "HtmlSanitizeEx.Scrubber.BasicHTML"
+      assert post =~ "Ysc.TrixScrubber"
       assert plain_text =~ "HtmlSanitizeEx.strip_tags()"
       refute post =~ "HtmlSanitizeEx.html5"
       refute trix =~ "HtmlSanitizeEx.Scrubber.HTML5"

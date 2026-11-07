@@ -167,10 +167,12 @@ defmodule Ysc.CowboyUpgradeTest do
   end
 
   describe "hex.audit ignores after 2.21" do
-    test "drops the patched 43969 ignore and keeps 43966" do
+    test "drops the patched 43969 ignore and keeps unpatched cowboy/cowlib IDs" do
       mix_exs = File.read!(@mix_exs)
       refute mix_exs =~ ~s|"EEF-CVE-2026-43969"|
       assert mix_exs =~ ~s|"EEF-CVE-2026-43966"|
+      assert mix_exs =~ ~s|"EEF-CVE-2026-115701"|
+      assert mix_exs =~ ~s|"EEF-CVE-2026-113431"|
     end
   end
 

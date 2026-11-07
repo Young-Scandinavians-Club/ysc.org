@@ -443,8 +443,8 @@ defmodule YscWeb.NewsLiveTest do
       post =
         create_post(%{
           title: "Rendered Body Post",
-          raw_body: "<p>short</p>",
-          rendered_body: long_html,
+          # new_post_changeset derives rendered_body from raw_body
+          raw_body: long_html,
           preview_text: nil,
           featured_post: true
         })
