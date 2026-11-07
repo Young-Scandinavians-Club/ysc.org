@@ -113,7 +113,7 @@ defmodule YscWeb.Feeds.AtomFeedTest do
         title: "Empty Preview Post",
         preview_text: "   ",
         raw_body: nil,
-        rendered_body: "<p>Rendered only</p>",
+        rendered_body: nil,
         updated_at: DateTime.utc_now() |> DateTime.truncate(:second),
         published_on: DateTime.utc_now() |> DateTime.truncate(:second)
       }
@@ -122,6 +122,23 @@ defmodule YscWeb.Feeds.AtomFeedTest do
 
       assert xml =~ "Empty Preview Post"
       refute xml =~ "<summary"
+    end
+
+    test "summary falls back to rendered_body when preview_text is blank" do
+      post = %Post{
+        id: Ecto.ULID.generate(),
+        url_name: "rendered-preview",
+        title: "Rendered Preview Post",
+        preview_text: "   ",
+        raw_body: nil,
+        rendered_body: "<p>Rendered only</p>",
+        updated_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        published_on: DateTime.utc_now() |> DateTime.truncate(:second)
+      }
+
+      xml = AtomFeed.posts_feed([post])
+
+      assert xml =~ "<summary>Rendered only</summary>"
     end
 
     test "scrubs script tags from rendered_body before emitting HTML content" do
