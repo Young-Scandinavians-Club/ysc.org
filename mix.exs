@@ -20,11 +20,15 @@ defmodule Ysc.MixProject do
       # cowlib 2.21.0 still reports EEF-CVE-2026-43966 (structured-fields
       # encoder). Cowboy 2.16+ rejects CR/LF in response headers
       # (invalid_response_headers). EEF-CVE-2026-43969 is patched in 2.21.0.
-      # Revisit by 2026-11-06. Requires Hex >= 2.5.1-dev for ignore_advisories
-      # (see etc/scripts/install_hex.sh).
+      # EEF-CVE-2026-115701 (cowboy HTTP/1.1 pipelined buffering) and
+      # EEF-CVE-2026-113431 (cowlib HPACK header-list size) are fixed on
+      # master only — no Hex release yet. Revisit by 2026-12-07. Requires
+      # Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       hex: [
         ignore_advisories: [
           "EEF-CVE-2026-43966",
+          "EEF-CVE-2026-115701",
+          "EEF-CVE-2026-113431",
           # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
           # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
           "EEF-CVE-2026-95105",
@@ -239,7 +243,9 @@ defmodule Ysc.MixProject do
       # Vendored to fix a Range.new/2 deprecation warning upstream hasn't
       # released a fix for — see vendor/blurhash/README.md.
       {:blurhash, path: "vendor/blurhash"},
-      {:brotli, ">= 0.0.0", runtime: false},
+      # EEF-CVE-2026-111497: OOB write in the bundled Brotli decoder; fixed
+      # in 0.3.4. PhoenixBakery compresses assets at compile time (runtime: false).
+      {:brotli, "~> 0.3.4", runtime: false},
       {:cachex, "~> 4.1"},
       # 1.17.2: CloseTarget calls Target.disposeBrowserContext instead of
       # relying on disposeOnDetach (orphaned Chrome after session close /

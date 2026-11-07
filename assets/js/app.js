@@ -185,7 +185,7 @@ waitForSentry().then((available) => {
                 /Invalid call to runtime\.sendMessage\(\)\. Tab not found/,
                 // JS-to-native bridge rejections from injected scripts (Sentry's
                 // default list only covers MethodName:simulateEvent)
-                /^Non-Error promise rejection captured with value: Object Not Found Matching Id:\d+, MethodName:\w+, ParamCount:\d+$/,
+                /^Non-Error promise rejection captured with value: Object Not Found Matching Id:\d+, MethodName:[^,]+, ParamCount:\d+$/,
             ],
             denyUrls: [
                 /^safari-(web-)?extension:\/\//i,
@@ -251,7 +251,7 @@ function isExpectedWebAuthnOrVideoNotAllowed(event) {
 function isInjectedScriptStackOverflow(event) {
     const exceptions = event?.exception?.values || [];
 
-    return exceptions.some((ex) => {
+    return exceptions.length === 1 && exceptions.some((ex) => {
         if (!/Maximum call stack size exceeded/i.test(ex.value || "")) return false;
 
         const frames = ex.stacktrace?.frames || [];
