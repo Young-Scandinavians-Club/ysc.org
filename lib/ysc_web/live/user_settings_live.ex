@@ -4706,8 +4706,8 @@ defmodule YscWeb.UserSettingsLive do
     )
   end
 
-  # FlowRoute (our SMS provider) can't verify numbers outside the US/Canada,
-  # so save the number directly instead of routing through the OTP step.
+  # Numbers we cannot SMS (outside US/CA FlowRoute and Nordic Twilio)
+  # are saved directly instead of routing through the OTP step.
   defp save_unverifiable_phone_change(socket, updated_user, new_phone) do
     case Accounts.update_user_phone_and_sms(updated_user, %{
            "phone_number" => new_phone

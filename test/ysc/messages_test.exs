@@ -541,6 +541,37 @@ defmodule Ysc.MessagesTest do
   # run_send_sms_idempotent/3  (SMS)
   # ---------------------------------------------------------------------------
 
+  describe "run_send_sms_idempotent/3 - provider routing" do
+    setup do
+      Cachex.clear(:ysc_cache)
+      :ok
+    end
+
+    test "sends US numbers through FlowRoute" do
+      key = "sms_route_us_#{System.unique_integer()}"
+
+      assert {:ok, %{id: "mdr2-" <> _}} =
+               Messages.run_send_sms_idempotent(
+                 "12065551234",
+                 "[YSC] Test.",
+                 sms_attrs(key)
+               )
+    end
+
+    test "sends Nordic numbers through Twilio" do
+      key = "sms_route_se_#{System.unique_integer()}"
+
+      attrs = %{sms_attrs(key) | phone_number: "46701234567"}
+
+      assert {:ok, %{id: "SM" <> _}} =
+               Messages.run_send_sms_idempotent(
+                 "46701234567",
+                 "[YSC] Test.",
+                 attrs
+               )
+    end
+  end
+
   describe "run_send_sms_idempotent/3 - first-time send" do
     setup do
       Cachex.clear(:ysc_cache)

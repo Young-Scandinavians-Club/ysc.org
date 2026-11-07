@@ -983,7 +983,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       refute has_element?(view, "#phone_verification_form")
     end
 
-    test "non-US/CA phone number saves and skips the verification step", %{
+    test "Swedish phone number advances to the verification step", %{
       conn: conn,
       user: user
     } do
@@ -994,13 +994,31 @@ defmodule YscWeb.AccountSetupLiveTest do
         "user" => %{"phone_number" => "+46701234567", "sms_opt_in" => "false"}
       })
 
-      # No further setup is needed once the unverifiable phone number is saved,
-      # so the LiveView completes setup and redirects home instead of showing
-      # the (unreachable, since FlowRoute can't text this number) OTP step.
-      assert_redirect(view, "/")
+      assert has_element?(view, "#phone_verification_form")
 
       updated_user = Accounts.get_user!(user.id)
       assert updated_user.phone_number == "+46701234567"
+      assert updated_user.phone_verified_at == nil
+    end
+
+    test "unsupported international phone number saves and skips the verification step",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
+
+      render_submit(view, "save_phone", %{
+        "user" => %{"phone_number" => "+4915112345678", "sms_opt_in" => "false"}
+      })
+
+      # Germany is outside FlowRoute (US/CA) and Twilio (Nordic), so the
+      # LiveView completes setup and redirects home instead of showing OTP.
+      assert_redirect(view, "/")
+
+      updated_user = Accounts.get_user!(user.id)
+      assert updated_user.phone_number == "+4915112345678"
       assert updated_user.phone_verified_at == nil
     end
 
