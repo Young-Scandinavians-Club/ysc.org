@@ -183,6 +183,10 @@ config :ysc, :printful_req_options,
   plug: {Req.Test, Ysc.Printful.Client},
   retry: false
 
+config :ysc, :poster_review_req_options,
+  plug: {Req.Test, Ysc.Media.PosterReview},
+  retry: false
+
 config :ysc, :stripe_subscription_retriever, Ysc.StripeSubscriptionRetrieverMock
 config :ysc, :accounts_module, Ysc.AccountsMock
 

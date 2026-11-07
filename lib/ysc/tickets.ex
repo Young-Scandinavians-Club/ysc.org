@@ -331,6 +331,7 @@ defmodule Ysc.Tickets do
     :completed_at,
     :payment_channel,
     :offline_amount_collected,
+    :granted_by_id,
     :user_id,
     :event_id,
     :payment_id
@@ -381,6 +382,7 @@ defmodule Ysc.Tickets do
     :discount_amount
   ]
   @email_ticket_tier_fields [:id, :name, :type, :price]
+  @email_registration_fields [:id, :ticket_id, :first_name, :last_name, :email]
 
   defp ticket_order_for_email_query(order_id) do
     user_query = from(u in User, select: struct(u, ^@email_user_fields))
@@ -418,10 +420,16 @@ defmodule Ysc.Tickets do
     tier_query =
       from(tt in TicketTier, select: struct(tt, ^@email_ticket_tier_fields))
 
+    registration_query =
+      from(td in TicketDetail,
+        select: struct(td, ^@email_registration_fields)
+      )
+
     ticket_query =
       from(t in Ticket,
         select: struct(t, ^@email_ticket_fields),
-        preload: [ticket_tier: ^tier_query]
+        order_by: [asc: t.inserted_at, asc: t.id],
+        preload: [ticket_tier: ^tier_query, registration: ^registration_query]
       )
 
     from(to in TicketOrder,
@@ -443,7 +451,11 @@ defmodule Ysc.Tickets do
       Ecto.assoc_loaded?(ticket_order.payment) and
       Ecto.assoc_loaded?(ticket_order.tickets) and
       ticket_order.tickets != [] and
-      Enum.all?(ticket_order.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+      Enum.all?(
+        ticket_order.tickets,
+        &(Ecto.assoc_loaded?(&1.ticket_tier) and
+            Ecto.assoc_loaded?(&1.registration))
+      )
   end
 
   defp ensure_ticket_order_for_email(%TicketOrder{} = ticket_order) do
@@ -663,7 +675,69 @@ defmodule Ysc.Tickets do
   @qr_ticket_tier_fields [:id, :name, :type]
   @qr_registration_fields [:id, :ticket_id, :first_name, :last_name]
 
+  @doc """
+  Resolves a verified `Ysc.Tickets.AccessToken` payload to the order the
+  sign-in-free ticket page shows.
+
+  Returns the same shape as `get_user_ticket_order_for_qr/2`, with `tickets`
+  narrowed to the ones the token covers, or `nil` when nothing matches.
+  """
+  def get_ticket_order_for_access({:order, order_id}) do
+    order_id |> ticket_order_for_qr_query() |> Repo.one()
+  end
+
+  def get_ticket_order_for_access({:ticket, ticket_id}),
+    do: get_ticket_order_for_access({:tickets, [ticket_id]})
+
+  def get_ticket_order_for_access({:tickets, ticket_ids}) do
+    order_id =
+      from(t in Ticket, where: t.id in ^ticket_ids, select: t.ticket_order_id)
+      |> Repo.all()
+      |> Enum.uniq()
+      |> case do
+        [order_id] -> order_id
+        _ -> nil
+      end
+
+    with order_id when not is_nil(order_id) <- order_id,
+         %TicketOrder{} = order <-
+           order_id |> ticket_order_for_qr_query() |> Repo.one() do
+      %{order | tickets: Enum.filter(order.tickets, &(&1.id in ticket_ids))}
+    end
+  end
+
+  @doc """
+  Returns the ticket when it can be used at the door (confirmed and not a
+  donation), else `nil`. Slim load for the sign-in-free QR and wallet endpoints.
+  """
+  def get_check_in_ticket(ticket_id) do
+    tier_query = from(tt in TicketTier, select: struct(tt, [:id, :type]))
+
+    ticket =
+      from(t in Ticket,
+        where: t.id == ^ticket_id,
+        select: struct(t, [:id, :status, :ticket_tier_id]),
+        preload: [ticket_tier: ^tier_query]
+      )
+      |> Repo.one()
+
+    if ticket && TicketTierHelpers.check_in_ticket?(ticket), do: ticket
+  end
+
+  @doc false
+  def ci_query_explain_ticket_order_for_access_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    ticket_order_for_qr_query(Fixtures.ulid())
+  end
+
   defp ticket_order_for_qr_query(user_id, order_id) do
+    order_id
+    |> ticket_order_for_qr_query()
+    |> where([to], to.user_id == ^user_id)
+  end
+
+  defp ticket_order_for_qr_query(order_id) do
     event_query =
       from(e in Event, select: struct(e, ^@qr_event_fields))
 
@@ -680,7 +754,7 @@ defmodule Ysc.Tickets do
       )
 
     from(to in TicketOrder,
-      where: to.id == ^order_id and to.user_id == ^user_id,
+      where: to.id == ^order_id,
       select: struct(to, ^@qr_ticket_order_fields),
       preload: [
         event: ^event_query,
@@ -3915,6 +3989,8 @@ defmodule Ysc.Tickets do
             idempotency_key: idempotency_key
           )
 
+          send_ticket_recipient_emails(ticket_order)
+
           :ok
 
         {:error, reason} ->
@@ -3938,6 +4014,59 @@ defmodule Ysc.Tickets do
 
         :error
     end
+  end
+
+  # Everyone whose email was given for a ticket (other than the purchaser)
+  # gets their own copy: who it's from, plus the QR code and wallet buttons.
+  # Best effort; a failure here must not fail the purchaser's confirmation.
+  defp send_ticket_recipient_emails(ticket_order) do
+    require Ysc.Logging
+
+    alias YscWeb.Emails.TicketRecipientNotification
+
+    Enum.each(TicketRecipientNotification.recipients(ticket_order), fn
+      %{email: email} = recipient ->
+        try do
+          email_data =
+            TicketRecipientNotification.prepare_email_data(
+              ticket_order,
+              recipient
+            )
+
+          result =
+            YscWeb.Emails.Notifier.schedule_email(
+              email,
+              "ticket_recipient_#{ticket_order.id}_#{email_hash(email)}",
+              TicketRecipientNotification.get_subject(ticket_order.event.title),
+              "ticket_recipient_notification",
+              email_data,
+              "",
+              nil
+            )
+
+          case result do
+            %Oban.Job{} ->
+              :ok
+
+            {:error, reason} ->
+              Ysc.Logging.error("Failed to schedule ticket recipient email",
+                ticket_order_id: ticket_order.id,
+                error: reason
+              )
+          end
+        rescue
+          error ->
+            Ysc.Logging.error("Failed to send ticket recipient email",
+              ticket_order_id: ticket_order.id,
+              error: error,
+              stacktrace: __STACKTRACE__
+            )
+        end
+    end)
+  end
+
+  defp email_hash(email) do
+    :crypto.hash(:sha256, email) |> Base.url_encode64(padding: false)
   end
 
   defp stripe_payment_method_module do

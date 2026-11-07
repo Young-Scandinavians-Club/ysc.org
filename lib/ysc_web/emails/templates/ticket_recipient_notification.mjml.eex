@@ -1,0 +1,73 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Your ticket is ready</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Hej <%= @first_name %>, </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong><%= @purchaser_name %></strong> got <%= if @ticket_count == 1 do %>a ticket<% else %><%= @ticket_count %> tickets<% end %> for you to <strong><%= @event.title %></strong>, and here <%= if @ticket_count == 1 do %>it is<% else %>they are<% end %>. You don't need a YSC account: show the QR code at the door, or add it to your phone's wallet.
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Ticket QR codes -->
+    <%= for card <- @ticket_cards do %>
+    <mj-divider border-width="1px" border-color="#e5e7eb" padding="8px 0px 16px 0px"></mj-divider>
+    <mj-text align="center" font-size="18px" line-height="1.4" padding="0px" font-weight="bold"><%= card.ticket_tier_name %></mj-text>
+    <%= if card.holder_name do %>
+    <mj-text align="center" font-size="16px" line-height="1.4" padding="4px 0px 0px 0px" color="#4B5563"><%= card.holder_name %></mj-text>
+    <% end %>
+    <mj-image src="<%= card.qr_image_url %>" alt="Check-in QR code for ticket <%= card.reference_id %>" width="200px" padding="16px 0px 8px 0px" href="<%= card.ticket_url %>"></mj-image>
+    <mj-text align="center" font-size="14px" line-height="1.4" padding="0px 0px 12px 0px" color="#6B7280">
+      Ticket <span style="font-family: monospace; font-weight: 600;"><%= card.reference_id %></span>
+    </mj-text>
+    <%= if card.apple_wallet_url do %>
+    <mj-image href="<%= card.apple_wallet_url %>" src="<%= apple_wallet_badge_url() %>" alt="Add to Apple Wallet" width="155px" padding="4px 0px" align="center"></mj-image>
+    <% end %>
+    <%= if card.google_wallet_url do %>
+    <mj-image href="<%= card.google_wallet_url %>" src="<%= google_wallet_badge_url() %>" alt="Add to Google Wallet" width="175px" padding="4px 0px" align="center"></mj-image>
+    <% end %>
+    <mj-text align="center" font-size="14px" line-height="1.4" padding="8px 0px 0px 0px" color="#6B7280">Can't see the QR code or buttons? <a href="<%= card.ticket_url %>" style="color: #1447e6;">Open your ticket</a></mj-text>
+    <% end %>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-spacer height="24px"></mj-spacer>
+    <!-- Event Details -->
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Event Details </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="20px" line-height="1.5" padding="0px">
+      <strong><%= @event.title %></strong>
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Date & Time:</strong> <%= @event_date_time %>
+    </mj-text>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Location:</strong> <%= @event.location_name %>
+    </mj-text>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Address:</strong> <%= @event.address %>
+    </mj-text>
+    <%= if @event.age_restriction && @event.age_restriction > 0 do %>
+    <mj-spacer height="4px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <strong>Must be <%= @event.age_restriction %> or older</strong>
+    </mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">See event details → </mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Questions? Reply to this email or write to us at <a href="mailto:info@ysc.org">info@ysc.org</a>. </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Vi ses snart! (See you soon!) 👋</mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

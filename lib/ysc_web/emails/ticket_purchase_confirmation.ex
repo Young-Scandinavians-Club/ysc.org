@@ -4,13 +4,16 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
 
   Sends a confirmation email to users after successful ticket purchase.
   """
+  # Imported before `use MjmlEEx`, which compiles the template at that point.
+  import YscWeb.Emails.TicketAccessHelpers,
+    only: [apple_wallet_badge_url: 0, google_wallet_badge_url: 0]
+
   use MjmlEEx,
     mjml_template: "templates/ticket_purchase_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
     only: [
-      absolute_url: 1,
       event_url: 1,
       format_datetime: 1,
       format_event_start_datetime: 3,
@@ -19,6 +22,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     ]
 
   alias Ysc.Tickets
+  alias YscWeb.Emails.TicketAccessHelpers
   alias YscWeb.Emails.TicketOrderHelpers
 
   def get_template_name() do
@@ -29,8 +33,12 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     "Your tickets are confirmed! 🎫"
   end
 
+  @doc """
+  Link to the order's tickets (QR codes and wallet buttons) that opens without
+  signing in.
+  """
   def tickets_qr_url(order_id) do
-    absolute_url("/tickets/#{order_id}/qr")
+    TicketAccessHelpers.order_tickets_url(order_id)
   end
 
   @doc """
@@ -192,14 +200,23 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
       payment_date: payment_date,
       payment_method: payment_method,
       paid_in_person: paid_in_person?,
+      granted: granted_by_admin?(ticket_order),
       total_amount: total_amount,
       gross_total: gross_total_str,
       total_discount: total_discount_str,
       has_discounts: Money.positive?(discount_amount),
       ticket_summaries: ticket_summaries,
       tickets:
-        TicketOrderHelpers.ticket_refs(ticket_order.tickets, status: true)
+        TicketOrderHelpers.ticket_refs(ticket_order.tickets, status: true),
+      ticket_cards: TicketAccessHelpers.ticket_cards(ticket_order.tickets)
     }
+  end
+
+  # Complimentary tickets assigned by an admin (volunteers, comps), as opposed
+  # to an in-person cash/check sale which is also booked as a $0 admin grant.
+  defp granted_by_admin?(ticket_order) do
+    not is_nil(ticket_order.granted_by_id) and
+      is_nil(ticket_order.payment_channel)
   end
 
   defp offline_payment_method_description("cash"), do: "Cash (paid in person)"
