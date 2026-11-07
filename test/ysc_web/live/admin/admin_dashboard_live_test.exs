@@ -151,10 +151,28 @@ defmodule YscWeb.AdminDashboardLiveTest do
     test "shows admin dashboard sections and event timeline", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
 
-      assert has_element?(view, "#dashboard-events-timeline")
-      assert has_element?(view, "#dashboard-financials")
-      assert has_element?(view, "#dashboard-newsletters")
-      assert has_element?(view, "#dashboard-recent-discussions")
+      assert has_element?(view, "#dashboard-events-timeline", "Upcoming events")
+
+      assert has_element?(
+               view,
+               "#dashboard-events-timeline a[href='/admin/events']",
+               "View all"
+             )
+
+      assert has_element?(view, "#dashboard-financials", "Financials")
+      assert has_element?(view, "#dashboard-newsletters", "Recent newsletters")
+
+      assert has_element?(
+               view,
+               "#dashboard-recent-discussions",
+               "Recent discussions"
+             )
+
+      assert has_element?(
+               view,
+               "#dashboard-recent-discussions a[href='/admin/posts']",
+               "View all posts"
+             )
     end
 
     test "event check-in link joins open membership session", %{
