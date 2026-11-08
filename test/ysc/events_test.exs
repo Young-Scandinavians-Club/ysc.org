@@ -1308,6 +1308,34 @@ defmodule Ysc.EventsTest do
       assert Enum.any?(rows, &(&1.id == ev.id))
     end
 
+    test "list_events_paginated/2 treats LIKE wildcards in the query literally" do
+      user = user_fixture()
+      title = "WildcardEvent#{System.unique_integer([:positive])}"
+
+      {:ok, ev} =
+        Events.create_event(%{
+          title: title,
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 50, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      params = %{page: 1, page_size: 50}
+
+      # Without escape_like/1, "%" dumps every admin event list row.
+      for wildcard <- ["%", "_", "%%"] do
+        assert {:ok, {rows, _meta}} =
+                 Events.list_events_paginated(params, wildcard)
+
+        refute Enum.any?(rows, &(&1.id == ev.id))
+      end
+
+      assert {:ok, {rows, _meta}} = Events.list_events_paginated(params, title)
+      assert Enum.any?(rows, &(&1.id == ev.id))
+    end
+
     test "publish_event/1 returns missing_start_date when start_date is nil" do
       user = user_fixture()
 

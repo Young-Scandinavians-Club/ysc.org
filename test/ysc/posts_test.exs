@@ -1314,6 +1314,37 @@ defmodule Ysc.PostsTest do
       assert Enum.any?(entries, &(&1.title == "BareStringSearchToken"))
     end
 
+    test "list_posts_paginated/2 treats LIKE wildcards in the query literally",
+         %{author: author} do
+      title = "WildcardPost#{System.unique_integer([:positive])}"
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => title,
+            "body" => "Body",
+            "url_name" => "wildcard-post-#{System.unique_integer([:positive])}",
+            "state" => "published"
+          },
+          author
+        )
+
+      params = %{limit: 50, offset: 0}
+
+      # Without escape_like/1, "%" dumps every admin news list row.
+      for wildcard <- ["%", "_", "%%"] do
+        {:ok, {entries, _meta}} =
+          Posts.list_posts_paginated(params, search_term: wildcard)
+
+        refute Enum.any?(entries, &(&1.id == post.id))
+      end
+
+      {:ok, {entries, _meta}} =
+        Posts.list_posts_paginated(params, search_term: title)
+
+      assert Enum.any?(entries, &(&1.id == post.id))
+    end
+
     test "applies date_from and date_to when valid ISO dates", %{author: author} do
       {:ok, post} =
         Posts.create_post(

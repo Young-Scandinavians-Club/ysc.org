@@ -8,6 +8,7 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
 
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.TicketAccessFixtures
 
   alias Ysc.Events
   alias Ysc.Repo
@@ -94,6 +95,57 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
 
       assert {:error, :invalid} =
                AccessToken.verify_ticket(AccessToken.sign_order("o1"))
+
+      assert {:error, :invalid} =
+               AccessToken.verify_ticket(AccessToken.sign_tickets(["t1", "t2"]))
+    end
+
+    test "rejects payloads that are not an order, ticket, or tickets list" do
+      # Same salt as AccessToken — a forged shape must not become a valid
+      # sign-in-free ticket grant if verify/1 ever starts returning the
+      # Phoenix.Token payload unchecked.
+      assert {:error, :invalid} =
+               AccessToken.verify(sign_raw({:admin, "user-id"}))
+
+      assert {:error, :invalid} =
+               AccessToken.verify(sign_raw({:order, 123}))
+
+      assert {:error, :invalid} =
+               AccessToken.verify(sign_raw({:tickets, "t1"}))
+    end
+  end
+
+  describe "get_ticket_order_for_access/1" do
+    test "an order payload returns every ticket in the order" do
+      %{order: order, tickets: tickets} = granted_tickets(2)
+
+      loaded = Tickets.get_ticket_order_for_access({:order, order.id})
+
+      assert loaded.id == order.id
+
+      assert Enum.sort(Enum.map(loaded.tickets, & &1.id)) ==
+               Enum.sort(Enum.map(tickets, & &1.id))
+    end
+
+    test "a tickets payload returns only those tickets from one order" do
+      %{tickets: [keep, drop, also_keep]} = granted_tickets(3)
+
+      loaded =
+        Tickets.get_ticket_order_for_access({:tickets, [keep.id, also_keep.id]})
+
+      ids = Enum.map(loaded.tickets, & &1.id)
+      assert keep.id in ids
+      assert also_keep.id in ids
+      refute drop.id in ids
+    end
+
+    test "tickets from two different orders do not resolve" do
+      %{tickets: [a]} = granted_tickets(1)
+      %{tickets: [b]} = granted_tickets(1)
+
+      assert is_nil(
+               Tickets.get_ticket_order_for_access({:tickets, [a.id, b.id]})
+             )
     end
   end
 
@@ -278,5 +330,9 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
     |> Map.fetch!(:path)
     |> String.replace_prefix("/t/", "")
     |> AccessToken.verify()
+  end
+
+  defp sign_raw(payload) do
+    Phoenix.Token.sign(YscWeb.Endpoint, "ticket_access_v1", payload)
   end
 end

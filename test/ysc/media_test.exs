@@ -315,6 +315,26 @@ defmodule Ysc.MediaTest do
       assert results == []
     end
 
+    test "treats LIKE wildcards in the search literally", %{user: user} do
+      {:ok, img} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/wildcard.jpg",
+          processing_state: :unprocessed,
+          title: "Ordinary Beach Photo"
+        }
+        |> Repo.insert()
+
+      # Without escape_like/1, "%" dumps every media-library image.
+      for wildcard <- ["%", "_", "%%"] do
+        results = Media.list_images_cursor(search: wildcard, limit: 50)
+        refute Enum.any?(results, &(&1.id == img.id))
+      end
+
+      results = Media.list_images_cursor(search: "Ordinary Beach", limit: 50)
+      assert Enum.any?(results, &(&1.id == img.id))
+    end
+
     test "search with empty string returns all images" do
       all = Media.list_images_cursor(limit: 50)
       with_empty_search = Media.list_images_cursor(search: "", limit: 50)
