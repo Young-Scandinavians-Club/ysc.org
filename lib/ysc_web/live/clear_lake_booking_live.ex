@@ -2948,7 +2948,8 @@ defmodule YscWeb.ClearLakeBookingLive do
           false,
           "Membership Required",
           YscWeb.BookingUserMessages.membership_required_message_html(
-            membership_path
+            membership_path,
+            Ysc.Accounts.MembershipCache.had_any_subscription?(user)
           )
         }
       end
