@@ -345,7 +345,10 @@ defmodule YscWeb.Emails.NewsletterEdition do
     %{
       title: post.title,
       preview_text:
-        clean_preview_text(post.preview_text || post.raw_body || ""),
+        clean_preview_text(
+          post.preview_text || Map.get(post, :rendered_body) ||
+            Map.get(post, :raw_body) || ""
+        ),
       url: absolute_url("/posts/#{post.url_name}"),
       image_url: post_image_url(post.featured_image)
     }

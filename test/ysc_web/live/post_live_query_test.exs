@@ -16,6 +16,8 @@ defmodule YscWeb.PostLiveQueryTest do
   alias Ysc.Repo
 
   defp post_fixture(author, attrs) do
+    {rendered_body, attrs} = Map.pop(attrs, :rendered_body)
+
     {:ok, post} =
       %Posts.Post{}
       |> Posts.Post.new_post_changeset(
@@ -33,10 +35,18 @@ defmodule YscWeb.PostLiveQueryTest do
       )
       |> Repo.insert()
 
-    post
+    if is_binary(rendered_body) do
+      post
+      |> Ecto.Changeset.change(%{rendered_body: rendered_body})
+      |> Repo.update!()
+    else
+      post
+    end
   end
 
   @post_query_pattern ~r/FROM "posts"/i
+  @raw_body_pattern ~r/raw_body/i
+  @secret_pattern ~r/hashed_password|board_bio|upload_data/i
 
   describe "mount query deduplication" do
     test "dead render and connect avoid duplicate post fetches", %{conn: conn} do
@@ -75,6 +85,59 @@ defmodule YscWeb.PostLiveQueryTest do
         )
 
       assert query_count == 1
+    end
+  end
+
+  describe "public page TOAST and preloads" do
+    test "dead render does not SELECT raw_body and still shows rendered body",
+         %{
+           conn: conn
+         } do
+      marker = "toast-#{System.unique_integer([:positive])}"
+      author = user_fixture()
+
+      post =
+        post_fixture(author, %{
+          title: "Public Body Toast Post",
+          raw_body: "<p>raw #{marker}</p>",
+          rendered_body: "<p>rendered #{marker}</p>"
+        })
+
+      {html, raw_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/posts/#{post.id}")
+            |> html_response(200)
+          end,
+          pattern: @raw_body_pattern,
+          caller_pids: [self()]
+        )
+
+      # Before: get_public_post selected posts.* including Trix source.
+      # After: public page fields omit raw_body; the article uses
+      # rendered_body.
+      assert raw_cols == 0
+      assert html =~ "rendered #{marker}"
+      refute html =~ "raw #{marker}"
+    end
+
+    test "dead render author preload skips hashed_password", %{conn: conn} do
+      author = user_fixture()
+      post = post_fixture(author, %{title: "Slim Author Post"})
+
+      {_html, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/posts/#{post.id}")
+            |> html_response(200)
+          end,
+          pattern: @secret_pattern,
+          caller_pids: [self()]
+        )
+
+      assert fat_cols == 0
     end
   end
 end

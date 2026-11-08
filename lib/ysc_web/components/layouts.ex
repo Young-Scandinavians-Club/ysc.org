@@ -225,12 +225,29 @@ defmodule YscWeb.Layouts do
 
   attr :current_user, :any, default: nil
   attr :active_membership?, :boolean, default: false
+  attr :had_membership?, :boolean, default: false
   attr :is_fullscreen, :boolean, default: false
 
   @doc """
   Pending-approval and inactive-membership alert banners shown in the app layout.
   """
   def membership_status_banners(assigns) do
+    had_membership? = assigns[:had_membership?] == true
+
+    assigns =
+      assigns
+      |> assign(:had_membership?, had_membership?)
+      |> assign(
+        :unpaid_membership_title,
+        YscWeb.BookingUserMessages.unpaid_membership_banner_title(
+          had_membership?
+        )
+      )
+      |> assign(
+        :unpaid_membership_cta,
+        YscWeb.BookingUserMessages.membership_cta_label(had_membership?)
+      )
+
     ~H"""
     <.alert_banner
       :if={
@@ -254,13 +271,19 @@ defmodule YscWeb.Layouts do
       }
       type="orange"
       icon="hero-exclamation-triangle"
-      title="Membership Required"
-      action_label="Choose a membership"
+      title={@unpaid_membership_title}
+      action_label={@unpaid_membership_cta}
       action_path={~p"/users/membership"}
     >
-      To access events and the cabin booking system, you need an active, paid membership. Use the
-      <strong>Choose a membership</strong>
-      button to pick a plan and complete payment.
+      <%= if @had_membership? do %>
+        Your membership has expired. Use the
+        <strong>{@unpaid_membership_cta}</strong>
+        button to pay dues and restore access to events and cabin bookings.
+      <% else %>
+        To access events and the cabin booking system, you need an active, paid membership. Use the
+        <strong>{@unpaid_membership_cta}</strong>
+        button to pick a plan and complete payment.
+      <% end %>
     </.alert_banner>
     """
   end

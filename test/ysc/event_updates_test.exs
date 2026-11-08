@@ -69,6 +69,32 @@ defmodule Ysc.EventUpdatesTest do
       other_event = event_fixture()
       assert Events.list_event_updates(other_event.id) == []
     end
+
+    test "omits raw_body TOAST and hashed_password from the SELECT", %{
+      event: event,
+      user: user
+    } do
+      marker = "admin-update-#{System.unique_integer([:positive])}"
+
+      {:ok, _} =
+        Events.create_event_update(event, %{
+          title: "Admin timeline",
+          raw_body: "<p>raw #{marker}</p>",
+          rendered_body: "<p>rendered #{marker}</p>",
+          sent_by_id: user.id
+        })
+
+      {{updates, raw_cols}, password_cols} =
+        with_column_counts(fn -> Events.list_event_updates(event.id) end)
+
+      [update] = updates
+      assert update.rendered_body == "<p>rendered #{marker}</p>"
+      assert is_nil(update.raw_body)
+      assert update.sent_by.first_name == user.first_name
+      assert update.sent_by.last_name == user.last_name
+      assert raw_cols == 0
+      assert password_cols == 0
+    end
   end
 
   describe "list_visible_event_updates/1" do
@@ -97,6 +123,35 @@ defmodule Ysc.EventUpdatesTest do
       updates = Events.list_visible_event_updates(event.id)
       assert length(updates) == 1
       assert hd(updates).id == visible.id
+    end
+
+    test "omits raw_body TOAST and hashed_password from the SELECT", %{
+      event: event,
+      user: user
+    } do
+      marker = "public-update-#{System.unique_integer([:positive])}"
+
+      {:ok, _} =
+        Events.create_event_update(event, %{
+          title: "Public update",
+          raw_body: "<p>raw #{marker}</p>",
+          rendered_body: "<p>rendered #{marker}</p>",
+          show_on_event_page: true,
+          sent_by_id: user.id
+        })
+
+      {{updates, raw_cols}, password_cols} =
+        with_column_counts(fn ->
+          Events.list_visible_event_updates(event.id)
+        end)
+
+      [update] = updates
+      assert update.rendered_body == "<p>rendered #{marker}</p>"
+      assert is_nil(update.raw_body)
+      assert update.sent_by.first_name == user.first_name
+      assert update.sent_by.last_name == user.last_name
+      assert raw_cols == 0
+      assert password_cols == 0
     end
   end
 
@@ -617,5 +672,21 @@ defmodule Ysc.EventUpdatesTest do
       assert marked.sms_recipient_count == 7
       assert marked.sms_body == "[YSC] Test: body"
     end
+  end
+
+  defp with_column_counts(fun) do
+    {result, raw_cols} =
+      Ysc.QueryCounter.with_query_counter(fun,
+        pattern: ~r/raw_body/i,
+        caller_pids: [self()]
+      )
+
+    {_result, password_cols} =
+      Ysc.QueryCounter.with_query_counter(fun,
+        pattern: ~r/hashed_password/i,
+        caller_pids: [self()]
+      )
+
+    {{result, raw_cols}, password_cols}
   end
 end

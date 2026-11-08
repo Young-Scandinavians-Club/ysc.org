@@ -5773,7 +5773,7 @@ defmodule YscWeb.TahoeBookingLive do
     if Accounts.has_active_membership?(user_with_subs) do
       check_booking_limits(user, user_with_subs, active_bookings)
     else
-      membership_required_error()
+      membership_required_error(user)
     end
   end
 
@@ -5788,14 +5788,15 @@ defmodule YscWeb.TahoeBookingLive do
     end
   end
 
-  defp membership_required_error do
+  defp membership_required_error(user) do
     membership_path = ~p"/users/membership"
 
     {
       false,
       "Membership Required",
       YscWeb.BookingUserMessages.membership_required_message_html(
-        membership_path
+        membership_path,
+        Ysc.Accounts.MembershipCache.had_any_subscription?(user)
       )
     }
   end

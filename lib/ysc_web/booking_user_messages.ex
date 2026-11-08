@@ -243,19 +243,43 @@ defmodule YscWeb.BookingUserMessages do
     "Your group has #{total_guests} #{person_word(total_guests)}, but the rooms you picked only sleep #{total_capacity}. Add another room or reduce your group size."
   end
 
-  def membership_required_link_text do
-    "Choose a membership"
+  def membership_cta_label(had_membership?)
+      when had_membership? in [true, false] do
+    if had_membership?, do: "Renew membership", else: "Choose a membership"
   end
 
-  def membership_required_message_html(membership_path) do
+  def unpaid_membership_banner_title(had_membership?)
+      when had_membership? in [true, false] do
+    if had_membership?, do: "Membership Expired", else: "Membership Required"
+  end
+
+  def membership_required_link_text(had_membership? \\ false)
+      when had_membership? in [true, false] do
+    membership_cta_label(had_membership?)
+  end
+
+  def membership_required_message_html(
+        membership_path,
+        had_membership? \\ false
+      )
+      when is_binary(membership_path) and had_membership? in [true, false] do
     link =
-      ~s(<a href="#{membership_path}" class="font-semibold text-amber-900 hover:text-amber-950 underline">#{membership_required_link_text()}</a>)
+      ~s(<a href="#{membership_path}" class="font-semibold text-amber-900 hover:text-amber-950 underline">#{membership_cta_label(had_membership?)}</a>)
 
-    "You need an active YSC membership to book the cabin. #{link} and complete payment."
+    if had_membership? do
+      "You need an active YSC membership to book the cabin. #{link} to restore access."
+    else
+      "You need an active YSC membership to book the cabin. #{link} and complete payment."
+    end
   end
 
-  def membership_required_plain_message do
-    "You need an active YSC membership to book the cabin. Click your name in the top-right corner and open Membership to pay or renew."
+  def membership_required_plain_message(had_membership? \\ false)
+      when had_membership? in [true, false] do
+    if had_membership? do
+      "You need an active YSC membership to book the cabin. Click your name in the top-right corner and open Membership to renew."
+    else
+      "You need an active YSC membership to book the cabin. Click your name in the top-right corner and open Membership to pick a plan and pay."
+    end
   end
 
   def application_pending_approval_message do

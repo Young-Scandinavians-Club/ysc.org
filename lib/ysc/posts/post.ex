@@ -79,6 +79,16 @@ defmodule Ysc.Posts.Post do
     timestamps()
   end
 
+  # Public post page and staff preview on that layout.
+  # Includes `rendered_body` (scrubbed body HTML the page renders). Omits
+  # `raw_body` (Trix source) so Postgres does not detoast a second copy of
+  # the same body. The editor writes both columns together. Virtual fields are
+  # not columns and cannot be selected.
+  @doc false
+  def public_page_fields do
+    __schema__(:fields) -- [:raw_body | __schema__(:virtual_fields)]
+  end
+
   @editor_fields [
     :title,
     :url_name,
@@ -119,6 +129,7 @@ defmodule Ysc.Posts.Post do
       :deleted_on,
       :board_position_at_publish
     ])
+    |> put_rendered_body_from_raw()
     |> validate_length(:title, max: 150)
     |> validate_length(:url_name, min: 1, max: 150)
     |> foreign_key_constraint(:image_id)
@@ -161,18 +172,16 @@ defmodule Ysc.Posts.Post do
     end
   end
 
-  # `rendered_body` is derived from `raw_body` so clients cannot persist
-  # unsanitized HTML by omitting raw_body or forging rendered_body.
+  # `rendered_body` is derived from `raw_body` with TrixScrubber so clients
+  # cannot persist unsanitized HTML by omitting raw_body or forging
+  # rendered_body. The public page renders `rendered_body` and omits `raw_body`.
   defp put_rendered_body_from_raw(changeset) do
     case get_change(changeset, :raw_body) do
       raw when is_binary(raw) ->
         put_change(
           changeset,
           :rendered_body,
-          HtmlSanitizeEx.Scrubber.scrub(
-            raw,
-            HtmlSanitizeEx.Scrubber.BasicHTML
-          )
+          HtmlSanitizeEx.Scrubber.scrub(raw, Ysc.TrixScrubber)
         )
 
       _ ->
