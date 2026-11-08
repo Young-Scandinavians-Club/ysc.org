@@ -448,22 +448,13 @@ defmodule YscWeb.AdminDashboardLive do
             else: "lg:col-span-12"
           )
         ]}>
-          <div
+          <.admin_dashboard_panel
             id="dashboard-events-timeline"
-            class="bg-white rounded-sm border border-zinc-200 p-5 sm:p-6 shadow-xs"
+            title="Upcoming events"
+            padding={:comfortable}
+            navigate={~p"/admin/events"}
+            action="View all"
           >
-            <div class="flex items-center justify-between mb-6 border-b border-zinc-100 pb-3">
-              <h2 class="text-lg text-zinc-900 type-subhead">
-                Upcoming events
-              </h2>
-              <.link
-                navigate={~p"/admin/events"}
-                class="text-xs font-bold text-blue-600 hover:underline"
-              >
-                View all
-              </.link>
-            </div>
-
             <div
               :if={@loading_dashboard}
               id="dashboard-events-timeline-loading"
@@ -583,17 +574,14 @@ defmodule YscWeb.AdminDashboardLive do
                 </div>
               </li>
             </ul>
-          </div>
+          </.admin_dashboard_panel>
         </div>
 
         <div
           :if={can?(@admin_role, :admin_panel_manage)}
           class="lg:col-span-4 space-y-6 min-w-0"
         >
-          <div
-            id="dashboard-financials"
-            class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs space-y-5"
-          >
+          <.admin_dashboard_panel id="dashboard-financials" class="space-y-5">
             <h2 class="text-sm text-zinc-900 border-b border-zinc-100 pb-2 type-eyebrow">
               Financials
             </h2>
@@ -739,12 +727,9 @@ defmodule YscWeb.AdminDashboardLive do
                 </span>
               </div>
             </div>
-          </div>
+          </.admin_dashboard_panel>
 
-          <div
-            id="dashboard-newsletters"
-            class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs"
-          >
+          <.admin_dashboard_panel id="dashboard-newsletters">
             <div class="flex items-center justify-between border-b border-zinc-100 pb-2 mb-3">
               <div>
                 <h2 class="text-sm text-zinc-900 type-eyebrow">
@@ -819,14 +804,15 @@ defmodule YscWeb.AdminDashboardLive do
                 </div>
               </li>
             </ul>
-          </div>
+          </.admin_dashboard_panel>
         </div>
       </div>
 
-      <div
+      <.admin_dashboard_panel
         :if={can?(@admin_role, :admin_panel_manage)}
         id="review-applications-section"
-        class="bg-white rounded-sm border border-zinc-200 p-5 sm:p-6 shadow-xs mb-6"
+        padding={:comfortable}
+        class="mb-6"
       >
         <div class="flex flex-wrap items-center justify-between gap-2 mb-4 border-b border-zinc-100 pb-3">
           <div class="flex items-center gap-2">
@@ -924,23 +910,17 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
           </div>
         </div>
-      </div>
+      </.admin_dashboard_panel>
 
-      <div
+      <.admin_dashboard_panel
         id="dashboard-recent-discussions"
-        class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs mb-8"
+        title="Recent discussions"
+        title_style={:eyebrow}
+        title_level={3}
+        navigate={~p"/admin/posts"}
+        action="View all posts"
+        class="mb-8"
       >
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm text-zinc-900 type-eyebrow">
-            Recent discussions
-          </h3>
-          <.link
-            navigate={~p"/admin/posts"}
-            class="text-xs font-bold text-blue-600 hover:underline"
-          >
-            View all posts
-          </.link>
-        </div>
         <div
           :if={@loading_dashboard}
           id="dashboard-recent-discussions-loading"
@@ -995,7 +975,7 @@ defmodule YscWeb.AdminDashboardLive do
             </div>
           </li>
         </ul>
-      </div>
+      </.admin_dashboard_panel>
     </.side_menu>
     """
   end

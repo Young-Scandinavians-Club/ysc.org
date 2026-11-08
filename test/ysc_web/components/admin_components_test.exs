@@ -787,6 +787,85 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_dashboard_panel/1" do
+    test "renders comfortable section chrome with title, id, and action link" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_dashboard_panel
+          id="dashboard-events-timeline"
+          title="Upcoming events"
+          padding={:comfortable}
+          navigate="/admin/events"
+          action="View all"
+        >
+          <ul id="dashboard-events-list"></ul>
+        </.admin_dashboard_panel>
+        """)
+
+      assert html =~ ~s(id="dashboard-events-timeline")
+      assert html =~ ~s(id="dashboard-events-list")
+      assert html =~ "Upcoming events"
+      assert html =~ "View all"
+      assert html =~ ~s(href="/admin/events")
+      assert html =~ "bg-white rounded-sm border border-zinc-200 shadow-xs"
+      assert html =~ "p-5 sm:p-6"
+      assert html =~ "mb-6 border-b border-zinc-100 pb-3"
+      assert html =~ ~s(<h2 class="text-lg text-zinc-900 type-subhead")
+      refute html =~ "<h3"
+      refute html =~ ~s(<span class="text-xs font-bold text-blue-600 shrink-0")
+    end
+
+    test "renders eyebrow h3 title and static action without a navigate path" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_dashboard_panel
+          id="dashboard-recent-discussions"
+          title="Recent discussions"
+          title_style={:eyebrow}
+          title_level={3}
+          action="View all posts"
+          class="mb-8"
+        >
+          <p id="discussion-empty">No comments</p>
+        </.admin_dashboard_panel>
+        """)
+
+      assert html =~ ~s(id="dashboard-recent-discussions")
+      assert html =~ ~s(id="discussion-empty")
+      assert html =~ "Recent discussions"
+      assert html =~ "View all posts"
+      assert html =~ "mb-8"
+      assert html =~ "p-5"
+      refute html =~ "p-5 sm:p-6"
+      assert html =~ "mb-4"
+      refute html =~ "mb-6 border-b"
+      assert html =~ ~s(<h3 class="text-sm text-zinc-900 type-eyebrow")
+      refute html =~ "<h2"
+      refute html =~ "href="
+    end
+
+    test "omits the title row when title is not set" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_dashboard_panel id="dashboard-financials" class="space-y-5">
+          <h2 id="financials-heading">Financials</h2>
+        </.admin_dashboard_panel>
+        """)
+
+      assert html =~ ~s(id="dashboard-financials")
+      assert html =~ ~s(id="financials-heading")
+      assert html =~ "space-y-5"
+      refute html =~ "flex items-center justify-between"
+      refute html =~ "View all"
+    end
+  end
+
   describe "admin_clipboard_button/1" do
     test "icon variant renders compact clipboard control" do
       assigns = %{}
