@@ -276,6 +276,7 @@
     <.membership_status_banners
       current_user={@current_user}
       active_membership?={@active_membership?}
+      had_membership?={assigns[:had_membership?] == true}
       is_fullscreen={is_fullscreen}
     />
   </div>
@@ -291,6 +292,7 @@
         <.membership_status_banners
           current_user={@current_user}
           active_membership?={@active_membership?}
+          had_membership?={assigns[:had_membership?] == true}
           is_fullscreen={is_fullscreen}
         />
       </div>

@@ -267,6 +267,42 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
                "Choose a membership"
              )
     end
+
+    test "expired member is told to renew membership", %{conn: conn} do
+      user = user_with_membership(:none)
+
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_cl_expired_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Expired Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      assert has_element?(
+               view,
+               "#clear-lake-booking-eligibility-banner",
+               "Membership Required"
+             )
+
+      assert has_element?(
+               view,
+               "#clear-lake-booking-eligibility-banner a[href=\"/users/membership\"]",
+               "Renew membership"
+             )
+
+      refute has_element?(
+               view,
+               "#clear-lake-booking-eligibility-banner",
+               "Choose a membership"
+             )
+    end
   end
 
   describe "mount/3 - authenticated with membership" do

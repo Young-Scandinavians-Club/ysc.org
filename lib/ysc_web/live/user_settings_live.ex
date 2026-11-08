@@ -1036,26 +1036,37 @@ defmodule YscWeb.UserSettingsLive do
                 !@is_sub_account
             }>
               <div class="mb-6">
-                <%= if @user_is_active do %>
-                  <h2
-                    id="membership-purchase-heading"
-                    class="text-2xl text-zinc-900 type-title"
-                  >
-                    Get Your YSC Membership
-                  </h2>
-                  <p class="text-zinc-500 mt-1">
-                    Enjoy exclusive events, cabin stays, and all membership benefits.
-                  </p>
-                <% else %>
-                  <h2
-                    id="membership-pending-heading"
-                    class="text-2xl text-zinc-900 type-title"
-                  >
-                    Your application is under review
-                  </h2>
-                  <p class="text-zinc-500 mt-1">
-                    After the board approves you, you can pay dues here and start using member benefits.
-                  </p>
+                <%= cond do %>
+                  <% !@user_is_active -> %>
+                    <h2
+                      id="membership-pending-heading"
+                      class="text-2xl text-zinc-900 type-title"
+                    >
+                      Your application is under review
+                    </h2>
+                    <p class="text-zinc-500 mt-1">
+                      After the board approves you, you can pay dues here and start using member benefits.
+                    </p>
+                  <% @had_membership? -> %>
+                    <h2
+                      id="membership-renew-heading"
+                      class="text-2xl text-zinc-900 type-title"
+                    >
+                      Renew your membership
+                    </h2>
+                    <p class="text-zinc-500 mt-1">
+                      Your membership has expired. Pay dues to restore cabin bookings and member event tickets.
+                    </p>
+                  <% true -> %>
+                    <h2
+                      id="membership-purchase-heading"
+                      class="text-2xl text-zinc-900 type-title"
+                    >
+                      Get Your YSC Membership
+                    </h2>
+                    <p class="text-zinc-500 mt-1">
+                      Enjoy exclusive events, cabin stays, and all membership benefits.
+                    </p>
                 <% end %>
               </div>
 

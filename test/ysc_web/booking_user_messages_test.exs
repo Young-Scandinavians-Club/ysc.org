@@ -415,15 +415,48 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.membership_required_link_text() ==
              "Choose a membership"
 
+    assert BookingUserMessages.membership_cta_label(false) ==
+             "Choose a membership"
+
+    assert BookingUserMessages.membership_cta_label(true) ==
+             "Renew membership"
+
+    assert BookingUserMessages.unpaid_membership_banner_title(false) ==
+             "Membership Required"
+
+    assert BookingUserMessages.unpaid_membership_banner_title(true) ==
+             "Membership Expired"
+
     assert BookingUserMessages.membership_required_message_html(
              "/users/membership"
            ) =~
              "Choose a membership"
 
+    assert BookingUserMessages.membership_required_message_html(
+             "/users/membership",
+             true
+           ) =~
+             "Renew membership"
+
+    refute BookingUserMessages.membership_required_message_html(
+             "/users/membership",
+             true
+           ) =~
+             "complete payment"
+
     assert BookingUserMessages.membership_required_plain_message() =~
              "active YSC membership"
 
+    assert BookingUserMessages.membership_required_plain_message() =~
+             "pick a plan and pay"
+
     refute BookingUserMessages.membership_required_plain_message() =~ "<a"
+
+    assert BookingUserMessages.membership_required_plain_message(true) =~
+             "open Membership to renew"
+
+    refute BookingUserMessages.membership_required_plain_message(true) =~
+             "pick a plan"
 
     assert BookingUserMessages.application_pending_approval_message() =~
              "still being reviewed"

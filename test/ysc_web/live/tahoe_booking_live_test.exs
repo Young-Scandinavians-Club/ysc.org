@@ -196,6 +196,42 @@ defmodule YscWeb.TahoeBookingLiveTest do
                "Choose a membership"
              )
     end
+
+    test "expired member is told to renew membership", %{conn: conn} do
+      user = user_with_membership(:none)
+
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_tahoe_expired_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Expired Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+
+      assert has_element?(
+               view,
+               "#tahoe-booking-eligibility-banner-public",
+               "Membership Required"
+             )
+
+      assert has_element?(
+               view,
+               "#tahoe-booking-eligibility-banner-public a[href=\"/users/membership\"]",
+               "Renew membership"
+             )
+
+      refute has_element?(
+               view,
+               "#tahoe-booking-eligibility-banner-public",
+               "Choose a membership"
+             )
+    end
   end
 
   describe "mount/3 - authenticated with membership" do

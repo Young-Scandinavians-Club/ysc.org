@@ -288,7 +288,7 @@ defmodule YscWeb.UserAuthTest do
       assert updated_socket.assigns.had_membership? == false
     end
 
-    test "does not load subscription history for had_membership? on every LiveView",
+    test "assigns had_membership? from the membership cache sidecar when dues have lapsed",
          %{
            conn: conn
          } do
@@ -309,7 +309,8 @@ defmodule YscWeb.UserAuthTest do
       {:cont, updated_socket} =
         UserAuth.on_mount(:mount_current_user, %{}, session, %LiveView.Socket{})
 
-      assert updated_socket.assigns.had_membership? == false
+      assert updated_socket.assigns.active_membership? == false
+      assert updated_socket.assigns.had_membership? == true
     end
 
     test "assigns nil to current_user assign if there isn't a valid user_token",
@@ -1605,6 +1606,31 @@ defmodule YscWeb.UserAuthTest do
       # User has no membership by default
       assert conn.assigns[:current_membership] == nil
       assert conn.assigns[:active_membership?] == false
+      assert conn.assigns[:had_membership?] == false
+    end
+
+    test "assigns had_membership? for a user with a lapsed subscription", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_lapsed_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), -2, :day)
+        })
+
+      user_token = Accounts.generate_user_session_token(user)
+
+      conn =
+        conn
+        |> put_session(:user_token, user_token)
+        |> UserAuth.fetch_current_user([])
+
+      assert conn.assigns[:active_membership?] == false
+      assert conn.assigns[:had_membership?] == true
     end
 
     test "assigns nil membership for unauthenticated user", %{conn: conn} do
@@ -1613,6 +1639,7 @@ defmodule YscWeb.UserAuthTest do
       refute conn.assigns[:current_user]
       assert conn.assigns[:current_membership] == nil
       assert conn.assigns[:active_membership?] == false
+      assert conn.assigns[:had_membership?] == false
     end
   end
 

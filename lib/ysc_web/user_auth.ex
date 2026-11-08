@@ -357,10 +357,15 @@ defmodule YscWeb.UserAuth do
       conn
       |> assign(:current_membership, active_membership)
       |> assign(:active_membership?, active_membership != nil)
+      |> assign(
+        :had_membership?,
+        lapsed_membership?(current_user, active_membership)
+      )
     else
       conn
       |> assign(:current_membership, nil)
       |> assign(:active_membership?, false)
+      |> assign(:had_membership?, false)
     end
   end
 
@@ -698,16 +703,27 @@ defmodule YscWeb.UserAuth do
 
     socket =
       Phoenix.Component.assign_new(socket, :had_membership?, fn ->
-        # Default false on every LiveView. EventDetailsLive computes the real
-        # value (expired vs never-subscribed copy) only when a logged-in user
-        # has no active membership — avoid `list_subscriptions/1` on all pages.
-        false
+        # True when dues have lapsed (any past subscription, no active
+        # membership). `get_active_membership/1` already wrote the sidecar, so
+        # this is a cache hit — not a second subscriptions query. Used for
+        # sitewide Renew vs Choose a membership copy.
+        lapsed_membership?(
+          socket.assigns.current_user,
+          socket.assigns.current_membership
+        )
       end)
 
     Phoenix.Component.assign_new(socket, :active_membership?, fn ->
       socket.assigns.current_membership != nil
     end)
   end
+
+  defp lapsed_membership?(user, active_membership)
+       when not is_nil(user) and is_nil(active_membership) do
+    MembershipCache.had_any_subscription?(user)
+  end
+
+  defp lapsed_membership?(_user, _active_membership), do: false
 
   @doc """
   Used for routes that require the user to not be authenticated.
