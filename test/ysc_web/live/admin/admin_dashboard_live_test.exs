@@ -46,10 +46,16 @@ defmodule YscWeb.AdminDashboardLiveTest do
       "ALTER TABLE ledger_entries DISABLE TRIGGER #{trigger}"
     )
 
+    now = DateTime.utc_now()
+    month_start = Ysc.ReportingPeriods.start_of_month(now)
+
+    # Never cross into the previous reporting month just after rollover.
+    backdated =
+      [DateTime.add(now, -seconds, :second), month_start]
+      |> Enum.max(DateTime)
+
     try do
-      Repo.update_all(Ysc.Ledgers.LedgerEntry,
-        set: [inserted_at: DateTime.add(DateTime.utc_now(), -seconds, :second)]
-      )
+      Repo.update_all(Ysc.Ledgers.LedgerEntry, set: [inserted_at: backdated])
     after
       Ecto.Adapters.SQL.query!(
         Repo,
@@ -327,6 +333,36 @@ defmodule YscWeb.AdminDashboardLiveTest do
 
       assert has_element?(view, "#revenue-mix-merch", "$60.00")
       assert has_element?(view, "#revenue-mix-merch-bar[style='width: 100%']")
+    end
+
+    test "splits the bar between merch and another stream", %{
+      conn: conn,
+      user: user
+    } do
+      stub_quickbooks_sync!()
+
+      for {type, amount} <- [merch: "60.00", membership: "40.00"] do
+        {:ok, _} =
+          Ysc.Ledgers.process_payment(%{
+            user_id: user.id,
+            amount: Money.new(:USD, amount),
+            entity_type: type,
+            entity_id: Ecto.ULID.generate(),
+            external_payment_id: "pi_dash_#{type}_#{System.unique_integer()}",
+            stripe_fee: Money.new(:USD, "1.00"),
+            description: "Dashboard mix #{type}",
+            property: nil,
+            payment_method_id: nil
+          })
+      end
+
+      backdate_ledger_entries(5)
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      render(view)
+
+      assert has_element?(view, "#revenue-mix-merch-bar[style='width: 60%']")
+      assert has_element?(view, "#revenue-mix-merch", "$60.00")
     end
 
     test "shows a zero merch row when nothing has been sold", %{conn: conn} do

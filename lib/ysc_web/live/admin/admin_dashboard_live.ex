@@ -1707,17 +1707,25 @@ defmodule YscWeb.AdminDashboardLive do
     }
   end
 
+  # Shares of the bar. A stream can net negative (refunds of earlier sales),
+  # which has no width, so only positive streams take part in the bar; the
+  # legend still shows the signed amount.
   defp mix_percentages(bookings_m, events_m, membership_m, merch_m) do
-    total =
-      [bookings_m, events_m, membership_m, merch_m]
-      |> Enum.map(& &1.amount)
-      |> Enum.reduce(Decimal.new(0), &Decimal.add/2)
+    zero = Decimal.new(0)
 
-    if Decimal.gt?(total, Decimal.new(0)) do
+    amounts =
+      Enum.map(
+        [bookings_m, events_m, membership_m, merch_m],
+        &Decimal.max(&1.amount, zero)
+      )
+
+    total = Enum.reduce(amounts, zero, &Decimal.add/2)
+
+    if Decimal.gt?(total, zero) do
       tf = Decimal.to_float(total)
 
-      [bookings_m, events_m, membership_m, merch_m]
-      |> Enum.map(&round(Decimal.to_float(&1.amount) / tf * 100))
+      amounts
+      |> Enum.map(&round(Decimal.to_float(&1) / tf * 100))
       |> List.to_tuple()
     else
       {0, 0, 0, 0}
