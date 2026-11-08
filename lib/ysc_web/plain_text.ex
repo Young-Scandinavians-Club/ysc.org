@@ -6,8 +6,6 @@ defmodule YscWeb.PlainText do
   and decodes HTML entities.
   """
 
-  alias Ysc.Posts.Post
-
   @block_close_tags ~r/<\/(p|div|h[1-6]|li|tr|blockquote)>/i
   @br_tags ~r/<br\s*\/?>/i
 
@@ -43,21 +41,24 @@ defmodule YscWeb.PlainText do
   end
 
   @doc """
-  Plain-text preview for a post, preferring `preview_text` over `raw_body`.
+  Plain-text preview for a post, preferring `preview_text` over `rendered_body`,
+  then `raw_body` for full structs that still carry Trix source.
   """
-  def from_post(%Post{preview_text: preview_text, raw_body: raw_body}) do
-    cond do
-      present?(preview_text) -> from_html(preview_text)
-      present?(raw_body) -> from_html(raw_body)
-      true -> ""
-    end
-  end
+  def from_post(post) when is_map(post), do: from_post_map(post)
 
-  def from_post(%{preview_text: preview_text, raw_body: raw_body}) do
+  defp from_post_map(post) do
     cond do
-      present?(preview_text) -> from_html(preview_text)
-      present?(raw_body) -> from_html(raw_body)
-      true -> ""
+      present?(Map.get(post, :preview_text)) ->
+        from_html(Map.get(post, :preview_text))
+
+      present?(Map.get(post, :rendered_body)) ->
+        from_html(Map.get(post, :rendered_body))
+
+      present?(Map.get(post, :raw_body)) ->
+        from_html(Map.get(post, :raw_body))
+
+      true ->
+        ""
     end
   end
 

@@ -112,7 +112,7 @@ defmodule YscWeb.PostLiveTest do
                ~s(content="Read this article on the Young Scandinavians Club news feed.")
     end
 
-    test "meta description uses raw_body when preview_text is nil", %{
+    test "meta description uses rendered_body when preview_text is nil", %{
       conn: conn
     } do
       marker = "Body meta#{System.unique_integer()}"
@@ -281,6 +281,21 @@ defmodule YscWeb.PostLiveTest do
       {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
 
       assert html =~ "This is the main content of the article."
+    end
+
+    test "keeps Trix figure attachments from rendered_body", %{conn: conn} do
+      post =
+        create_post(%{
+          title: "Figure article",
+          raw_body:
+            ~s(<p>Lead</p><figure class="attachment"><img src="https://example.com/photo.jpg" alt="Cabin"></figure>)
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
+      article_html = view |> element("#article-body") |> render()
+
+      assert article_html =~ "<figure"
+      assert article_html =~ "https://example.com/photo.jpg"
     end
 
     test "sanitizes stored post HTML before rendering (no script or inline handlers)",
