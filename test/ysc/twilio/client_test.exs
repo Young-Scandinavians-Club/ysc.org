@@ -37,11 +37,29 @@ defmodule Ysc.Twilio.ClientTest do
       assert {:error, :invalid_phone_number_format} =
                Client.send_sms(to: "abc", body: "Hi")
 
+      assert {:error, :invalid_phone_number_format} =
+               Client.send_sms(to: 46_701_234_567, body: "Hi")
+
       assert {:error, :empty_message_body} =
                Client.send_sms(to: "+46701234567", body: "")
 
+      assert {:error, :invalid_message_body} =
+               Client.send_sms(to: "+46701234567", body: :hi)
+
       assert {:error, :missing_required_parameter} =
                Client.send_sms(body: "Hi")
+    end
+
+    test "falls back to a placeholder sender when none is configured" do
+      original = Application.get_env(:ysc, :twilio)
+      Application.put_env(:ysc, :twilio, Keyword.delete(original, :sender))
+      on_exit(fn -> Application.put_env(:ysc, :twilio, original) end)
+
+      assert {:ok, %{id: sid}} =
+               Client.send_sms(to: "+46701234567", body: "Hi")
+
+      assert Repo.get_by!(SmsMessage, provider_message_id: sid).from ==
+               "twilio-noop"
     end
   end
 
@@ -159,6 +177,54 @@ defmodule Ysc.Twilio.ClientTest do
 
       assert {:error, :twilio_sender_not_configured} =
                Client.send_sms(to: "+46701234567", body: "Hi")
+    end
+
+    test "errors when the auth token is not configured" do
+      original = Application.get_env(:ysc, :twilio)
+      Application.put_env(:ysc, :twilio, Keyword.delete(original, :auth_token))
+      on_exit(fn -> Application.put_env(:ysc, :twilio, original) end)
+
+      assert {:error, :twilio_auth_token_not_configured} =
+               Client.send_sms(to: "+46701234567", body: "Hi")
+    end
+
+    test "honors an explicit :from override" do
+      Req.Test.stub(__MODULE__, fn conn ->
+        {:ok, raw, conn} = Plug.Conn.read_body(conn)
+        params = URI.decode_query(raw)
+        assert params["From"] == "+14155550100"
+
+        conn
+        |> Plug.Conn.put_status(200)
+        |> Req.Test.json(%{
+          "sid" => "SMfrom1",
+          "status" => "queued",
+          "from" => "+14155550100"
+        })
+      end)
+
+      assert {:ok, %{id: "SMfrom1"}} =
+               Client.send_sms(
+                 to: "+46701234567",
+                 body: "Hi",
+                 from: "+14155550100"
+               )
+
+      assert Repo.get_by!(SmsMessage, provider_message_id: "SMfrom1").from ==
+               "+14155550100"
+    end
+
+    test "inspects a non-map Twilio error body" do
+      Req.Test.stub(__MODULE__, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("text/plain")
+        |> Plug.Conn.send_resp(500, "upstream unavailable")
+      end)
+
+      assert {:error, inspected} =
+               Client.send_sms(to: "+46701234567", body: "Hi")
+
+      assert inspected =~ "upstream unavailable"
     end
   end
 end
