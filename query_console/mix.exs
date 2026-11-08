@@ -55,6 +55,16 @@ defmodule QueryConsole.MixProject do
       {:plug_crypto, "~> 2.2.1", override: true},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
+      # 3.14.3: EEF-CVE-2026-118391 (HIGH / GHSA-cxjx-vmm2-qr8r) — do not
+      # cache queries with interpolated JSON paths, splice/1, or constant/1
+      # (each distinct value used to create a new query-cache entry and
+      # prepared statement). Also include join prefixes and hints in the
+      # cache key, and keep interpolated true filters that a later
+      # or_where depends on. We do not interpolate JSON paths or splice/1
+      # in app code; AnalyticsRepo.query/3 runs raw SQL. lotus lists
+      # ecto ~> 3.10, phoenix_ecto ~> 3.5, and ecto_sql ~> 3.14.0 (which
+      # still allows 3.14.2), so pin the patched floor.
+      {:ecto, "~> 3.14.3"},
       # 0.22.4: Escape comments on Postgrex.stream/4 (EEF-CVE-2026-66838).
       # We use Postgrex.query/start_link and AnalyticsRepo.query, not stream/4
       # or the :comment option. Public query APIs and BinaryExtension are
