@@ -4,8 +4,6 @@ defmodule YscWeb.AdminPostEditorLive do
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
 
-  alias HtmlSanitizeEx.Scrubber
-
   alias Ysc.Media.Image
   alias Ysc.Posts
   alias Ysc.Posts.Post
@@ -946,7 +944,7 @@ defmodule YscWeb.AdminPostEditorLive do
       Map.put(
         values,
         "rendered_body",
-        Scrubber.scrub(Map.get(values, "raw_body"), Ysc.TrixScrubber)
+        Ysc.Html.Trix.scrub(Map.get(values, "raw_body"))
       )
     else
       values

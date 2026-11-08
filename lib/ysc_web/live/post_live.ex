@@ -375,7 +375,7 @@ defmodule YscWeb.PostLive do
   # The fallback is for full `%Post{}` structs such as editor previews.
   defp post_body(post) do
     html = Map.get(post, :rendered_body) || Map.get(post, :raw_body) || ""
-    Scrubber.scrub(html, Ysc.TrixScrubber)
+    Ysc.Html.Trix.scrub(html)
   end
 
   defp comment_is_reply(%Comment{comment_id: nil}), do: false

@@ -1,9 +1,7 @@
 defmodule Ysc.TrixScrubberTest do
   use ExUnit.Case, async: true
 
-  alias HtmlSanitizeEx.Scrubber
-
-  defp scrub(html), do: Scrubber.scrub(html, Ysc.TrixScrubber)
+  defp scrub(html), do: Ysc.Html.Trix.scrub(html)
 
   describe "scrub/1" do
     test "allows basic formatting and structure" do
