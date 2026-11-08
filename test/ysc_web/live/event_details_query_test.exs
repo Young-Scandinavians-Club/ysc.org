@@ -286,4 +286,60 @@ defmodule YscWeb.EventDetailsQueryTest do
       assert html =~ "Choose a membership and pay your dues to buy tickets"
     end
   end
+
+  describe "event updates on connect" do
+    setup do
+      EventPricingCache.invalidate()
+      :ok
+    end
+
+    test "async load omits raw_body TOAST and still shows rendered body", %{
+      conn: conn
+    } do
+      marker = "live-update-#{System.unique_integer([:positive])}"
+
+      author =
+        user_with_membership(:none, %{
+          first_name: "Ingrid",
+          last_name: "Bergman"
+        })
+
+      event =
+        event_fixture(%{
+          title: "Public Update Toast Event",
+          state: :published
+        })
+
+      ticket_tier_fixture(%{event_id: event.id})
+
+      {:ok, update} =
+        Ysc.Events.create_event_update(event, %{
+          title: "Gate code",
+          raw_body: "<p>raw #{marker}</p>",
+          rendered_body: "<p>rendered #{marker}</p>",
+          show_on_event_page: true,
+          sent_by_id: author.id
+        })
+
+      {{:ok, view, _html}, raw_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+            render_async(view)
+            {:ok, view, html}
+          end,
+          pattern: ~r/raw_body/i,
+          caller_pids: [self()]
+        )
+
+      page = render(view)
+
+      assert raw_cols == 0
+      assert has_element?(view, "#event-update-body-#{update.id}")
+      assert page =~ "rendered #{marker}"
+      refute page =~ "raw #{marker}"
+      assert page =~ "Posted by Ingrid Bergman"
+    end
+  end
 end
