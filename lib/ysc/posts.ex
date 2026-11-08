@@ -598,7 +598,7 @@ defmodule Ysc.Posts do
     raw = Map.get(params, "raw_body") || Map.get(params, :raw_body)
 
     if is_binary(raw) do
-      rendered = HtmlSanitizeEx.Scrubber.scrub(raw, Ysc.TrixScrubber)
+      rendered = Ysc.Html.Trix.scrub(raw)
 
       params
       |> Map.put("rendered_body", rendered)

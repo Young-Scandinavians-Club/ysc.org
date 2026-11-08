@@ -28,6 +28,7 @@ defmodule Ysc.HtmlSanitizeExUpgradeTest do
                __DIR__
              )
   @trix Path.expand("../../lib/ysc/trix_scrubber.ex", __DIR__)
+  @html_trix Path.expand("../../lib/ysc/html/trix.ex", __DIR__)
   @post Path.expand("../../lib/ysc/posts/post.ex", __DIR__)
   @plain_text Path.expand("../../lib/ysc_web/plain_text.ex", __DIR__)
 
@@ -109,13 +110,17 @@ defmodule Ysc.HtmlSanitizeExUpgradeTest do
   describe "app still uses BasicHTML / Trix / strip_tags, not HTML5" do
     test "TrixScrubber, BasicHTML, and strip_tags remain the production scrubbers" do
       trix = File.read!(@trix)
+      html_trix = File.read!(@html_trix)
       post = File.read!(@post)
       plain_text = File.read!(@plain_text)
 
       assert trix =~ "HtmlSanitizeEx.ScrubberCompiler"
-      assert post =~ "Ysc.TrixScrubber"
+      assert html_trix =~ "Ysc.TrixScrubber"
+      assert html_trix =~ "HtmlSanitizeEx.Scrubber.scrub"
+      assert post =~ "Ysc.Html.Trix.scrub"
       assert plain_text =~ "HtmlSanitizeEx.strip_tags()"
       refute post =~ "HtmlSanitizeEx.html5"
+      refute html_trix =~ "HtmlSanitizeEx.html5"
       refute trix =~ "HtmlSanitizeEx.Scrubber.HTML5"
     end
   end
