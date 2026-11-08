@@ -7390,11 +7390,10 @@ defmodule YscWeb.EventDetailsLive do
   defp membership_cta(%{state: :pending_approval}, _had_membership?),
     do: {~p"/pending-review", "View application status"}
 
-  defp membership_cta(_user, true),
-    do: {~p"/users/membership", "Renew membership"}
-
-  defp membership_cta(_user, _had_membership?),
-    do: {~p"/users/membership", "Choose a membership"}
+  defp membership_cta(_user, had_membership?),
+    do:
+      {~p"/users/membership",
+       YscWeb.BookingUserMessages.membership_cta_label(had_membership?)}
 
   defp event_in_past?(event) do
     case event_ends_at(event) do

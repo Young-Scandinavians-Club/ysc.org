@@ -37,11 +37,32 @@ defmodule YscWeb.Components.LayoutSiteComponentsTest do
         render_component(&Layouts.membership_status_banners/1, %{
           current_user: user,
           active_membership?: false,
+          had_membership?: false,
           is_fullscreen: false
         })
 
       assert html =~ "Membership Required"
       assert html =~ "Choose a membership"
+      refute html =~ "Membership Expired"
+      refute html =~ "Renew membership"
+    end
+
+    test "renders expired-membership banner for a lapsed member" do
+      user = %{state: :active}
+
+      html =
+        render_component(&Layouts.membership_status_banners/1, %{
+          current_user: user,
+          active_membership?: false,
+          had_membership?: true,
+          is_fullscreen: false
+        })
+
+      assert html =~ "Membership Expired"
+      assert html =~ "Renew membership"
+      assert html =~ "Your membership has expired"
+      refute html =~ "Choose a membership"
+      refute html =~ "pick a plan"
     end
 
     test "renders nothing on fullscreen layout" do

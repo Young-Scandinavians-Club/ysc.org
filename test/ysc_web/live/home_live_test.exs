@@ -436,6 +436,33 @@ defmodule YscWeb.HomeLiveTest do
 
       assert html =~ "Membership Required"
       assert html =~ "Choose a membership"
+      refute html =~ "Membership Expired"
+      refute html =~ "Renew membership"
+    end
+
+    test "shows renew copy when the logged-in user's membership has lapsed", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, _} =
+        Ysc.Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_home_expired_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Expired Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_async(view, 5_000)
+      html = render(view)
+
+      assert html =~ "Membership Expired"
+      assert html =~ "Your membership has expired"
+      assert has_element?(view, "#home-membership-cta", "Renew membership")
+      refute html =~ "Choose a membership"
+      refute html =~ "Get started today!"
     end
 
     test "shows pending review state for users awaiting board approval", %{

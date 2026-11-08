@@ -1607,6 +1607,42 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert html =~ "Add a payment method in step 2 to pay your dues."
       refute html =~ "Complete Membership Purchase"
       refute html =~ "complete your purchase"
+      refute html =~ "Renew your membership"
+    end
+
+    test "expired member sees renew heading instead of first-time purchase copy",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{state: :active})
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_settings_expired_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Expired Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render_async(view)
+      html = render(view)
+
+      assert has_element?(view, "#membership_form")
+
+      assert has_element?(
+               view,
+               "#membership-renew-heading",
+               "Renew your membership"
+             )
+
+      assert html =~ "Your membership has expired"
+      assert html =~ "Pay dues to restore cabin bookings"
+      refute has_element?(view, "#membership-purchase-heading")
+      refute html =~ "Get Your YSC Membership"
     end
 
     test "sub-account can leave family membership", %{conn: conn} do

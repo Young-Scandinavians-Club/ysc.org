@@ -4014,26 +4014,79 @@ defmodule Ysc.Events do
 
   defp maybe_put_sms_body(changeset, _), do: changeset
 
+  # Public event page: rendered HTML + poster name. Omits Trix source
+  # (`raw_body`), SMS copy, and recipient counts the page never shows.
+  @public_event_update_fields [
+    :id,
+    :title,
+    :rendered_body,
+    :inserted_at,
+    :sent_by_id
+  ]
+
+  # Admin timeline + sales-chart markers. Omits Trix source (`raw_body`)
+  # and SMS body; keeps recipient/SMS flags the timeline prints.
+  @admin_event_update_fields [
+    :id,
+    :event_id,
+    :title,
+    :rendered_body,
+    :show_on_event_page,
+    :send_sms,
+    :sent_at,
+    :recipient_count,
+    :sms_recipient_count,
+    :inserted_at,
+    :sent_by_id
+  ]
+
+  @event_update_author_fields [:id, :first_name, :last_name]
+
   @doc """
   Returns all updates for an event, newest first (admin view).
+
+  Selects timeline columns only — not `raw_body` (Trix source) or `sms_body`.
+  `sent_by` is name-only so the preload skips `hashed_password`.
   """
   def list_event_updates(event_id) do
-    EventUpdate
-    |> where([u], u.event_id == ^event_id)
-    |> order_by([u], desc: u.inserted_at)
-    |> preload(:sent_by)
+    event_id
+    |> event_updates_query()
     |> Repo.all()
   end
 
   @doc """
   Returns updates visible on the public event page, newest first.
+
+  Selects `rendered_body` (the HTML the page renders) and omits `raw_body`
+  so Postgres does not detoast a second copy of the same body. Sender is
+  first/last name only.
   """
   def list_visible_event_updates(event_id) do
-    EventUpdate
-    |> where([u], u.event_id == ^event_id and u.show_on_event_page == true)
-    |> order_by([u], desc: u.inserted_at)
-    |> preload(:sent_by)
+    event_id
+    |> visible_event_updates_query()
     |> Repo.all()
+  end
+
+  defp event_updates_query(event_id) do
+    from(eu in EventUpdate,
+      where: eu.event_id == ^event_id,
+      order_by: [desc: eu.inserted_at],
+      select: struct(eu, ^@admin_event_update_fields),
+      preload: [sent_by: ^event_update_author_query()]
+    )
+  end
+
+  defp visible_event_updates_query(event_id) do
+    from(eu in EventUpdate,
+      where: eu.event_id == ^event_id and eu.show_on_event_page == true,
+      order_by: [desc: eu.inserted_at],
+      select: struct(eu, ^@public_event_update_fields),
+      preload: [sent_by: ^event_update_author_query()]
+    )
+  end
+
+  defp event_update_author_query do
+    from(u in User, select: struct(u, ^@event_update_author_fields))
   end
 
   @doc """
@@ -4255,6 +4308,16 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_event_update_sms_recipients_query do
     event_update_sms_recipients_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_list_event_updates_query do
+    event_updates_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_list_visible_event_updates_query do
+    visible_event_updates_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc """

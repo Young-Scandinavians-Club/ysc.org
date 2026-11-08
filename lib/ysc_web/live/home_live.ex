@@ -1351,6 +1351,8 @@ defmodule YscWeb.HomeLive do
                         {YscWeb.UserAuth.get_membership_plan_display_name(
                           @current_membership
                         )}
+                      <% @had_membership? -> %>
+                        Membership Expired
                       <% true -> %>
                         Membership Required
                     <% end %>
@@ -1397,12 +1399,10 @@ defmodule YscWeb.HomeLive do
                       Pending Approval
                     </span>
                     Your membership application has been submitted and is being reviewed by the board. We will email you when there is a decision. Cabin bookings and member-only tickets become available after you are approved and your membership dues are paid.
+                  <% @had_membership? -> %>
+                    Your membership has expired. Renew now to continue enjoying all YSC benefits, including cabin stays and exclusive events.
                   <% true -> %>
-                    <%= if @current_membership == nil do %>
-                      You need an active membership to access YSC events, cabin bookings, and all membership perks. Get started today!
-                    <% else %>
-                      Your membership has expired. Renew now to continue enjoying all YSC benefits, including cabin stays and exclusive events.
-                    <% end %>
+                    You need an active membership to access YSC events, cabin bookings, and all membership perks. Get started today!
                 <% end %>
               </p>
 
@@ -1437,11 +1437,7 @@ defmodule YscWeb.HomeLive do
                 navigate={~p"/users/membership"}
                 class="flex w-full items-center justify-center rounded-md px-4 py-2.5 text-sm font-semibold bg-blue-700 text-white hover:bg-blue-800 transition-colors duration-150 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
               >
-                <%= if @current_membership == nil do %>
-                  Choose a membership
-                <% else %>
-                  Renew membership
-                <% end %>
+                {YscWeb.BookingUserMessages.membership_cta_label(@had_membership?)}
               </.link>
             </div>
 
