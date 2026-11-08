@@ -41,6 +41,20 @@ defmodule YscWeb.PublicTicketLiveTest do
     refute has_element?(view, "#ticket-qr-#{other.reference_id}")
   end
 
+  test "a guest multi-ticket token shows only the tickets it covers", %{
+    conn: conn
+  } do
+    %{tickets: [mine, also_mine, other]} = granted_tickets(3)
+    token = AccessToken.sign_tickets([mine.id, also_mine.id])
+
+    {:ok, view, _html} = live(conn, ~p"/t/#{token}")
+    render_async(view)
+
+    assert has_element?(view, "#ticket-qr-#{mine.reference_id}")
+    assert has_element?(view, "#ticket-qr-#{also_mine.reference_id}")
+    refute has_element?(view, "#ticket-qr-#{other.reference_id}")
+  end
+
   test "an invalid token says so instead of redirecting to login", %{
     conn: conn
   } do

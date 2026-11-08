@@ -42,6 +42,15 @@ defmodule YscWeb.PublicTicketControllerTest do
              |> response(404)
     end
 
+    test "404s on a multi-ticket token, which doesn't identify one ticket", %{
+      conn: conn
+    } do
+      %{tickets: tickets} = granted_tickets(2)
+      token = AccessToken.sign_tickets(Enum.map(tickets, & &1.id))
+
+      assert conn |> get("/t/#{token}/qr.png") |> response(404)
+    end
+
     test "404s once the ticket is no longer confirmed", %{conn: conn} do
       %{tickets: [ticket]} = granted_tickets()
 
