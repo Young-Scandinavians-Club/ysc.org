@@ -6,6 +6,7 @@ defmodule YscWeb.AdminDashboardLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.MerchFixtures, only: [stub_quickbooks_sync!: 0]
   import Ysc.ScanningFixtures
 
   alias Ysc.Accounts.User
@@ -34,6 +35,26 @@ defmodule YscWeb.AdminDashboardLiveTest do
         expires_at: DateTime.add(now, 1, :day)
       }
       |> Repo.insert!()
+    end
+  end
+
+  defp backdate_ledger_entries(seconds) do
+    trigger = "ledger_entries_append_only_trigger"
+
+    Ecto.Adapters.SQL.query!(
+      Repo,
+      "ALTER TABLE ledger_entries DISABLE TRIGGER #{trigger}"
+    )
+
+    try do
+      Repo.update_all(Ysc.Ledgers.LedgerEntry,
+        set: [inserted_at: DateTime.add(DateTime.utc_now(), -seconds, :second)]
+      )
+    after
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "ALTER TABLE ledger_entries ENABLE TRIGGER #{trigger}"
+      )
     end
   end
 
@@ -271,6 +292,49 @@ defmodule YscWeb.AdminDashboardLiveTest do
       assert html =~ "Slow Applicant"
       assert html =~ "Review Now"
       assert html =~ "Overdue"
+    end
+  end
+
+  describe "revenue mix" do
+    setup [:create_admin]
+
+    test "includes merch sales and shipping alongside the other streams", %{
+      conn: conn,
+      user: user
+    } do
+      stub_quickbooks_sync!()
+
+      {:ok, _} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "60.00"),
+          shipping_amount: Money.new(:USD, "10.00"),
+          entity_type: :merch,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: "pi_dash_merch_#{System.unique_integer()}",
+          stripe_fee: Money.new(:USD, "2.00"),
+          description: "Merch - Order MRC-DASH",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      # The dashboard's "now" cutoff is truncated to the second, so entries
+      # written this second are not counted yet; backdate them.
+      backdate_ledger_entries(5)
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      render(view)
+
+      assert has_element?(view, "#revenue-mix-merch", "$60.00")
+      assert has_element?(view, "#revenue-mix-merch-bar[style='width: 100%']")
+    end
+
+    test "shows a zero merch row when nothing has been sold", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+      render(view)
+
+      assert has_element?(view, "#revenue-mix-merch", "$0.00")
+      assert has_element?(view, "#revenue-mix-merch-bar[style='width: 0%']")
     end
   end
 

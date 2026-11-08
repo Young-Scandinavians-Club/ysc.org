@@ -680,6 +680,12 @@ defmodule YscWeb.AdminDashboardLive do
                   style={"width: #{@revenue_mix_membership_percent}%"}
                 >
                 </div>
+                <div
+                  id="revenue-mix-merch-bar"
+                  class="bg-amber-500 h-full"
+                  style={"width: #{@revenue_mix_merch_percent}%"}
+                >
+                </div>
               </div>
               <div class="space-y-1.5 text-xs">
                 <div class="flex items-center justify-between">
@@ -707,6 +713,18 @@ defmodule YscWeb.AdminDashboardLive do
                   </span>
                   <span class="font-bold font-mono text-zinc-800">
                     {format_money(@revenue_membership)}
+                  </span>
+                </div>
+                <div
+                  id="revenue-mix-merch"
+                  class="flex items-center justify-between"
+                >
+                  <span class="flex items-center gap-1.5 text-zinc-500">
+                    <span class="inline-block w-2 h-2 rounded-xs bg-amber-500 shrink-0"></span>
+                    Merch
+                  </span>
+                  <span class="font-bold font-mono text-zinc-800">
+                    {format_money(@revenue_merch)}
                   </span>
                 </div>
               </div>
@@ -1031,21 +1049,27 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:revenue_bookings, Money.new(:USD, 0))
       |> assign(:revenue_events, Money.new(:USD, 0))
       |> assign(:revenue_membership, Money.new(:USD, 0))
+      |> assign(:revenue_merch, Money.new(:USD, 0))
       |> assign(:revenue_mix_bookings_percent, 0)
       |> assign(:revenue_mix_events_percent, 0)
       |> assign(:revenue_mix_membership_percent, 0)
+      |> assign(:revenue_mix_merch_percent, 0)
       |> assign(:prev_revenue_bookings, Money.new(:USD, 0))
       |> assign(:prev_revenue_events, Money.new(:USD, 0))
       |> assign(:prev_revenue_membership, Money.new(:USD, 0))
+      |> assign(:prev_revenue_merch, Money.new(:USD, 0))
       |> assign(:prev_revenue_mix_bookings_percent, 0)
       |> assign(:prev_revenue_mix_events_percent, 0)
       |> assign(:prev_revenue_mix_membership_percent, 0)
+      |> assign(:prev_revenue_mix_merch_percent, 0)
       |> assign(:last_year_revenue_bookings, Money.new(:USD, 0))
       |> assign(:last_year_revenue_events, Money.new(:USD, 0))
       |> assign(:last_year_revenue_membership, Money.new(:USD, 0))
+      |> assign(:last_year_revenue_merch, Money.new(:USD, 0))
       |> assign(:last_year_revenue_mix_bookings_percent, 0)
       |> assign(:last_year_revenue_mix_events_percent, 0)
       |> assign(:last_year_revenue_mix_membership_percent, 0)
+      |> assign(:last_year_revenue_mix_merch_percent, 0)
       |> assign(:revenue_tahoe_bookings, Money.new(:USD, 0))
       |> assign(:revenue_clear_lake_bookings, Money.new(:USD, 0))
       |> assign(:cabin_tahoe_percent_of_bookings, 0)
@@ -1494,6 +1518,11 @@ defmodule YscWeb.AdminDashboardLive do
         do: accounts["membership_revenue"].id,
         else: nil
 
+    merch_account_ids =
+      [accounts["merch_revenue"], accounts["merch_shipping_revenue"]]
+      |> Enum.filter(&(&1 != nil))
+      |> Enum.map(& &1.id)
+
     current_total = sum_revenue_map(current)
     prev_total = sum_revenue_map(prev)
     last_year_total = sum_revenue_map(last_year)
@@ -1502,42 +1531,46 @@ defmodule YscWeb.AdminDashboardLive do
     prev_revenue = Money.new(prev_total, :USD)
     last_year_revenue = Money.new(last_year_total, :USD)
 
-    {bookings_revenue, events_revenue, membership_revenue} =
-      revenue_three_way_totals(
+    {bookings_revenue, events_revenue, membership_revenue, merch_revenue} =
+      revenue_mix_totals(
         current,
         bookings_account_ids,
         events_account_id,
-        membership_account_id
+        membership_account_id,
+        merch_account_ids
       )
 
-    {prev_bookings, prev_events, prev_membership} =
-      revenue_three_way_totals(
+    {prev_bookings, prev_events, prev_membership, prev_merch} =
+      revenue_mix_totals(
         prev,
         bookings_account_ids,
         events_account_id,
-        membership_account_id
+        membership_account_id,
+        merch_account_ids
       )
 
-    {ly_bookings, ly_events, ly_membership} =
-      revenue_three_way_totals(
+    {ly_bookings, ly_events, ly_membership, ly_merch} =
+      revenue_mix_totals(
         last_year,
         bookings_account_ids,
         events_account_id,
-        membership_account_id
+        membership_account_id,
+        merch_account_ids
       )
 
-    {bookings_percent, events_percent, membership_percent} =
-      mix_three_percentages(
+    {bookings_percent, events_percent, membership_percent, merch_percent} =
+      mix_percentages(
         bookings_revenue,
         events_revenue,
-        membership_revenue
+        membership_revenue,
+        merch_revenue
       )
 
-    {prev_b_pct, prev_e_pct, prev_m_pct} =
-      mix_three_percentages(prev_bookings, prev_events, prev_membership)
+    {prev_b_pct, prev_e_pct, prev_m_pct, prev_merch_pct} =
+      mix_percentages(prev_bookings, prev_events, prev_membership, prev_merch)
 
-    {ly_b_pct, ly_e_pct, ly_m_pct} =
-      mix_three_percentages(ly_bookings, ly_events, ly_membership)
+    {ly_b_pct, ly_e_pct, ly_m_pct, ly_merch_pct} =
+      mix_percentages(ly_bookings, ly_events, ly_membership, ly_merch)
 
     revenue_tahoe =
       decimal_to_money(Map.get(current, tahoe_account_id, Decimal.new(0)))
@@ -1604,21 +1637,27 @@ defmodule YscWeb.AdminDashboardLive do
       revenue_bookings: bookings_revenue,
       revenue_events: events_revenue,
       revenue_membership: membership_revenue,
+      revenue_merch: merch_revenue,
       revenue_mix_bookings_percent: bookings_percent,
       revenue_mix_events_percent: events_percent,
       revenue_mix_membership_percent: membership_percent,
+      revenue_mix_merch_percent: merch_percent,
       prev_revenue_bookings: prev_bookings,
       prev_revenue_events: prev_events,
       prev_revenue_membership: prev_membership,
+      prev_revenue_merch: prev_merch,
       prev_revenue_mix_bookings_percent: prev_b_pct,
       prev_revenue_mix_events_percent: prev_e_pct,
       prev_revenue_mix_membership_percent: prev_m_pct,
+      prev_revenue_mix_merch_percent: prev_merch_pct,
       last_year_revenue_bookings: ly_bookings,
       last_year_revenue_events: ly_events,
       last_year_revenue_membership: ly_membership,
+      last_year_revenue_merch: ly_merch,
       last_year_revenue_mix_bookings_percent: ly_b_pct,
       last_year_revenue_mix_events_percent: ly_e_pct,
       last_year_revenue_mix_membership_percent: ly_m_pct,
+      last_year_revenue_mix_merch_percent: ly_merch_pct,
       revenue_tahoe_bookings: revenue_tahoe,
       revenue_clear_lake_bookings: revenue_clear_lake,
       cabin_tahoe_percent_of_bookings: cabin_tahoe_pct,
@@ -1647,57 +1686,41 @@ defmodule YscWeb.AdminDashboardLive do
     Money.new(decimal, :USD)
   end
 
-  defp revenue_three_way_totals(
+  defp revenue_mix_totals(
          revenue_map,
          bookings_account_ids,
          events_account_id,
-         membership_account_id
+         membership_account_id,
+         merch_account_ids
        ) do
-    bookings_dec =
-      Enum.reduce(bookings_account_ids, Decimal.new(0), fn id, acc ->
+    sum_accounts = fn ids ->
+      Enum.reduce(ids, Decimal.new(0), fn id, acc ->
         Decimal.add(acc, Map.get(revenue_map, id, Decimal.new(0)))
       end)
-
-    events_dec =
-      if events_account_id do
-        Map.get(revenue_map, events_account_id, Decimal.new(0))
-      else
-        Decimal.new(0)
-      end
-
-    membership_dec =
-      if membership_account_id do
-        Map.get(revenue_map, membership_account_id, Decimal.new(0))
-      else
-        Decimal.new(0)
-      end
+    end
 
     {
-      Money.new(bookings_dec, :USD),
-      Money.new(events_dec, :USD),
-      Money.new(membership_dec, :USD)
+      Money.new(sum_accounts.(bookings_account_ids), :USD),
+      Money.new(sum_accounts.(List.wrap(events_account_id)), :USD),
+      Money.new(sum_accounts.(List.wrap(membership_account_id)), :USD),
+      Money.new(sum_accounts.(merch_account_ids), :USD)
     }
   end
 
-  defp mix_three_percentages(bookings_m, events_m, membership_m) do
-    {:ok, sub} = Money.add(bookings_m, events_m)
-    {:ok, total} = Money.add(sub, membership_m)
+  defp mix_percentages(bookings_m, events_m, membership_m, merch_m) do
+    total =
+      [bookings_m, events_m, membership_m, merch_m]
+      |> Enum.map(& &1.amount)
+      |> Enum.reduce(Decimal.new(0), &Decimal.add/2)
 
-    if Decimal.gt?(total.amount, Decimal.new(0)) do
-      tf = Decimal.to_float(total.amount)
+    if Decimal.gt?(total, Decimal.new(0)) do
+      tf = Decimal.to_float(total)
 
-      bookings_percent =
-        round(Decimal.to_float(bookings_m.amount) / tf * 100)
-
-      events_percent =
-        round(Decimal.to_float(events_m.amount) / tf * 100)
-
-      membership_percent =
-        round(Decimal.to_float(membership_m.amount) / tf * 100)
-
-      {bookings_percent, events_percent, membership_percent}
+      [bookings_m, events_m, membership_m, merch_m]
+      |> Enum.map(&round(Decimal.to_float(&1.amount) / tf * 100))
+      |> List.to_tuple()
     else
-      {0, 0, 0}
+      {0, 0, 0, 0}
     end
   end
 
