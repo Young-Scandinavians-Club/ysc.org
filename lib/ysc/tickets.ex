@@ -681,6 +681,10 @@ defmodule Ysc.Tickets do
 
   Returns the same shape as `get_user_ticket_order_for_qr/2`, with `tickets`
   narrowed to the ones the token covers, or `nil` when nothing matches.
+
+  Guest `{:tickets, ids}` payloads resolve in one `ticket_orders` round-trip
+  (order id via subquery) and preload only those tickets — not a separate
+  order-id lookup followed by every sibling on the order.
   """
   def get_ticket_order_for_access({:order, order_id}) do
     order_id |> ticket_order_for_qr_query() |> Repo.one()
@@ -690,19 +694,20 @@ defmodule Ysc.Tickets do
     do: get_ticket_order_for_access({:tickets, [ticket_id]})
 
   def get_ticket_order_for_access({:tickets, ticket_ids}) do
-    order_id =
-      from(t in Ticket, where: t.id in ^ticket_ids, select: t.ticket_order_id)
-      |> Repo.all()
-      |> Enum.uniq()
-      |> case do
-        [order_id] -> order_id
-        _ -> nil
-      end
+    ticket_ids = Enum.uniq(ticket_ids)
 
-    with order_id when not is_nil(order_id) <- order_id,
-         %TicketOrder{} = order <-
-           order_id |> ticket_order_for_qr_query() |> Repo.one() do
-      %{order | tickets: Enum.filter(order.tickets, &(&1.id in ticket_ids))}
+    case ticket_ids do
+      [] ->
+        nil
+
+      _ ->
+        ticket_ids
+        |> ticket_order_for_access_tickets_query()
+        |> Repo.all()
+        |> case do
+          [%TicketOrder{} = order] -> order
+          _ -> nil
+        end
     end
   end
 
@@ -728,7 +733,7 @@ defmodule Ysc.Tickets do
   def ci_query_explain_ticket_order_for_access_query do
     alias Ysc.Ci.QueryExplain.Fixtures
 
-    ticket_order_for_qr_query(Fixtures.ulid())
+    ticket_order_for_access_tickets_query([Fixtures.ulid()])
   end
 
   defp ticket_order_for_qr_query(user_id, order_id) do
@@ -738,29 +743,55 @@ defmodule Ysc.Tickets do
   end
 
   defp ticket_order_for_qr_query(order_id) do
-    event_query =
-      from(e in Event, select: struct(e, ^@qr_event_fields))
+    from(to in TicketOrder,
+      where: to.id == ^order_id,
+      select: struct(to, ^@qr_ticket_order_fields),
+      preload: [
+        event: ^qr_event_preload_query(),
+        tickets: ^qr_tickets_preload_query()
+      ]
+    )
+  end
 
+  defp ticket_order_for_access_tickets_query(ticket_ids) do
+    order_ids_query =
+      from(t in Ticket,
+        where: t.id in ^ticket_ids,
+        distinct: true,
+        select: t.ticket_order_id
+      )
+
+    from(to in TicketOrder,
+      where: to.id in subquery(order_ids_query),
+      select: struct(to, ^@qr_ticket_order_fields),
+      preload: [
+        event: ^qr_event_preload_query(),
+        tickets: ^qr_tickets_preload_query(ticket_ids)
+      ]
+    )
+  end
+
+  defp qr_event_preload_query do
+    from(e in Event, select: struct(e, ^@qr_event_fields))
+  end
+
+  defp qr_tickets_preload_query(ticket_ids \\ nil) do
     tier_query =
       from(tt in TicketTier, select: struct(tt, ^@qr_ticket_tier_fields))
 
     registration_query =
       from(td in TicketDetail, select: struct(td, ^@qr_registration_fields))
 
-    ticket_query =
+    query =
       from(t in Ticket,
         select: struct(t, ^@qr_ticket_fields),
         preload: [ticket_tier: ^tier_query, registration: ^registration_query]
       )
 
-    from(to in TicketOrder,
-      where: to.id == ^order_id,
-      select: struct(to, ^@qr_ticket_order_fields),
-      preload: [
-        event: ^event_query,
-        tickets: ^ticket_query
-      ]
-    )
+    case ticket_ids do
+      nil -> query
+      ids -> from(t in query, where: t.id in ^ids)
+    end
   end
 
   @doc """
