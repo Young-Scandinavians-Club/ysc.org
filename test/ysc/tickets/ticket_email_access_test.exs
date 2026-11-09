@@ -115,6 +115,51 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
     end
   end
 
+  describe "get_check_in_ticket/1" do
+    test "returns a confirmed event ticket" do
+      %{tickets: [ticket]} = granted_tickets()
+
+      loaded = Tickets.get_check_in_ticket(ticket.id)
+      assert loaded.id == ticket.id
+    end
+
+    test "rejects cancelled and pending tickets" do
+      %{tickets: [ticket]} = granted_tickets()
+
+      ticket
+      |> Ecto.Changeset.change(status: :cancelled)
+      |> Repo.update!()
+
+      assert is_nil(Tickets.get_check_in_ticket(ticket.id))
+
+      ticket
+      |> Ecto.Changeset.change(status: :pending)
+      |> Repo.update!()
+
+      assert is_nil(Tickets.get_check_in_ticket(ticket.id))
+    end
+
+    test "rejects a confirmed donation ticket" do
+      %{user: user, event: event} = granted_tickets()
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      donation =
+        %Ysc.Events.Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      assert is_nil(Tickets.get_check_in_ticket(donation.id))
+    end
+  end
+
   describe "get_ticket_order_for_access/1" do
     test "an order payload returns every ticket in the order" do
       %{order: order, tickets: tickets} = granted_tickets(2)
