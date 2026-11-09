@@ -192,6 +192,52 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
                Tickets.get_ticket_order_for_access({:tickets, [a.id, b.id]})
              )
     end
+
+    test "tickets payload is one ticket_orders round-trip without fat columns" do
+      %{tickets: [keep, _drop, also_keep], event: event, order: order} =
+        granted_tickets(3)
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>guest ticket access must not load this</p>",
+        rendered_details: "<p>guest ticket access must not load this</p>"
+      })
+      |> Repo.update!()
+
+      payload = {:tickets, [keep.id, also_keep.id]}
+
+      {loaded, order_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_access(payload) end,
+          pattern: ~r/FROM ["']?ticket_orders["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_access(payload) end,
+          pattern: ~r/hashed_password|board_bio|raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, order_id_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_access(payload) end,
+          pattern: ~r/SELECT t0\."ticket_order_id" FROM "tickets"/i,
+          caller_pids: [self()]
+        )
+
+      assert loaded.id == order.id
+
+      assert Enum.sort(Enum.map(loaded.tickets, & &1.id)) ==
+               Enum.sort([keep.id, also_keep.id])
+
+      assert order_queries == 1
+      assert order_id_lookups == 0
+      assert fat_cols == 0
+      assert loaded.event.raw_details == nil
+      assert loaded.event.rendered_details == nil
+    end
   end
 
   describe "confirmation email" do

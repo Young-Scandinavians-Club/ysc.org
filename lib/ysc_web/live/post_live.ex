@@ -236,11 +236,11 @@ defmodule YscWeb.PostLive do
           # Initialize empty stream for comments (will be populated after connection)
           |> stream(:comments, [])
 
-        if connected?(socket) do
-          # Subscribe to real-time updates only when connected
+        # Guests never see the discussion section; skip subscribe + comment
+        # queries so public/SEO visits do not load authors after connect.
+        if connected?(socket) && viewer do
           YscWeb.Endpoint.subscribe(Posts.post_topic(post.id))
 
-          # Load comments asynchronously (not needed for SEO)
           {:ok, load_comments_async(socket, post.id),
            temporary_assigns: [form: nil]}
         else

@@ -847,6 +847,31 @@ defmodule Ysc.PostsTest do
       assert Enum.any?(emails, &sent_to?(&1, Ysc.EmailConfig.board_email()))
     end
 
+    test "reply-author preload omits hashed_password", %{
+      post: post,
+      root: root
+    } do
+      replier = user_fixture()
+
+      {_reply, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Posts.add_comment_to_post(
+              %{
+                "post_id" => post.id,
+                "text" => "Welcome slim!",
+                "comment_id" => root.id
+              },
+              replier
+            )
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert fat_cols == 0
+    end
+
     test "does not email someone who replies to themselves", %{
       post: post,
       root: root,
@@ -1035,6 +1060,48 @@ defmodule Ysc.PostsTest do
       [c] = Posts.get_comments_for_post(post.id, [:author])
       assert c.text == "Comment 1"
       assert Ecto.assoc_loaded?(c.author)
+    end
+
+    test "author preload omits hashed_password and still loads display fields",
+         %{
+           author: author,
+           regular_user: user
+         } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "list-comments-slim-#{System.unique_integer()}",
+            "state" => "published"
+          },
+          author
+        )
+
+      Posts.add_comment_to_post(
+        %{"post_id" => post.id, "text" => "Slim author"},
+        user
+      )
+
+      {comments, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Posts.get_comments_for_post(post.id, author: :current_avatar)
+          end,
+          pattern: ~r/hashed_password|board_bio|upload_data/i,
+          caller_pids: [self()]
+        )
+
+      [comment] = comments
+      assert comment.author.email == user.email
+      assert comment.author.first_name == user.first_name
+
+      assert comment.author.most_connected_country ==
+               user.most_connected_country
+
+      assert is_nil(comment.author.hashed_password)
+      assert Ecto.assoc_loaded?(comment.author.current_avatar)
+      assert fat_cols == 0
     end
   end
 
@@ -1464,6 +1531,45 @@ defmodule Ysc.PostsTest do
       assert length(comments) >= 2
       assert Enum.any?(comments, &(&1.text == "Comment 1"))
     end
+
+    test "omits post raw_body and author hashed_password from the SELECT", %{
+      author: author,
+      regular_user: user
+    } do
+      marker = "latest-#{System.unique_integer([:positive])}"
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Dashboard #{marker}",
+            "body" => "Body",
+            "url_name" => "latest-comments-slim-#{marker}",
+            "state" => "published",
+            "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+          },
+          author
+        )
+
+      Posts.add_comment_to_post(
+        %{"post_id" => post.id, "text" => "Discuss #{marker}"},
+        user
+      )
+
+      {{comments, raw_cols}, password_cols} =
+        with_comment_column_counts(fn -> Posts.get_latest_comments(5) end)
+
+      comment = Enum.find(comments, &(&1.text == "Discuss #{marker}"))
+      assert comment
+      assert comment.post.title == "Dashboard #{marker}"
+      assert comment.post.url_name == "latest-comments-slim-#{marker}"
+      assert is_nil(comment.post.raw_body)
+      refute Ecto.assoc_loaded?(comment.post.author)
+      assert comment.author.first_name == user.first_name
+      assert comment.author.last_name == user.last_name
+      assert is_nil(comment.author.hashed_password)
+      assert raw_cols == 0
+      assert password_cols == 0
+    end
   end
 
   describe "reply comments" do
@@ -1631,6 +1737,42 @@ defmodule Ysc.PostsTest do
       assert Ecto.assoc_loaded?(found.post)
     end
 
+    test "author preload omits hashed_password", %{
+      author: author,
+      regular_user: user
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "get-comment-slim-#{System.unique_integer()}",
+            "state" => "published"
+          },
+          author
+        )
+
+      {:ok, comment} =
+        Posts.add_comment_to_post(
+          %{"post_id" => post.id, "text" => "Slim get"},
+          user
+        )
+
+      {found, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Posts.get_comment!(comment.id, author: :current_avatar)
+          end,
+          pattern: ~r/hashed_password|board_bio|upload_data/i,
+          caller_pids: [self()]
+        )
+
+      assert found.author.email == user.email
+      assert is_nil(found.author.hashed_password)
+      assert Ecto.assoc_loaded?(found.author.current_avatar)
+      assert fat_cols == 0
+    end
+
     test "returns nil for missing comment id" do
       assert Posts.get_comment!(Ecto.ULID.generate()) == nil
     end
@@ -1781,5 +1923,21 @@ defmodule Ysc.PostsTest do
 
       assert id == draft.id
     end
+  end
+
+  defp with_comment_column_counts(fun) do
+    {result, raw_cols} =
+      Ysc.QueryCounter.with_query_counter(fun,
+        pattern: ~r/raw_body/i,
+        caller_pids: [self()]
+      )
+
+    {_result, password_cols} =
+      Ysc.QueryCounter.with_query_counter(fun,
+        pattern: ~r/hashed_password/i,
+        caller_pids: [self()]
+      )
+
+    {{result, raw_cols}, password_cols}
   end
 end
