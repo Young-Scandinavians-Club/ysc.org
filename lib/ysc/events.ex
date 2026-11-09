@@ -1582,8 +1582,13 @@ defmodule Ysc.Events do
 
   @doc """
   Publish an event by updating its state and setting `published_at`.
+
+  The member event-notification email is only scheduled when notifications are
+  enabled. Pass `send_notification: true` to opt in; without the option the
+  event's stored `send_notification` flag (set when it was scheduled) is used,
+  which defaults to `false`.
   """
-  def publish_event(%Event{} = event) do
+  def publish_event(%Event{} = event, opts \\ []) do
     cond do
       event.state not in [:draft, :scheduled] ->
         {:error, :invalid_state}
@@ -1597,8 +1602,15 @@ defmodule Ysc.Events do
       true ->
         now = DateTime.utc_now()
 
+        send_notification? =
+          Keyword.get(opts, :send_notification, event.send_notification)
+
         event
-        |> Event.changeset(%{state: "published", published_at: now})
+        |> Event.changeset(%{
+          state: "published",
+          published_at: now,
+          send_notification: send_notification?
+        })
         |> Repo.update()
         |> case do
           {:ok, updated_event} ->
@@ -1608,7 +1620,9 @@ defmodule Ysc.Events do
               event: updated_event
             })
 
-            schedule_event_notifications(updated_event, now)
+            if send_notification?,
+              do: schedule_event_notifications(updated_event, now)
+
             schedule_event_photo_reminders(updated_event)
 
             {:ok, updated_event}
@@ -1678,7 +1692,12 @@ defmodule Ysc.Events do
   defp maybe_reschedule_event_photo_reminder(_event), do: :ok
 
   defp maybe_reschedule_event_notification(
-         %Event{state: state, published_at: published_at} = event
+         %Event{
+           state: state,
+           published_at: published_at,
+           send_notification: true
+         } =
+           event
        )
        when state in [:published, "published"] and not is_nil(published_at) do
     if is_nil(event.notification_sent_at) do
@@ -1769,7 +1788,16 @@ defmodule Ysc.Events do
   defp finalize_lifecycle_broadcast({:error, changeset}),
     do: {:error, changeset}
 
-  def schedule_event(%Event{} = event, publish_at) when is_binary(publish_at) do
+  @doc """
+  Schedules an event to be published at `publish_at`.
+
+  Pass `send_notification: true` to send the member event-notification email
+  once the event goes live; it defaults to `false`.
+  """
+  def schedule_event(event, publish_at, opts \\ [])
+
+  def schedule_event(%Event{} = event, publish_at, opts)
+      when is_binary(publish_at) do
     # Try to parse as full ISO8601 first, then fall back to datetime-local format
     parsed_datetime =
       case DateTime.from_iso8601(publish_at) do
@@ -1787,13 +1815,17 @@ defmodule Ysc.Events do
           end
       end
 
-    schedule_event(event, parsed_datetime)
+    schedule_event(event, parsed_datetime, opts)
   end
 
-  def schedule_event(%Event{} = event, publish_at)
+  def schedule_event(%Event{} = event, publish_at, opts)
       when is_struct(publish_at, DateTime) do
     changeset =
-      Event.changeset(event, %{state: "scheduled", publish_at: publish_at})
+      Event.changeset(event, %{
+        state: "scheduled",
+        publish_at: publish_at,
+        send_notification: Keyword.get(opts, :send_notification, false)
+      })
 
     case Repo.update(changeset) do
       {:ok, event} ->

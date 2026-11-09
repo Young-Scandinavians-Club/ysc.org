@@ -4447,10 +4447,49 @@ defmodule Ysc.EventsTest do
       assert Repo.get!(Event, published.id).state == :published
     end
 
-    test "publish_event schedules the notification and photo-reminder jobs independently",
+    test "publish_event does not schedule the notification by default",
          %{event: event} do
       Oban.Testing.with_testing_mode(:manual, fn ->
         assert {:ok, published} = Events.publish_event(event)
+
+        refute published.send_notification
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        # Editing the live event must not enqueue the notification either.
+        assert {:ok, _} = Events.update_event(published, %{title: "Renamed"})
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+      end)
+    end
+
+    test "publish_event uses the flag stored by schedule_event", %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        publish_at = DateTime.add(DateTime.utc_now(), 1, :day)
+
+        assert {:ok, scheduled} =
+                 Events.schedule_event(event, publish_at,
+                   send_notification: true
+                 )
+
+        assert scheduled.send_notification
+        assert {:ok, published} = Events.publish_event(scheduled)
+        assert published.send_notification
+
+        assert [_job] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+      end)
+    end
+
+    test "schedule_event defaults send_notification to false", %{event: event} do
+      publish_at = DateTime.add(DateTime.utc_now(), 1, :day)
+      assert {:ok, scheduled} = Events.schedule_event(event, publish_at)
+      refute scheduled.send_notification
+    end
+
+    test "publish_event schedules the notification and photo-reminder jobs independently",
+         %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, published} =
+                 Events.publish_event(event, send_notification: true)
 
         assert [notification_job] =
                  all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
@@ -4481,7 +4520,8 @@ defmodule Ysc.EventsTest do
     test "updating a published event's dates keeps both jobs independently scheduled",
          %{event: event} do
       Oban.Testing.with_testing_mode(:manual, fn ->
-        assert {:ok, published} = Events.publish_event(event)
+        assert {:ok, published} =
+                 Events.publish_event(event, send_notification: true)
 
         assert [_notification_job] =
                  all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)

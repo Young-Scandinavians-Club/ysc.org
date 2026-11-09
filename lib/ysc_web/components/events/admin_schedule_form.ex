@@ -25,6 +25,16 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
           phx-mounted={JS.focus()}
         />
 
+        <label class="flex cursor-pointer items-center gap-2 text-sm text-zinc-700">
+          <input
+            type="checkbox"
+            id={"schedule-send-notification-#{@event_id}"}
+            class="rounded-sm border-zinc-300 text-blue-600 focus:ring-blue-500"
+            checked={@send_notification}
+            phx-click="toggle-send-notification"
+          /> Send event notification email
+        </label>
+
         <div class="flex justify-end">
           <.button type="submit" phx-disable-with="Saving...">Set Schedule</.button>
         </div>
@@ -56,6 +66,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventForm do
 
     {:ok,
      socket
+     |> assign_new(:send_notification, fn -> false end)
      |> assign(assigns)
      |> assign_form(changeset)}
   end

@@ -60,6 +60,9 @@ defmodule Ysc.Events.Event do
     field :state, Ysc.Events.EventState
     field :published_at, :utc_datetime
     field :publish_at, :utc_datetime
+    # Whether publishing sends the member event-notification email. Chosen by
+    # the admin when publishing/scheduling; off unless explicitly enabled.
+    field :send_notification, :boolean, default: false
     field :notification_sent_at, :utc_datetime
     field :notification_recipient_count, :integer
 
@@ -180,7 +183,13 @@ defmodule Ysc.Events.Event do
     __schema__(:fields) -- [:raw_details | __schema__(:virtual_fields)]
   end
 
-  @publish_control_fields [:state, :published_at, :publish_at, :organizer_id]
+  @publish_control_fields [
+    :state,
+    :published_at,
+    :publish_at,
+    :organizer_id,
+    :send_notification
+  ]
 
   # Finding 70: tickets_tbd is a dedicated lifecycle flag (`Events.set_tickets_tbd/2`),
   # not an editorial auto-save field. Keep it on `changeset/2` so create/copy and
