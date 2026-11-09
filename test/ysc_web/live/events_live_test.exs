@@ -71,7 +71,10 @@ defmodule YscWeb.EventsLiveTest do
       location: "Test Location",
       max_attendees: 100,
       organizer_id: organizer.id,
-      image_id: if(image, do: image.id, else: nil)
+      image_id: if(image, do: image.id, else: nil),
+      # Stay out of ReferenceGenerator's 4-char daily namespace so a 20-event
+      # loop cannot collide with other async tests on `events_reference_id_index`.
+      reference_id: "EVT-LIVE-#{System.unique_integer([:positive])}"
     }
 
     attrs =
@@ -85,7 +88,7 @@ defmodule YscWeb.EventsLiveTest do
     {:ok, event} =
       %Events.Event{}
       |> Events.Event.changeset(attrs)
-      |> Repo.insert()
+      |> Repo.insert_with_reference_retry(Events.Event)
 
     event
   end
@@ -257,8 +260,15 @@ defmodule YscWeb.EventsLiveTest do
 
   describe "show more past events" do
     test "does not show 'Show More' button when few past events", %{conn: conn} do
+      organizer = user_fixture()
+
       for i <- 1..5 do
-        create_event(%{title: "Past Event #{i}", past: true})
+        create_event(%{
+          title: "Past Event #{i}",
+          past: true,
+          with_image: false,
+          organizer: organizer
+        })
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
@@ -269,8 +279,15 @@ defmodule YscWeb.EventsLiveTest do
     end
 
     test "shows 'Show More' button when many past events exist", %{conn: conn} do
+      organizer = user_fixture()
+
       for i <- 1..15 do
-        create_event(%{title: "Past Event #{i}", past: true})
+        create_event(%{
+          title: "Past Event #{i}",
+          past: true,
+          with_image: false,
+          organizer: organizer
+        })
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")
@@ -281,8 +298,15 @@ defmodule YscWeb.EventsLiveTest do
     end
 
     test "clicking 'Show More' loads more past events", %{conn: conn} do
+      organizer = user_fixture()
+
       for i <- 1..20 do
-        create_event(%{title: "Past Event #{i}", past: true})
+        create_event(%{
+          title: "Past Event #{i}",
+          past: true,
+          with_image: false,
+          organizer: organizer
+        })
       end
 
       {:ok, view, _html} = live(conn, ~p"/events")

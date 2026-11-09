@@ -595,34 +595,16 @@ defmodule Ysc.Events do
       |> Event.changeset(attrs)
       |> maybe_put_updated_by(organizer_id)
 
-    multi =
-      Ecto.Multi.new()
-      |> Ecto.Multi.insert(:event, event_changeset)
+    # Retry the whole Multi after a unique-constraint rollback. Retrying
+    # inside the open transaction (insert_with_reference_retry in Multi.run)
+    # hits PostgreSQL 25P02: the failed insert aborts the savepoint.
+    insert_event_retrying_reference_id(event_changeset, organizer_id, 5)
+  end
 
-    multi =
-      if organizer_id do
-        Ecto.Multi.run(multi, :add_host, fn repo, %{event: event} ->
-          case repo.get(User, organizer_id) do
-            nil ->
-              {:ok, nil}
-
-            organizer ->
-              event
-              |> repo.preload(:hosts)
-              |> Ecto.Changeset.change()
-              |> Ecto.Changeset.put_assoc(:hosts, [organizer])
-              |> repo.update()
-          end
-        end)
-      else
-        multi
-      end
-
-    case Repo.transaction(multi) do
+  defp insert_event_retrying_reference_id(event_changeset, organizer_id, 0) do
+    case Repo.transaction(event_insert_multi(event_changeset, organizer_id)) do
       {:ok, %{event: event}} ->
-        maybe_invalidate_event_caches(event)
-        broadcast(%Ysc.MessagePassingEvents.EventAdded{event: event})
-        {:ok, event}
+        finalize_created_event(event)
 
       {:error, :event, changeset, _} ->
         {:error, changeset}
@@ -630,6 +612,82 @@ defmodule Ysc.Events do
       {:error, :add_host, error, _} ->
         {:error, error}
     end
+  end
+
+  defp insert_event_retrying_reference_id(
+         event_changeset,
+         organizer_id,
+         attempts
+       )
+       when attempts > 0 do
+    case Repo.transaction(event_insert_multi(event_changeset, organizer_id)) do
+      {:ok, %{event: event}} ->
+        finalize_created_event(event)
+
+      {:error, :event, changeset, _} ->
+        if reference_id_unique_constraint?(changeset) do
+          new_changeset =
+            changeset
+            |> clear_reference_id_error()
+            |> Event.put_new_reference_id()
+
+          insert_event_retrying_reference_id(
+            new_changeset,
+            organizer_id,
+            attempts - 1
+          )
+        else
+          {:error, changeset}
+        end
+
+      {:error, :add_host, error, _} ->
+        {:error, error}
+    end
+  end
+
+  defp event_insert_multi(event_changeset, organizer_id) do
+    multi =
+      Ecto.Multi.new()
+      |> Ecto.Multi.insert(:event, event_changeset)
+
+    if organizer_id do
+      Ecto.Multi.run(multi, :add_host, fn repo, %{event: event} ->
+        case repo.get(User, organizer_id) do
+          nil ->
+            {:ok, nil}
+
+          organizer ->
+            event
+            |> repo.preload(:hosts)
+            |> Ecto.Changeset.change()
+            |> Ecto.Changeset.put_assoc(:hosts, [organizer])
+            |> repo.update()
+        end
+      end)
+    else
+      multi
+    end
+  end
+
+  defp finalize_created_event(event) do
+    maybe_invalidate_event_caches(event)
+    broadcast(%Ysc.MessagePassingEvents.EventAdded{event: event})
+    {:ok, event}
+  end
+
+  defp reference_id_unique_constraint?(changeset) do
+    Enum.any?(changeset.errors, fn
+      {:reference_id, {_, opts}} when is_list(opts) ->
+        Keyword.get(opts, :constraint) == :unique
+
+      _ ->
+        false
+    end)
+  end
+
+  defp clear_reference_id_error(changeset) do
+    new_errors = Keyword.delete(changeset.errors, :reference_id)
+    %{changeset | errors: new_errors, valid?: new_errors == []}
   end
 
   # Event page "Who's going" chips and host pills: name, country for default

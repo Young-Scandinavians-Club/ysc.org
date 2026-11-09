@@ -310,4 +310,15 @@ defmodule Ysc.Events.EventTest do
       assert Ecto.Changeset.get_field(cs, :reference_id) == "EVT-CUSTOM-1"
     end
   end
+
+  describe "put_new_reference_id/1" do
+    test "generates a new EVT reference id" do
+      cs =
+        Ecto.Changeset.change(%Event{}, %{}) |> Event.put_new_reference_id()
+
+      ref = Ecto.Changeset.get_field(cs, :reference_id)
+      assert is_binary(ref)
+      assert ref =~ ~r/^EVT-\d{6}-[A-Z0-9]{5}$/
+    end
+  end
 end

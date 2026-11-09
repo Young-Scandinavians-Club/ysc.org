@@ -251,6 +251,14 @@ defmodule Ysc.Events.Event do
     |> shared_validations()
   end
 
+  @doc """
+  Puts a new reference_id on the changeset (for retry after unique constraint).
+  Call this when insert fails with a reference_id unique constraint.
+  """
+  def put_new_reference_id(changeset) do
+    ReferenceGenerator.put_new_reference_id(changeset, @reference_prefix)
+  end
+
   defp shared_validations(changeset) do
     changeset
     |> validate_length(:title, max: 100)
