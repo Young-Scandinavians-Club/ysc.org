@@ -162,6 +162,40 @@ defmodule Ysc.AppleWalletTest do
       end)
     end
 
+    test "`:any` generates a pass without matching the ticket owner (email guest path)" do
+      {_owner, ticket} = member_with_confirmed_ticket()
+
+      with_fake_certs(fn ->
+        assert {:ok, pkpass} = AppleWallet.generate_ticket_pass(ticket.id, :any)
+        assert is_binary(pkpass) and byte_size(pkpass) > 0
+        assert <<80, 75, _::binary>> = pkpass
+      end)
+    end
+
+    test "`:any` still rejects pending and cancelled tickets" do
+      {_user, ticket} = member_with_confirmed_ticket()
+
+      pending =
+        ticket
+        |> Ecto.Changeset.change(status: :pending)
+        |> Ysc.Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:error, :not_found} =
+                 AppleWallet.generate_ticket_pass(pending.id, :any)
+      end)
+
+      cancelled =
+        pending
+        |> Ecto.Changeset.change(status: :cancelled)
+        |> Ysc.Repo.update!()
+
+      with_fake_certs(fn ->
+        assert {:error, :not_found} =
+                 AppleWallet.generate_ticket_pass(cancelled.id, :any)
+      end)
+    end
+
     test "struct-selects pass fields and skips event body HTML (certs injected)" do
       {user, ticket} = member_with_confirmed_ticket()
 

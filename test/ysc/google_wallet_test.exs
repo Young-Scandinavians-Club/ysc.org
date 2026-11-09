@@ -147,6 +147,31 @@ defmodule Ysc.GoogleWalletTest do
       end)
     end
 
+    test "`:any` generates a save URL without matching the ticket owner" do
+      {_owner, ticket} = member_with_confirmed_ticket()
+
+      with_fake_credentials(fn ->
+        assert {:ok, url} =
+                 GoogleWallet.generate_ticket_save_url(ticket.id, :any)
+
+        assert String.starts_with?(url, "https://pay.google.com/gp/v/save/")
+      end)
+    end
+
+    test "`:any` still rejects a pending ticket" do
+      {_user, ticket} = member_with_confirmed_ticket()
+
+      pending =
+        ticket
+        |> Ecto.Changeset.change(status: :pending)
+        |> Ysc.Repo.update!()
+
+      with_fake_credentials(fn ->
+        assert {:error, :not_found} =
+                 GoogleWallet.generate_ticket_save_url(pending.id, :any)
+      end)
+    end
+
     test "struct-selects pass fields and skips event body HTML" do
       {user, ticket} = member_with_confirmed_ticket()
 
@@ -233,6 +258,18 @@ defmodule Ysc.GoogleWalletTest do
                  )
 
         assert {:error, :not_found} = Map.fetch!(results, ticket.id)
+      end)
+    end
+
+    test "`:any` loads tickets regardless of owner (public email page)" do
+      {_owner, ticket} = member_with_confirmed_ticket()
+
+      with_fake_credentials(fn ->
+        assert {:ok, results} =
+                 GoogleWallet.generate_ticket_save_urls([ticket.id], :any)
+
+        assert {:ok, url} = Map.fetch!(results, ticket.id)
+        assert String.starts_with?(url, "https://pay.google.com/gp/v/save/")
       end)
     end
 
