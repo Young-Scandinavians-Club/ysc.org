@@ -1,18 +1,18 @@
 defmodule Ysc.H2UpgradeTest do
   @moduledoc """
-  Guards the h2 0.12.4 → 0.12.5 upgrade.
+  Guards the h2 0.12.5 → 0.15.0 upgrade (pulled by hackney 4.10.0).
 
-  0.12.5 adds optional `connection_window_size` (65535..2147483647,
-  default still 65535) so clients and servers can raise the
-  connection-wide receive window. The default stays 64 KB, so nothing
-  changes unless the option is set. Invalid values return
-  `{error, {invalid_option, {connection_window_size, V}}}` from
-  `h2_connection:start_link/3,4`.
+  0.12.7 MadeYouReset (CVE-2025-8671) caps server stream resets per
+  second. 0.13.0 SETTINGS flood (CVE-2019-9515) accepts at most 20
+  SETTINGS frames per second from a peer, then closes the connection.
+  0.14.0 adds `peercert/1` and makes the server own its listen socket.
+  0.15.0 adds optional `notify_stream_available` (off by default).
+  0.12.5 `connection_window_size` is unchanged.
 
-  We do not start h2 servers. hackney 4.9.1 now calls
-  `h2_connection:start_link/4` with `connection_window_size` 32 MiB
-  (and stream `initial_window_size` 8 MiB) so HTTP/2 downloads are
-  not stuck at the 64 KB default. Public client APIs are unchanged.
+  We do not start h2 servers in production. hackney 4.10.0 still
+  calls `h2_connection:start_link/4` with `connection_window_size`
+  32 MiB and now sets `notify_stream_available => true` so HTTP/2
+  can wait for a free stream. Public client APIs are unchanged.
   """
   use ExUnit.Case, async: false
 
@@ -44,23 +44,24 @@ defmodule Ysc.H2UpgradeTest do
     :ok
   end
 
-  describe "0.12.5 Hex lock and public APIs" do
-    test "locks the Hex package to 0.12.5" do
-      assert to_string(Application.spec(:h2, :vsn)) == "0.12.5"
+  describe "0.15.0 Hex lock and public APIs" do
+    test "locks the Hex package to 0.15.0" do
+      assert to_string(Application.spec(:h2, :vsn)) == "0.15.0"
     end
 
-    test "companion lock is 0.12.5" do
+    test "companion lock is 0.15.0" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"h2": {:hex, :h2, "0.12.5"|
-      refute lock =~ ~s|"h2": {:hex, :h2, "0.12.4"|
+      assert lock =~ ~s|"h2": {:hex, :h2, "0.15.0"|
+      refute lock =~ ~s|"h2": {:hex, :h2, "0.12.5"|
     end
 
     test "mix.exs override matches hackney and webtransport" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s|{:h2, "~> 0.12.5", override: true}|
+      assert mix_exs =~ ~s|{:h2, "~> 0.15.0", override: true}|
+      refute mix_exs =~ ~s|{:h2, "~> 0.12.5", override: true}|
 
-      assert File.read!(@hackney_rebar) =~ ~s|{h2, "~>0.12.5"}|
-      assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.12"}|
+      assert File.read!(@hackney_rebar) =~ ~s|{h2, "~>0.15.0"}|
+      assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.15.0"}|
     end
 
     test "client APIs hackney and webtransport use still exist" do
@@ -81,7 +82,10 @@ defmodule Ysc.H2UpgradeTest do
       assert function_exported?(:h2, :goaway, 2)
       assert function_exported?(:h2, :send_trailers, 3)
       assert function_exported?(:h2, :send_response, 4)
+      assert function_exported?(:h2, :send_response, 5)
       assert function_exported?(:h2, :respond, 5)
+      assert function_exported?(:h2, :peercert, 1)
+      assert function_exported?(:h2, :connection_info, 1)
 
       assert {:module, _} = Code.ensure_loaded(:h2_connection)
       assert function_exported?(:h2_connection, :start_link, 3)
@@ -388,10 +392,12 @@ defmodule Ysc.H2UpgradeTest do
       source = File.read!(@h2_src)
 
       assert source =~ "connection_window_size => 65535..2147483647"
-      assert source =~ "maps:with([settings, connection_window_size], Opts)"
 
       assert source =~
-               "maps:merge(maps:with([connection_window_size], Opts),"
+               "maps:with([settings, connection_window_size, notify_peer_settings,"
+
+      assert source =~
+               "maps:merge(maps:with([connection_window_size, notify_peer_settings], Opts),"
     end
 
     test "connection source validates, grants, and refills the target window" do
@@ -416,7 +422,8 @@ defmodule Ysc.H2UpgradeTest do
       assert conn =~
                ~S|H2Opts = #{settings => #{initial_window_size => ?H2_STREAM_WINDOW},|
 
-      assert conn =~ ~S|connection_window_size => ?H2_CONN_WINDOW}|
+      assert conn =~ ~S|connection_window_size => ?H2_CONN_WINDOW,|
+      assert conn =~ ~S|notify_stream_available => true}|
 
       assert conn =~
                ~S|h2_connection:start_link(client, Socket, self(), H2Opts)|
@@ -570,6 +577,165 @@ defmodule Ysc.H2UpgradeTest do
       assert {<<"content-type">>, <<"text/plain">>} in headers
       assert_receive {:h2, ^conn, {:data, ^fast_id, "h2-fast", true}}, 2_000
       assert Process.alive?(conn)
+    end
+  end
+
+  describe "0.12.6 extension settings" do
+    test "changelog and encoder keep raw integer setting keys" do
+      changelog = File.read!(@h2_changelog)
+
+      v0126 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.find(&String.starts_with?(&1, "[0.12.6]"))
+
+      assert v0126
+      assert v0126 =~ "16#2b67"
+      refute v0126 =~ "Breaking"
+
+      source = File.read!(@h2_connection_src)
+      assert source =~ ~S|settings_to_list(#{16#2b67 => 1, enable_push => 0,|
+    end
+  end
+
+  describe "0.12.7 MadeYouReset" do
+    test "changelog documents CVE-2025-8671 and the per-second reset cap" do
+      changelog = File.read!(@h2_changelog)
+
+      v0127 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.find(&String.starts_with?(&1, "[0.12.7]"))
+
+      assert v0127
+      assert v0127 =~ "MadeYouReset"
+      assert v0127 =~ "CVE-2025-8671"
+      assert v0127 =~ "max_concurrent_streams"
+      refute v0127 =~ "Breaking"
+    end
+
+    test "connection source caps sent RST_STREAM frames for peer abuse" do
+      source = File.read!(@h2_connection_src)
+      assert source =~ "-define(SENT_RST_FLOOD_LIMIT_PER_SEC, 100)."
+      assert source =~ "MadeYouReset (CVE-2025-8671)"
+      assert source =~ "over_sent_rst_budget("
+      assert source =~ "sent_rst(StreamId, ErrorCode,"
+    end
+  end
+
+  describe "0.13.0 SETTINGS flood" do
+    test "changelog documents CVE-2019-9515 and the 20-per-second cap" do
+      changelog = File.read!(@h2_changelog)
+
+      v0130 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.find(&String.starts_with?(&1, "[0.13.0]"))
+
+      assert v0130
+      assert v0130 =~ "SETTINGS flood"
+      assert v0130 =~ "CVE-2019-9515"
+      assert v0130 =~ "20 SETTINGS frames per second"
+      assert v0130 =~ "notify_peer_settings"
+      assert v0130 =~ "connection_info/1"
+      refute v0130 =~ "Breaking"
+    end
+
+    test "connection source counts SETTINGS like PING and GOAWAYs past the cap" do
+      source = File.read!(@h2_connection_src)
+      assert source =~ "-define(SETTINGS_FLOOD_LIMIT_PER_SEC, 20)."
+      assert source =~ "settings_flood = {0, 0}"
+      assert source =~ "bump_flood_counter(settings, State)"
+      assert source =~ "flood        -> {error, enhance_your_calm, State}"
+    end
+
+    test "notify_peer_settings stays off; h2c round-trip still works" do
+      handler = fn conn, stream_id, _method, _path, _headers ->
+        :ok =
+          :h2.send_response(conn, stream_id, 200, [
+            {<<"content-type">>, <<"text/plain">>}
+          ])
+
+        :ok = :h2.send_data(conn, stream_id, "h2-settings-ok", true)
+      end
+
+      {_server, conn} = start_h2c_client(handler)
+
+      assert {:ok, stream_id} =
+               :h2.request(conn, "GET", "/", [{<<"host">>, <<"127.0.0.1">>}])
+
+      assert_receive {:h2, ^conn, {:response, ^stream_id, 200, _headers}}, 2_000
+
+      assert_receive {:h2, ^conn, {:data, ^stream_id, "h2-settings-ok", true}},
+                     2_000
+
+      refute_received {:h2, ^conn, {:peer_settings, _}}
+    end
+  end
+
+  describe "0.14.0 peercert and connection_info" do
+    test "changelog documents peercert/1 and listen-socket ownership" do
+      changelog = File.read!(@h2_changelog)
+
+      v0140 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.find(&String.starts_with?(&1, "[0.14.0]"))
+
+      assert v0140
+      assert v0140 =~ "h2:peercert/1"
+      assert v0140 =~ "stop_server/1"
+      refute v0140 =~ "Breaking"
+    end
+
+    test "h2c reports tcp transport and has no peer certificate" do
+      handler = fn conn, stream_id, _method, _path, _headers ->
+        :ok =
+          :h2.send_response(conn, stream_id, 200, [
+            {<<"content-type">>, <<"text/plain">>}
+          ])
+
+        :ok = :h2.send_data(conn, stream_id, "h2-info-ok", true)
+      end
+
+      {_server, conn} = start_h2c_client(handler)
+
+      assert {:ok, %{transport: :tcp}} = :h2.connection_info(conn)
+      assert {:error, :no_peercert} = :h2.peercert(conn)
+
+      assert {:ok, stream_id} =
+               :h2.request(conn, "GET", "/", [{<<"host">>, <<"127.0.0.1">>}])
+
+      assert_receive {:h2, ^conn, {:response, ^stream_id, 200, _headers}}, 2_000
+
+      assert_receive {:h2, ^conn, {:data, ^stream_id, "h2-info-ok", true}},
+                     2_000
+    end
+  end
+
+  describe "0.15.0 notify_stream_available" do
+    test "changelog documents the opt-in client option" do
+      changelog = File.read!(@h2_changelog)
+
+      v0150 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.find(&String.starts_with?(&1, "[0.15.0]"))
+
+      assert v0150
+      assert v0150 =~ "notify_stream_available"
+      assert v0150 =~ "Off by default"
+      refute v0150 =~ "Breaking"
+    end
+
+    test "option defaults to false; hackney opts in" do
+      source = File.read!(@h2_connection_src)
+      assert source =~ "notify_stream_available = false :: boolean()"
+      assert source =~ "maps:get(notify_stream_available, Opts, false) =:= true"
+
+      conn = File.read!(@hackney_conn)
+      assert conn =~ "notify_stream_available => true"
+      assert conn =~ "handle_h2_event(stream_available, Data)"
     end
   end
 
