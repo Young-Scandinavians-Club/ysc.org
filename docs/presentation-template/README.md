@@ -42,7 +42,7 @@ Charts you insert with Insert, then Chart pick up the theme's series order autom
 
 ## Icons
 
-The "Icon library" slide has 32 icons (Heroicons, MIT license, the same set the website uses). Each is a theme-colored circle plus a symbol. Group the pair (right-click, Group), copy it and paste it into your slide. Circle colors are theme colors, so they follow the theme.
+The "Icon library" slide has 32 icons (Heroicons, MIT license, the same set the website uses). Each is one grouped object (a theme-colored circle plus a symbol): click it, copy it and paste it into your slide. Circle colors are theme colors, so they follow the theme.
 
 ## Typeface
 
