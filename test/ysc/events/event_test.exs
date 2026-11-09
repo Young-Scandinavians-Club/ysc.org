@@ -75,6 +75,29 @@ defmodule Ysc.Events.EventTest do
       refute Event.tickets_tbd?(%{tickets_tbd: false})
     end
 
+    test "clearing an existing external ticket link with nil removes it", %{
+      organizer: organizer
+    } do
+      event = %Event{
+        state: :draft,
+        organizer_id: organizer.id,
+        title: "T",
+        external_ticket_url: "https://example.org/tickets",
+        external_organizer: "Norwegian Club"
+      }
+
+      cs =
+        Event.changeset(event, %{
+          external_ticket_url: nil,
+          external_organizer: nil
+        })
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :external_ticket_url) == nil
+      assert Ecto.Changeset.get_field(cs, :external_organizer) == nil
+      refute Event.external_ticketing?(Ecto.Changeset.apply_changes(cs))
+    end
+
     test "blank external ticket link is cleared", %{organizer: organizer} do
       cs =
         Event.changeset(%Event{}, %{

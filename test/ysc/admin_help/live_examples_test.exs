@@ -63,6 +63,16 @@ defmodule Ysc.AdminHelp.LiveExamplesTest do
     assert content =~ "published"
   end
 
+  test "live-recent-events marks externally ticketed events" do
+    event_fixture(%{
+      title: "Midsommar Elsewhere",
+      external_ticket_url: "https://example.org/tickets"
+    })
+
+    assert {:ok, content} = LiveExamples.fetch("live-recent-events")
+    assert content =~ "tickets sold on another organization's website"
+  end
+
   test "live-recent-newsletters includes real editions with status" do
     {:ok, _edition} =
       Newsletter.create_edition(%{
