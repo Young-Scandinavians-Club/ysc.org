@@ -584,5 +584,25 @@ defmodule YscWeb.PageControllerTest do
                )
              ) == 1
     end
+
+    test "hides the Google Slides button when the template id is not a file id",
+         %{conn: conn} do
+      Application.put_env(
+        :ysc,
+        :brand_google_slides_template_id,
+        "1abc/../x?next=https://evil.example#frag"
+      )
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :brand_google_slides_template_id)
+      end)
+
+      assert YscWeb.BrandGuide.google_slides_copy_url() == nil
+
+      html = conn |> get(~p"/brand") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      assert Enum.empty?(LazyHTML.query(document, "#open-in-google-slides"))
+    end
   end
 end

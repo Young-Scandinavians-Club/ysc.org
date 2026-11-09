@@ -95,10 +95,19 @@ defmodule YscWeb.BrandGuide do
   URL that opens a Google Slides "Make a copy" prompt for the template, or
   `nil` when no Slides file has been configured.
   """
+  # Google file IDs are unreserved characters. Anything else is treated as
+  # unset so a mistyped env value cannot inject `/`, `?`, or `#` into the path.
+  @google_slides_id_pattern ~r/\A[A-Za-z0-9_-]+\z/
+
   def google_slides_copy_url do
     case Application.get_env(:ysc, :brand_google_slides_template_id) do
       id when is_binary(id) and id != "" ->
-        "https://docs.google.com/presentation/d/#{URI.encode(id)}/copy"
+        if Regex.match?(@google_slides_id_pattern, id) do
+          encoded = URI.encode(id, &URI.char_unreserved?/1)
+          "https://docs.google.com/presentation/d/#{encoded}/copy"
+        else
+          nil
+        end
 
       _ ->
         nil
