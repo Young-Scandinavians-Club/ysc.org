@@ -36,14 +36,10 @@ defmodule YscWeb.ShopListingTest do
     }
   end
 
-  defp live_shop(conn, path \\ ~p"/shop") do
-    {:ok, view, _html} = live(conn, path)
-    html = render_async(view)
-    {:ok, view, html}
-  end
+  defp live_shop(conn, path \\ ~p"/shop"), do: live_shop_page(conn, path)
 
   defp product_ids(view) do
-    render_async(view)
+    render_shop_async(view)
 
     view
     |> render()
