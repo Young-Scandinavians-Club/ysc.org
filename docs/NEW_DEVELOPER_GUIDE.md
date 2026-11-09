@@ -42,6 +42,10 @@ Welcome! This document provides an overview of all the documentation available t
   - Technology stack
   - Codebase structure
 
+### 🎨 Brand & Design
+- **[style-guide/](style-guide/README.md)** - Visual style guide page (logo, Nordic colors, type, components)
+- **[presentation-template/](presentation-template/README.md)** - PowerPoint template for slides
+
 ## Documentation Organization
 
 ```

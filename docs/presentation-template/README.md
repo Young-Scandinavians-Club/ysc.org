@@ -47,3 +47,7 @@ The "Icon library" slide has 32 icons (Heroicons, MIT license, the same set the 
 ## Typeface
 
 Arial, set once in the theme (Design, Variants, Fonts). The website uses the system font, and Arial is installed everywhere.
+
+## Related
+
+- [Visual style guide](../style-guide/README.md): the web page that documents the colors, type and logo rules used here.
