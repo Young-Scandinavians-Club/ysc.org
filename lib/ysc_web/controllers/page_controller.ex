@@ -90,7 +90,10 @@ defmodule YscWeb.PageController do
     |> assign(:zinc_scale, YscWeb.BrandGuide.zinc_scale())
     |> assign(:chart_bars, YscWeb.BrandGuide.chart_bars())
     |> assign(:series_colors, YscWeb.BrandGuide.series_colors())
-    |> assign(:google_slides_url, YscWeb.BrandGuide.google_slides_copy_url())
+    |> assign(
+      :google_slides_url,
+      YscWeb.BrandGuide.google_slides_template_url()
+    )
     |> assign(:profile_pictures, YscWeb.BrandGuide.profile_pictures())
     |> assign(:link_preview, YscWeb.BrandGuide.link_preview())
     |> assign(:canvases, YscWeb.BrandGuide.canvases())
