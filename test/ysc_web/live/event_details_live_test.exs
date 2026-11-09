@@ -2600,6 +2600,44 @@ defmodule YscWeb.EventDetailsLiveTest do
       refute has_element?(view, "#external-tickets-sidebar")
       refute has_element?(view, "#external-tickets-spotlight")
     end
+
+    test "deep link to /tickets does not open YSC checkout", %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "SWEA Christmas Fair",
+            external_ticket_url: "https://example.org/fair"
+          }
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#ticket-modal")
+      assert has_element?(view, "#external-tickets-sidebar")
+    end
+
+    test "leftover YSC tiers are not sold on the public page", %{conn: conn} do
+      event =
+        event_with_tickets(
+          tier_count: 1,
+          event_attrs: %{
+            title: "SWEA Fair leftover tiers",
+            external_ticket_url: "https://example.org/fair"
+          }
+        )
+
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "#external-tickets-sidebar")
+      refute html =~ "phx-click=\"open-ticket-modal\""
+      refute has_element?(view, "#ticket-modal")
+
+      {:ok, tickets_view, _html} = live(conn, ~p"/events/#{event.id}/tickets")
+
+      refute has_element?(tickets_view, "#ticket-modal")
+      assert has_element?(tickets_view, "#external-tickets-sidebar")
+    end
   end
 
   describe "Partiful - event with external registration" do

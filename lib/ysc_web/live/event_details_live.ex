@@ -3089,10 +3089,12 @@ defmodule YscWeb.EventDetailsLive do
     has_ticket_info = has_ticket_tiers || tickets_tbd?(event)
 
     # Check if we're on the tickets route (live_action == :tickets). Never open
-    # the modal once sales have closed — handle_params redirects on connect,
-    # this just avoids a flash of the modal in the dead render.
+    # the modal once sales have closed or tickets are sold elsewhere —
+    # handle_params redirects on connect, this just avoids a flash of the modal
+    # in the dead render.
     show_ticket_modal =
-      socket.assigns.live_action == :tickets and not ticket_sales_closed?(event)
+      socket.assigns.live_action == :tickets and not ticket_sales_closed?(event) and
+        not external_tickets?(event)
 
     # Member-only limits are only visible in the ticket modal. On the regular
     # event page the modal is closed, so skip plan-type work until connect.
@@ -3906,6 +3908,14 @@ defmodule YscWeb.EventDetailsLive do
               checkout_event_unavailable_message(:event_in_past),
               title: "Event"
             )
+            |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
+
+          # External events sell tickets on the organizer's site, even if leftover
+          # YSC tiers still exist. Do not open checkout.
+          socket.assigns.live_action == :tickets &&
+              external_tickets?(socket.assigns.event) ->
+            socket
+            |> assign(:show_ticket_modal, false)
             |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
 
           # If we're on the tickets route, show ticket modal
@@ -5344,20 +5354,25 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("open-ticket-modal", _params, socket) do
-    if ticket_sales_closed?(socket.assigns.event) do
-      {:noreply,
-       socket
-       |> assign(:show_ticket_modal, false)
-       |> YscWeb.Flash.put_toast(
-         :error,
-         checkout_event_unavailable_message(:event_in_past),
-         title: "Event"
-       )}
-    else
-      {:noreply,
-       socket
-       |> assign(:show_ticket_modal, true)
-       |> push_patch(to: ~p"/events/#{socket.assigns.event.id}/tickets")}
+    cond do
+      ticket_sales_closed?(socket.assigns.event) ->
+        {:noreply,
+         socket
+         |> assign(:show_ticket_modal, false)
+         |> YscWeb.Flash.put_toast(
+           :error,
+           checkout_event_unavailable_message(:event_in_past),
+           title: "Event"
+         )}
+
+      external_tickets?(socket.assigns.event) ->
+        {:noreply, assign(socket, :show_ticket_modal, false)}
+
+      true ->
+        {:noreply,
+         socket
+         |> assign(:show_ticket_modal, true)
+         |> push_patch(to: ~p"/events/#{socket.assigns.event.id}/tickets")}
     end
   end
 
