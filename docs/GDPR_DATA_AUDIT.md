@@ -229,7 +229,7 @@ flowchart TB
 6. **Conduct reports** — Document retention with board; anonymize after case closure where possible.
 7. **Signup applications for rejected applicants** — Define purge timeline.
 8. **Logging** — Remove or redact `inspect(guest_params)` in `booking_checkout_live.ex` at debug level.
-9. **Sentry browser context** — Review whether email is necessary in client-side user context (`docs/sentry-user-context.md`).
+9. **Sentry browser context** — Review whether email is necessary in client-side user context (see [MONITORING.md](MONITORING.md#sentry)).
 10. **Cloudflare Web Analytics** — If enabled at CDN level, disclose in cookie section and consider consent for EU.
 
 ---

@@ -279,39 +279,13 @@ Business logic inconsistencies:
 
 ## Alerting
 
-When discrepancies are found, the system:
+When a run finds discrepancies, `ReconciliationWorker`:
 
-1. **Logs Critical Errors** - All discrepancies logged at CRITICAL level
-2. **Sends Alerts** - Integrates with alerting system (Slack, email, PagerDuty)
-3. **Provides Details** - Specific payment IDs, amounts, and issues
-4. **Suggests Actions** - Guidance on investigating and resolving issues
+1. Logs the discrepancies
+2. Posts to Discord: `Discord.send_reconciliation_report/2` for the summary (`:success` / `:error`), plus `send_ledger_imbalance_alert/1` for an imbalance and `send_payment_discrepancy_alert/…` when individual payment discrepancies exist. An aggregate-only payment mismatch shows in the summary without the totals (see [DISCORD_ALERTS.md](DISCORD_ALERTS.md))
+3. Emails the Treasurer when a Stripe payout does not reconcile (payout mismatch template)
 
-### Alert Example
-
-```
-🚨 CRITICAL: Financial Reconciliation Discrepancies Detected
-
-**Timestamp:** 2024-11-20 01:00:00Z
-**Duration:** 1234ms
-
-**PAYMENT DISCREPANCIES**
-- Total Discrepancies: 2
-- Payments Total: $750.00
-- Ledger Total: $740.00
-- Match: false
-
-Issues:
-  - Payment 01ABC123:
-    No ledger transaction found
-  - Payment 01DEF456:
-    Transaction amount ($15.00) doesn't match payment amount ($25.00)
-
-**Action Required:**
-Investigate these discrepancies immediately. Run detailed checks:
-```
-Ysc.Ledgers.Reconciliation.run_full_reconciliation()
-```
-```
+The Discord summary shows counts and match status, and the payment alert lists IDs and issues for up to three payments. Run `Ysc.Ledgers.Reconciliation.run_full_reconciliation()` and inspect `report.checks.payments.discrepancies` and `report.checks.refunds.discrepancies` for the complete lists.
 
 ## Troubleshooting
 
@@ -374,139 +348,35 @@ entries = Ysc.Ledgers.get_entries_by_payment(payment_id)
 
 **Fix**: Update entity_type or correct ledger account classification
 
-## Best Practices
+## Ledger balance check
 
-### 1. Run Regularly
-- Automated daily checks at off-peak hours
-- Manual checks after major migrations or data changes
-- Spot checks when suspicious activity detected
-
-### 2. Monitor Trends
-- Track discrepancy counts over time
-- Alert on increasing error rates
-- Investigate patterns in failures
-
-### 3. Immediate Response
-- Treat reconciliation failures as P0 incidents
-- Investigate and resolve within 24 hours
-- Document root causes and fixes
-
-### 4. Preventive Measures
-- Use database transactions for all financial operations
-- Implement idempotency for webhook handlers
-- Add validation at multiple layers
-- Test edge cases thoroughly
-
-### 5. Audit Trail
-- Log all reconciliation results
-- Store reports for historical analysis
-- Maintain records of discrepancies and resolutions
-
-## Integration
-
-### Slack Notifications
+`Ysc.Ledgers.BalanceCheckWorker` runs at 00:00 UTC (`maintenance` queue, 3 attempts), an hour before reconciliation, and verifies that total debits equal total credits. On an imbalance it logs a warning with the difference, the account-type breakdown and the top five accounts by absolute balance. It does **not** post to Discord; the 01:00 reconciliation run reports an imbalance to Discord.
 
 ```elixir
-defp send_slack_notification(alert_message) do
-  # Configure in your alerting module
-  Ysc.Alerts.send_slack_message(
-    channel: "#finance-alerts",
-    message: alert_message,
-    priority: :critical
-  )
-end
+Ysc.Ledgers.BalanceCheckWorker.check_balance_now()   # run on demand
+
+Ysc.Ledgers.verify_ledger_balance()                  # {:ok, :balanced} | {:error, {:imbalanced, diff}}
+Ysc.Ledgers.get_ledger_imbalance_details()           # adds the per-account breakdown
+Ysc.Ledgers.get_account_balances()                   # [{account, balance}, ...]
+Ysc.Ledgers.calculate_account_balance(account_id)
 ```
 
-### Email Alerts
+Investigating an imbalance: look at the largest account balances, then at recent payments and ledger transactions that are incomplete or failed. Ledger entries are append-only (see `ledger_entry_append_only_test.exs`), so fix a bad entry with a compensating transaction rather than editing it.
 
-```elixir
-defp send_email_alert(alert_message) do
-  Ysc.Mailer.deliver(
-    Ysc.Emails.reconciliation_alert(
-      to: "finance@yourcompany.com",
-      subject: "🚨 Financial Reconciliation Alert",
-      body: alert_message
-    )
-  )
-end
-```
+## Practices
 
-### PagerDuty Integration
+- Treat a reconciliation failure as a priority incident; fix and record the root cause.
+- Keep every financial write inside a database transaction and idempotent (see [STRIPE_WEBHOOKS.md](STRIPE_WEBHOOKS.md)).
+- Run `run_full_reconciliation/0` by hand after migrations or data repairs.
 
-```elixir
-defp trigger_pagerduty(report) do
-  Ysc.PagerDuty.create_incident(
-    service: "financial-system",
-    severity: "critical",
-    summary: "Financial reconciliation discrepancies detected",
-    details: report
-  )
-end
-```
+## Tests
 
-## Performance Considerations
+`test/ysc/ledgers/reconciliation_test.exs`, `reconciliation_worker_test.exs`, `reconciliation_telemetry_test.exs` and `balance_check_worker_test.exs`. Each discrepancy type in this document has a test that builds the inconsistent data and asserts it is reported; add one when you add a check.
 
-### Large Datasets
+## Related
 
-For systems with millions of transactions:
-
-1. **Pagination**: Process payments/refunds in batches
-2. **Sampling**: Run full checks periodically, sample daily
-3. **Indexes**: Ensure proper database indexes on foreign keys
-4. **Caching**: Cache account lookups and calculations
-5. **Parallelization**: Use concurrent queries where safe
-
-### Optimization Example
-
-```elixir
-# Process payments in batches
-def reconcile_payments_batched(batch_size \\ 1000) do
-  Payment
-  |> Repo.stream()
-  |> Stream.chunk_every(batch_size)
-  |> Enum.reduce([], fn batch, acc ->
-    batch_discrepancies = check_batch(batch)
-    acc ++ batch_discrepancies
-  end)
-end
-```
-
-## Testing
-
-Comprehensive tests should cover:
-
-```elixir
-# Test successful reconciliation
-test "reconciliation passes with consistent data"
-
-# Test payment discrepancies
-test "detects payment without ledger transaction"
-test "detects payment amount mismatch"
-
-# Test refund discrepancies
-test "detects refund without ledger transaction"
-test "detects orphaned refund"
-
-# Test ledger imbalances
-test "detects ledger imbalance"
-
-# Test orphaned entries
-test "detects entries without valid payments"
-
-# Test entity mismatches
-test "detects membership revenue mismatch"
-```
-
-## Related Documentation
-
-- [Ledger System](LEDGER_SYSTEM_README.md) - Double-entry accounting overview
-- [Currency Handling](CURRENCY_HANDLING.md) - Dollars vs cents conversion
-- [Stripe Webhooks](STRIPE_WEBHOOK_FIXES_IMPLEMENTED_V2.md) - Payment processing
-- [Balance Monitoring](LEDGER_BALANCE_MONITORING.md) - Daily balance checks
-
----
-
-**Last Updated**: November 20, 2024
-**Maintained By**: Engineering Team
-**Review Frequency**: Quarterly
-
+- [LEDGER_SYSTEM_README.md](LEDGER_SYSTEM_README.md): double-entry model and accounts
+- [CURRENCY_HANDLING.md](CURRENCY_HANDLING.md): dollars vs. cents
+- [STRIPE_WEBHOOKS.md](STRIPE_WEBHOOKS.md): how payments and refunds reach the ledger
+- [REPROCESS_PAYOUTS.md](REPROCESS_PAYOUTS.md): fixing payout links and fees
+- [MONITORING.md](MONITORING.md): all nightly checks

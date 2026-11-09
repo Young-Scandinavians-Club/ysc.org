@@ -55,11 +55,7 @@ ysc-redesign-ex/
 │   ├── DEVELOPMENT_ARCHITECTURE.md     # System architecture
 │   ├── SEED_DATA_REFERENCE.md          # Complete seed data reference
 │   │
-│   └── [other project docs]/           # Additional documentation
-│       ├── LEDGER_SYSTEM_README.md
-│       ├── TICKET_SYSTEM_README.md
-│       ├── RECONCILIATION_SYSTEM.md
-│       └── ...
+│   └── README.md                       # Index of everything in docs/
 │
 └── [project files]
 ```
@@ -208,7 +204,7 @@ Public unsubscribe: `/newsletter/unsubscribe/:token`
 2. Add credentials from `.env.example` (all `QUICKBOOKS_*` vars)
 3. Create a payment in the app; monitor sync in Oban at `/admin/settings`
 
-See also [QUICKBOOKS_SYNC_DESIGN.md](QUICKBOOKS_SYNC_DESIGN.md).
+See also [QUICKBOOKS.md](QUICKBOOKS.md).
 
 ## Essential Commands
 
