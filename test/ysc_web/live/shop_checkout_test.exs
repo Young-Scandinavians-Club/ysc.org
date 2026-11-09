@@ -88,7 +88,7 @@ defmodule YscWeb.ShopCheckoutTest do
     |> form("#address-form", address: Map.merge(@address, overrides))
     |> render_submit()
 
-    render_async(view)
+    render_shop_async(view)
   end
 
   defp to_shipping(view) do
@@ -113,7 +113,7 @@ defmodule YscWeb.ShopCheckoutTest do
 
     {:ok, view, html} = live(conn, ~p"/shop/checkout")
     assert html =~ ~s(id="shop-checkout-loading")
-    assert_redirect(view, ~p"/shop/cart")
+    assert_shop_async_redirect(view, ~p"/shop/cart")
   end
 
   test "static HTML paints a checkout skeleton before the cart loads", %{
@@ -319,7 +319,7 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert [%Order{status: :pending} = order] = Repo.all(Order)
       assert order.user_id == member.id
@@ -357,11 +357,11 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       view |> element("#edit-shipping") |> render_click()
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert Repo.aggregate(Order, :count) == 1
     end
@@ -410,7 +410,7 @@ defmodule YscWeb.ShopCheckoutTest do
       assert {:ok, _} = Cart.add(member, extra.id, 1)
 
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert [%Order{status: :pending} = order] = Repo.all(Order)
       assert Money.equal?(order.shipping_amount, Money.new(:USD, "24.00"))
@@ -428,7 +428,7 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert has_element?(view, "#shipping-error")
       refute has_element?(view, "#checkout-payment")
@@ -458,7 +458,7 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert has_element?(view, "#shipping-error", "couldn't set up payment")
       refute has_element?(view, "#checkout-payment")
@@ -497,7 +497,7 @@ defmodule YscWeb.ShopCheckoutTest do
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
 
-      assert_redirect(
+      assert_shop_async_redirect(
         view,
         ~p"/shop/orders/#{order.id}/confirmation"
       )
@@ -536,7 +536,7 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert has_element?(view, "#shipping-error", "still processing")
       refute has_element?(view, "#checkout-payment")
@@ -583,7 +583,7 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert has_element?(view, "#checkout-payment")
       assert Orders.get_order!(order.id).status == :canceled
@@ -643,7 +643,7 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert has_element?(view, "#shipping-error", "still processing")
       refute has_element?(view, "#checkout-payment")
@@ -678,7 +678,7 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert has_element?(view, "#shipping-error", "still processing")
       refute has_element?(view, "#checkout-payment")
@@ -693,7 +693,7 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       [order] = Repo.all(Order)
 
@@ -722,7 +722,7 @@ defmodule YscWeb.ShopCheckoutTest do
       {:ok, view, _html} = live_shop_page(conn, ~p"/shop/checkout")
       to_shipping(view)
       view |> element("#continue-to-payment") |> render_click()
-      render_async(view)
+      render_shop_async(view)
 
       assert has_element?(view, "#submit-payment[disabled]")
 

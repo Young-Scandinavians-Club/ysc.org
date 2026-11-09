@@ -130,15 +130,13 @@ defmodule YscWeb.ShopBrowseTest do
     end
 
     test "marks Products as the current page", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop")
-      render_async(view)
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop")
       assert has_element?(view, "#shop-nav-products[aria-current=page]")
       refute has_element?(view, "#back-to-products")
     end
 
     test "shows an empty state with nothing for sale", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/shop")
-      render_async(view)
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop")
       assert has_element?(view, "#shop-empty")
       refute has_element?(view, "#shop-products")
     end
@@ -151,8 +149,7 @@ defmodule YscWeb.ShopBrowseTest do
       hidden = product_fixture(%{name: "Secret Hoodie", status: :hidden})
       variant_fixture(hidden)
 
-      {:ok, view, _html} = live(conn, ~p"/shop")
-      render_async(view)
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop")
 
       assert has_element?(view, "#shop-product-#{product.id}", "Club Tee")
       assert has_element?(view, "#shop-product-#{product.id}", "From $25.00")
@@ -165,8 +162,7 @@ defmodule YscWeb.ShopBrowseTest do
       %{variants: [variant | _]} = tee_product()
       {:ok, _} = Cart.add(member, variant.id, 3)
 
-      {:ok, view, _html} = live(conn, ~p"/shop")
-      render_async(view)
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop")
       assert has_element?(view, "#shop-cart-count", "3")
     end
   end
@@ -339,21 +335,27 @@ defmodule YscWeb.ShopBrowseTest do
       assert_redirect(view, ~p"/shop")
     end
 
-    test "unknown and hidden products go back to the shop", %{conn: conn} do
+    test "unknown products go back to the shop", %{conn: conn} do
       {:ok, view, html} =
         live(conn, ~p"/shop/products/#{Ecto.ULID.generate()}")
 
       assert html =~ ~s(id="shop-product-loading")
-      assert_redirect(view, ~p"/shop")
+      assert_shop_async_redirect(view, ~p"/shop")
+    end
 
-      {:ok, view, _html} = live(conn, ~p"/shop/products/not-an-id")
-      assert_redirect(view, ~p"/shop")
+    test "invalid product ids go back to the shop", %{conn: conn} do
+      {:ok, view, html} = live(conn, ~p"/shop/products/not-an-id")
+      assert html =~ ~s(id="shop-product-loading")
+      assert_shop_async_redirect(view, ~p"/shop")
+    end
 
+    test "hidden products go back to the shop", %{conn: conn} do
       hidden = product_fixture(%{status: :hidden})
       variant_fixture(hidden)
 
-      {:ok, view, _html} = live(conn, ~p"/shop/products/#{hidden.id}")
-      assert_redirect(view, ~p"/shop")
+      {:ok, view, html} = live(conn, ~p"/shop/products/#{hidden.id}")
+      assert html =~ ~s(id="shop-product-loading")
+      assert_shop_async_redirect(view, ~p"/shop")
     end
 
     test "products without options can be added straight away", %{
@@ -395,8 +397,7 @@ defmodule YscWeb.ShopBrowseTest do
     end
 
     test "is absent while the cart is empty", %{conn: conn, product: product} do
-      {:ok, view, _html} = live(conn, ~p"/shop")
-      render_async(view)
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop")
       refute has_element?(view, "#cart-dock")
 
       {:ok, view, _html} =
@@ -412,8 +413,7 @@ defmodule YscWeb.ShopBrowseTest do
     } do
       {:ok, _} = Cart.add(member, v.id, 2)
 
-      {:ok, view, _html} = live(conn, ~p"/shop")
-      render_async(view)
+      {:ok, view, _html} = live_shop_page(conn, ~p"/shop")
 
       assert has_element?(view, "#cart-pill[href='/shop/cart']")
       assert has_element?(view, "#cart-dock-count-2", "2")
