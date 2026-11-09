@@ -63,10 +63,11 @@ defmodule YscWeb.EventsLive do
                 Contact Us <.icon name="hero-arrow-right" class="w-4 h-4 ml-1" />
               </.link>
             </.feature_card>
-            <div class="p-6 md:p-8 bg-white rounded-xl border border-zinc-100">
-              <h4 class="text-sm text-zinc-500 mb-3 md:mb-4 type-eyebrow">
-                Stay Connected
-              </h4>
+            <.feature_card
+              id="events-stay-connected"
+              title="Stay Connected"
+              title_tone={:surface}
+            >
               <p class="text-base text-zinc-600 leading-relaxed mb-4">
                 Read club news, or join the groups where members post informal get-togethers.
               </p>
@@ -132,7 +133,7 @@ defmodule YscWeb.EventsLive do
                   </div>
                 </div>
               </div>
-            </div>
+            </.feature_card>
           </aside>
         </div>
       </div>
