@@ -42,6 +42,15 @@ defmodule YscWeb.PublicTicketControllerTest do
              |> response(404)
     end
 
+    test "404s on a multi-ticket token, which doesn't identify one ticket", %{
+      conn: conn
+    } do
+      %{tickets: tickets} = granted_tickets(2)
+      token = AccessToken.sign_tickets(Enum.map(tickets, & &1.id))
+
+      assert conn |> get("/t/#{token}/qr.png") |> response(404)
+    end
+
     test "404s once the ticket is no longer confirmed", %{conn: conn} do
       %{tickets: [ticket]} = granted_tickets()
 
@@ -63,6 +72,39 @@ defmodule YscWeb.PublicTicketControllerTest do
 
     test "404 when the wallet isn't configured", %{conn: conn} do
       %{tickets: [ticket]} = granted_tickets()
+      token = AccessToken.sign_ticket(ticket.id)
+
+      assert conn |> get("/t/#{token}/apple") |> response(404)
+      assert conn |> get("/t/#{token}/google") |> response(404)
+    end
+
+    test "404 on an order-wide token, which doesn't identify one ticket", %{
+      conn: conn
+    } do
+      %{order: order} = granted_tickets()
+      token = AccessToken.sign_order(order.id)
+
+      assert conn |> get("/t/#{token}/apple") |> response(404)
+      assert conn |> get("/t/#{token}/google") |> response(404)
+    end
+
+    test "404 on a multi-ticket token, which doesn't identify one ticket", %{
+      conn: conn
+    } do
+      %{tickets: tickets} = granted_tickets(2)
+      token = AccessToken.sign_tickets(Enum.map(tickets, & &1.id))
+
+      assert conn |> get("/t/#{token}/apple") |> response(404)
+      assert conn |> get("/t/#{token}/google") |> response(404)
+    end
+
+    test "404 once the ticket is no longer confirmed", %{conn: conn} do
+      %{tickets: [ticket]} = granted_tickets()
+
+      ticket
+      |> Ecto.Changeset.change(status: :cancelled)
+      |> Ysc.Repo.update!()
+
       token = AccessToken.sign_ticket(ticket.id)
 
       assert conn |> get("/t/#{token}/apple") |> response(404)

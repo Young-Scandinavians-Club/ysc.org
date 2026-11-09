@@ -39,7 +39,7 @@ defmodule Ysc.Newsletter.Notice do
         changeset
 
       body when is_binary(body) ->
-        scrubbed = HtmlSanitizeEx.Scrubber.scrub(body, Ysc.TrixScrubber)
+        scrubbed = Ysc.Html.Trix.scrub(body)
         put_change(changeset, :body, scrubbed)
 
       _ ->

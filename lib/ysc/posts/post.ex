@@ -181,7 +181,7 @@ defmodule Ysc.Posts.Post do
         put_change(
           changeset,
           :rendered_body,
-          HtmlSanitizeEx.Scrubber.scrub(raw, Ysc.TrixScrubber)
+          Ysc.Html.Trix.scrub(raw)
         )
 
       _ ->

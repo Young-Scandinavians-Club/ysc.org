@@ -3301,6 +3301,135 @@ defmodule YscWeb.AdminComponents do
     do: "bg-white border-zinc-200"
 
   # ---------------------------------------------------------------------------
+  # admin_dashboard_panel
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Bordered dashboard section used on the admin home page and its ghost preview.
+
+  Unlike `admin_form_card` (rounded-lg, compact title) and `admin_table_card`
+  (header bar + overflow), this is the dashboard's `rounded-sm` + `shadow-xs`
+  panel with an optional title row and "View all" action.
+
+  - `padding={:compact}` — `p-5` (sidebar financials, newsletters, discussions)
+  - `padding={:comfortable}` — `p-5 sm:p-6` (events timeline, applications)
+  - `title_style={:section}` — `h2` `text-lg type-subhead` with a header divider
+  - `title_style={:eyebrow}` — compact `type-eyebrow` title, no divider
+
+  Pass `navigate` for a LiveView action link; omit it and keep `action` for a
+  static ghost preview label. Omit `title` when the section has a custom header
+  (icon + badge, subtitle) and put that markup in the inner block.
+
+  ## Examples
+
+      <.admin_dashboard_panel
+        id="dashboard-events-timeline"
+        title="Upcoming events"
+        padding={:comfortable}
+        navigate={~p"/admin/events"}
+        action="View all"
+      >
+        ...
+      </.admin_dashboard_panel>
+
+      <.admin_dashboard_panel
+        id="dashboard-recent-discussions"
+        title="Recent discussions"
+        title_style={:eyebrow}
+        title_level={3}
+        navigate={~p"/admin/posts"}
+        action="View all posts"
+        class="mb-8"
+      >
+        ...
+      </.admin_dashboard_panel>
+  """
+  attr :id, :string, default: nil
+  attr :title, :string, default: nil
+
+  attr :title_style, :atom,
+    default: :section,
+    values: [:section, :eyebrow],
+    doc:
+      "`:section` is the events-timeline heading; `:eyebrow` is the compact discussions heading"
+
+  attr :title_level, :integer,
+    default: 2,
+    values: [2, 3],
+    doc: "Heading level for `title` (`h2` by default, `h3` for nested panels)"
+
+  attr :padding, :atom,
+    default: :compact,
+    values: [:compact, :comfortable]
+
+  attr :navigate, :any,
+    default: nil,
+    doc: "LiveView path for the action link. Omit for a static action label."
+
+  attr :action, :string,
+    default: nil,
+    doc:
+      "Title-row CTA, e.g. `View all`. Rendered as a link when `navigate` is set."
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the panel"
+
+  slot :inner_block, required: true
+
+  def admin_dashboard_panel(assigns) do
+    title_class =
+      case assigns.title_style do
+        :section -> "text-lg text-zinc-900 type-subhead"
+        :eyebrow -> "text-sm text-zinc-900 type-eyebrow"
+      end
+
+    assigns =
+      assigns
+      |> assign(:header_divider?, assigns.title_style == :section)
+      |> assign(:title_class, title_class)
+      |> assign(:show_header?, not is_nil(assigns.title))
+
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "bg-white rounded-sm border border-zinc-200 shadow-xs",
+        @padding == :compact && "p-5",
+        @padding == :comfortable && "p-5 sm:p-6",
+        @class
+      ]}
+    >
+      <div
+        :if={@show_header?}
+        class={[
+          "flex items-center justify-between",
+          @header_divider? && "mb-6 border-b border-zinc-100 pb-3",
+          !@header_divider? && "mb-4"
+        ]}
+      >
+        <h2 :if={@title_level == 2} class={@title_class}>{@title}</h2>
+        <h3 :if={@title_level == 3} class={@title_class}>{@title}</h3>
+        <.link
+          :if={@navigate && @action}
+          navigate={@navigate}
+          class="text-xs font-bold text-blue-600 hover:underline shrink-0"
+        >
+          {@action}
+        </.link>
+        <span
+          :if={!@navigate && @action}
+          class="text-xs font-bold text-blue-600 shrink-0"
+        >
+          {@action}
+        </span>
+      </div>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_property_occupancy_card
   # ---------------------------------------------------------------------------
 

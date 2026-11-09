@@ -8,6 +8,8 @@ defmodule Ysc.Posts.CommentNotifications do
 
   Every job has an idempotency key, so retries never send twice.
   """
+  import Ecto.Query
+
   require Ysc.Logging
 
   alias Ysc.Accounts.User
@@ -19,6 +21,8 @@ defmodule Ysc.Posts.CommentNotifications do
     PostCommentBoardNotification,
     PostCommentReplyNotification
   }
+
+  @reply_author_fields [:id, :email, :first_name, :last_name]
 
   @doc """
   Queues the emails for `comment`, which `author` just posted on `post`.
@@ -76,10 +80,24 @@ defmodule Ysc.Posts.CommentNotifications do
   # root comment; if it targets a reply, walk up to that reply's root.
   defp root_comment(comment_id, post_id) do
     case Repo.get_by(Comment, id: comment_id, post_id: post_id) do
-      %Comment{comment_id: nil} = root -> Repo.preload(root, :author)
-      %Comment{comment_id: parent_id} -> root_comment(parent_id, post_id)
-      nil -> nil
+      %Comment{comment_id: nil} = root ->
+        Repo.preload(root, author: reply_author_query())
+
+      %Comment{comment_id: parent_id} ->
+        root_comment(parent_id, post_id)
+
+      nil ->
+        nil
     end
+  end
+
+  defp reply_author_query do
+    from(u in User, select: struct(u, ^@reply_author_fields))
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    reply_author_query()
   end
 
   defp safely(comment, fun) do

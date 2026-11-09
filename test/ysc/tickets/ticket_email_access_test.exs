@@ -8,6 +8,7 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
 
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.TicketAccessFixtures
 
   alias Ysc.Events
   alias Ysc.Repo
@@ -94,6 +95,148 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
 
       assert {:error, :invalid} =
                AccessToken.verify_ticket(AccessToken.sign_order("o1"))
+
+      assert {:error, :invalid} =
+               AccessToken.verify_ticket(AccessToken.sign_tickets(["t1", "t2"]))
+    end
+
+    test "rejects payloads that are not an order, ticket, or tickets list" do
+      # Same salt as AccessToken — a forged shape must not become a valid
+      # sign-in-free ticket grant if verify/1 ever starts returning the
+      # Phoenix.Token payload unchecked.
+      assert {:error, :invalid} =
+               AccessToken.verify(sign_raw({:admin, "user-id"}))
+
+      assert {:error, :invalid} =
+               AccessToken.verify(sign_raw({:order, 123}))
+
+      assert {:error, :invalid} =
+               AccessToken.verify(sign_raw({:tickets, "t1"}))
+    end
+  end
+
+  describe "get_check_in_ticket/1" do
+    test "returns a confirmed event ticket" do
+      %{tickets: [ticket]} = granted_tickets()
+
+      loaded = Tickets.get_check_in_ticket(ticket.id)
+      assert loaded.id == ticket.id
+    end
+
+    test "rejects cancelled and pending tickets" do
+      %{tickets: [ticket]} = granted_tickets()
+
+      ticket
+      |> Ecto.Changeset.change(status: :cancelled)
+      |> Repo.update!()
+
+      assert is_nil(Tickets.get_check_in_ticket(ticket.id))
+
+      ticket
+      |> Ecto.Changeset.change(status: :pending)
+      |> Repo.update!()
+
+      assert is_nil(Tickets.get_check_in_ticket(ticket.id))
+    end
+
+    test "rejects a confirmed donation ticket" do
+      %{user: user, event: event} = granted_tickets()
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      donation =
+        %Ysc.Events.Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      assert is_nil(Tickets.get_check_in_ticket(donation.id))
+    end
+  end
+
+  describe "get_ticket_order_for_access/1" do
+    test "an order payload returns every ticket in the order" do
+      %{order: order, tickets: tickets} = granted_tickets(2)
+
+      loaded = Tickets.get_ticket_order_for_access({:order, order.id})
+
+      assert loaded.id == order.id
+
+      assert Enum.sort(Enum.map(loaded.tickets, & &1.id)) ==
+               Enum.sort(Enum.map(tickets, & &1.id))
+    end
+
+    test "a tickets payload returns only those tickets from one order" do
+      %{tickets: [keep, drop, also_keep]} = granted_tickets(3)
+
+      loaded =
+        Tickets.get_ticket_order_for_access({:tickets, [keep.id, also_keep.id]})
+
+      ids = Enum.map(loaded.tickets, & &1.id)
+      assert keep.id in ids
+      assert also_keep.id in ids
+      refute drop.id in ids
+    end
+
+    test "tickets from two different orders do not resolve" do
+      %{tickets: [a]} = granted_tickets(1)
+      %{tickets: [b]} = granted_tickets(1)
+
+      assert is_nil(
+               Tickets.get_ticket_order_for_access({:tickets, [a.id, b.id]})
+             )
+    end
+
+    test "tickets payload is one ticket_orders round-trip without fat columns" do
+      %{tickets: [keep, _drop, also_keep], event: event, order: order} =
+        granted_tickets(3)
+
+      event
+      |> Ecto.Changeset.change(%{
+        raw_details: "<p>guest ticket access must not load this</p>",
+        rendered_details: "<p>guest ticket access must not load this</p>"
+      })
+      |> Repo.update!()
+
+      payload = {:tickets, [keep.id, also_keep.id]}
+
+      {loaded, order_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_access(payload) end,
+          pattern: ~r/FROM ["']?ticket_orders["']?/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_access(payload) end,
+          pattern: ~r/hashed_password|board_bio|raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      {_loaded, order_id_lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Tickets.get_ticket_order_for_access(payload) end,
+          pattern: ~r/SELECT t0\."ticket_order_id" FROM "tickets"/i,
+          caller_pids: [self()]
+        )
+
+      assert loaded.id == order.id
+
+      assert Enum.sort(Enum.map(loaded.tickets, & &1.id)) ==
+               Enum.sort([keep.id, also_keep.id])
+
+      assert order_queries == 1
+      assert order_id_lookups == 0
+      assert fat_cols == 0
+      assert loaded.event.raw_details == nil
+      assert loaded.event.rendered_details == nil
     end
   end
 
@@ -278,5 +421,9 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
     |> Map.fetch!(:path)
     |> String.replace_prefix("/t/", "")
     |> AccessToken.verify()
+  end
+
+  defp sign_raw(payload) do
+    Phoenix.Token.sign(YscWeb.Endpoint, "ticket_access_v1", payload)
   end
 end

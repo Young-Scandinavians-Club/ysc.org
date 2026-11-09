@@ -31,10 +31,12 @@ defmodule YscWeb.EventPhotoUploadLive do
         max_entries: 30,
         max_file_size: Limits.max_upload_bytes(),
         auto_upload: true,
-        # Direct-to-S3 upload: with files up to 20 GB, buffering through the
-        # LiveView socket onto local disk isn't viable, and a locally-staged
-        # file wouldn't be visible to the Oban job if it runs on a different
-        # app instance. S3 is durable and shared across every instance.
+        # Direct-to-S3 upload: videos can be up to 20 GB, so buffering
+        # through the LiveView socket onto local disk isn't viable, and a
+        # locally-staged file wouldn't be visible to the Oban job if it
+        # runs on a different app instance. S3 is durable and shared across
+        # every instance. The POST policy itself is sized per file in
+        # EventPhotoUpload.presign/3 (Finding 100).
         external: fn entry, socket ->
           YscWeb.EventPhotoUpload.presign(
             entry,
@@ -306,6 +308,12 @@ defmodule YscWeb.EventPhotoUploadLive do
   end
 
   def handle_event("cancel-upload", %{"ref" => ref}, socket) do
+    # Finding 100: auto_upload already POSTed to public-read S3. Dropping
+    # the LiveView entry without deleting the object leaves an orphan.
+    if key = staged_upload_key(socket, ref) do
+      delete_staged_upload(key)
+    end
+
     {:noreply,
      socket
      |> cancel_upload(:photos, ref)
@@ -422,6 +430,19 @@ defmodule YscWeb.EventPhotoUploadLive do
 
   # The Oban insert itself failed (e.g. DB hiccup) before any worker could run,
   # so nothing else will ever clean up this orphaned upload — remove it here.
+  defp staged_upload_key(socket, ref) when is_binary(ref) do
+    metas =
+      case socket.assigns.uploads do
+        %{photos: %{entry_refs_to_metas: metas}} -> metas
+        _ -> %{}
+      end
+
+    case Map.get(metas, ref) do
+      %{key: key} when is_binary(key) and key != "" -> key
+      _ -> nil
+    end
+  end
+
   defp delete_staged_upload(s3_key) do
     case S3Config.bucket_name()
          |> ExAws.S3.delete_object(s3_key)

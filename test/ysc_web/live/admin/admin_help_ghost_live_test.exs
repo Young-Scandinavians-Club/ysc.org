@@ -39,6 +39,8 @@ defmodule YscWeb.AdminHelpGhostLiveTest do
     assert has_element?(view, "#volunteer-stats-row", "Upcoming Events")
     assert has_element?(view, "#volunteer-stats-row", "News & Posts")
     assert has_element?(view, "#dashboard-events-timeline", "Upcoming events")
+    assert has_element?(view, "#dashboard-events-timeline", "View all")
+    refute has_element?(view, "#dashboard-events-timeline a")
 
     assert has_element?(
              view,
@@ -51,6 +53,9 @@ defmodule YscWeb.AdminHelpGhostLiveTest do
              "#dashboard-recent-discussions",
              "Recent discussions"
            )
+
+    assert has_element?(view, "#dashboard-recent-discussions", "View all posts")
+    refute has_element?(view, "#dashboard-recent-discussions a")
   end
 
   test "collapsed sidebar query param renders narrow sidebar", %{conn: conn} do

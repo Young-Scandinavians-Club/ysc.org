@@ -191,22 +191,25 @@ defmodule Ysc.MixProject do
       # Ysc.Tzdata.HttpClient). We do not call hackney APIs, pin cacerts,
       # follow redirects with basic_auth, use proxy_auth_fun, HTTP/3, or
       # WebTransport. 4.8.x is pooling / HTTP/2 / HTTP/3 correctness plus
-      # h2 0.12.5, certifi 2.18.0 (drops compromised eMudhra CAs),
-      # webtransport 0.4.8, and quic 2.1.2. 4.9.1 is docs-only over 4.9.0.
-      # 4.9.0: max_body_size (default 512 MiB, also as 1.x max_body) stops
-      # unbounded buffered / auto_decompress bodies with
-      # {error, body_too_large} (EEF-CVE-2026-97200 HIGH); cacerts /
-      # cacertfile actually restrict trust (EEF-CVE-2026-115693 CRITICAL);
-      # redirects keep basic_auth/cookie only on same scheme+host+port
-      # unless location_trusted (EEF-CVE-2026-113440 MEDIUM); percent-
-      # encoded bracketed IPv6 and trailing-dot IP literals are refused
-      # like other IP literals (EEF-CVE-2026-115700 MEDIUM); proxy_auth_fun
-      # values with CR/LF/NUL return
-      # {error, {proxy_auth_error, invalid_header}} (EEF-CVE-2026-112880
-      # LOW). Also HTTPS CONNECT proxy cert checks, requester-side pool
-      # dials, and max_per_host slot accounting. Requires webtransport
-      # ~> 0.4.8, certifi ~> 2.18.0, quic ~> 2.1.2, h2 ~> 0.12.5.
-      {:hackney, "~> 4.9.1", override: true},
+      # h2 0.12.5, certifi 2.18.0 (drops compromised eMudhra CAs).
+      # 4.9.1 is docs-only over 4.9.0 (max_body_size 512 MiB /
+      # {error, body_too_large}, pinned CA trust, same-origin redirects,
+      # IP-literal SSRF spellings, proxy_auth_fun CR/LF/NUL).
+      # 4.10.0: HTTP/1.1 chunked max_body_size is checked as chunk data
+      # arrives (a single huge chunk used to bypass the cap until the
+      # whole chunk was buffered); chunk-size lines > 4096 bytes or more
+      # than 16 hex digits are refused. HTTP/2 and HTTP/3 wait for a free
+      # stream (checkout_timeout) instead of failing at the peer's
+      # concurrent-stream limit; a GOAWAY / refused / rejected request is
+      # retried once on a fresh connection (function bodies are not sent
+      # twice). Function request bodies work on HTTP/2 and HTTP/3.
+      # extras: h2 0.15.0 (MadeYouReset + SETTINGS flood), quic 2.6.1
+      # (HTTP/3 header-block CPU DoS, GHSA-224p-pchv-5r3r), webtransport
+      # 0.5.3 (draft-17/16; unused), ssl_verify_fun 1.1.9 (non-ASCII
+      # dNSName). We do not use HTTP/3, WebTransport, unix sockets,
+      # cookies/1, or function request bodies. Requires webtransport
+      # ~> 0.5.3, certifi ~> 2.18.0, quic ~> 2.6.1, h2 ~> 0.15.0.
+      {:hackney, "~> 4.10.0", override: true},
       # 0.12.0: serve_socket/2 for embedders that own the TLS listener; handshake
       # now runs in the per-connection process. We do not start h2 servers;
       # hackney talks to h2_connection client APIs only, so those are unused.
@@ -226,11 +229,25 @@ defmodule Ysc.MixProject do
       # 0.12.5: optional connection_window_size (65535..2147483647,
       # default still 65535) raises the connection receive window via
       # a stream-0 WINDOW_UPDATE after SETTINGS. We do not start h2
-      # servers. hackney 4.9.1 now passes connection_window_size =>
+      # servers. hackney 4.10.0 still passes connection_window_size =>
       # 32 MiB (and initial_window_size 8 MiB) so HTTP/2 downloads
       # over slow links are not stuck at 64 KB/RTT. Invalid values
       # return {error, {invalid_option, {connection_window_size, V}}}.
-      {:h2, "~> 0.12.5", override: true},
+      # 0.12.6: extension settings by number in the settings map are
+      # actually sent (WebTransport). Unused.
+      # 0.12.7: MadeYouReset (CVE-2025-8671) caps server stream resets
+      # per second. We do not start h2 servers.
+      # 0.13.0: SETTINGS flood (CVE-2019-9515) — at most 20 SETTINGS
+      # frames per second from a peer, then the connection closes.
+      # Applies to clients too. Optional notify_peer_settings /
+      # connection_info/1 / report_peer_settings are off by default.
+      # 0.14.0: peercert/1; server owns its listen socket; stop_server/1
+      # waits. We do not start h2 servers in production.
+      # 0.15.0: optional notify_stream_available for clients (off by
+      # default). Public client APIs unchanged. Pin the floor so
+      # hackney's ~> 0.15.0 cannot resolve below the SETTINGS-flood
+      # fix.
+      {:h2, "~> 0.15.0", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},

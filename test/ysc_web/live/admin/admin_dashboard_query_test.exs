@@ -214,4 +214,54 @@ defmodule YscWeb.AdminDashboardQueryTest do
       assert html_cols == 0
     end
   end
+
+  describe "recent discussion comments" do
+    setup %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      %{conn: log_in_user(conn, admin), admin: admin}
+    end
+
+    test "dashboard comments omit post raw_body and still show author names", %{
+      conn: conn,
+      admin: admin
+    } do
+      marker = "dash-#{System.unique_integer([:positive])}"
+
+      {:ok, post} =
+        Ysc.Posts.create_post(
+          %{
+            "title" => "Dashboard #{marker}",
+            "body" => "<p>secret toast #{marker}</p>",
+            "url_name" => "dash-comments-#{marker}",
+            "state" => "published",
+            "published_on" => DateTime.truncate(DateTime.utc_now(), :second)
+          },
+          admin
+        )
+
+      commenter =
+        user_fixture(%{first_name: "Dash", last_name: "Commenter#{marker}"})
+
+      Ysc.Posts.add_comment_to_post(
+        %{"post_id" => post.id, "text" => "Please review #{marker}"},
+        commenter
+      )
+
+      {html, raw_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, _html} = live(conn, ~p"/admin")
+            render_async(view)
+            render(view)
+          end,
+          pattern: ~r/FROM "posts".*raw_body|raw_body.*FROM "posts"/is
+        )
+
+      assert html =~ "Dashboard #{marker}"
+      assert html =~ "Please review #{marker}"
+      assert html =~ "Dash Commenter#{marker}"
+      refute html =~ "secret toast #{marker}"
+      assert raw_cols == 0
+    end
+  end
 end

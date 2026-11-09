@@ -455,6 +455,45 @@ defmodule YscWeb.AuthControllerTest do
 
       assert get_session(conn, :user_token)
     end
+
+    test "accepts the Google v2 verified_email flag", %{conn: conn} do
+      user = user_fixture(%{state: "active", email: "v2-verified@example.com"})
+
+      auth = %{
+        build_oauth_auth(user.email)
+        | extra: %Ueberauth.Auth.Extra{
+            raw_info: %{
+              user: %{"email" => user.email, "verified_email" => true}
+            }
+          }
+      }
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(:ueberauth_auth, auth)
+        |> AuthController.callback(%{})
+
+      assert get_session(conn, :user_token)
+    end
+
+    test "accepts the string true Google verification flag", %{conn: conn} do
+      user =
+        user_fixture(%{state: "active", email: "string-true@example.com"})
+
+      conn =
+        conn
+        |> init_test_session(%{})
+        |> fetch_flash()
+        |> assign(
+          :ueberauth_auth,
+          google_auth_with_verified_flag(user.email, "true")
+        )
+        |> AuthController.callback(%{})
+
+      assert get_session(conn, :user_token)
+    end
   end
 
   describe "callback/2 - rejected or inactive users" do

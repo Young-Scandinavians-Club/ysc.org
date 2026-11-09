@@ -242,16 +242,13 @@ defmodule YscWeb.AdminGhostComponents do
         </.admin_dashboard_link_card>
       </div>
 
-      <div
+      <.admin_dashboard_panel
         id="dashboard-events-timeline"
-        class="bg-white rounded-sm border border-zinc-200 p-5 sm:p-6 shadow-xs mb-8"
+        title="Upcoming events"
+        padding={:comfortable}
+        action="View all"
+        class="mb-8"
       >
-        <div class="flex items-center justify-between mb-6 border-b border-zinc-100 pb-3">
-          <h2 class="text-lg text-zinc-900 type-subhead">
-            Upcoming events
-          </h2>
-          <span class="text-xs font-bold text-blue-600">View all</span>
-        </div>
         <ul class="relative border-l-2 border-zinc-200 ml-2.5 sm:ml-3 space-y-0">
           <li
             :for={{event, idx} <- Enum.with_index(@events)}
@@ -307,18 +304,16 @@ defmodule YscWeb.AdminGhostComponents do
             </div>
           </li>
         </ul>
-      </div>
+      </.admin_dashboard_panel>
 
-      <div
+      <.admin_dashboard_panel
         id="dashboard-recent-discussions"
-        class="bg-white rounded-sm border border-zinc-200 p-5 shadow-xs mb-4"
+        title="Recent discussions"
+        title_style={:eyebrow}
+        title_level={3}
+        action="View all posts"
+        class="mb-4"
       >
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm text-zinc-900 type-eyebrow">
-            Recent discussions
-          </h3>
-          <span class="text-xs font-bold text-blue-600">View all posts</span>
-        </div>
         <ul class="space-y-3">
           <li
             :for={discussion <- @discussions}
@@ -337,7 +332,7 @@ defmodule YscWeb.AdminGhostComponents do
             </div>
           </li>
         </ul>
-      </div>
+      </.admin_dashboard_panel>
     </div>
     """
   end

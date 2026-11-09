@@ -194,6 +194,15 @@ defmodule YscWeb.TicketQrLiveTest do
       html = render_async(view)
 
       assert html =~ "Show this QR code to event staff"
+      refute html =~ "Scan to check in"
+
+      ticket = hd(order.tickets)
+
+      assert has_element?(
+               view,
+               "#ticket-qr-check-in-hint-#{ticket.reference_id}",
+               "Show this to staff"
+             )
     end
 
     test "renders order reference link", %{

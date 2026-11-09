@@ -8,8 +8,6 @@ defmodule YscWeb.EventDetailsLive do
   @availability_refresh_debounce_ms 300
   @ticket_checkout_timeout_message "Your ticket checkout timed out. Choose your tickets again if any are still available. If you see a charge, email info@ysc.org with the date and amount."
 
-  alias HtmlSanitizeEx.Scrubber
-
   alias Ysc.Events
 
   alias Ysc.Events.{
@@ -6371,7 +6369,7 @@ defmodule YscWeb.EventDetailsLive do
       Map.get(event, :rendered_details) || Map.get(event, :raw_details) || ""
 
     html
-    |> Scrubber.scrub(Ysc.TrixScrubber)
+    |> Ysc.Html.Trix.scrub()
     |> Ysc.Html.Links.open_in_new_tab()
   end
 

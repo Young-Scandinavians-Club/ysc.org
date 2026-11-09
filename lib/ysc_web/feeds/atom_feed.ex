@@ -123,8 +123,8 @@ defmodule YscWeb.Feeds.AtomFeed do
     # Public `/feeds/*.atom` is unauthenticated. Event/post bodies are stored
     # after TrixScrubber on the editor path, but leftover LiveView events have
     # previously persisted client HTML (Finding 40/96). Re-scrub on emit.
-    case HtmlSanitizeEx.Scrubber.scrub(html, Ysc.TrixScrubber) do
-      scrubbed when scrubbed in [nil, ""] -> entry
+    case Ysc.Html.Trix.scrub(html) do
+      "" -> entry
       scrubbed -> Entry.content(entry, scrubbed, type: "html")
     end
   end

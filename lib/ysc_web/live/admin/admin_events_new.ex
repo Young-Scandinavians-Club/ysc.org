@@ -34,8 +34,6 @@ defmodule YscWeb.AdminEventsNewLive do
   alias YscWeb.Emails.EventUpdateNotification
   alias YscWeb.Sms.Segment
 
-  alias HtmlSanitizeEx.Scrubber
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -2524,7 +2522,7 @@ defmodule YscWeb.AdminEventsNewLive do
         socket
       ) do
     current_form = socket.assigns.update_form.params || %{}
-    rendered = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+    rendered = Ysc.Html.Trix.scrub(raw_body)
 
     updated_params =
       Map.merge(current_form, %{
@@ -2551,7 +2549,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     rendered =
       raw_body
-      |> Scrubber.scrub(Ysc.TrixScrubber)
+      |> Ysc.Html.Trix.scrub()
       |> Ysc.Html.Links.open_in_new_tab()
 
     update_attrs = %{"raw_details" => raw_body, "rendered_details" => rendered}
@@ -2623,7 +2621,7 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("send-event-update", %{"update" => params}, socket) do
     event = socket.assigns.event
     raw_body = params["raw_body"] || ""
-    rendered_body = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+    rendered_body = Ysc.Html.Trix.scrub(raw_body)
     send_sms = params["send_sms"] == "true"
 
     if String.trim(raw_body) == "" do
@@ -3591,7 +3589,7 @@ defmodule YscWeb.AdminEventsNewLive do
       event = socket.assigns.event
 
       rendered_body =
-        params["rendered_body"] || Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+        params["rendered_body"] || Ysc.Html.Trix.scrub(raw_body)
 
       preview_update = %EventUpdate{
         title: params["title"],

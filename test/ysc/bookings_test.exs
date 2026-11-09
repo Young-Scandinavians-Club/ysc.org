@@ -1647,6 +1647,25 @@ defmodule Ysc.BookingsTest do
       assert is_list(bookings)
     end
 
+    test "list_paginated_bookings/2 treats LIKE wildcards in the query literally" do
+      user = user_fixture(%{first_name: "Wildcard", last_name: "Booking"})
+      booking = booking_fixture(%{user_id: user.id})
+      params = %{page: 1, page_size: 50}
+
+      # Without escape_like/1, "%" dumps every cabin booking (member PII).
+      for wildcard <- ["%", "_", "%%"] do
+        assert {:ok, {rows, _meta}} =
+                 Bookings.list_paginated_bookings(params, wildcard)
+
+        refute Enum.any?(rows, &(&1.id == booking.id))
+      end
+
+      assert {:ok, {rows, _meta}} =
+               Bookings.list_paginated_bookings(params, user.email)
+
+      assert Enum.any?(rows, &(&1.id == booking.id))
+    end
+
     test "list_user_bookings_paginated/2 returns user's bookings" do
       user = user_fixture()
       _booking1 = booking_fixture(%{user_id: user.id})
