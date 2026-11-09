@@ -140,4 +140,50 @@ defmodule YscWeb.PostLiveQueryTest do
       assert fat_cols == 0
     end
   end
+
+  describe "comment loading" do
+    test "guest connect does not query comments", %{conn: conn} do
+      author = user_fixture()
+      post = post_fixture(author, %{title: "Guest Comment Skip"})
+
+      Posts.add_comment_to_post(
+        %{"post_id" => post.id, "text" => "Hidden from guests"},
+        author
+      )
+
+      {_result, comment_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
+            render_async(view)
+          end,
+          pattern: ~r/FROM "comments"/i
+        )
+
+      assert comment_cols == 0
+    end
+
+    test "signed-in connect still shows comment author and body", %{
+      conn: conn
+    } do
+      author = user_fixture(%{first_name: "Commenter", last_name: "Member"})
+      post = post_fixture(author, %{title: "Member Comments"})
+      marker = "visible-#{System.unique_integer([:positive])}"
+
+      Posts.add_comment_to_post(
+        %{"post_id" => post.id, "text" => "Hello #{marker}"},
+        author
+      )
+
+      conn = log_in_user(conn, author)
+
+      {:ok, view, _html} = live(conn, ~p"/posts/#{post.id}")
+      render_async(view)
+      html = render(view)
+
+      assert html =~ "Hello #{marker}"
+      assert html =~ "Commenter"
+      assert has_element?(view, "#primary-post-comment")
+    end
+  end
 end

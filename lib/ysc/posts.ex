@@ -65,6 +65,8 @@ defmodule Ysc.Posts do
     :current_avatar_id
   ]
   @public_post_author_name_fields [:id, :first_name, :last_name]
+  # Admin dashboard "recent discussions": title + permalink. Omits `raw_body`.
+  @latest_comment_post_fields [:id, :title, :url_name, :state]
   @public_post_avatar_fields [
     :id,
     :user_id,
@@ -455,6 +457,53 @@ defmodule Ysc.Posts do
     from(u in User, select: struct(u, ^@public_post_author_name_fields))
   end
 
+  defp comment_author_query do
+    from(u in User, select: struct(u, ^@public_post_author_fields))
+  end
+
+  defp latest_comment_post_query do
+    from(p in Post, select: struct(p, ^@latest_comment_post_fields))
+  end
+
+  defp comments_for_post_query(post_id) do
+    from(c in Comment,
+      where: c.post_id == ^post_id,
+      order_by: [desc: :inserted_at]
+    )
+  end
+
+  defp latest_comments_query(limit) do
+    from(c in Comment,
+      join: p in Post,
+      on: c.post_id == p.id,
+      where: p.state == :published,
+      preload: [
+        author: ^public_post_author_name_query(),
+        post: ^latest_comment_post_query()
+      ],
+      order_by: [desc: c.inserted_at],
+      limit: ^limit
+    )
+  end
+
+  defp preload_comment_assocs(nil, _preloads), do: nil
+  defp preload_comment_assocs(comments, []), do: comments
+
+  defp preload_comment_assocs(comments, preloads) do
+    Repo.preload(comments, slim_comment_preloads(preloads))
+  end
+
+  defp slim_comment_preloads(preloads) when is_list(preloads) do
+    Enum.map(preloads, &slim_comment_preload/1)
+  end
+
+  defp slim_comment_preload(:author), do: {:author, comment_author_query()}
+
+  defp slim_comment_preload({:author, :current_avatar}),
+    do: {:author, public_post_author_query()}
+
+  defp slim_comment_preload(other), do: other
+
   defp public_post_avatar_query do
     from(a in Avatar, select: struct(a, ^@public_post_avatar_fields))
   end
@@ -617,35 +666,28 @@ defmodule Ysc.Posts do
   end
 
   def get_comment!(comment_id, preloads \\ []) do
-    Repo.one(
-      from c in Comment,
-        where: c.id == ^comment_id
-    )
-    |> Repo.preload(preloads)
+    comment = Repo.one(from(c in Comment, where: c.id == ^comment_id))
+    preload_comment_assocs(comment, preloads)
   end
 
   def get_comments_for_post(post_id, preloads \\ []) do
-    Repo.all(
-      from c in Comment,
-        where: c.post_id == ^post_id,
-        order_by: [{:desc, :inserted_at}]
-    )
-    |> Repo.preload(preloads)
+    post_id
+    |> comments_for_post_query()
+    |> Repo.all()
+    |> preload_comment_assocs(preloads)
   end
 
   @doc """
-  Gets the latest comments across all posts with author and post information.
+  Gets the latest comments across published posts for the admin dashboard.
+
+  Author is first/last name only (no `hashed_password`). The post select is
+  the permalink fields the dashboard renders — not `raw_body` or the unused
+  post author.
   """
   def get_latest_comments(limit \\ 5) do
-    Repo.all(
-      from c in Comment,
-        join: p in Post,
-        on: c.post_id == p.id,
-        where: p.state == :published,
-        preload: [:author, post: [:author]],
-        order_by: [{:desc, c.inserted_at}],
-        limit: ^limit
-    )
+    limit
+    |> latest_comments_query()
+    |> Repo.all()
   end
 
   def sort_comments_for_render(comments) do
@@ -923,5 +965,15 @@ defmodule Ysc.Posts do
   @doc false
   def ci_query_explain_staff_preview_post_query do
     staff_preview_post_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_comments_for_post_query do
+    comments_for_post_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_latest_comments_query do
+    latest_comments_query(5)
   end
 end
