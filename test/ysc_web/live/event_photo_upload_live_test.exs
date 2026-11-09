@@ -92,6 +92,42 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
     assert message =~ "Please try again"
   end
 
+  test "Finding 100: image presign policy is the photo cap, not 20 GB", %{
+    conn: conn,
+    upload_path: path
+  } do
+    {:ok, view, _html} = live(conn, path)
+
+    upload =
+      file_input(view, "#event-photo-upload-form", :photos, [
+        %{
+          last_modified: System.system_time(:millisecond),
+          name: "party.jpg",
+          content: @tiny_png,
+          type: "image/jpeg"
+        }
+      ])
+
+    assert {:ok, %{entries: entries}} = preflight_upload(upload)
+
+    meta =
+      entries
+      |> Map.values()
+      |> List.first()
+
+    fields = meta[:fields] || meta["fields"]
+    policy_b64 = fields["policy"] || fields[:policy]
+    policy = policy_b64 |> Base.decode64!() |> Jason.decode!()
+
+    assert Enum.any?(policy["conditions"], fn
+             ["content-length-range", 0, size] ->
+               size == Ysc.GooglePhotos.Limits.max_photo_bytes()
+
+             _ ->
+               false
+           end)
+  end
+
   test "flags an unsupported file extension immediately and blocks submit", %{
     conn: conn,
     upload_path: path

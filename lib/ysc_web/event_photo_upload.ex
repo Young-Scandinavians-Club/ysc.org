@@ -16,15 +16,25 @@ defmodule YscWeb.EventPhotoUpload do
   Presigns a direct event photo/video upload for the given collection.
   """
   def presign(entry, socket, collection_id) when is_binary(collection_id) do
-    ext = entry.client_name |> Path.extname() |> String.downcase()
-    key = "event_photo_uploads/#{collection_id}/#{Ecto.ULID.generate()}#{ext}"
+    filename = entry.client_name || ""
 
-    DirectUpload.presign(socket,
-      kind: :media,
-      key: key,
-      content_type: Limits.content_type_for_filename(entry.client_name),
-      max_file_size: socket.assigns.uploads.photos.max_file_size,
-      expires_in: :timer.hours(2)
-    )
+    # Finding 100: the LiveView `max_file_size` is the video cap (20 GB) so
+    # a 4 GB `.jpg` can otherwise land on the public-read media bucket
+    # before `Limits.validate_upload/2` runs. Bind the S3 POST policy to
+    # the per-type limit. Refuse to mint a policy for unsupported names.
+    if Limits.photo?(filename) or Limits.video?(filename) do
+      ext = filename |> Path.extname() |> String.downcase()
+      key = "event_photo_uploads/#{collection_id}/#{Ecto.ULID.generate()}#{ext}"
+
+      DirectUpload.presign(socket,
+        kind: :media,
+        key: key,
+        content_type: Limits.content_type_for_filename(filename),
+        max_file_size: Limits.max_bytes_for_filename(filename),
+        expires_in: :timer.hours(2)
+      )
+    else
+      {:error, %{reason: Limits.error_message(:unsupported_type)}, socket}
+    end
   end
 end
