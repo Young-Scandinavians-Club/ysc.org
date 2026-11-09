@@ -28,21 +28,24 @@ The HTTP client is `Ysc.Quickbooks.Client` (behaviour in `client_behaviour.ex` s
 ## Flow
 
 ```
-Payment / Refund / Payout created
+Payment / Refund created
   → status "pending" + Oban job enqueued
+Payout created or relinked
+  → enqueued only once `fee_total` is set and every linked payment/refund is synced
   → worker takes FOR UPDATE NOWAIT lock on the row, calls QBO
   → success: "synced" + QBO id stored      failure: "failed" + error stored
 ```
 
 - **Workers** (`lib/ysc_web/workers/`): `QuickbooksSyncPaymentWorker`, `…RefundWorker`, `…PayoutWorker` (default queue, 5 attempts, unique for 5 minutes). If the row lock is already held the job returns `:ok` and leaves the record for the retry worker.
-- **Nightly retry** (`QuickbooksSyncRetryWorker`, 03:00 UTC): enqueues a job for every payment, refund and payout whose status is not `synced`.
+- **Nightly retry** (`QuickbooksSyncRetryWorker`, 03:00 UTC): enqueues jobs for up to 1,000 unsynced payments, up to 1,000 refunds and up to 1,000 payouts per run. The queries are unordered, so with a larger backlog it is not defined which records are picked up first.
 - **Expense reports**: `QuickbooksSyncExpenseReportWorker`, with `QuickbooksSyncExpenseReportBackupWorker` every 6 hours picking up approved reports that were never synced. Inbound QBO events (`/webhooks/quickbooks`) are handled by `QuickbooksBillPaymentProcessorWorker` (marks a report `paid` only once the linked Bill is confirmed fully paid) and `QuickbooksBillDeletedProcessorWorker`.
-- **Payouts** sync once all their linked payments and refunds have synced; syncing a payment or refund re-checks any payout waiting on it.
+- **Payouts** are not marked `pending` and get no job until `fee_total` is populated and all linked payments and refunds are synced (`enqueue_quickbooks_sync_payout_if_ready/1`). Syncing a payment or refund re-checks any unsynced payout it belongs to, and relinking re-runs the check; if the conditions never become true the payout stays unsynced until the nightly retry.
+- **`synced` is a point-in-time status.** `sync_payout/1` decides by deposit presence, not status: for an existing deposit it diffs against QuickBooks and leaves it alone, sparse-updates it, or alerts if it is too old to auto-correct (journal-entry payouts are left alone). After relinking a payout (see [REPROCESS_PAYOUTS.md](REPROCESS_PAYOUTS.md)) verify the deposit in QuickBooks, particularly the fee line.
 - **Refunds** use the same item as the original sale so revenue is reversed on the right account, and the system customer is used when the user no longer exists.
 
 ## Idempotency
 
-Every create call sends QBO's `requestid` query parameter so a retried request replays the original response instead of creating a duplicate (scope: per company/realm, max 255 chars). Keys are derived from the record id:
+Payment, refund, deposit and bill creates send QBO's `requestid` query parameter so a retried request replays the original response instead of creating a duplicate (scope: per company/realm, max 255 chars). Keys are derived from the record id:
 
 | Operation          | Key                               |
 | ------------------ | --------------------------------- |
@@ -50,6 +53,8 @@ Every create call sends QBO's `requestid` query parameter so a retried request r
 | RefundReceipt      | `rr_ref_<refund_id>`              |
 | Deposit / journal entry | `dep_payout_…` / `je_payout_…` (payout id) |
 | Bill               | `expense_report_<expense_report_id>` |
+
+**Exception: items.** `get_or_create_item` is called without an idempotency key. It relies on a name lookup plus a cached id, so after a lost response a failed lookup can lead to a duplicate-name error on retry rather than a replay.
 
 Beyond the key, the app also: stores the QBO id as soon as it is created (a bill is recorded even if the receipt upload then fails), pre-checks for existing vendors/items by name or email before creating, and retries once with a refreshed OAuth token on `401` using the same key. Read-only queries and PUT updates are naturally idempotent.
 

@@ -10,7 +10,7 @@ Sensitive settings changes — **email, phone, password** — require a recent r
 
 1. The user submits the form (e.g. `request_email_change`, `request_password_change`). If the session already has a valid re-auth, the change proceeds immediately; otherwise a re-auth modal opens.
 2. The modal offers whatever the account supports: password (only if the user has one), passkey (WebAuthn), or OAuth.
-3. On success the session records `reauth_verified_at`. `YscWeb.UserAuth` (`:mount_reauth_session` on_mount hook) turns that into `session_reauth_verified` / `session_reauth_expires_at` assigns. **The window is 300 seconds** (`@reauth_ttl_seconds`), and handlers re-check the absolute expiry at action time rather than trusting a flag frozen at mount.
+3. Password and passkey re-auth satisfy only the pending action: they do not write a session timestamp, so a later sensitive action (on this or another settings page) can prompt again even within five minutes. **OAuth re-auth** writes the session `reauth_verified_at` (in `AuthController`), and `YscWeb.UserAuth` (`:mount_reauth_session` on_mount hook) turns that into `session_reauth_verified` / `session_reauth_expires_at` assigns. **That window is 300 seconds** (`@reauth_ttl_seconds`), and handlers re-check the absolute expiry at action time rather than trusting a flag frozen at mount.
 4. The pending change then continues (e.g. a verification code is sent to the new email address; the change only completes once that code is verified).
 
 **OAuth leaves the LiveView**, so the pending intent travels in the `return_to` URL as an encrypted token (`YscWeb.ReauthResume`, 10-minute max age). The token is bound to the `user_id` that started the flow; it is rejected if a different user opens it.
@@ -25,7 +25,7 @@ Sensitive settings changes — **email, phone, password** — require a recent r
 
 ### Manual test matrix
 
-Use three users: password-only, passkey (± password), and OAuth-only. For each of email change and password change:
+Use three users: password-only, passkey (± password), and OAuth-only. Run each of email change, phone change and password change:
 
 | User         | Expect in the re-auth modal                  | Then                                                   |
 | ------------ | -------------------------------------------- | ------------------------------------------------------ |
@@ -33,15 +33,15 @@ Use three users: password-only, passkey (± password), and OAuth-only. For each 
 | Passkey-only | No password field; passkey button            | Browser passkey prompt, then the flow proceeds         |
 | OAuth-only   | OAuth option                                 | Round trip to the provider, resume with the pending change intact |
 
-Also check: cancelling closes the modal and drops the pending change; a second change within 5 minutes skips the modal; after 5 minutes it asks again.
+Also check: cancelling closes the modal and drops the pending change; after an OAuth re-auth, a second change within 5 minutes skips the modal and after 5 minutes it asks again; after a password or passkey re-auth, expect to be asked again.
 
 ## Passkey debugging
 
-The `PasskeyAuth` hook (`assets/js/passkey_auth.js`) reports every failure to Sentry and always pushes an error event back to the LiveView (`passkey_auth_error`, `passkey_registration_error`) so the UI never hangs.
+The `PasskeyAuth` hook (`assets/js/passkey_auth.js`) reports unexpected failures to Sentry and always pushes an error event back to the LiveView (`passkey_auth_error`, `passkey_registration_error`) so the UI never hangs.
 
 **Sentry tags**: `component: passkey_auth`, `operation: authentication | registration`, `error_name`, `browser`. Breadcrumbs record the challenge start, legacy-vs-modern WebAuthn API choice and the base64 fallback. Filter Sentry by `component:passkey_auth` and read the breadcrumbs for the execution path.
 
-**Console**: every message is prefixed `[PasskeyAuth]`. On Firefox mobile use `about:debugging` → This Firefox → Inspect.
+**Console**: every message is prefixed `[PasskeyAuth]`. Expected errors (`NotAllowedError`, `AbortError`, `NotSupportedError`) are logged to the console only and are **not** sent to Sentry, so check the user's console rather than looking for a Sentry event. On Firefox mobile use `about:debugging` → This Firefox → Inspect.
 
 | `error_name`         | Usual meaning                                           |
 | -------------------- | ------------------------------------------------------- |

@@ -4,7 +4,7 @@ This document explains how the ticket booking system prevents overbooking while 
 
 ## Overview
 
-The system uses a **reservation-based approach** with **database-level locking** to ensure that:
+The system uses a **reservation-based approach**: capacity is checked and tickets are inserted in one transaction, and pending tickets count against capacity. See the known limitation under mechanism 1. Goals:
 
 1. Tickets are reserved immediately when a booking is initiated
 2. Reserved tickets count against capacity (preventing overbooking)
@@ -13,42 +13,30 @@ The system uses a **reservation-based approach** with **database-level locking**
 
 ## Key Mechanisms
 
-### 1. Atomic Booking with Database Locking
+### 1. Atomic Booking in One Transaction
 
 **Location**: `lib/ysc/tickets/booking_locker.ex`
 
-The `BookingLocker.atomic_booking/3` function uses PostgreSQL row-level locking (`FOR UPDATE`) to ensure atomic operations:
+`BookingLocker.atomic_booking/4` validates availability, creates the ticket order and creates the tickets inside a single `Repo.transaction`, so a failure rolls everything back and validation and inserts share one snapshot:
 
 ```elixir
-def atomic_booking(user_id, event_id, ticket_selections) do
-  Repo.transaction(fn ->
-    with {:ok, _event} <- lock_and_validate_event(event_id),
-         {:ok, tiers} <- lock_and_validate_tiers(event_id, ticket_selections),
-         {:ok, total_amount} <- calculate_total_amount(tiers, ticket_selections),
-         {:ok, ticket_order} <- create_ticket_order_atomic(user_id, event_id, total_amount),
-         {:ok, _tickets} <- create_tickets_atomic(ticket_order, tiers, ticket_selections) do
-      ticket_order
-    else
-      {:error, reason} -> Repo.rollback(reason)
-    end
-  end)
-end
+Repo.transaction(fn ->
+  with {:ok, _event} <- lock_and_validate_event(event_id, bypass_guards?, opts),
+       {:ok, tiers} <- lock_and_validate_tiers(event_id, ticket_selections, ...),
+       # ... totals, ticket order, tickets (all `:pending`) ...
+  else
+    {:error, reason} -> Repo.rollback(reason)
+  end
+end)
 ```
 
-**How it works**:
+**Known limitation**: despite the `lock_*` function names, the event and tier rows are read **without `FOR UPDATE`** (see the module doc and `lock_event/1` / `lock_ticket_tiers/1`). Two transactions can therefore read the same counts and both succeed under heavy load. Callers that must be strictly race-free need row locks or stricter isolation added. A per-user/event advisory lock does guard against the same user creating two pending orders from two tabs (`concurrent_checkout_test.exs`).
 
-- Locks the event row (`FOR UPDATE`) - prevents concurrent modifications
-- Locks all ticket tiers for the event (`FOR UPDATE`)
-- Validates availability **within the locked transaction**
-- Creates tickets with `:pending` status **within the same transaction**
-- All operations are atomic - either all succeed or all fail
+**What it does guarantee**:
 
-**Why this prevents overbooking**:
-
-- Only one booking can lock the event/tiers at a time
-- Availability is checked **after** acquiring locks
-- Tickets are created **before** releasing locks
-- No race conditions possible
+- Availability is checked and tickets are created in the same transaction
+- Tickets are created with `:pending` status, which immediately counts against capacity for later requests
+- Partial failures roll back; there are no half-created orders
 
 ### 2. Pending Tickets Count Against Capacity
 
@@ -174,15 +162,15 @@ end
 ```
 User Initiates Booking
     ↓
-[1] Lock Event & Tiers (FOR UPDATE)
+[1] Load Event & Tiers (plain reads)
     ↓
-[2] Check Availability (within lock)
+[2] Check Availability (same transaction)
     ↓
 [3] Create TicketOrder (:pending)
     ↓
 [4] Create Tickets (:pending status)
     ↓
-[5] Release Locks
+[5] Commit
     ↓
 [6] Tickets Count Against Capacity ✓
     ↓
@@ -233,17 +221,16 @@ Tickets Released ✓
 
 ## Safety Guarantees
 
-### 1. **No Race Conditions**
+### 1. **Atomic Reservations**
 
-- Database locks ensure only one booking processes at a time
-- Availability checks happen within locked transactions
-- Ticket creation is atomic
+- Availability checks and ticket creation share one transaction, and ticket creation is atomic
+- Event/tier rows are not row-locked today, so very high concurrency can still race (see mechanism 1)
 
 ### 2. **Capacity Always Respected**
 
 - Pending tickets count against capacity
 - Availability calculations include pending tickets
-- No possibility of selling more than available
+- Pending tickets are counted on every check, which narrows (but without row locks does not fully close) the window for overselling
 
 ### 3. **Automatic Cleanup**
 
@@ -358,14 +345,14 @@ end
 
 ## Testing
 
-Concurrency is tested against the real database (no mocks, `async: false`) by firing many simultaneous attempts with `Task.async_stream/3` at a capacity boundary and asserting the limit is never exceeded:
+These tests fire simultaneous attempts with `Task.async_stream/3` against the real database (no mocks, `async: false`). **Limitation:** the tasks are `allow`ed onto the test's single sandbox connection, so they exercise the logic but do not verify competing database transactions. The ticket tests can pass even though event/tier reads have no row locks, so treat them as regression checks, not proof of race-freedom.
 
-- `test/ysc/tickets/booking_locker_concurrency_test.exs`: tier capacity (e.g. 60 buyers for 50 tickets), event-level `max_attendees` across tiers, multiple tickets per order, pending tickets counting against capacity, unlimited tiers
+- `test/ysc/tickets/booking_locker_concurrency_test.exs`: 10 buyers for a 10-ticket tier, five bookings on an unlimited tier, and an event-level count assertion (10 single-ticket requests on one tier, checked against `max_attendees: 50`; it does not cover the cross-tier boundary)
 - `test/ysc/tickets/concurrent_checkout_test.exs`: regression for two tabs creating a ticket order for the same user/event at once (guarded by a per-user/event advisory lock)
 - `test/ysc/bookings/booking_locker_concurrency_test.exs`: Tahoe room double-booking and overlapping dates, Clear Lake per-guest capacity (12), buyouts vs. room/per-guest bookings, and holds blocking new bookings until released
 
 ```bash
-mix test test/ysc/tickets/booking_locker_concurrency_test.exs test/ysc/bookings/booking_locker_concurrency_test.exs
+mix test test/ysc/tickets/booking_locker_concurrency_test.exs test/ysc/tickets/concurrent_checkout_test.exs test/ysc/bookings/booking_locker_concurrency_test.exs
 ```
 
 Timeout expiry and duplicate webhooks are covered by the timeout worker tests and `webhook_handler_test.exs` ([STRIPE_WEBHOOKS.md](STRIPE_WEBHOOKS.md)).
@@ -375,7 +362,7 @@ Timeout expiry and duplicate webhooks are covered by the timeout worker tests an
 1. **Always use `BookingLocker.atomic_booking/3`** for creating orders
 
    - Never create tickets outside of this function
-   - Ensures proper locking and validation
+   - Ensures validation and creation happen in one transaction
 
 2. **Check order status before processing payments**
 
@@ -402,7 +389,7 @@ Timeout expiry and duplicate webhooks are covered by the timeout worker tests an
 
 The system prevents overbooking through:
 
-1. ✅ **Database-level locking** - Ensures atomic operations
+1. ✅ **Single-transaction booking** - Validation and inserts commit or roll back together
 2. ✅ **Pending ticket counting** - Reserves capacity immediately
 3. ✅ **Timeout mechanism** - Releases abandoned reservations
 4. ✅ **Idempotent webhooks** - Prevents double-processing
@@ -410,7 +397,7 @@ The system prevents overbooking through:
 
 The combination of these mechanisms ensures that:
 
-- Capacity is never exceeded
+- Capacity is respected in normal operation (strict guarantees under extreme concurrency would need row locks)
 - Tickets are fairly distributed
 - Failed payments don't block availability
 - System is resilient to failures

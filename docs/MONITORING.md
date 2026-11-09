@@ -14,7 +14,7 @@ All are Oban cron jobs in `config/config.exs`; each can also be run on demand fr
 
 | Time (UTC) | Worker                                   | Checks                                                     | Docs                                   |
 | ---------- | ---------------------------------------- | ---------------------------------------------------------- | -------------------------------------- |
-| 00:00      | `Ysc.Ledgers.BalanceCheckWorker`         | Ledger debits = credits; lists imbalanced accounts         | [RECONCILIATION_SYSTEM.md](RECONCILIATION_SYSTEM.md) |
+| 00:00      | `Ysc.Ledgers.BalanceCheckWorker`         | Ledger debits = credits; logs imbalanced accounts (no Discord) | [RECONCILIATION_SYSTEM.md](RECONCILIATION_SYSTEM.md) |
 | 01:00      | `Ysc.Ledgers.ReconciliationWorker`       | Payments, refunds, entities and payouts vs. ledger         | [RECONCILIATION_SYSTEM.md](RECONCILIATION_SYSTEM.md) |
 | 02:00      | `Ysc.Stripe.WebhookReconciliationWorker` | Last 24h of Stripe events vs. `webhook_events`             | [STRIPE_WEBHOOKS.md](STRIPE_WEBHOOKS.md) |
 | 03:00      | `YscWeb.Workers.WebhookRetryWorker`      | Retries pending / failed / stuck webhooks                  | [STRIPE_WEBHOOKS.md](STRIPE_WEBHOOKS.md) |

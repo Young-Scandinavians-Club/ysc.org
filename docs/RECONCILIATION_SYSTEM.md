@@ -282,10 +282,10 @@ Business logic inconsistencies:
 When a run finds discrepancies, `ReconciliationWorker`:
 
 1. Logs the discrepancies
-2. Posts to Discord: `Discord.send_reconciliation_report/2` for the summary (`:success` / `:error`), plus `send_ledger_imbalance_alert/1` and `send_payment_discrepancy_alert/…` for those specific failures (see [DISCORD_ALERTS.md](DISCORD_ALERTS.md))
+2. Posts to Discord: `Discord.send_reconciliation_report/2` for the summary (`:success` / `:error`), plus `send_ledger_imbalance_alert/1` for an imbalance and `send_payment_discrepancy_alert/…` when individual payment discrepancies exist. An aggregate-only payment mismatch shows in the summary without the totals (see [DISCORD_ALERTS.md](DISCORD_ALERTS.md))
 3. Emails the Treasurer when a Stripe payout does not reconcile (payout mismatch template)
 
-The alert lists the specific payment/refund IDs and amounts involved; start with `Ysc.Ledgers.Reconciliation.run_full_reconciliation()` to reproduce it.
+The Discord summary shows counts and match status, and the payment alert lists IDs and issues for up to three payments. Run `Ysc.Ledgers.Reconciliation.run_full_reconciliation()` and inspect `report.checks.payments.discrepancies` and `report.checks.refunds.discrepancies` for the complete lists.
 
 ## Troubleshooting
 
@@ -350,7 +350,7 @@ entries = Ysc.Ledgers.get_entries_by_payment(payment_id)
 
 ## Ledger balance check
 
-`Ysc.Ledgers.BalanceCheckWorker` runs at 00:00 UTC (`maintenance` queue, 3 attempts), an hour before reconciliation, and verifies that total debits equal total credits. On an imbalance it logs the difference, groups the offending accounts by type, and posts a critical Discord alert with the top five accounts by absolute balance.
+`Ysc.Ledgers.BalanceCheckWorker` runs at 00:00 UTC (`maintenance` queue, 3 attempts), an hour before reconciliation, and verifies that total debits equal total credits. On an imbalance it logs a warning with the difference, the account-type breakdown and the top five accounts by absolute balance. It does **not** post to Discord; the 01:00 reconciliation run reports an imbalance to Discord.
 
 ```elixir
 Ysc.Ledgers.BalanceCheckWorker.check_balance_now()   # run on demand
