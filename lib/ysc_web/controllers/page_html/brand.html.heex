@@ -151,7 +151,7 @@
           <button
             :for={swatch <- country.swatches}
             type="button"
-            data-copy={swatch.hex}
+            data-brand-copy={swatch.hex}
             title={"Copy #{swatch.hex}"}
             class={[
               "flex min-h-24 flex-col justify-end rounded-sm border border-zinc-200 p-3 text-left hover:-translate-y-0.5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
@@ -160,7 +160,7 @@
             ]}
           >
             <span class="text-sm font-semibold">{swatch.label}</span>
-            <span class="font-mono text-xs" data-copy-label>{swatch.hex}</span>
+            <span class="font-mono text-xs" data-brand-copy-label>{swatch.hex}</span>
           </button>
         </div>
       </li>
@@ -272,7 +272,7 @@
       <button
         :for={swatch <- @blue_scale}
         type="button"
-        data-copy={swatch.hex}
+        data-brand-copy={swatch.hex}
         title={"Copy #{swatch.hex}"}
         class={[
           "px-1 pb-2 pt-7 text-center text-xs focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600",
@@ -281,7 +281,7 @@
         ]}
       >
         <b class="block text-sm">{swatch.step}</b>
-        <span class="font-mono" data-copy-label>{swatch.hex}</span>
+        <span class="font-mono" data-brand-copy-label>{swatch.hex}</span>
       </button>
     </div>
     <p class="mt-6 mb-3 text-sm text-zinc-600">
@@ -294,7 +294,7 @@
       <button
         :for={swatch <- @zinc_scale}
         type="button"
-        data-copy={swatch.hex}
+        data-brand-copy={swatch.hex}
         title={"Copy #{swatch.hex}"}
         class={[
           "px-1 pb-2 pt-7 text-center text-xs focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600",
@@ -303,7 +303,7 @@
         ]}
       >
         <b class="block text-sm">{swatch.step}</b>
-        <span class="font-mono" data-copy-label>{swatch.hex}</span>
+        <span class="font-mono" data-brand-copy-label>{swatch.hex}</span>
       </button>
     </div>
   </section>
@@ -831,11 +831,11 @@
         <button
           id="copy-email-signature"
           type="button"
-          data-copy={@email_signature}
+          data-brand-copy={@email_signature}
           class="mt-3 inline-flex items-center gap-2 rounded-sm bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
         >
           <.icon name="hero-clipboard-document" class="w-4 h-4" />
-          <span data-copy-label>Copy HTML</span>
+          <span data-brand-copy-label>Copy HTML</span>
         </button>
       </div>
     </div>

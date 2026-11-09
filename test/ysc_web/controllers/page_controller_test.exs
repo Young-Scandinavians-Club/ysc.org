@@ -490,17 +490,31 @@ defmodule YscWeb.PageControllerTest do
       end
     end
 
-    test "links to both template downloads", %{conn: conn} do
+    test "links each template button to its own file", %{conn: conn} do
       html = conn |> get(~p"/brand") |> html_response(200)
       document = LazyHTML.from_fragment(html)
 
-      assert Enum.count(
-               LazyHTML.query(document, "a#download-template-potx[download]")
-             ) == 1
+      expected = %{
+        "download-template-potx" =>
+          ~p"/documents/brand/YSC-presentation-template.potx",
+        "download-template-pptx" =>
+          ~p"/documents/brand/YSC-presentation-template.pptx",
+        "download-document-dotx" =>
+          ~p"/documents/brand/YSC-document-template.dotx",
+        "download-document-docx" =>
+          ~p"/documents/brand/YSC-document-template.docx"
+      }
 
-      assert Enum.count(
-               LazyHTML.query(document, "a#download-template-pptx[download]")
-             ) == 1
+      for {id, href} <- expected do
+        assert Enum.count(
+                 LazyHTML.query(document, "a##{id}[download][href='#{href}']")
+               ) == 1
+      end
+    end
+
+    test "marks Denmark red with dark text as large-text only", %{conn: conn} do
+      html = conn |> get(~p"/brand") |> html_response(200)
+      assert html =~ "3.0:1 · large text only"
     end
 
     test "offers document, palette and social kit downloads", %{conn: conn} do
@@ -515,10 +529,9 @@ defmodule YscWeb.PageControllerTest do
                ) == 1
       end
 
-      for id <-
-            ~w(download-document-dotx download-document-docx download-social-kit) do
-        assert Enum.count(LazyHTML.query(document, "a##{id}[download]")) == 1
-      end
+      assert Enum.count(
+               LazyHTML.query(document, "a#download-social-kit[download]")
+             ) == 1
 
       assert Enum.count(
                LazyHTML.query(document, "#palette-downloads a[download]")
@@ -538,7 +551,7 @@ defmodule YscWeb.PageControllerTest do
       assert Enum.count(
                LazyHTML.query(
                  document,
-                 "button#copy-email-signature[data-copy]"
+                 "button#copy-email-signature[data-brand-copy]"
                )
              ) == 1
     end

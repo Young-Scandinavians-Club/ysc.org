@@ -193,7 +193,7 @@ defmodule YscWeb.BrandGuide do
         hex: "#C8102E",
         bg: "bg-denmark-red",
         white: {"5.9", :ok},
-        ink: {"3.0", :no},
+        ink: {"3.0", :large},
         use: "Background with white text"
       },
       %{
@@ -262,8 +262,8 @@ defmodule YscWeb.BrandGuide do
       %{step: "200", hex: "#B9E3FF", bg: "bg-blue-200", fg: "text-zinc-900"},
       %{step: "300", hex: "#89D3FF", bg: "bg-blue-300", fg: "text-zinc-900"},
       %{step: "400", hex: "#52BBFF", bg: "bg-blue-400", fg: "text-zinc-900"},
-      %{step: "500", hex: "#2A9DFF", bg: "bg-blue-500", fg: "text-white"},
-      %{step: "600", hex: "#1381FD", bg: "bg-blue-600", fg: "text-white"},
+      %{step: "500", hex: "#2A9DFF", bg: "bg-blue-500", fg: "text-zinc-900"},
+      %{step: "600", hex: "#1381FD", bg: "bg-blue-600", fg: "text-zinc-900"},
       %{step: "700", hex: "#0C69E9", bg: "bg-blue-700", fg: "text-white"},
       %{step: "800", hex: "#1154BC", bg: "bg-blue-800", fg: "text-white"},
       %{step: "900", hex: "#144993", bg: "bg-blue-900", fg: "text-white"},

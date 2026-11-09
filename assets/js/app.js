@@ -40,6 +40,7 @@ import StripeInput from "./stripe_payment";
 import StripeElements from "./stripe_elements";
 import Countdown from "./countdown";
 import GLightboxHook from "./glightbox_hook";
+import ClipboardCopy from "./clipboard_copy";
 import ProductLightbox from "./product_lightbox";
 import ShopTile from "./shop_tile";
 import CartPeekHover from "./cart_peek_hover";
@@ -584,20 +585,35 @@ document.addEventListener("click", (event) => {
     }
 });
 
-// Click-to-copy for elements with data-copy (swatches on /brand).
-// An optional [data-copy-label] child briefly reads "Copied".
+// Click-to-copy for elements with data-brand-copy (swatches and the email signature
+// on /brand). Reuses the ClipboardCopy helper, which falls back to execCommand
+// when navigator.clipboard is unavailable (plain HTTP). An optional
+// [data-brand-copy-label] child shows "Copied" or "Copy failed", then restores its
+// original text; repeated clicks restart the timer.
+const copyLabelTimers = new WeakMap();
+
+function flashCopyLabel(label, message) {
+    if (!label) return;
+    if (label.dataset.original === undefined) label.dataset.original = label.textContent;
+
+    label.textContent = message;
+    window.clearTimeout(copyLabelTimers.get(label));
+    copyLabelTimers.set(label, window.setTimeout(() => {
+        label.textContent = label.dataset.original;
+    }, 1500));
+}
+
 document.addEventListener("click", (event) => {
-    const el = event.target.closest("[data-copy]");
+    const el = event.target.closest("[data-brand-copy]");
     if (!el) return;
-    navigator.clipboard.writeText(el.getAttribute("data-copy")).then(() => {
-        const label = el.querySelector("[data-copy-label]");
-        if (!label) return;
-        const original = label.textContent;
-        label.textContent = "Copied";
-        setTimeout(() => { label.textContent = original; }, 1200);
-    }).catch((err) => {
-        console.error("Failed to copy:", err);
-    });
+
+    const label = el.querySelector("[data-brand-copy-label]");
+    ClipboardCopy.copyText.call(ClipboardCopy, el.getAttribute("data-brand-copy"))
+        .then(() => flashCopyLabel(label, "Copied"))
+        .catch((err) => {
+            console.error("Failed to copy:", err);
+            flashCopyLabel(label, "Copy failed");
+        });
 });
 
 // expose liveSocket on window for web console debug logs and latency simulation:

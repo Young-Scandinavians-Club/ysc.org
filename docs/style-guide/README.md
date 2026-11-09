@@ -15,7 +15,7 @@ The public brand page lives at **`/brand`** (linked from the site footer). It sh
 | Palette files (css, json, gpl, ase) | `priv/static/documents/brand/ysc-palette.*`, made by `etc/scripts/brand/make_palette.py` |
 | Social and web image kit | `priv/static/images/brand/kit/`, made by `etc/scripts/brand/make_social_kit.sh` |
 | Email signature, image sizes, checklist | `BrandGuide.email_signature_html/0`, `BrandGuide.image_sizes/0` and the template |
-| Click-to-copy for swatches | `[data-copy]` handler in `assets/js/app.js` |
+| Click-to-copy for swatches | `[data-brand-copy]` handler in `assets/js/app.js` |
 | Tests | `describe "GET /brand"` in `test/ysc_web/controllers/page_controller_test.exs` |
 
 The route is public (no sign-in) and the files are served as static assets, so nothing in these folders may be private.
