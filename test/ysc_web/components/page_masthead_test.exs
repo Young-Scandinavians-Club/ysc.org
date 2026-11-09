@@ -124,6 +124,30 @@ defmodule YscWeb.Components.PageMastheadTest do
       assert html =~ "text-center"
       assert html =~ "Sign in to view availability."
     end
+
+    test "renders surface feature card styling with optional id" do
+      assigns = %{}
+
+      heex = ~H"""
+      <.feature_card
+        id="events-stay-connected"
+        title="Stay Connected"
+        title_tone={:surface}
+      >
+        <p>Read club news.</p>
+      </.feature_card>
+      """
+
+      html = rendered_to_string(heex)
+
+      assert html =~ ~s(id="events-stay-connected")
+      assert html =~ "bg-white"
+      assert html =~ "border-zinc-100"
+      assert html =~ "Stay Connected"
+      assert html =~ "Read club news."
+      refute html =~ "bg-zinc-50"
+      refute html =~ "bg-blue-50/40"
+    end
   end
 
   describe "page_header/1" do
