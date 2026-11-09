@@ -1,0 +1,18 @@
+GIMP Palette
+Name: YSC
+Columns: 4
+#
+200  16  46	Denmark Red
+  0  47 108	Finland Blue
+  2  82 156	Iceland Blue
+220  30  53	Iceland Red
+186  12  47	Norway Red
+  0  32  91	Norway Blue
+  0  82 147	Sweden Blue
+254 203   0	Sweden Yellow
+ 20  73 147	Brand Blue (web)
+ 24  24  27	Ink
+ 82  82  91	Secondary Text
+228 228 231	Border
+244 245 247	Page Gray
+255 255 255	White

@@ -1,6 +1,6 @@
 # Brand & style guide
 
-The public brand page lives at **`/brand`** (linked from the site footer). It shows the logo, Nordic colors, type, components, imagery and chart colors, and hosts the logo and slide template downloads.
+The public brand page lives at **`/brand`** (linked from the site footer). It shows the logo, Nordic colors, type, components, imagery and chart colors, and hosts downloads for people making documents, slides and web assets: logos, a PowerPoint template, a Word/Google Docs template, palette files, a social and web image kit, an email signature, and a pre-publish checklist.
 
 ## Where things are
 
@@ -11,6 +11,10 @@ The public brand page lives at **`/brand`** (linked from the site footer). It sh
 | Colors, logo variants, chart colors | `lib/ysc_web/brand_guide.ex` |
 | Logo files (SVG, PDF, PNG, AI, zip) | `priv/static/images/brand/logos/` |
 | Slide template (.potx, .pptx) | `priv/static/documents/brand/` (see [presentation-template](../presentation-template/README.md)) |
+| Document template (.dotx, .docx) | `priv/static/documents/brand/YSC-document-template.*` |
+| Palette files (css, json, gpl, ase) | `priv/static/documents/brand/ysc-palette.*`, made by `etc/scripts/brand/make_palette.py` |
+| Social and web image kit | `priv/static/images/brand/kit/`, made by `etc/scripts/brand/make_social_kit.sh` |
+| Email signature, image sizes, checklist | `BrandGuide.email_signature_html/0`, `BrandGuide.image_sizes/0` and the template |
 | Click-to-copy for swatches | `[data-copy]` handler in `assets/js/app.js` |
 | Tests | `describe "GET /brand"` in `test/ysc_web/controllers/page_controller_test.exs` |
 
@@ -48,6 +52,23 @@ pdftocairo -png -transp -scale-to-x 512 -scale-to-y -1 -singlefile master.ai ysc
 ```
 
 `ysc-logos.zip` holds the SVG, PDF and PNG files of every variant (not the AI masters). To add a variant, add it to `BrandGuide.logo_variants/0`, drop its five files in `priv/static/images/brand/logos/`, and rebuild the zip.
+
+## Document template
+
+`YSC-document-template.docx` (and the `.dotx` template, which is the same file with a template content type) has the brand styles built in: Title, Subtitle, Heading 1 to 3, Quote, lists, tables, a header with the logo, a footer with page numbers, a meeting agenda and minutes page, and callouts in the five Nordic colors. It was generated with the `docx` npm library and imports cleanly into Google Docs. To change it, edit the `.docx` in Word, save, and export a copy as `.dotx`.
+
+## Social and web kit
+
+`make_social_kit.sh` builds the profile pictures, the 1200 × 630 link-preview image and 15 text-free post canvases (square, landscape and story sizes in the five country colors) from the logo files, plus `ysc-social-kit.zip`. It needs ImageMagick and `zip`.
+
+```bash
+etc/scripts/brand/make_social_kit.sh
+python3 etc/scripts/brand/make_palette.py
+```
+
+If you change the palette, update `COLORS` in `make_palette.py` and the country list in `make_social_kit.sh`, then rerun both.
+
+The email signature loads the logo from `https://ysc.org/images/brand/logos/ysc-logo-seal-white-center-512.png`, so its preview on `/brand` shows a broken image until this page is deployed to production.
 
 ## Google Slides button
 

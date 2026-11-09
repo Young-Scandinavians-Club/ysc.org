@@ -91,6 +91,12 @@ defmodule YscWeb.PageController do
     |> assign(:chart_bars, YscWeb.BrandGuide.chart_bars())
     |> assign(:series_colors, YscWeb.BrandGuide.series_colors())
     |> assign(:google_slides_url, YscWeb.BrandGuide.google_slides_copy_url())
+    |> assign(:profile_pictures, YscWeb.BrandGuide.profile_pictures())
+    |> assign(:link_preview, YscWeb.BrandGuide.link_preview())
+    |> assign(:canvases, YscWeb.BrandGuide.canvases())
+    |> assign(:social_kit_zip_path, YscWeb.BrandGuide.social_kit_zip_path())
+    |> assign(:image_sizes, YscWeb.BrandGuide.image_sizes())
+    |> assign(:email_signature, YscWeb.BrandGuide.email_signature_html())
     |> render(:brand)
   end
 

@@ -306,4 +306,160 @@ defmodule YscWeb.BrandGuide do
       %{n: 4, hex: "#002F6C", bg: "bg-finland-blue"}
     ]
   end
+
+  @doc "Word / Google Docs template files, relative to `priv/static`."
+  def document_template_files do
+    [
+      "documents/brand/YSC-document-template.docx",
+      "documents/brand/YSC-document-template.dotx"
+    ]
+  end
+
+  @doc "Palette files, relative to `priv/static`."
+  def palette_files do
+    for ext <- ~w(css json gpl ase), do: "documents/brand/ysc-palette.#{ext}"
+  end
+
+  @doc "Social and web image kit files, relative to `priv/static`."
+  def social_kit_files do
+    singles =
+      for f <- [
+            "ysc-profile-seal-white.png",
+            "ysc-profile-seal-navy.png",
+            "ysc-link-preview-1200x630.png",
+            "ysc-social-kit.zip"
+          ],
+          do: "images/brand/kit/#{f}"
+
+    canvases =
+      for c <- canvases(), i <- c.items, do: String.trim_leading(i.href, "/")
+
+    singles ++ canvases
+  end
+
+  def profile_pictures do
+    [
+      %{
+        name: "Profile picture, white",
+        description:
+          "Seal on white. For Facebook, Instagram and other round avatars.",
+        dark: false,
+        href: kit_href("ysc-profile-seal-white.png")
+      },
+      %{
+        name: "Profile picture, navy",
+        description: "White-ring seal on navy. A good fit for dark interfaces.",
+        dark: true,
+        href: kit_href("ysc-profile-seal-navy.png")
+      }
+    ]
+  end
+
+  def link_preview do
+    %{
+      name: "Link preview image",
+      description:
+        "1200 × 630 px, the size used when a link is shared on Facebook, Slack, iMessage and LinkedIn.",
+      href: kit_href("ysc-link-preview-1200x630.png")
+    }
+  end
+
+  @canvas_sizes [
+    {"square", "1080x1080", "Square 1080 × 1080"},
+    {"landscape", "1200x630", "Landscape 1200 × 630"},
+    {"story", "1080x1920", "Story 1080 × 1920"}
+  ]
+
+  @doc "Text-free post canvases, one set per Nordic country color."
+  def canvases do
+    for {name, slug, bg} <- [
+          {"Denmark", "denmark", "bg-denmark-red"},
+          {"Finland", "finland", "bg-finland-blue"},
+          {"Iceland", "iceland", "bg-iceland-blue"},
+          {"Norway", "norway", "bg-norway-blue"},
+          {"Sweden", "sweden", "bg-sweden-yellow"}
+        ] do
+      %{
+        name: name,
+        slug: slug,
+        bg: bg,
+        items:
+          for {kind, dims, label} <- @canvas_sizes do
+            %{
+              label: label,
+              href: kit_href("ysc-canvas-#{kind}-#{dims}-#{slug}.png")
+            }
+          end
+      }
+    end
+  end
+
+  defp kit_href(file), do: ~p"/images/brand/kit/#{file}"
+
+  def social_kit_zip_path, do: ~p"/images/brand/kit/ysc-social-kit.zip"
+
+  @doc "Common image sizes. Platform sizes change, so treat these as a starting point."
+  def image_sizes do
+    [
+      %{
+        where: "Link preview (Open Graph)",
+        size: "1200 × 630",
+        note: "Facebook, LinkedIn, Slack, iMessage"
+      },
+      %{
+        where: "Instagram or Facebook post",
+        size: "1080 × 1080",
+        note: "Square. 1080 × 1350 for a portrait post"
+      },
+      %{
+        where: "Story or Reel",
+        size: "1080 × 1920",
+        note: "Keep text out of the top and bottom 250 px"
+      },
+      %{
+        where: "Facebook event cover",
+        size: "1920 × 1005",
+        note: "Photo or color field with a short headline"
+      },
+      %{
+        where: "Profile picture",
+        size: "1080 × 1080",
+        note: "Shown as a circle, so keep the seal centered"
+      },
+      %{
+        where: "Email header or banner",
+        size: "1200 px wide",
+        note: "Shown at 600 px; keep it under 200 KB"
+      },
+      %{
+        where: "Slides",
+        size: "1920 × 1080",
+        note: "16:9, the same as the slide template"
+      },
+      %{
+        where: "A4 or US Letter",
+        size: "2480 × 3508 / 2550 × 3300",
+        note: "300 dpi, for print"
+      }
+    ]
+  end
+
+  @doc "HTML email signature (table layout and inline styles, as email apps require)."
+  def email_signature_html do
+    """
+    <table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #18181b;">
+      <tr>
+        <td style="padding-right: 16px; vertical-align: top;">
+          <a href="https://ysc.org"><img src="https://ysc.org/images/brand/logos/ysc-logo-seal-white-center-512.png" width="96" alt="Young Scandinavians Club" style="display: block; border: 0;"></a>
+        </td>
+        <td style="vertical-align: top; line-height: 1.4;">
+          <div style="font-size: 16px; font-weight: bold; color: #00205b;">Your Name</div>
+          <div style="color: #52525b;">Your role, Young Scandinavians Club</div>
+          <div style="margin-top: 6px;"><a href="mailto:you@ysc.org" style="color: #0c69e9; text-decoration: none;">you@ysc.org</a> &middot; <a href="https://ysc.org" style="color: #0c69e9; text-decoration: none;">ysc.org</a></div>
+        </td>
+      </tr>
+    </table>
+    """
+    |> String.trim()
+  end
 end

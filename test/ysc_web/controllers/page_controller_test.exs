@@ -498,6 +498,46 @@ defmodule YscWeb.PageControllerTest do
              ) == 1
     end
 
+    test "offers document, palette and social kit downloads", %{conn: conn} do
+      html = conn |> get(~p"/brand") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      for id <- ~w(documents web checklist) do
+        assert Enum.count(LazyHTML.query(document, "section##{id}")) == 1
+
+        assert Enum.count(
+                 LazyHTML.query(document, "#brand-nav a[href='##{id}']")
+               ) == 1
+      end
+
+      for id <-
+            ~w(download-document-dotx download-document-docx download-social-kit) do
+        assert Enum.count(LazyHTML.query(document, "a##{id}[download]")) == 1
+      end
+
+      assert Enum.count(
+               LazyHTML.query(document, "#palette-downloads a[download]")
+             ) == 4
+
+      assert Enum.count(LazyHTML.query(document, "#post-canvases > li")) == 5
+
+      assert Enum.count(LazyHTML.query(document, "#post-canvases a[download]")) ==
+               15
+
+      assert Enum.count(
+               LazyHTML.query(document, "#profile-pictures a[download]")
+             ) == 3
+
+      assert Enum.count(LazyHTML.query(document, "#image-sizes tbody tr")) == 8
+
+      assert Enum.count(
+               LazyHTML.query(
+                 document,
+                 "button#copy-email-signature[data-copy]"
+               )
+             ) == 1
+    end
+
     test "hides the Google Slides button until a template is configured", %{
       conn: conn
     } do

@@ -20,7 +20,10 @@
           {"#components", "Components"},
           {"#imagery", "Imagery"},
           {"#charts", "Charts"},
-          {"#slides", "Slides"}
+          {"#slides", "Slides"},
+          {"#documents", "Documents"},
+          {"#web", "Social & web"},
+          {"#checklist", "Checklist"}
         ]
       }
       href={href}
@@ -165,6 +168,25 @@
     <p class="mt-3 text-sm text-zinc-500">
       White is shared by every flag, so it is a neutral, not a country color.
     </p>
+
+    <div id="palette-downloads" class="mt-6 flex flex-wrap items-center gap-2">
+      <span class="me-1 text-sm font-semibold text-zinc-700">Palette files:</span>
+      <a
+        :for={
+          {label, href} <- [
+            {"CSS variables", ~p"/documents/brand/ysc-palette.css"},
+            {"JSON", ~p"/documents/brand/ysc-palette.json"},
+            {"GIMP / Inkscape (.gpl)", ~p"/documents/brand/ysc-palette.gpl"},
+            {"Adobe swatches (.ase)", ~p"/documents/brand/ysc-palette.ase"}
+          ]
+        }
+        href={href}
+        download
+        class="inline-flex items-center gap-1 rounded-sm border border-zinc-300 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+      >
+        {label}
+      </a>
+    </div>
 
     <h3 class="mt-12 mb-4 text-xl type-subhead text-zinc-900">How to use it</h3>
     <div class="grid gap-4 md:grid-cols-3">
@@ -582,5 +604,288 @@
     <p class="mt-1 max-w-2xl text-sm text-zinc-500">
       Slides use Arial in place of the system font so they look the same on every computer.
     </p>
+  </section>
+
+  <%!-- DOCUMENTS --%>
+  <section
+    id="documents"
+    class="scroll-mt-24 mb-20"
+    aria-labelledby="documents-heading"
+  >
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Documents</p>
+    <h2
+      id="documents-heading"
+      class="text-3xl md:text-4xl type-title text-zinc-900"
+    >
+      Document template
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      A Word template for letters, reports, agendas and minutes, with the brand styles built in. It works in Google Docs too.
+    </p>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <a
+        id="download-document-dotx"
+        href={~p"/documents/brand/YSC-document-template.dotx"}
+        download
+        class="inline-flex items-center gap-2 rounded-sm bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
+      >
+        <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
+        Word template (.dotx)
+      </a>
+      <a
+        id="download-document-docx"
+        href={~p"/documents/brand/YSC-document-template.docx"}
+        download
+        class="inline-flex items-center gap-2 rounded-sm border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+      >
+        <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
+        Regular document (.docx)
+      </a>
+    </div>
+    <p class="mt-3 max-w-2xl text-sm text-zinc-500">
+      Using Google Docs? Upload the .docx to Google Drive and open it with Google Docs, then make a copy for each new document.
+    </p>
+
+    <div class="mt-8 grid gap-4 md:grid-cols-2">
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">What's inside</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Title, Subtitle, Heading 1 to 3, Quote, lists and tables, all as real styles.
+          </li>
+          <li>
+            The logo and club name in the page header, web address and page number in the footer.
+          </li>
+          <li>A meeting agenda and minutes page with an action items table.</li>
+          <li>Callouts in all five Nordic colors.</li>
+        </ul>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Writing tips</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Use the heading styles instead of making text big and bold by hand.
+          </li>
+          <li>
+            Navy headings, blue sub-headings and near-black body text keep contrast high.
+          </li>
+          <li>
+            Use country colors for callouts and charts, not for long passages of text.
+          </li>
+          <li>Save as PDF before sending, so fonts and layout stay put.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <%!-- SOCIAL AND WEB --%>
+  <section id="web" class="scroll-mt-24 mb-20" aria-labelledby="web-heading">
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Social & web</p>
+    <h2 id="web-heading" class="text-3xl md:text-4xl type-title text-zinc-900">
+      Images for posts, pages and email
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      Start from a ready-made canvas, add your headline or photo in any design tool, and export at the size you need.
+    </p>
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <a
+        id="download-social-kit"
+        href={@social_kit_zip_path}
+        download
+        class="inline-flex items-center gap-2 rounded-sm bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
+      >
+        <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
+        Download the whole kit (.zip)
+      </a>
+      <span class="text-sm text-zinc-500">Profile pictures, link preview and all 15 canvases.</span>
+    </div>
+
+    <h3 class="mt-10 mb-4 text-xl type-subhead text-zinc-900">
+      Profile pictures and link preview
+    </h3>
+    <div id="profile-pictures" class="grid items-start gap-4 sm:grid-cols-3">
+      <div
+        :for={pic <- @profile_pictures}
+        class="overflow-hidden rounded-sm border border-zinc-200 bg-white"
+      >
+        <img
+          src={pic.href}
+          alt={pic.name}
+          class="aspect-square w-full object-cover"
+          loading="lazy"
+        />
+        <div class="p-4">
+          <p class="font-semibold text-zinc-900">{pic.name}</p>
+          <p class="mt-1 text-sm text-zinc-600">{pic.description}</p>
+          <a
+            href={pic.href}
+            download
+            class="mt-3 inline-flex rounded-sm border border-zinc-300 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+          >
+            PNG 1080 px
+          </a>
+        </div>
+      </div>
+      <div
+        id="link-preview"
+        class="overflow-hidden rounded-sm border border-zinc-200 bg-white"
+      >
+        <img
+          src={@link_preview.href}
+          alt={@link_preview.name}
+          class="aspect-[1200/630] w-full object-cover"
+          loading="lazy"
+        />
+        <div class="p-4">
+          <p class="font-semibold text-zinc-900">{@link_preview.name}</p>
+          <p class="mt-1 text-sm text-zinc-600">{@link_preview.description}</p>
+          <a
+            href={@link_preview.href}
+            download
+            class="mt-3 inline-flex rounded-sm border border-zinc-300 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+          >
+            PNG 1200 × 630
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mt-10 mb-2 text-xl type-subhead text-zinc-900">Post canvases</h3>
+    <p class="mb-4 max-w-2xl text-sm text-zinc-600">
+      Text-free backgrounds in the five Nordic colors with the seal in the corner. Keep text clear of the seal and away from the edges.
+    </p>
+    <ul id="post-canvases" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <li
+        :for={canvas <- @canvases}
+        id={"canvas-#{canvas.slug}"}
+        class="overflow-hidden rounded-sm border border-zinc-200 bg-white"
+      >
+        <img
+          src={hd(canvas.items).href}
+          alt={"#{canvas.name} colored post canvas with the club seal"}
+          class="aspect-square w-full object-cover"
+          loading="lazy"
+        />
+        <div class="p-4">
+          <p class="font-semibold text-zinc-900">{canvas.name}</p>
+          <div class="mt-2 flex flex-col items-start gap-1.5">
+            <a
+              :for={item <- canvas.items}
+              href={item.href}
+              download
+              class="text-sm text-blue-700 underline underline-offset-2 hover:text-blue-800"
+            >
+              {item.label}
+            </a>
+          </div>
+        </div>
+      </li>
+    </ul>
+
+    <h3 class="mt-10 mb-4 text-xl type-subhead text-zinc-900">
+      Common image sizes
+    </h3>
+    <div class="overflow-x-auto rounded-sm border border-zinc-200 bg-white">
+      <table id="image-sizes" class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-zinc-200 text-left text-xs text-zinc-500 type-eyebrow">
+            <th class="px-4 py-3">Where</th>
+            <th class="px-4 py-3">Size (px)</th>
+            <th class="px-4 py-3">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            :for={row <- @image_sizes}
+            class="border-b border-zinc-100 last:border-0"
+          >
+            <td class="px-4 py-3 font-medium text-zinc-900">{row.where}</td>
+            <td class="px-4 py-3 whitespace-nowrap font-mono text-xs">
+              {row.size}
+            </td>
+            <td class="px-4 py-3 text-zinc-600">{row.note}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-sm text-zinc-500">
+      Platforms change their sizes from time to time, so check before exporting a final file.
+    </p>
+
+    <h3 class="mt-10 mb-2 text-xl type-subhead text-zinc-900">
+      Email signature
+    </h3>
+    <p class="mb-4 max-w-2xl text-sm text-zinc-600">
+      Select the preview and copy it, or use Copy HTML for apps that take raw HTML, then paste it into your email app's signature settings. Replace the name, role and email address.
+    </p>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div
+        id="email-signature-preview"
+        class="rounded-sm border border-zinc-200 bg-white p-6"
+      >
+        {Phoenix.HTML.raw(@email_signature)}
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-4">
+        <pre class="max-h-56 overflow-auto text-xs text-zinc-700"><code>{@email_signature}</code></pre>
+        <button
+          id="copy-email-signature"
+          type="button"
+          data-copy={@email_signature}
+          class="mt-3 inline-flex items-center gap-2 rounded-sm bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
+        >
+          <.icon name="hero-clipboard-document" class="w-4 h-4" />
+          <span data-copy-label>Copy HTML</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <%!-- CHECKLIST --%>
+  <section
+    id="checklist"
+    class="scroll-mt-24 mb-8"
+    aria-labelledby="checklist-heading"
+  >
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Before you publish</p>
+    <h2
+      id="checklist-heading"
+      class="text-3xl md:text-4xl type-title text-zinc-900"
+    >
+      A quick checklist
+    </h2>
+    <div class="mt-8 grid gap-4 md:grid-cols-3">
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Looks right</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Logo from this page, not recolored or stretched, with room around it.
+          </li>
+          <li>Country colors rotated, not one color everywhere.</li>
+          <li>Real photos of members, darkened if text sits on top.</li>
+        </ul>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Readable by everyone</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Text contrast of at least 4.5:1. Check the pairings table above.
+          </li>
+          <li>Never rely on color alone; add a word or label.</li>
+          <li>Alt text on every image that carries meaning.</li>
+          <li>Links say where they go ("Buy tickets"), not "click here".</li>
+        </ul>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Ready to share</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>Exported at the right size, and under 500 KB for the web.</li>
+          <li>Dates, times, prices and links checked once more.</li>
+          <li>
+            Documents saved as PDF; slides exported if they will be emailed.
+          </li>
+        </ul>
+      </div>
+    </div>
   </section>
 </div>

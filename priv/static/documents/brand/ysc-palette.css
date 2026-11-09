@@ -1,0 +1,17 @@
+/* Young Scandinavians Club palette. All five Nordic countries share equal weight. */
+:root {
+  --ysc-denmark-red: #c8102e;
+  --ysc-finland-blue: #002f6c;
+  --ysc-iceland-blue: #02529c;
+  --ysc-iceland-red: #dc1e35;
+  --ysc-norway-red: #ba0c2f;
+  --ysc-norway-blue: #00205b;
+  --ysc-sweden-blue: #005293;
+  --ysc-sweden-yellow: #fecb00;
+  --ysc-brand-blue: #144993;
+  --ysc-ink: #18181b;
+  --ysc-gray: #52525b;
+  --ysc-border: #e4e4e7;
+  --ysc-page: #f4f5f7;
+  --ysc-white: #ffffff;
+}
