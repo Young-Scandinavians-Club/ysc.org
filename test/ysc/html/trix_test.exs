@@ -29,5 +29,15 @@ defmodule Ysc.Html.TrixTest do
     test "returns empty string for empty input" do
       assert Trix.scrub("") == ""
     end
+
+    # Regression: #1811 extracted scrub/1 with only an is_binary clause.
+    # HtmlSanitizeEx.Scrubber.scrub/2 accepted nil → ""; admin_post_editor
+    # still passes Map.get(values, "raw_body") which can be nil.
+    test "returns empty string for nil (HtmlSanitizeEx parity)" do
+      assert Trix.scrub(nil) == ""
+
+      assert Trix.scrub(nil) ==
+               HtmlSanitizeEx.Scrubber.scrub(nil, Ysc.TrixScrubber)
+    end
   end
 end

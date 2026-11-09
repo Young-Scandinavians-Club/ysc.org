@@ -944,7 +944,7 @@ defmodule YscWeb.AdminPostEditorLive do
       Map.put(
         values,
         "rendered_body",
-        Ysc.Html.Trix.scrub(Map.get(values, "raw_body"))
+        Ysc.Html.Trix.scrub(Map.get(values, "raw_body") || "")
       )
     else
       values

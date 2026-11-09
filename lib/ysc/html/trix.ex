@@ -18,9 +18,13 @@ defmodule Ysc.Html.Trix do
   @doc """
   Returns `html` with disallowed tags and attributes removed.
 
-  Only binaries are accepted; callers that may receive `nil` should
-  default to `""` first (as the public post and event pages do).
+  Accepts binaries and `nil` (treated as `""`), matching
+  `HtmlSanitizeEx.Scrubber.scrub/2`. Call sites such as the admin post
+  editor pass `Map.get/2` results that may be `nil` when the key is
+  present with a null value.
   """
+  def scrub(nil), do: ""
+
   def scrub(html) when is_binary(html) do
     HtmlSanitizeEx.Scrubber.scrub(html, Ysc.TrixScrubber)
   end
