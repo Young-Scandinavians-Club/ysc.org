@@ -32,8 +32,8 @@ magick -size 1200x630 "xc:$NAVY" \( "$WORK/seal-dark.png" -resize x430 \) \
 # Text-free post canvases: country color field, seal bottom-left in the safe zone.
 canvas() {
   local country="$1" color="$2" width="$3" height="$4" kind="$5"
-  local logo=$((width * 14 / 100))
-  local margin=$((width * 6 / 100))
+  local logo=$((width * 20 / 100))
+  local margin=$((width * 5 / 100))
   magick -size "${width}x${height}" "xc:$color" \
     \( "$WORK/seal-light.png" -resize "${logo}x${logo}" \) \
     -gravity southwest -geometry "+${margin}+${margin}" -composite \
