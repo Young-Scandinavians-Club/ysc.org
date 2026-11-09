@@ -179,7 +179,7 @@ defmodule Ysc.Events.TvPosterImage do
       Map.get(event, :location_name),
       DateTimeFormatter.format_event_start(event, separator: " · "),
       Map.get(event, :state),
-      Map.get(event, :tickets_tbd),
+      Ysc.Events.Event.tickets_tbd?(event),
       Image.display_path_with_fallback(image),
       poster_image_alt(image, event),
       poster_pricing_text(event)

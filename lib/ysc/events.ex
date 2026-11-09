@@ -770,6 +770,8 @@ defmodule Ysc.Events do
       longitude: event.longitude,
       place_id: event.place_id,
       partiful_link: event.partiful_link,
+      external_ticket_url: event.external_ticket_url,
+      external_organizer: event.external_organizer,
       tickets_tbd: event.tickets_tbd,
       start_date: event.start_date,
       start_time: event.start_time,
@@ -1142,6 +1144,8 @@ defmodule Ysc.Events do
         latitude: e.latitude,
         longitude: e.longitude,
         partiful_link: e.partiful_link,
+        external_ticket_url: e.external_ticket_url,
+        external_organizer: e.external_organizer,
         tickets_tbd: e.tickets_tbd,
         recent_tickets_count: count(t.id),
         selling_fast: fragment("count(?) >= 5", t.id)
@@ -1298,6 +1302,8 @@ defmodule Ysc.Events do
         longitude: e.longitude,
         place_id: e.place_id,
         partiful_link: e.partiful_link,
+        external_ticket_url: e.external_ticket_url,
+        external_organizer: e.external_organizer,
         tickets_tbd: e.tickets_tbd,
         lock_version: e.lock_version,
         inserted_at: e.inserted_at,
@@ -1528,18 +1534,18 @@ defmodule Ysc.Events do
   end
 
   @doc """
-  Returns a short display string for event pricing (e.g. "Free", "From $10", "Tickets coming soon").
+  Returns a short display string for event pricing (e.g. "Free", "From $10", "Tickets coming soon", "External Tickets").
   Use for newsletters and other places that need a single line. Event can have ticket_tiers preloaded
   or they will be loaded.
   """
   def event_pricing_display_string(%{id: _} = event) do
     event = ensure_ticket_tiers_loaded(event)
 
-    if Map.get(event, :tickets_tbd) do
+    if Event.tickets_tbd?(event) do
       "Tickets coming soon"
     else
       tiers = Map.get(event, :ticket_tiers) || []
-      PricingDisplay.from_tiers(tiers).display_text
+      PricingDisplay.pricing_info(event, tiers).display_text
     end
   end
 

@@ -50,7 +50,7 @@ defmodule YscWeb.Emails.EventNotification do
         is_nil(event) ->
           Enum.random(@subjects_without_event)
 
-        event.tickets_tbd ->
+        Ysc.Events.Event.tickets_tbd?(event) ->
           @subjects_save_the_date
           |> Enum.random()
           |> String.replace("{title}", event.title)

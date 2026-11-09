@@ -28,6 +28,29 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           set on the Details tab. It's shown to attendees alongside these ticket tiers.
         </p>
       </div>
+      <div
+        :if={Ysc.Events.Event.external_ticketing?(@event)}
+        id="external-ticketing-notice"
+        class="border border-amber-200 rounded-lg p-4 bg-amber-50 flex items-center gap-3"
+      >
+        <.icon
+          name="hero-exclamation-triangle"
+          class="w-5 h-5 text-amber-600 shrink-0"
+        />
+        <p class="text-sm text-amber-900">
+          This event sells tickets on an external website (set on the Details tab).
+          Ticket tiers below are ignored on the public page, which links to
+          <a
+            href={@event.external_ticket_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="font-semibold underline"
+          >
+            the external ticket link
+          </a>
+          instead. Clear that link to sell tickets here.
+        </p>
+      </div>
       <%!-- Ticket Tiers List --%>
       <div class="border border-zinc-200 rounded-sm p-4 sm:p-6">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4">

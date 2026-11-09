@@ -44,7 +44,7 @@ defmodule YscWeb.EventBadgeHelpers do
           []
           |> maybe_append(
             :save_the_date,
-            include_save_the_date && get_field(event, :tickets_tbd)
+            include_save_the_date && Ysc.Events.Event.tickets_tbd?(event)
           )
           |> maybe_append(:just_added, just_added?(published_at))
           |> append_proximity(event, proximity)
@@ -61,7 +61,7 @@ defmodule YscWeb.EventBadgeHelpers do
     sold_out = EventHelpers.event_sold_out?(event)
 
     []
-    |> maybe_append(:save_the_date, get_field(event, :tickets_tbd))
+    |> maybe_append(:save_the_date, Ysc.Events.Event.tickets_tbd?(event))
     |> maybe_append(:sold_out, sold_out)
     |> maybe_append(:going_fast, !sold_out && get_field(event, :selling_fast))
     |> maybe_append(

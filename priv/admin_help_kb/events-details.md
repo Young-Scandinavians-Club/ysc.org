@@ -21,6 +21,14 @@ Admin pages: `/admin/events` (list), `/admin/events/new` (creates a draft immedi
 - **Dates** — single day or a multi-day range, with start and end times.
 - **Location** — address text plus a map pin that powers the map and directions on the public page.
 
+## External ticketing (events run by other organizations)
+
+- For events on our calendar that another group organizes (e.g. other Scandinavian clubs in the Bay Area). Fill in the **External Ticketing** section on the Details tab: "Ticket Link" (any http/https URL) and optionally "Organized By" (the group's name).
+- With a ticket link set, the event is labeled **External Tickets** on cards, the home page, TV posters, the newsletter and the API instead of "Free", and the event page shows a "Get Tickets" button that opens the organizer's site in a new tab. YSC does not sell tickets for these events.
+- An external ticket link also overrides "Tickets Coming Soon" (the Save the Date badge and "Notify me when tickets open" disappear without clearing the flag). Any ticket tiers on the event are ignored on the public page (the Tickets tab shows a notice). Clear the link to sell tickets through YSC instead.
+- Leaving both the ticket link and tiers empty still shows "Free" — set the link for events that are not free.
+- Copying an event also copies the ticket link and organizer.
+
 ## Partiful link (external registration)
 
 - Optional field "Partiful Link (Optional)" (placeholder `https://partiful.com/e/...`). It must be a partiful.com URL.
@@ -48,7 +56,7 @@ Admin pages: `/admin/events` (list), `/admin/events/new` (creates a draft immedi
 ## Copying an event
 
 - **Copy Event** (in the editor menu, or **Copy** in the list's row actions; confirmation "Copy this event?") creates a new **draft** titled "Copy of {original title}".
-- Copied: agendas and items, ticket tiers, FAQ entries, cover image, location, dates, Partiful link, capacity, and details.
+- Copied: agendas and items, ticket tiers, FAQ entries, cover image, location, dates, Partiful link, external ticket link, capacity, and details.
 - NOT copied: hosts, tickets/orders/registrations, publish timestamps.
 - Always update the dates on the copy before publishing. Copying is the fastest way to set up recurring events.
 
