@@ -477,7 +477,12 @@ defmodule YscWeb.PageControllerTest do
           &YscWeb.BrandGuide.logo_files(&1.slug)
         ) ++
           ["images/brand/logos/ysc-logos.zip"] ++
-          YscWeb.BrandGuide.template_files()
+          YscWeb.BrandGuide.template_files() ++
+          YscWeb.BrandGuide.document_template_files() ++
+          YscWeb.BrandGuide.palette_files() ++
+          YscWeb.BrandGuide.social_kit_files()
+
+      assert length(files) > 40
 
       for file <- files do
         assert File.regular?(Path.join(static, file)), "missing #{file}"
