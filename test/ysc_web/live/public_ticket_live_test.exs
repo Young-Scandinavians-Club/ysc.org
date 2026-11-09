@@ -20,10 +20,16 @@ defmodule YscWeb.PublicTicketLiveTest do
     html = render_async(view)
 
     assert has_element?(view, "#ticket-slider")
-    assert html =~ "Scan to check in"
+    refute html =~ "Scan to check in"
 
     for ticket <- tickets do
       assert has_element?(view, "#ticket-qr-#{ticket.reference_id}")
+
+      assert has_element?(
+               view,
+               "#ticket-qr-check-in-hint-#{ticket.reference_id}",
+               "Show this to staff"
+             )
     end
 
     refute has_element?(view, "#back-link")

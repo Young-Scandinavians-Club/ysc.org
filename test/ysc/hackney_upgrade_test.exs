@@ -1,31 +1,24 @@
 defmodule Ysc.HackneyUpgradeTest do
   @moduledoc """
-  Guards the hackney 4.7.4 → 4.9.1 upgrade.
+  Guards the hackney 4.9.1 → 4.10.0 upgrade (tightly coupled with h2 0.15.0).
 
-  4.9.1 is docs-only over 4.9.0. 4.9.0 patches:
+  4.10.0 patches HTTP/1.1 chunked `max_body_size`: the cap is checked as
+  chunk data arrives, so one huge chunk can no longer bypass it. Chunk-size
+  lines longer than 4096 bytes or more than 16 hex digits are refused.
+  HTTP/2 and HTTP/3 wait for a free stream (`checkout_timeout`) instead of
+  failing at the peer's concurrent-stream limit, and retry a GOAWAY /
+  refused / rejected request once on a fresh connection.
 
-  * EEF-CVE-2026-97200 (HIGH) — buffered / auto_decompress bodies stop at
-    `max_body_size` (default 512 MiB; 1.x name `max_body`) with
-    `{error, body_too_large}`.
-  * EEF-CVE-2026-115693 (CRITICAL) — `cacerts` / `cacertfile` actually
-    restrict trust; hackney's `partial_chain` no longer keeps bundled
-    public roots when the caller pins a CA.
-  * EEF-CVE-2026-113440 (MEDIUM) — redirects keep `basic_auth` / `cookie`
-    only on the same scheme+host+port unless `location_trusted`.
-  * EEF-CVE-2026-115700 (MEDIUM) — percent-encoded bracketed IPv6 and
-    trailing-dot IP literals are refused like other IP literals.
-  * EEF-CVE-2026-112880 (LOW) — `proxy_auth_fun` values with CR/LF/NUL
-    return `{error, {proxy_auth_error, invalid_header}}`.
+  extras: h2 0.15.0 (MadeYouReset + SETTINGS flood), quic 2.6.1 (HTTP/3
+  header-block CPU DoS), webtransport 0.5.3 (unused draft-17/16),
+  ssl_verify_fun 1.1.9 (non-ASCII dNSName). certifi stays 2.18.0.
 
-  4.8.x is pooling / HTTP/2 / HTTP/3 correctness plus extras: h2 0.12.5,
-  certifi 2.18.0 (drops compromised eMudhra CAs), webtransport 0.4.8,
-  and quic 2.1.2 (lock 2.1.3). hackney now starts h2 with a 32 MiB
-  connection window so HTTP/2 downloads are not stuck at 64 KB/RTT.
-
-  App HTTP uses Req (`ExAws.Request.Req`, `Ysc.Stripe.HttpClient`,
-  `Ysc.Tzdata.HttpClient`). We do not call hackney APIs, pin cacerts,
-  follow redirects with `basic_auth`, use `proxy_auth_fun`, HTTP/3, or
-  WebTransport. tzdata still lists `~> 1.17`.
+  4.9.1 is docs-only over 4.9.0 (`max_body_size`, pinned CA trust,
+  same-origin redirects, IP-literal SSRF spellings, proxy_auth_fun
+  CR/LF/NUL). App HTTP uses Req (`ExAws.Request.Req`,
+  `Ysc.Stripe.HttpClient`, `Ysc.Tzdata.HttpClient`). We do not call
+  hackney APIs, pin cacerts, follow redirects with `basic_auth`, use
+  `proxy_auth_fun`, HTTP/3, or WebTransport. tzdata still lists `~> 1.17`.
   """
   use ExUnit.Case, async: false
 
@@ -41,6 +34,7 @@ defmodule Ysc.HackneyUpgradeTest do
                           "../../deps/hackney/src/hackney_http_connect.erl",
                           __DIR__
                         )
+  @hackney_http Path.expand("../../deps/hackney/src/hackney_http.erl", __DIR__)
   @hackney_rebar Path.expand("../../deps/hackney/rebar.config", __DIR__)
   @webtransport_rebar Path.expand(
                         "../../deps/webtransport/rebar.config",
@@ -62,15 +56,15 @@ defmodule Ysc.HackneyUpgradeTest do
     :ok
   end
 
-  describe "4.9.1 Hex lock and public APIs" do
-    test "locks the Hex package to 4.9.1" do
-      assert to_string(Application.spec(:hackney, :vsn)) == "4.9.1"
+  describe "4.10.0 Hex lock and public APIs" do
+    test "locks the Hex package to 4.10.0" do
+      assert to_string(Application.spec(:hackney, :vsn)) == "4.10.0"
     end
 
-    test "mix.exs pins the 4.9.1 floor" do
+    test "mix.exs pins the 4.10.0 floor" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s({:hackney, "~> 4.9.1", override: true})
-      refute mix_exs =~ ~s({:hackney, "~> 4.7", override: true})
+      assert mix_exs =~ ~s({:hackney, "~> 4.10.0", override: true})
+      refute mix_exs =~ ~s({:hackney, "~> 4.9.1", override: true})
 
       ignore =
         mix_exs
@@ -86,27 +80,29 @@ defmodule Ysc.HackneyUpgradeTest do
       refute ignore =~ "EEF-CVE-2026-113440"
     end
 
-    test "companion extras are webtransport 0.4.8, certifi 2.18.0, quic 2.1.3" do
+    test "companion extras are h2 0.15.0, webtransport 0.5.3, quic 2.6.1" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"hackney": {:hex, :hackney, "4.9.1"|
-      refute lock =~ ~s|"hackney": {:hex, :hackney, "4.7.4"|
-      assert lock =~ ~s|"webtransport": {:hex, :webtransport, "0.4.8"|
-      refute lock =~ ~s|"webtransport": {:hex, :webtransport, "0.4.5"|
+      assert lock =~ ~s|"hackney": {:hex, :hackney, "4.10.0"|
+      refute lock =~ ~s|"hackney": {:hex, :hackney, "4.9.1"|
+      assert lock =~ ~s|"webtransport": {:hex, :webtransport, "0.5.3"|
+      refute lock =~ ~s|"webtransport": {:hex, :webtransport, "0.4.8"|
       assert lock =~ ~s|"certifi": {:hex, :certifi, "2.18.0"|
-      refute lock =~ ~s|"certifi": {:hex, :certifi, "2.17.0"|
-      assert lock =~ ~s|"quic": {:hex, :quic, "2.1.3"|
-      refute lock =~ ~s|"quic": {:hex, :quic, "1.8.1"|
-      assert lock =~ ~s|"h2": {:hex, :h2, "0.12.5"|
+      assert lock =~ ~s|"quic": {:hex, :quic, "2.6.1"|
+      refute lock =~ ~s|"quic": {:hex, :quic, "2.1.3"|
+      assert lock =~ ~s|"h2": {:hex, :h2, "0.15.0"|
+      refute lock =~ ~s|"h2": {:hex, :h2, "0.12.5"|
+      assert lock =~ ~s|"ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.9"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
     end
 
-    test "rebar deps match the extras hackney 4.9.1 requires" do
+    test "rebar deps match the extras hackney 4.10.0 requires" do
       rebar = File.read!(@hackney_rebar)
-      assert rebar =~ ~s|{quic, "~>2.1.2"}|
-      assert rebar =~ ~s|{h2, "~>0.12.5"}|
-      assert rebar =~ ~s|{webtransport, "~>0.4.8"}|
+      assert rebar =~ ~s|{quic, "~>2.6.1"}|
+      assert rebar =~ ~s|{h2, "~>0.15.0"}|
+      assert rebar =~ ~s|{webtransport, "~>0.5.3"}|
       assert rebar =~ ~s|{certifi, "~>2.18.0"}|
-      assert File.read!(@webtransport_rebar) =~ ~s|{quic, "~> 2.0"}|
+      assert File.read!(@webtransport_rebar) =~ ~s|{quic, "~> 2.6.1"}|
+      assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.15.0"}|
     end
 
     test "request APIs still exist" do
@@ -137,6 +133,22 @@ defmodule Ysc.HackneyUpgradeTest do
       assert news =~ "proxy_auth_fun"
       assert news =~ "{error, {proxy_auth_error, invalid_header}}"
       assert news =~ "The documentation builds again"
+    end
+  end
+
+  describe "4.10.0 NEWS" do
+    test "documents chunked max_body_size, h2 0.15.0, and stream wait" do
+      news = File.read!(@news)
+      assert news =~ "4.10.0 - 2026-11-09"
+      assert news =~ "chunked body"
+      assert news =~ "4096 bytes"
+      assert news =~ "16 hex digits"
+      assert news =~ "checkout_timeout"
+      assert news =~ "h2 0.15.0"
+      assert news =~ "MadeYouReset"
+      assert news =~ "SETTINGS flood"
+      assert news =~ "quic 2.6.1"
+      assert news =~ "webtransport 0.5.3"
     end
   end
 
@@ -261,7 +273,91 @@ defmodule Ysc.HackneyUpgradeTest do
       conn = File.read!(@hackney_conn)
       assert conn =~ "-define(H2_STREAM_WINDOW, 8 * 1024 * 1024)."
       assert conn =~ "-define(H2_CONN_WINDOW, 32 * 1024 * 1024)."
-      assert conn =~ ~S|connection_window_size => ?H2_CONN_WINDOW}|
+      assert conn =~ ~S|connection_window_size => ?H2_CONN_WINDOW,|
+    end
+  end
+
+  describe "4.10.0 chunked max_body_size" do
+    test "parser hands chunk data on as it arrives and bounds the size line" do
+      source = File.read!(@hackney_http)
+      assert source =~ "-define(MAX_CHUNK_LINE, 4096)."
+      assert source =~ "-define(MAX_CHUNK_SIZE_DIGITS, 16)."
+      assert source =~ "Chunk data is handed out as it arrives"
+
+      assert source =~
+               "{chunk_part, Data, {remaining, R - byte_size(Data)}, <<>>}"
+
+      assert source =~ "{error, invalid_chunk_size}"
+    end
+
+    test "chunk-size lines over 16 hex digits or 4096 bytes are refused" do
+      {:module, _} = Code.ensure_loaded(:hackney_http)
+      headers = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n"
+
+      parser = skip_to_body(:hackney_http.parser([:response]), headers)
+
+      assert {:error, :invalid_chunk_size} =
+               :hackney_http.execute(parser, "10000000000000000\r\n")
+
+      parser = skip_to_body(:hackney_http.parser([:response]), headers)
+      overlong = String.duplicate("1", 4097) <> "\r\n"
+
+      assert {:error, :invalid_chunk_size} =
+               :hackney_http.execute(parser, overlong)
+    end
+
+    test "a chunked body over max_body_size fails as data arrives" do
+      {:ok, lsock} =
+        :gen_tcp.listen(0, [
+          :binary,
+          packet: :raw,
+          active: false,
+          reuseaddr: true,
+          ip: {127, 0, 0, 1}
+        ])
+
+      {:ok, port} = :inet.port(lsock)
+
+      server =
+        Task.async(fn ->
+          {:ok, sock} = :gen_tcp.accept(lsock, 2_000)
+          _ = :gen_tcp.recv(sock, 0, 2_000)
+          chunk = String.duplicate("x", 64)
+
+          resp = [
+            "HTTP/1.1 200 OK\r\n",
+            "Transfer-Encoding: chunked\r\n",
+            "\r\n",
+            Integer.to_string(byte_size(chunk), 16),
+            "\r\n",
+            chunk,
+            "\r\n0\r\n\r\n"
+          ]
+
+          :ok = :gen_tcp.send(sock, resp)
+          :gen_tcp.close(sock)
+        end)
+
+      url = "http://127.0.0.1:#{port}/"
+
+      try do
+        assert {:error, :body_too_large} =
+                 :hackney.request(:get, url, [], "",
+                   max_body_size: 8,
+                   pool: false
+                 )
+      after
+        _ = Task.shutdown(server, :brutal_kill)
+        :gen_tcp.close(lsock)
+      end
+    end
+  end
+
+  describe "4.10.0 HTTP/2 stream wait extra" do
+    test "hackney opts into notify_stream_available" do
+      conn = File.read!(@hackney_conn)
+      assert conn =~ "notify_stream_available => true"
+      assert conn =~ "handle_h2_event(stream_available, Data)"
     end
   end
 
@@ -278,4 +374,20 @@ defmodule Ysc.HackneyUpgradeTest do
       assert length(:certifi.cacerts()) == 118
     end
   end
+
+  defp skip_to_body(parser, data) do
+    case call_parser(parser, data) do
+      {:response, _version, _status, _reason, next} ->
+        skip_to_body(next, :continue)
+
+      {:header, _header, next} ->
+        skip_to_body(next, :continue)
+
+      {:headers_complete, next} ->
+        next
+    end
+  end
+
+  defp call_parser(parser, :continue), do: :hackney_http.execute(parser)
+  defp call_parser(parser, data), do: :hackney_http.execute(parser, data)
 end

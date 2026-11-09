@@ -92,6 +92,35 @@ defmodule YscWeb.Workers.EventPhotoUploadWorkerTest do
            |> Enum.any?(&String.starts_with?(&1, "party"))
   end
 
+  test "Finding 100: rejects an oversized photo from S3 Content-Length without downloading it",
+       %{collection: collection, user: user} do
+    prev = Application.get_env(:ysc, :google_photos_max_photo_bytes)
+
+    Application.put_env(:ysc, :google_photos_max_photo_bytes, 1)
+
+    on_exit(fn ->
+      if prev do
+        Application.put_env(:ysc, :google_photos_max_photo_bytes, prev)
+      else
+        Application.delete_env(:ysc, :google_photos_max_photo_bytes)
+      end
+    end)
+
+    key = "event_photo_uploads/#{collection.id}/#{Ecto.UUID.generate()}.png"
+    put_s3_object(key, @tiny_png)
+
+    job =
+      make_job(%{
+        "collection_id" => collection.id,
+        "s3_key" => key,
+        "filename" => "huge.png",
+        "user_id" => user.id
+      })
+
+    assert :ok = EventPhotoUploadWorker.perform(job)
+    refute s3_object_exists?(key)
+  end
+
   test "rejects an unsupported file type without retrying, and still cleans up S3",
        %{collection: collection, user: user} do
     key = "event_photo_uploads/#{collection.id}/#{Ecto.UUID.generate()}.xyz"

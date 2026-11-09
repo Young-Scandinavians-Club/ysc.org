@@ -199,7 +199,7 @@
     <!-- Individual ticket numbers -->
     <mj-text align="left" font-size="20px" line-height="1.4" padding="0px" font-weight="bold"> Your ticket numbers </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Keep these ticket numbers. You'll need them at check-in, or if you write to us about this order: </mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Keep these ticket numbers if you write to us about this order: </mj-text>
     <mj-spacer height="8px"></mj-spacer>
     <mj-text align="left" font-size="14px" line-height="1.5" padding="0px" padding-left="16px">
       <%= for ticket <- @tickets do %>

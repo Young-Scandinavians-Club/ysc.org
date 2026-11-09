@@ -88,6 +88,20 @@ defmodule Ysc.Events.TicketTierHelpersTest do
 
       refute TicketTierHelpers.has_check_in_tickets?(tickets)
     end
+
+    test "is false when the only paid ticket is still pending" do
+      tickets = [
+        %{status: :pending, ticket_tier: %{type: :paid}},
+        %{status: :confirmed, ticket_tier: %{type: :donation}}
+      ]
+
+      refute TicketTierHelpers.has_check_in_tickets?(tickets)
+    end
+
+    test "is false for a non-list" do
+      refute TicketTierHelpers.has_check_in_tickets?(nil)
+      refute TicketTierHelpers.has_check_in_tickets?(%{})
+    end
   end
 
   describe "free_tier?/1" do
