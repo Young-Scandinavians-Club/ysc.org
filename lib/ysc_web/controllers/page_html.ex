@@ -132,4 +132,30 @@ defmodule YscWeb.PageHTML do
   defp doc_title(:report, _fy), do: "Full Annual Report"
   defp doc_title(:minutes, _fy), do: "Meeting Minutes"
   defp doc_title(:slides, _fy), do: "Financials Presentation"
+
+  # A contrast ratio with a plain-words verdict, so meaning never rests on
+  # color alone. `level` is :ok (passes body text), :large (large text only)
+  # or :no.
+  attr :ratio, :string, required: true
+  attr :level, :atom, required: true, values: [:ok, :large, :no]
+
+  defp contrast_cell(assigns) do
+    ~H"""
+    <span class={[
+      "font-semibold",
+      @level == :ok && "text-green-800",
+      @level == :large && "text-amber-800",
+      @level == :no && "text-red-800"
+    ]}>
+      {@ratio}:1 · {contrast_verdict(@level, @ratio)}
+    </span>
+    """
+  end
+
+  defp contrast_verdict(:ok, ratio) do
+    if String.to_float(ratio) >= 7.0, do: "AAA", else: "AA"
+  end
+
+  defp contrast_verdict(:large, _ratio), do: "large text only"
+  defp contrast_verdict(:no, _ratio), do: "too low"
 end

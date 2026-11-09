@@ -238,6 +238,7 @@ defmodule YscWeb.Router do
     get "/privacy-policy", PageController, :privacy_policy
     get "/terms-of-service", PageController, :terms_of_service
     get "/choir", PageController, :choir
+    get "/brand", PageController, :brand
 
     get "/up", UpController, :index
 

@@ -75,6 +75,25 @@ defmodule YscWeb.PageController do
     |> render(:history)
   end
 
+  def brand(conn, _params) do
+    conn
+    |> assign(:page_title, "Brand & Style Guide")
+    |> assign(
+      :meta_description,
+      "Download the Young Scandinavians Club logo and presentation template, and see our colors, type and design rules."
+    )
+    |> assign(:logo_variants, YscWeb.BrandGuide.logo_variants())
+    |> assign(:logo_zip_path, YscWeb.BrandGuide.logo_zip_path())
+    |> assign(:countries, YscWeb.BrandGuide.countries())
+    |> assign(:pairings, YscWeb.BrandGuide.pairings())
+    |> assign(:blue_scale, YscWeb.BrandGuide.blue_scale())
+    |> assign(:zinc_scale, YscWeb.BrandGuide.zinc_scale())
+    |> assign(:chart_bars, YscWeb.BrandGuide.chart_bars())
+    |> assign(:series_colors, YscWeb.BrandGuide.series_colors())
+    |> assign(:google_slides_url, YscWeb.BrandGuide.google_slides_copy_url())
+    |> render(:brand)
+  end
+
   def privacy_policy(conn, _params) do
     conn
     |> assign(:page_title, "Privacy Policy")

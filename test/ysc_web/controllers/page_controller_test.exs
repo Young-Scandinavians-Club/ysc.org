@@ -417,4 +417,114 @@ defmodule YscWeb.PageControllerTest do
                3
     end
   end
+
+  describe "GET /brand" do
+    test "is public and shows every section", %{conn: conn} do
+      html = conn |> get(~p"/brand") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      assert Enum.count(LazyHTML.query(document, "#brand-masthead")) == 1
+
+      for id <- ~w(logo color type components imagery charts slides) do
+        assert Enum.count(LazyHTML.query(document, "section##{id}")) == 1
+
+        assert Enum.count(
+                 LazyHTML.query(document, "#brand-nav a[href='##{id}']")
+               ) == 1
+      end
+
+      assert Enum.count(LazyHTML.query(document, "#country-palette > li")) == 5
+
+      assert Enum.count(LazyHTML.query(document, "#contrast-table tbody tr")) ==
+               8
+    end
+
+    test "offers each logo in every format", %{conn: conn} do
+      html = conn |> get(~p"/brand") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      assert Enum.count(
+               LazyHTML.query(document, "a#download-all-logos[download]")
+             ) == 1
+
+      variants = YscWeb.BrandGuide.logo_variants()
+      assert length(variants) == 5
+
+      for variant <- variants do
+        assert Enum.count(LazyHTML.query(document, "#logo-#{variant.slug}")) ==
+                 1
+
+        for file <- variant.downloads do
+          assert Enum.count(
+                   LazyHTML.query(
+                     document,
+                     "#logo-#{variant.slug} a[download][href='#{file.href}']"
+                   )
+                 ) == 1
+        end
+
+        assert Enum.map(variant.downloads, & &1.label) ==
+                 ["SVG", "PNG 2000 px", "PNG 512 px", "PDF", "AI"]
+      end
+    end
+
+    test "all logo and template files exist and are served", %{conn: conn} do
+      static = :code.priv_dir(:ysc) |> Path.join("static")
+
+      files =
+        Enum.flat_map(
+          YscWeb.BrandGuide.logo_variants(),
+          &YscWeb.BrandGuide.logo_files(&1.slug)
+        ) ++
+          ["images/brand/logos/ysc-logos.zip"] ++
+          YscWeb.BrandGuide.template_files()
+
+      for file <- files do
+        assert File.regular?(Path.join(static, file)), "missing #{file}"
+        assert conn |> get("/" <> file) |> response(200)
+      end
+    end
+
+    test "links to both template downloads", %{conn: conn} do
+      html = conn |> get(~p"/brand") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      assert Enum.count(
+               LazyHTML.query(document, "a#download-template-potx[download]")
+             ) == 1
+
+      assert Enum.count(
+               LazyHTML.query(document, "a#download-template-pptx[download]")
+             ) == 1
+    end
+
+    test "hides the Google Slides button until a template is configured", %{
+      conn: conn
+    } do
+      html = conn |> get(~p"/brand") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      assert Enum.empty?(LazyHTML.query(document, "#open-in-google-slides"))
+    end
+
+    test "shows a Google Slides copy link when a template is configured", %{
+      conn: conn
+    } do
+      Application.put_env(:ysc, :brand_google_slides_template_id, "abc_123-XYZ")
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :brand_google_slides_template_id)
+      end)
+
+      html = conn |> get(~p"/brand") |> html_response(200)
+      document = LazyHTML.from_fragment(html)
+
+      assert Enum.count(
+               LazyHTML.query(
+                 document,
+                 "a#open-in-google-slides[href='https://docs.google.com/presentation/d/abc_123-XYZ/copy'][target='_blank']"
+               )
+             ) == 1
+    end
+  end
 end

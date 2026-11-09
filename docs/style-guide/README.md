@@ -1,43 +1,67 @@
-# YSC visual style guide
+# Brand & style guide
 
-A single static page that shows how the club looks: logo, Nordic colors, type, components, imagery and chart colors.
+The public brand page lives at **`/brand`** (linked from the site footer). It shows the logo, Nordic colors, type, components, imagery and chart colors, and hosts the logo and slide template downloads.
 
-Open [`index.html`](index.html) in a browser. There is no build step and no dependencies; the page uses the system font and loads nothing from the network.
+## Where things are
 
-## Files
-
-| Path | What it is |
+| What | Where |
 | --- | --- |
-| `index.html` | The whole guide (HTML, CSS and a few lines of JS for copying hex codes) |
-| `assets/ysc-logo.png` | Club seal, used on the page |
-| `assets/ysc-logo-no-circle.svg` | Shield-only logo |
-| `assets/bonfire.jpg` | Sample photo for the imagery section |
+| Page template | `lib/ysc_web/controllers/page_html/brand.html.heex` |
+| Controller action | `YscWeb.PageController.brand/2` |
+| Colors, logo variants, chart colors | `lib/ysc_web/brand_guide.ex` |
+| Logo files (SVG, PDF, PNG, AI, zip) | `priv/static/images/brand/logos/` |
+| Slide template (.potx, .pptx) | `priv/static/documents/brand/` (see [presentation-template](../presentation-template/README.md)) |
+| Click-to-copy for swatches | `[data-copy]` handler in `assets/js/app.js` |
+| Tests | `describe "GET /brand"` in `test/ysc_web/controllers/page_controller_test.exs` |
 
-The logo and photo are copies of `priv/static/images/ysc_logo.png`, `ysc_logo_no_circle.svg` and `ysc_bonfire_2024.jpg`.
-
-## Viewing it
-
-Double-click `index.html`, or serve the folder:
-
-```bash
-python3 -m http.server 8000 --directory docs/style-guide
-```
-
-Then open <http://localhost:8000>. The "Slide template" links point at `../presentation-template/`, so they work when the whole `docs/` folder is served or opened from disk.
+The route is public (no sign-in) and the files are served as static assets, so nothing in these folders may be private.
 
 ## Keeping it in sync
 
-The code is the source of truth. If the page and the code disagree, the code wins. When these change, update the page:
+The code is the source of truth. When these change, update the page:
 
-- **Colors:** `assets/tailwind.config.js` (brand blue, blue scale, Nordic flag colors).
-- **Type tokens:** the `TYPE TOKENS` block in `assets/css/app.css`.
-- **Buttons, badges and form fields:** `lib/ysc_web/components/core_components.ex`.
+- **Colors:** `assets/tailwind.config.js` (brand blue, blue scale, Nordic flag colors). Mirror changes in `BrandGuide`.
+- **Type tokens:** the `TYPE TOKENS` block in `assets/css/app.css`. The page uses the real `type-*` classes, so it follows automatically.
+- **Buttons and badges:** `lib/ysc_web/components/core_components.ex`. The page renders the real components.
 
 Contrast ratios in the "Accessible pairings" table are WCAG 2.x values computed from the hex codes. Recompute them if a color changes.
 
+## Logos
+
+The five variants come from the Illustrator masters in the club's Box folder (`YSC LOGO`):
+
+| Variant (file slug) | Box file |
+| --- | --- |
+| `seal-white-center` | `YSC LOGO 4 color 050125 - white background.ai` |
+| `seal-transparent-center` | `YSC LOGO 4 color 052522.ai` |
+| `seal-white-ring` | `YSC LOGO 4 color inverted circle 091222.ai` |
+| `shield-white-text` | `YSC LOGO 4 color no circle background 091222.ai` |
+| `stacked-white-text` | `YSC LOGO 4 color straight text 091222.ai` |
+
+The `.ai` files are PDF-compatible, so the other formats were made with poppler's `pdftocairo`:
+
+```bash
+pdftocairo -svg master.ai ysc-logo-<slug>.svg
+pdftocairo -pdf master.ai ysc-logo-<slug>.pdf
+pdftocairo -png -transp -scale-to-x 2000 -scale-to-y -1 -singlefile master.ai ysc-logo-<slug>
+pdftocairo -png -transp -scale-to-x 512 -scale-to-y -1 -singlefile master.ai ysc-logo-<slug>-512
+```
+
+`ysc-logos.zip` holds the SVG, PDF and PNG files of every variant (not the AI masters). To add a variant, add it to `BrandGuide.logo_variants/0`, drop its five files in `priv/static/images/brand/logos/`, and rebuild the zip.
+
+## Google Slides button
+
+The "Open in Google Slides" button on `/brand` appears only when `BRAND_GOOGLE_SLIDES_TEMPLATE_ID` is set (read in `config/runtime.exs`). To set it up:
+
+1. Upload `YSC-presentation-template.pptx` to the club's Google Drive and open it with Google Slides.
+2. Choose File, Save as Google Slides, then Share, General access: **Anyone with the link**, Viewer.
+3. Copy the file ID from the URL (`docs.google.com/presentation/d/<ID>/edit`) and set `BRAND_GOOGLE_SLIDES_TEMPLATE_ID=<ID>` in production.
+
+The button links to `.../presentation/d/<ID>/copy`, which asks the visitor to make their own copy in their Google account. After updating the template, repeat these steps; if the file ID changes, update the environment variable.
+
 ## What comes from the code and what is proposed
 
-Colors, type tokens, button and badge styling come from the code above. The logo rules (clear space of a quarter of the logo's width, minimum size of 48 px on screen and 15 mm in print) and the photo guidance are proposals, not taken from existing brand rules.
+Colors, type tokens, button and badge styling come from the code above. The logo usage tips (clear space of about a quarter of the logo's width, darkening photos behind it) and the photo guidance are proposals, not existing brand rules.
 
 ## Related
 

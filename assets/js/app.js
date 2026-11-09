@@ -584,6 +584,22 @@ document.addEventListener("click", (event) => {
     }
 });
 
+// Click-to-copy for elements with data-copy (swatches on /brand).
+// An optional [data-copy-label] child briefly reads "Copied".
+document.addEventListener("click", (event) => {
+    const el = event.target.closest("[data-copy]");
+    if (!el) return;
+    navigator.clipboard.writeText(el.getAttribute("data-copy")).then(() => {
+        const label = el.querySelector("[data-copy-label]");
+        if (!label) return;
+        const original = label.textContent;
+        label.textContent = "Copied";
+        setTimeout(() => { label.textContent = original; }, 1200);
+    }).catch((err) => {
+        console.error("Failed to copy:", err);
+    });
+});
+
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session

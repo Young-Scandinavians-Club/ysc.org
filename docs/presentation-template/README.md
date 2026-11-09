@@ -7,6 +7,8 @@ PowerPoint template for board, admin and member presentations, styled after the 
 | `YSC-presentation-template.potx` | PowerPoint template. Double-click to start a new deck from it. |
 | `YSC-presentation-template.pptx` | Same content as a regular deck. Use it to upload to Google Slides (Drive, then open with Google Slides) or to edit the master. |
 
+The files are served publicly from the [brand page](../style-guide/README.md) at `/brand`, and live in `priv/static/documents/brand/`. Replace them there to publish a new version.
+
 ## Layouts
 
 - **Title**: photo cover, plus five solid-color versions, one per Nordic country.
