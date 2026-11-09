@@ -218,8 +218,11 @@ defmodule YscWeb.TicketQrLive do
                             class="rounded-xl"
                           />
                         </div>
-                        <p class="text-center text-xs text-zinc-400 mt-4 type-eyebrow">
-                          Scan to check in
+                        <p
+                          id={"ticket-qr-check-in-hint-#{ticket.reference_id}"}
+                          class="text-center text-xs text-zinc-400 mt-4 type-eyebrow"
+                        >
+                          Show this to staff
                         </p>
                         <%!-- Fixed-height wallet row: platform detection must not expand the card --%>
                         <div class="flex flex-col items-center justify-center gap-2 mt-4 min-h-14">

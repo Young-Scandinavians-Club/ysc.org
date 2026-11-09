@@ -857,6 +857,11 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert text =~ "Order number:"
       assert text =~ "Payment number:"
       assert text =~ "Your ticket numbers"
+
+      assert text =~
+               "Keep these ticket numbers if you write to us about this order"
+
+      refute text =~ "You'll need them at check-in"
       refute text =~ "Payment Reference:"
       refute text =~ "Order Reference"
       refute text =~ "Ticket Reference"
