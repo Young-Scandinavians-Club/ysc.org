@@ -3,9 +3,9 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
   Uploads event photos or videos to Google Photos (or DevStub in local development).
 
   The browser uploads directly to S3 (see `YscWeb.EventPhotoUpload`), so this
-  worker downloads the object to local scratch space before handing it to the
-  Google Photos API client, then removes both the scratch file and (on a
-  terminal outcome) the S3 object.
+  worker HEADs the object for Content-Length (Finding 100), downloads it to
+  local scratch space before handing it to the Google Photos API client, then
+  removes both the scratch file and (on a terminal outcome) the S3 object.
   """
   require Ysc.Logging
 
@@ -54,11 +54,11 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
     scratch_id = Ecto.UUID.generate()
 
     result =
-      with {:ok, dest} <-
+      with {:ok, size} <- s3_object_byte_size(s3_key),
+           :ok <- Limits.validate_upload(filename, size),
+           {:ok, dest} <-
              SafeFile.event_photo_tmp_path(collection_id, scratch_id, filename),
            :ok <- download_from_s3(s3_key, dest),
-           {:ok, stat} <- SafeFile.stat_under_root(tmp_root, dest),
-           :ok <- Limits.validate_upload(filename, stat.size),
            collection <-
              EventPhotos.Collection
              |> Repo.get!(collection_id)
@@ -183,13 +183,74 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
   defp describe_reason({:s3_download_failed, detail}),
     do: "s3_download_failed #{inspect(detail)}"
 
+  defp describe_reason({:s3_head_failed, detail}),
+    do: "s3_head_failed #{inspect(detail)}"
+
   defp describe_reason(reason), do: inspect(reason)
 
   @download_timeout :timer.minutes(30)
 
-  # Errors that can only occur *after* a successful download (Limits.validate_upload
-  # inspecting the real file). Safe to delete the S3 object for these — we've
-  # confirmed we could actually read it, it's just not a file we can use.
+  # Signed HEAD works against Tigris/MinIO even though signed GET 405s
+  # (see download_from_s3/2). Use it to enforce photo/video size limits
+  # before streaming the object onto disk.
+  defp s3_object_byte_size(s3_key) do
+    case S3Config.bucket_name()
+         |> ExAws.S3.head_object(s3_key)
+         |> ExAws.request() do
+      {:ok, %{headers: headers}} ->
+        case content_length_from_headers(headers) do
+          size when is_integer(size) and size >= 0 ->
+            {:ok, size}
+
+          _ ->
+            {:error, {:s3_head_failed, :missing_content_length}}
+        end
+
+      {:error, reason} ->
+        {:error, {:s3_head_failed, reason}}
+    end
+  end
+
+  defp content_length_from_headers(headers) when is_list(headers) do
+    Enum.find_value(headers, &header_content_length/1)
+  end
+
+  defp content_length_from_headers(headers) when is_map(headers) do
+    Enum.find_value(headers, fn {name, value} ->
+      header_content_length({name, value})
+    end)
+  end
+
+  defp content_length_from_headers(_), do: nil
+
+  defp header_content_length({name, value}) do
+    if header_name(name) == "content-length" do
+      parse_non_neg_int(value)
+    end
+  end
+
+  defp header_content_length(_), do: nil
+
+  defp header_name(name) when is_atom(name),
+    do: name |> Atom.to_string() |> String.downcase()
+
+  defp header_name(name) when is_binary(name), do: String.downcase(name)
+  defp header_name(_), do: ""
+
+  defp parse_non_neg_int(value) when is_integer(value) and value >= 0, do: value
+
+  defp parse_non_neg_int(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {size, ""} when size >= 0 -> size
+      _ -> nil
+    end
+  end
+
+  defp parse_non_neg_int(_), do: nil
+
+  # Limits.validate_upload/2 now runs against the S3 Content-Length from HEAD
+  # (Finding 100), so a 4 GB photo is rejected without streaming it onto disk.
+  # HEAD succeeding is enough confirmation that the object exists and can go.
   @safe_to_delete_after_terminal_error [
     :photo_too_large,
     :video_too_large,
@@ -243,11 +304,11 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
   end
 
   # Always clears the local scratch file (cheap to re-download on retry).
-  # Only removes the S3 object when we know it was actually read (a
-  # successful upload, or a terminal validation rejection that only happens
-  # after reading the file) — never for a download failure, even on the
-  # final attempt, since that would permanently destroy a file we never
-  # actually got hold of. Those are left in S3 for manual recovery/cleanup.
+  # Only removes the S3 object when we know it exists (successful upload,
+  # or a terminal Limits rejection after HEAD) — never for a download/HEAD
+  # failure, even on the final attempt, since that would permanently destroy
+  # a file we never actually got hold of. Those are left in S3 for manual
+  # recovery/cleanup.
   defp cleanup(tmp_root, collection_id, scratch_id, filename, s3_key, result) do
     case SafeFile.event_photo_tmp_path(collection_id, scratch_id, filename) do
       {:ok, dest} -> SafeFile.rm_under_root(tmp_root, dest)
