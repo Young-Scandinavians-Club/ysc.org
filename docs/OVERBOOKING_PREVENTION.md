@@ -356,40 +356,19 @@ if failed_webhook_count() > 10 do
 end
 ```
 
-## Testing Recommendations
+## Testing
 
-### Unit Tests
+Concurrency is tested against the real database (no mocks, `async: false`) by firing many simultaneous attempts with `Task.async_stream/3` at a capacity boundary and asserting the limit is never exceeded:
 
-```elixir
-test "prevents overbooking with concurrent requests" do
-  # Create event with capacity of 10
-  # Simulate 15 concurrent booking requests for 1 ticket each
-  # Verify only 10 succeed
-end
+- `test/ysc/tickets/booking_locker_concurrency_test.exs`: tier capacity (e.g. 60 buyers for 50 tickets), event-level `max_attendees` across tiers, multiple tickets per order, pending tickets counting against capacity, unlimited tiers
+- `test/ysc/tickets/concurrent_checkout_test.exs`: regression for two tabs creating a ticket order for the same user/event at once (guarded by a per-user/event advisory lock)
+- `test/ysc/bookings/booking_locker_concurrency_test.exs`: Tahoe room double-booking and overlapping dates, Clear Lake per-guest capacity (12), buyouts vs. room/per-guest bookings, and holds blocking new bookings until released
 
-test "releases tickets on payment timeout" do
-  # Create pending order
-  # Advance time past expiration
-  # Run timeout worker
-  # Verify tickets are expired and available again
-end
-
-test "handles duplicate webhooks idempotently" do
-  # Process same webhook twice
-  # Verify order only processed once
-end
+```bash
+mix test test/ysc/tickets/booking_locker_concurrency_test.exs test/ysc/bookings/booking_locker_concurrency_test.exs
 ```
 
-### Integration Tests
-
-```elixir
-test "complete booking flow prevents overbooking" do
-  # Create event with limited capacity
-  # Create multiple orders concurrently
-  # Verify capacity is never exceeded
-  # Verify expired orders release tickets
-end
-```
+Timeout expiry and duplicate webhooks are covered by the timeout worker tests and `webhook_handler_test.exs` ([STRIPE_WEBHOOKS.md](STRIPE_WEBHOOKS.md)).
 
 ## Best Practices
 

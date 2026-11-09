@@ -25,7 +25,7 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
 
   ## Critical Audit Findings
 
-  Based on RECONCILIATION_AUDIT.md, the following issues were identified:
+  Known limitations of the reconciliation worker (from an earlier audit):
   1. Worker assumes {:ok, report} from reconciliation (no error handling) ⚠️
   2. Returns {:ok, report} even for errors (intentional, requires manual investigation)
   3. No transaction isolation in reconciliation ⚠️
