@@ -45,7 +45,7 @@ Payout created or relinked
 
 ## Idempotency
 
-Payment, refund, deposit and bill creates send QBO's `requestid` query parameter so a retried request replays the original response instead of creating a duplicate (scope: per company/realm, max 255 chars). Keys are derived from the record id:
+Payment, refund, deposit and bill creates send QBO's `requestid` query parameter so a retried request replays the original response instead of creating a duplicate (scope: per company/realm). Intuit allows at most **50 characters** for a non-batch request id, and rejects longer ones with error 2130. The code only truncates at 255, so it does not enforce this: keep new keys under 50 characters. Keys are derived from the record id:
 
 | Operation          | Key                               |
 | ------------------ | --------------------------------- |
