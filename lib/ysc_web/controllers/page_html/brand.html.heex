@@ -1,0 +1,891 @@
+<div class="py-6 lg:py-8 max-w-(--breakpoint-xl) mx-auto px-4">
+  <.page_masthead
+    id="brand-masthead"
+    eyebrow="Brand"
+    title="Brand & Style Guide"
+    subtitle="Download the club logo and presentation template, and see how we use color, type and imagery."
+  />
+
+  <nav
+    id="brand-nav"
+    aria-label="Brand sections"
+    class="flex flex-wrap gap-2 -mt-6 mb-12"
+  >
+    <a
+      :for={
+        {href, label} <- [
+          {"#logo", "Logo"},
+          {"#color", "Color"},
+          {"#type", "Type"},
+          {"#components", "Components"},
+          {"#imagery", "Imagery"},
+          {"#charts", "Charts"},
+          {"#slides", "Slides"},
+          {"#documents", "Documents"},
+          {"#web", "Social & web"},
+          {"#checklist", "Checklist"}
+        ]
+      }
+      href={href}
+      class="rounded-sm border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900 transition-colors"
+    >
+      {label}
+    </a>
+  </nav>
+
+  <%!-- LOGO --%>
+  <section id="logo" class="scroll-mt-24 mb-20" aria-labelledby="logo-heading">
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Logo</p>
+    <h2 id="logo-heading" class="text-3xl md:text-4xl type-title text-zinc-900">
+      The club seal
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      Use the seal as supplied. It carries the five Nordic flags, so it needs no extra decoration. Pick the version that suits the background, then download it in the format you need.
+    </p>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <a
+        id="download-all-logos"
+        href={@logo_zip_path}
+        download
+        class="inline-flex items-center gap-2 rounded-sm bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
+      >
+        <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
+        Download all logos (.zip)
+      </a>
+      <span class="text-sm text-zinc-500">
+        SVG, PDF and PNG of every version. Illustrator (AI) files are on each card.
+      </span>
+    </div>
+
+    <ul class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <li
+        :for={logo <- @logo_variants}
+        id={"logo-#{logo.slug}"}
+        class="flex flex-col overflow-hidden rounded-sm border border-zinc-200 bg-white shadow-xs"
+      >
+        <div class={[
+          "flex items-center justify-center p-8 h-56",
+          logo.surface == :dark && "bg-norway-blue",
+          logo.surface == :light && "bg-white border-b border-zinc-200"
+        ]}>
+          <img
+            src={logo.preview}
+            alt={"YSC logo: #{logo.name}"}
+            class="max-h-full w-auto"
+            loading="lazy"
+          />
+        </div>
+        <div class="flex flex-1 flex-col gap-3 p-5">
+          <div>
+            <h3 class="text-lg type-subhead text-zinc-900">{logo.name}</h3>
+            <p class="mt-1 text-sm text-zinc-600">{logo.description}</p>
+          </div>
+          <div class="mt-auto flex flex-wrap gap-2">
+            <a
+              :for={file <- logo.downloads}
+              href={file.href}
+              download
+              class="inline-flex items-center gap-1 rounded-sm border border-zinc-300 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+            >
+              {file.label}
+            </a>
+          </div>
+        </div>
+      </li>
+    </ul>
+
+    <div class="mt-6 grid gap-6 md:grid-cols-2">
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Which format?</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            <b>SVG or PDF</b>
+            for print, signs, shirts and anything that gets resized.
+          </li>
+          <li>
+            <b>PNG</b>
+            for web, email, documents and slides. All PNGs have transparent backgrounds.
+          </li>
+          <li>
+            <b>AI</b> for designers who need to edit the artwork in Illustrator.
+          </li>
+        </ul>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Using it well</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Keep clear space around the logo of about a quarter of its width.
+          </li>
+          <li>
+            Scale proportionally. Don't recolor, rotate, stretch or add effects.
+          </li>
+          <li>On photos, darken the photo first so the logo stays readable.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <%!-- COLOR --%>
+  <section id="color" class="scroll-mt-24 mb-20" aria-labelledby="color-heading">
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Color</p>
+    <h2 id="color-heading" class="text-3xl md:text-4xl type-title text-zinc-900">
+      The Nordic palette
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      The five Nordic countries share equal prominence. No single country color is "the" brand color: rotate through all five on covers, section dividers, charts and highlights. Click a swatch to copy its hex code.
+    </p>
+
+    <ul
+      id="country-palette"
+      class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
+    >
+      <li
+        :for={country <- @countries}
+        id={"country-#{String.downcase(country.name)}"}
+        class="rounded-sm border border-zinc-200 bg-white p-4 shadow-xs"
+      >
+        <h3 class="text-lg type-subhead text-zinc-900">{country.name}</h3>
+        <div class="mt-3 grid gap-2">
+          <button
+            :for={swatch <- country.swatches}
+            type="button"
+            data-brand-copy={swatch.hex}
+            title={"Copy #{swatch.hex}"}
+            class={[
+              "flex min-h-24 flex-col justify-end rounded-sm border border-zinc-200 p-3 text-left hover:-translate-y-0.5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
+              swatch.bg,
+              swatch.fg
+            ]}
+          >
+            <span class="text-sm font-semibold">{swatch.label}</span>
+            <span class="font-mono text-xs" data-brand-copy-label>{swatch.hex}</span>
+          </button>
+        </div>
+      </li>
+    </ul>
+    <p class="mt-3 text-sm text-zinc-500">
+      White is shared by every flag, so it is a neutral, not a country color.
+    </p>
+
+    <div id="palette-downloads" class="mt-6 flex flex-wrap items-center gap-2">
+      <span class="me-1 text-sm font-semibold text-zinc-700">Palette files:</span>
+      <a
+        :for={
+          {label, href} <- [
+            {"CSS variables", ~p"/documents/brand/ysc-palette.css"},
+            {"JSON", ~p"/documents/brand/ysc-palette.json"},
+            {"GIMP / Inkscape (.gpl)", ~p"/documents/brand/ysc-palette.gpl"},
+            {"Adobe swatches (.ase)", ~p"/documents/brand/ysc-palette.ase"}
+          ]
+        }
+        href={href}
+        download
+        class="inline-flex items-center gap-1 rounded-sm border border-zinc-300 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+      >
+        {label}
+      </a>
+    </div>
+
+    <h3 class="mt-12 mb-4 text-xl type-subhead text-zinc-900">How to use it</h3>
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="rounded-sm border border-zinc-200 bg-white p-5">
+        <p class="font-semibold text-zinc-900">Rotate, don't pick a favorite</p>
+        <p class="mt-2 text-sm text-zinc-600">
+          Across a deck or a page, give each country a turn. On slides, use the Title, Section and Statement versions for all five.
+        </p>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-5">
+        <p class="font-semibold text-zinc-900">
+          Solid fields, light or dark text
+        </p>
+        <p class="mt-2 text-sm text-zinc-600">
+          Use a country color as a full background with white text. Sweden yellow takes dark text instead.
+        </p>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-5">
+        <p class="font-semibold text-zinc-900">Neutrals carry the rest</p>
+        <p class="mt-2 text-sm text-zinc-600">
+          Light gray pages, white cards, near-black text. Color is for emphasis, not for every surface.
+        </p>
+      </div>
+    </div>
+
+    <h3 class="mt-12 mb-4 text-xl type-subhead text-zinc-900">
+      Accessible pairings
+    </h3>
+    <div class="overflow-x-auto rounded-sm border border-zinc-200 bg-white">
+      <table id="contrast-table" class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-zinc-200 text-left text-xs text-zinc-500 type-eyebrow">
+            <th class="px-4 py-3">Color</th>
+            <th class="px-4 py-3">Hex</th>
+            <th class="px-4 py-3">White text</th>
+            <th class="px-4 py-3">Dark text</th>
+            <th class="px-4 py-3">Use as</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            :for={row <- @pairings}
+            class="border-b border-zinc-100 last:border-0"
+          >
+            <td class="px-4 py-3 whitespace-nowrap">
+              <span class={[
+                "inline-block h-4 w-4 rounded-full align-[-3px] me-2 border border-black/10",
+                row.bg
+              ]}></span>
+              {row.name}
+            </td>
+            <td class="px-4 py-3 font-mono text-xs">{row.hex}</td>
+            <td class="px-4 py-3">
+              <.contrast_cell
+                ratio={elem(row.white, 0)}
+                level={elem(row.white, 1)}
+              />
+            </td>
+            <td class="px-4 py-3">
+              <.contrast_cell ratio={elem(row.ink, 0)} level={elem(row.ink, 1)} />
+            </td>
+            <td class="px-4 py-3 text-zinc-600">{row.use}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-sm text-zinc-500">
+      WCAG 2.x contrast ratios. Body text needs 4.5:1; large text (24 px, or 19 px bold) needs 3:1.
+    </p>
+
+    <h3 class="mt-12 mb-2 text-xl type-subhead text-zinc-900">Web scales</h3>
+    <p class="mb-3 text-sm text-zinc-600">
+      Blue, from <code class="font-mono">blue-50</code>
+      to <code class="font-mono">blue-950</code>.
+      <code class="font-mono">brand</code>
+      and <code class="font-mono">primary</code>
+      are #144993 (blue-900); buttons use blue-700.
+    </p>
+    <div
+      id="blue-scale"
+      class="grid grid-cols-4 overflow-hidden rounded-sm border border-zinc-200 sm:grid-cols-6 lg:grid-cols-11"
+    >
+      <button
+        :for={swatch <- @blue_scale}
+        type="button"
+        data-brand-copy={swatch.hex}
+        title={"Copy #{swatch.hex}"}
+        class={[
+          "px-1 pb-2 pt-7 text-center text-xs focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600",
+          swatch.bg,
+          swatch.fg
+        ]}
+      >
+        <b class="block text-sm">{swatch.step}</b>
+        <span class="font-mono" data-brand-copy-label>{swatch.hex}</span>
+      </button>
+    </div>
+    <p class="mt-6 mb-3 text-sm text-zinc-600">
+      Neutral (zinc): text, borders and surfaces.
+    </p>
+    <div
+      id="zinc-scale"
+      class="grid grid-cols-5 overflow-hidden rounded-sm border border-zinc-200 lg:grid-cols-10"
+    >
+      <button
+        :for={swatch <- @zinc_scale}
+        type="button"
+        data-brand-copy={swatch.hex}
+        title={"Copy #{swatch.hex}"}
+        class={[
+          "px-1 pb-2 pt-7 text-center text-xs focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600",
+          swatch.bg,
+          swatch.fg
+        ]}
+      >
+        <b class="block text-sm">{swatch.step}</b>
+        <span class="font-mono" data-brand-copy-label>{swatch.hex}</span>
+      </button>
+    </div>
+  </section>
+
+  <%!-- TYPE --%>
+  <section id="type" class="scroll-mt-24 mb-20" aria-labelledby="type-heading">
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Typography</p>
+    <h2 id="type-heading" class="text-3xl md:text-4xl type-title text-zinc-900">
+      Plain, sturdy type
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      The site uses the system sans-serif, so it loads instantly and looks native on every device. Weight, tracking and line height travel together as five tokens; only the size changes with the screen.
+    </p>
+
+    <div class="mt-8 rounded-sm border border-zinc-200 bg-white px-6 divide-y divide-zinc-200">
+      <div class="grid gap-2 py-5 md:grid-cols-[180px_1fr] md:gap-6 md:items-baseline">
+        <div class="text-xs text-zinc-500">
+          <b class="block font-mono text-sm text-zinc-900">type-display</b>
+          Hero and page title<br />700 · −0.022em · 1.05
+        </div>
+        <p class="text-4xl md:text-6xl type-display text-norway-blue">
+          Young Scandinavians
+        </p>
+      </div>
+      <div class="grid gap-2 py-5 md:grid-cols-[180px_1fr] md:gap-6 md:items-baseline">
+        <div class="text-xs text-zinc-500">
+          <b class="block font-mono text-sm text-zinc-900">type-title</b>
+          Section heading<br />700 · −0.015em · 1.15
+        </div>
+        <p class="text-3xl md:text-4xl type-title text-norway-blue">
+          Upcoming events and gatherings
+        </p>
+      </div>
+      <div class="grid gap-2 py-5 md:grid-cols-[180px_1fr] md:gap-6 md:items-baseline">
+        <div class="text-xs text-zinc-500">
+          <b class="block font-mono text-sm text-zinc-900">type-subhead</b>
+          Card title<br />600 · −0.01em · 1.25
+        </div>
+        <p class="text-2xl type-subhead text-norway-blue">
+          Midsummer dinner at the cabin
+        </p>
+      </div>
+      <div class="grid gap-2 py-5 md:grid-cols-[180px_1fr] md:gap-6 md:items-baseline">
+        <div class="text-xs text-zinc-500">
+          <b class="block font-mono text-sm text-zinc-900">type-body</b>
+          Running text<br />400 · 0 · 1.6
+        </div>
+        <p class="max-w-xl text-lg type-body text-zinc-800">
+          Join us for an evening of food, songs and friends. Members can bring one guest, and tickets are limited so reserve early.
+        </p>
+      </div>
+      <div class="grid gap-2 py-5 md:grid-cols-[180px_1fr] md:gap-6 md:items-baseline">
+        <div class="text-xs text-zinc-500">
+          <b class="block font-mono text-sm text-zinc-900">type-eyebrow</b>
+          Labels, badges, table headings<br />600 · +0.05em · 1.3 · caps
+        </div>
+        <p class="text-sm type-eyebrow text-blue-600">
+          Events · Tahoe cabin · Members
+        </p>
+      </div>
+    </div>
+
+    <div class="mt-6 grid gap-4 md:grid-cols-2">
+      <div class="rounded-sm border border-zinc-200 bg-white p-5">
+        <ul class="space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Headings use a token; don't set weight, tracking or leading by hand.
+          </li>
+          <li>One page title (<code class="font-mono">h1</code>) per page.</li>
+          <li>Uppercase only for the eyebrow tier, at small sizes.</li>
+        </ul>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-5">
+        <ul class="space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>Never uppercase headings or body text.</li>
+          <li>No extra-heavy weights; use bold (700).</li>
+          <li>Left-align paragraphs; center only titles.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <%!-- COMPONENTS --%>
+  <section
+    id="components"
+    class="scroll-mt-24 mb-20"
+    aria-labelledby="components-heading"
+  >
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Components</p>
+    <h2
+      id="components-heading"
+      class="text-3xl md:text-4xl type-title text-zinc-900"
+    >
+      Buttons and badges
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      Square-ish corners, generous touch targets, and one clear primary action per view.
+    </p>
+
+    <div class="mt-8 grid gap-4 md:grid-cols-2">
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <p class="mb-3 text-sm font-semibold text-zinc-600">Buttons</p>
+        <div class="flex flex-wrap items-center gap-3">
+          <.button type="button">Buy tickets</.button>
+          <.button type="button" variant="outline">Learn more</.button>
+          <.button type="button" color="zinc">Cancel</.button>
+          <.button type="button" color="red">Delete</.button>
+        </div>
+        <p class="mt-3 text-sm text-zinc-500">
+          Blue is the primary action. Outline for secondary, gray for neutral, red only for destructive actions.
+        </p>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <p class="mb-3 text-sm font-semibold text-zinc-600">Badges</p>
+        <div class="flex flex-wrap items-center gap-y-2">
+          <.badge type="default">Members only</.badge>
+          <.badge type="green">On sale</.badge>
+          <.badge type="yellow">Few left</.badge>
+          <.badge type="red">Sold out</.badge>
+          <.badge type="zinc">Draft</.badge>
+        </div>
+        <p class="mt-3 text-sm text-zinc-500">
+          Small soft tint with dark text. Say it in words; never rely on color alone.
+        </p>
+      </div>
+    </div>
+    <p class="mt-6 max-w-2xl text-sm text-zinc-600">
+      Icons come from Heroicons (outline), added with the
+      <code class="font-mono">&lt;.icon name="hero-…" /&gt;</code>
+      component. On slides, place a white outline icon on a solid Nordic-color circle; the slide template has an icon library ready to copy.
+    </p>
+  </section>
+
+  <%!-- IMAGERY --%>
+  <section
+    id="imagery"
+    class="scroll-mt-24 mb-20"
+    aria-labelledby="imagery-heading"
+  >
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Imagery</p>
+    <h2
+      id="imagery-heading"
+      class="text-3xl md:text-4xl type-title text-zinc-900"
+    >
+      Real people, real gatherings
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      Use candid photos of members: bonfires, dinners, the cabins. Avoid stock imagery. Warm light and group shots fit best.
+    </p>
+    <div class="mt-8 grid gap-6 md:grid-cols-2">
+      <figure>
+        <img
+          src={~p"/images/ysc_bonfire_2024.jpg"}
+          alt="Club members around a beach bonfire at sunset"
+          class="aspect-[16/10] w-full rounded-sm border border-zinc-200 object-cover"
+          loading="lazy"
+        />
+        <figcaption class="mt-2 text-sm text-zinc-500">
+          <b>Photo.</b> Full color, candid, faces visible.
+        </figcaption>
+      </figure>
+      <figure>
+        <div class="relative overflow-hidden rounded-sm border border-zinc-200 bg-norway-blue">
+          <img
+            src={~p"/images/ysc_bonfire_2024.jpg"}
+            alt=""
+            class="aspect-[16/10] w-full object-cover"
+            loading="lazy"
+          />
+          <div class="absolute inset-0 bg-linear-to-r from-norway-blue/95 to-norway-blue/30">
+          </div>
+          <p class="absolute bottom-4 left-5 text-2xl type-title text-white">
+            Midsummer at the beach
+          </p>
+        </div>
+        <figcaption class="mt-2 text-sm text-zinc-500">
+          <b>Behind text.</b>
+          Darken with a navy gradient (95% to 30%) so white text stays readable.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <%!-- CHARTS --%>
+  <section
+    id="charts"
+    class="scroll-mt-24 mb-20"
+    aria-labelledby="charts-heading"
+  >
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Charts</p>
+    <h2
+      id="charts-heading"
+      class="text-3xl md:text-4xl type-title text-zinc-900"
+    >
+      Data in the Nordic colors
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      When bars or slices are countries, color each with its own country. For other series, use the fixed order below.
+    </p>
+    <div class="mt-8 grid gap-4 md:grid-cols-2">
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <p class="mb-3 text-sm font-semibold text-zinc-600">By country</p>
+        <div
+          id="chart-by-country"
+          role="img"
+          aria-label="Sample bar chart with one bar per country, each in that country's color"
+          class="flex h-40 items-end gap-3 border-b border-zinc-300 px-1"
+        >
+          <span
+            :for={bar <- @chart_bars}
+            title={bar.name}
+            class={["block flex-1 rounded-t-sm", bar.bg, bar.h]}
+          ></span>
+        </div>
+        <p class="mt-2 text-sm text-zinc-500">
+          Denmark · Finland · Iceland · Norway · Sweden
+        </p>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <p class="mb-3 text-sm font-semibold text-zinc-600">
+          Series order (four at most)
+        </p>
+        <div class="flex flex-wrap gap-5">
+          <div :for={series <- @series_colors} class="text-center">
+            <span class={[
+              "block h-14 w-14 rounded-full border border-black/10",
+              series.bg
+            ]}></span>
+            <span class="mt-1 block text-xs text-zinc-500">{series.n} · {series.hex}</span>
+          </div>
+        </div>
+        <p class="mt-4 text-sm text-zinc-500">
+          No chart title (the heading does that), light gray gridlines, labels 11 px or larger, no 3D.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <%!-- SLIDES --%>
+  <section
+    id="slides"
+    class="scroll-mt-24 mb-8"
+    aria-labelledby="slides-heading"
+  >
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Presentations</p>
+    <h2
+      id="slides-heading"
+      class="text-3xl md:text-4xl type-title text-zinc-900"
+    >
+      Slide template
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      A PowerPoint template carries all of this: Title, Section and Statement slides in all five country colors, Five columns and Process layouts, chart styles and an icon library.
+    </p>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <a
+        :if={@google_slides_url}
+        id="open-in-google-slides"
+        href={@google_slides_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-2 rounded-sm bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
+      >
+        <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
+        Open in Google Slides
+      </a>
+      <a
+        id="download-template-potx"
+        href={~p"/documents/brand/YSC-presentation-template.potx"}
+        download
+        class={[
+          "inline-flex items-center gap-2 rounded-sm px-4 py-2.5 text-sm font-semibold transition-colors",
+          @google_slides_url &&
+            "border border-zinc-300 text-zinc-800 hover:bg-zinc-100",
+          !@google_slides_url && "bg-blue-700 text-white hover:bg-blue-800"
+        ]}
+      >
+        <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
+        PowerPoint template (.potx)
+      </a>
+      <a
+        id="download-template-pptx"
+        href={~p"/documents/brand/YSC-presentation-template.pptx"}
+        download
+        class="inline-flex items-center gap-2 rounded-sm border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+      >
+        <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
+        Regular deck (.pptx)
+      </a>
+    </div>
+    <p :if={@google_slides_url} class="mt-3 max-w-2xl text-sm text-zinc-500">
+      Google Slides asks you to make your own copy. You need to be signed in to a Google account.
+    </p>
+    <p :if={!@google_slides_url} class="mt-3 max-w-2xl text-sm text-zinc-500">
+      Using Google Slides? Download the .pptx, upload it to Google Drive, and open it with Google Slides.
+    </p>
+    <p class="mt-1 max-w-2xl text-sm text-zinc-500">
+      Slides use Arial in place of the system font so they look the same on every computer.
+    </p>
+  </section>
+
+  <%!-- DOCUMENTS --%>
+  <section
+    id="documents"
+    class="scroll-mt-24 mb-20"
+    aria-labelledby="documents-heading"
+  >
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Documents</p>
+    <h2
+      id="documents-heading"
+      class="text-3xl md:text-4xl type-title text-zinc-900"
+    >
+      Document template
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      A Word template for letters, reports, agendas and minutes, with the brand styles built in. It works in Google Docs too.
+    </p>
+
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <a
+        id="download-document-dotx"
+        href={~p"/documents/brand/YSC-document-template.dotx"}
+        download
+        class="inline-flex items-center gap-2 rounded-sm bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
+      >
+        <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
+        Word template (.dotx)
+      </a>
+      <a
+        id="download-document-docx"
+        href={~p"/documents/brand/YSC-document-template.docx"}
+        download
+        class="inline-flex items-center gap-2 rounded-sm border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+      >
+        <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
+        Regular document (.docx)
+      </a>
+    </div>
+    <p class="mt-3 max-w-2xl text-sm text-zinc-500">
+      Using Google Docs? Upload the .docx to Google Drive and open it with Google Docs, then make a copy for each new document.
+    </p>
+
+    <div class="mt-8 grid gap-4 md:grid-cols-2">
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">What's inside</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Title, Subtitle, Heading 1 to 3, Quote, lists and tables, all as real styles.
+          </li>
+          <li>
+            The logo and club name in the page header, web address and page number in the footer.
+          </li>
+          <li>A meeting agenda and minutes page with an action items table.</li>
+          <li>Callouts in all five Nordic colors.</li>
+        </ul>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Writing tips</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Use the heading styles instead of making text big and bold by hand.
+          </li>
+          <li>
+            Navy headings, blue sub-headings and near-black body text keep contrast high.
+          </li>
+          <li>
+            Use country colors for callouts and charts, not for long passages of text.
+          </li>
+          <li>Save as PDF before sending, so fonts and layout stay put.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <%!-- SOCIAL AND WEB --%>
+  <section id="web" class="scroll-mt-24 mb-20" aria-labelledby="web-heading">
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Social & web</p>
+    <h2 id="web-heading" class="text-3xl md:text-4xl type-title text-zinc-900">
+      Images for posts, pages and email
+    </h2>
+    <p class="mt-3 max-w-2xl text-lg text-zinc-600 type-body">
+      Start from a ready-made canvas, add your headline or photo in any design tool, and export at the size you need.
+    </p>
+    <div class="mt-6 flex flex-wrap items-center gap-3">
+      <a
+        id="download-social-kit"
+        href={@social_kit_zip_path}
+        download
+        class="inline-flex items-center gap-2 rounded-sm bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
+      >
+        <.icon name="hero-arrow-down-tray" class="w-4 h-4" />
+        Download the whole kit (.zip)
+      </a>
+      <span class="text-sm text-zinc-500">Profile pictures, link preview and all 15 canvases.</span>
+    </div>
+
+    <h3 class="mt-10 mb-4 text-xl type-subhead text-zinc-900">
+      Profile pictures and link preview
+    </h3>
+    <div id="profile-pictures" class="grid items-start gap-4 sm:grid-cols-3">
+      <div
+        :for={pic <- @profile_pictures}
+        class="overflow-hidden rounded-sm border border-zinc-200 bg-white"
+      >
+        <img
+          src={pic.href}
+          alt={pic.name}
+          class="aspect-square w-full object-cover"
+          loading="lazy"
+        />
+        <div class="p-4">
+          <p class="font-semibold text-zinc-900">{pic.name}</p>
+          <p class="mt-1 text-sm text-zinc-600">{pic.description}</p>
+          <a
+            href={pic.href}
+            download
+            class="mt-3 inline-flex rounded-sm border border-zinc-300 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+          >
+            PNG 1080 px
+          </a>
+        </div>
+      </div>
+      <div
+        id="link-preview"
+        class="overflow-hidden rounded-sm border border-zinc-200 bg-white"
+      >
+        <img
+          src={@link_preview.href}
+          alt={@link_preview.name}
+          class="aspect-[1200/630] w-full object-cover"
+          loading="lazy"
+        />
+        <div class="p-4">
+          <p class="font-semibold text-zinc-900">{@link_preview.name}</p>
+          <p class="mt-1 text-sm text-zinc-600">{@link_preview.description}</p>
+          <a
+            href={@link_preview.href}
+            download
+            class="mt-3 inline-flex rounded-sm border border-zinc-300 px-2.5 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 transition-colors"
+          >
+            PNG 1200 × 630
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="mt-10 mb-2 text-xl type-subhead text-zinc-900">Post canvases</h3>
+    <p class="mb-4 max-w-2xl text-sm text-zinc-600">
+      Text-free backgrounds in the five Nordic colors with the seal in the corner. Keep text clear of the seal and away from the edges.
+    </p>
+    <ul id="post-canvases" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <li
+        :for={canvas <- @canvases}
+        id={"canvas-#{canvas.slug}"}
+        class="overflow-hidden rounded-sm border border-zinc-200 bg-white"
+      >
+        <img
+          src={hd(canvas.items).href}
+          alt={"#{canvas.name} colored post canvas with the club seal"}
+          class="aspect-square w-full object-cover"
+          loading="lazy"
+        />
+        <div class="p-4">
+          <p class="font-semibold text-zinc-900">{canvas.name}</p>
+          <div class="mt-2 flex flex-col items-start gap-1.5">
+            <a
+              :for={item <- canvas.items}
+              href={item.href}
+              download
+              class="text-sm text-blue-700 underline underline-offset-2 hover:text-blue-800"
+            >
+              {item.label}
+            </a>
+          </div>
+        </div>
+      </li>
+    </ul>
+
+    <h3 class="mt-10 mb-4 text-xl type-subhead text-zinc-900">
+      Common image sizes
+    </h3>
+    <div class="overflow-x-auto rounded-sm border border-zinc-200 bg-white">
+      <table id="image-sizes" class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-zinc-200 text-left text-xs text-zinc-500 type-eyebrow">
+            <th class="px-4 py-3">Where</th>
+            <th class="px-4 py-3">Size (px)</th>
+            <th class="px-4 py-3">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            :for={row <- @image_sizes}
+            class="border-b border-zinc-100 last:border-0"
+          >
+            <td class="px-4 py-3 font-medium text-zinc-900">{row.where}</td>
+            <td class="px-4 py-3 whitespace-nowrap font-mono text-xs">
+              {row.size}
+            </td>
+            <td class="px-4 py-3 text-zinc-600">{row.note}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-sm text-zinc-500">
+      Platforms change their sizes from time to time, so check before exporting a final file.
+    </p>
+
+    <h3 class="mt-10 mb-2 text-xl type-subhead text-zinc-900">
+      Email signature
+    </h3>
+    <p class="mb-4 max-w-2xl text-sm text-zinc-600">
+      Select the preview and copy it, or use Copy HTML for apps that take raw HTML, then paste it into your email app's signature settings. Replace the name, role and email address.
+    </p>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div
+        id="email-signature-preview"
+        class="rounded-sm border border-zinc-200 bg-white p-6"
+      >
+        {Phoenix.HTML.raw(@email_signature)}
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-4">
+        <pre class="max-h-56 overflow-auto text-xs text-zinc-700"><code>{@email_signature}</code></pre>
+        <button
+          id="copy-email-signature"
+          type="button"
+          data-brand-copy={@email_signature}
+          class="mt-3 inline-flex items-center gap-2 rounded-sm bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 transition-colors"
+        >
+          <.icon name="hero-clipboard-document" class="w-4 h-4" />
+          <span data-brand-copy-label>Copy HTML</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <%!-- CHECKLIST --%>
+  <section
+    id="checklist"
+    class="scroll-mt-24 mb-8"
+    aria-labelledby="checklist-heading"
+  >
+    <p class="text-xs text-blue-600 mb-2 type-eyebrow">Before you publish</p>
+    <h2
+      id="checklist-heading"
+      class="text-3xl md:text-4xl type-title text-zinc-900"
+    >
+      A quick checklist
+    </h2>
+    <div class="mt-8 grid gap-4 md:grid-cols-3">
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Looks right</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Logo from this page, not recolored or stretched, with room around it.
+          </li>
+          <li>Country colors rotated, not one color everywhere.</li>
+          <li>Real photos of members, darkened if text sits on top.</li>
+        </ul>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Readable by everyone</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>
+            Text contrast of at least 4.5:1. Check the pairings table above.
+          </li>
+          <li>Never rely on color alone; add a word or label.</li>
+          <li>Alt text on every image that carries meaning.</li>
+          <li>Links say where they go ("Buy tickets"), not "click here".</li>
+        </ul>
+      </div>
+      <div class="rounded-sm border border-zinc-200 bg-white p-6">
+        <h3 class="text-lg type-subhead text-zinc-900">Ready to share</h3>
+        <ul class="mt-3 space-y-2 text-sm text-zinc-700 ps-5 list-disc">
+          <li>Exported at the right size, and under 500 KB for the web.</li>
+          <li>Dates, times, prices and links checked once more.</li>
+          <li>
+            Documents saved as PDF; slides exported if they will be emailed.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>

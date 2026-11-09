@@ -1,0 +1,142 @@
+[
+  {
+    "name": "Denmark Red",
+    "id": "denmark-red",
+    "hex": "#C8102E",
+    "rgb": [
+      200,
+      16,
+      46
+    ]
+  },
+  {
+    "name": "Finland Blue",
+    "id": "finland-blue",
+    "hex": "#002F6C",
+    "rgb": [
+      0,
+      47,
+      108
+    ]
+  },
+  {
+    "name": "Iceland Blue",
+    "id": "iceland-blue",
+    "hex": "#02529C",
+    "rgb": [
+      2,
+      82,
+      156
+    ]
+  },
+  {
+    "name": "Iceland Red",
+    "id": "iceland-red",
+    "hex": "#DC1E35",
+    "rgb": [
+      220,
+      30,
+      53
+    ]
+  },
+  {
+    "name": "Norway Red",
+    "id": "norway-red",
+    "hex": "#BA0C2F",
+    "rgb": [
+      186,
+      12,
+      47
+    ]
+  },
+  {
+    "name": "Norway Blue",
+    "id": "norway-blue",
+    "hex": "#00205B",
+    "rgb": [
+      0,
+      32,
+      91
+    ]
+  },
+  {
+    "name": "Sweden Blue",
+    "id": "sweden-blue",
+    "hex": "#005293",
+    "rgb": [
+      0,
+      82,
+      147
+    ]
+  },
+  {
+    "name": "Sweden Yellow",
+    "id": "sweden-yellow",
+    "hex": "#FECB00",
+    "rgb": [
+      254,
+      203,
+      0
+    ]
+  },
+  {
+    "name": "Brand Blue (web)",
+    "id": "brand-blue",
+    "hex": "#144993",
+    "rgb": [
+      20,
+      73,
+      147
+    ]
+  },
+  {
+    "name": "Ink",
+    "id": "ink",
+    "hex": "#18181B",
+    "rgb": [
+      24,
+      24,
+      27
+    ]
+  },
+  {
+    "name": "Secondary Text",
+    "id": "gray",
+    "hex": "#52525B",
+    "rgb": [
+      82,
+      82,
+      91
+    ]
+  },
+  {
+    "name": "Border",
+    "id": "border",
+    "hex": "#E4E4E7",
+    "rgb": [
+      228,
+      228,
+      231
+    ]
+  },
+  {
+    "name": "Page Gray",
+    "id": "page",
+    "hex": "#F4F5F7",
+    "rgb": [
+      244,
+      245,
+      247
+    ]
+  },
+  {
+    "name": "White",
+    "id": "white",
+    "hex": "#FFFFFF",
+    "rgb": [
+      255,
+      255,
+      255
+    ]
+  }
+]

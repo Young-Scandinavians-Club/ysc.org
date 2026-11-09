@@ -15,6 +15,17 @@ if System.get_env("ENVIRONMENT") do
     environment: System.get_env("ENVIRONMENT")
 end
 
+# Google Slides copy of the presentation template, shown as an "Open in Google
+# Slides" button on /brand. Set to the file ID from the Slides URL
+# (docs.google.com/presentation/d/<ID>/edit); the file must be shared as
+# "Anyone with the link can view". No button is shown when unset.
+if config_env() != :test and
+     System.get_env("BRAND_GOOGLE_SLIDES_TEMPLATE_ID") not in [nil, ""] do
+  config :ysc,
+    brand_google_slides_template_id:
+      System.get_env("BRAND_GOOGLE_SLIDES_TEMPLATE_ID")
+end
+
 # Fly Proxy sets `Fly-Client-IP` (FLY_APP_NAME is present on every Fly Machine).
 # Without this, `conn.remote_ip` is the proxy/app address and per-IP rate limits
 # bucket every visitor together. See YscWeb.ClientIP.
