@@ -149,7 +149,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
       true ->
         []
         |> maybe_add_badge(
-          Map.get(event, :tickets_tbd),
+          Ysc.Events.Event.tickets_tbd?(event),
           %{
             text: "Save the Date",
             class: "bg-blue-600 text-white",

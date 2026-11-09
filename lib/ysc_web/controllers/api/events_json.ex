@@ -29,6 +29,8 @@ defmodule YscWeb.Api.EventsJSON do
       max_attendees: e.max_attendees,
       tickets_tbd: e.tickets_tbd,
       partiful_link: e.partiful_link,
+      external_ticket_url: Map.get(e, :external_ticket_url),
+      external_organizer: Map.get(e, :external_organizer),
       selling_fast: e.selling_fast,
       recent_tickets_count: e.recent_tickets_count,
       ticket_count: Map.get(e, :ticket_count),

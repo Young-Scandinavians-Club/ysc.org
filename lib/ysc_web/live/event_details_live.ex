@@ -13,6 +13,7 @@ defmodule YscWeb.EventDetailsLive do
   alias Ysc.Events.{
     AttendeeInfo,
     DateTimeFormatter,
+    Event,
     EventPricingCache,
     MemberOnlyTickets,
     TierPurchaseLimits,
@@ -70,6 +71,30 @@ defmodule YscWeb.EventDetailsLive do
     </.button>
     """
   end
+
+  attr :id, :string, required: true
+  attr :event, :map, required: true
+  attr :class, :string, default: "w-full py-4"
+  attr :icon_class, :string, default: "w-5 h-5"
+
+  defp external_tickets_button(assigns) do
+    ~H"""
+    <.button
+      id={@id}
+      href={@event.external_ticket_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      class={"flex items-center justify-center gap-2 type-eyebrow #{@class}"}
+    >
+      <.icon name="hero-ticket" class={@icon_class} />
+      <span>Get Tickets</span>
+      <.icon name="hero-arrow-top-right-on-square" class={@icon_class} />
+    </.button>
+    """
+  end
+
+  defp external_tickets?(event), do: Event.external_ticketing?(event)
+  defp tickets_tbd?(event), do: Event.tickets_tbd?(event)
 
   @impl true
   def render(assigns) do
@@ -137,9 +162,9 @@ defmodule YscWeb.EventDetailsLive do
                 <div
                   :if={
                     event_day_label ||
-                      (@event.tickets_tbd && @event.state != :cancelled) ||
+                      (tickets_tbd?(@event) && @event.state != :cancelled) ||
                       (@event.state != :cancelled && @async_data_loaded &&
-                         @event_sold_out_for_user && !@event.tickets_tbd)
+                         @event_sold_out_for_user && !tickets_tbd?(@event))
                   }
                   class="flex flex-wrap items-center gap-2"
                 >
@@ -164,7 +189,7 @@ defmodule YscWeb.EventDetailsLive do
                     <span class="relative z-10">Happening Tomorrow</span>
                   </span>
                   <span
-                    :if={@event.tickets_tbd && @event.state != :cancelled}
+                    :if={tickets_tbd?(@event) && @event.state != :cancelled}
                     class="px-3 py-1.5 text-white text-xs rounded-sm bg-blue-600 sm:bg-blue-500/90 sm:border sm:border-blue-400 type-eyebrow"
                   >
                     <.icon
@@ -176,7 +201,7 @@ defmodule YscWeb.EventDetailsLive do
                   <span
                     :if={
                       @event.state != :cancelled && @async_data_loaded &&
-                        @event_sold_out_for_user && !@event.tickets_tbd
+                        @event_sold_out_for_user && !tickets_tbd?(@event)
                     }
                     class="px-3 py-1.5 text-white text-xs rounded-sm bg-red-600 sm:bg-red-500/90 sm:border sm:border-red-400 type-eyebrow"
                   >
@@ -535,6 +560,42 @@ defmodule YscWeb.EventDetailsLive do
                   </p>
                 </div>
               <% end %>
+            </div>
+
+            <%!-- Tickets sold by another organization --%>
+            <div
+              :if={external_tickets?(@event)}
+              id="external-tickets-spotlight"
+              class="rounded-xl border border-zinc-100 bg-white p-6 sm:p-8"
+            >
+              <div class="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6">
+                <div class="flex items-start gap-3 flex-1 min-w-0">
+                  <div class="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                    <.icon
+                      name="hero-arrow-top-right-on-square"
+                      class="w-4 h-4 text-blue-600"
+                    />
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-xs text-blue-600 mb-1 type-eyebrow">
+                      Tickets on another website
+                    </p>
+                    <p class="text-zinc-600 text-sm font-medium leading-relaxed">
+                      <%= if @event.external_organizer do %>
+                        This event is run by {@event.external_organizer}, not YSC. Tickets are sold on their website.
+                      <% else %>
+                        This event is not run by YSC. Tickets are sold on the organizer's website.
+                      <% end %>
+                    </p>
+                  </div>
+                </div>
+                <.external_tickets_button
+                  id="external-tickets-spotlight-button"
+                  event={@event}
+                  class="shrink-0 w-full sm:w-auto px-6 py-3.5"
+                  icon_class="w-4 h-4"
+                />
+              </div>
             </div>
 
             <%!-- Partiful RSVP --%>
@@ -917,7 +978,7 @@ defmodule YscWeb.EventDetailsLive do
                     </p>
                     <p class={[
                       "text-4xl text-zinc-900 type-title",
-                      if @event_sold_out_for_user && !@event.tickets_tbd do
+                      if @event_sold_out_for_user && !tickets_tbd?(@event) do
                         "line-through"
                       else
                         ""
@@ -990,7 +1051,7 @@ defmodule YscWeb.EventDetailsLive do
 
                     <div class="space-y-3">
                       <%= if @has_ticket_info do %>
-                        <%= if @event.tickets_tbd do %>
+                        <%= if tickets_tbd?(@event) do %>
                           <div class="p-4 bg-blue-50 rounded-xl border border-blue-200 text-center">
                             <.icon
                               name="hero-ticket"
@@ -1118,6 +1179,12 @@ defmodule YscWeb.EventDetailsLive do
                       </div>
                     </div>
 
+                    <.external_tickets_button
+                      :if={external_tickets?(@event)}
+                      id="external-tickets-sidebar"
+                      event={@event}
+                    />
+
                     <%= if @event.partiful_link not in [nil, ""] && !@has_ticket_tiers do %>
                       <.partiful_rsvp_button
                         id="partiful-rsvp-sidebar"
@@ -1150,7 +1217,7 @@ defmodule YscWeb.EventDetailsLive do
                           </.button>
                         <% end %>
                       <% else %>
-                        <%= if !@event.tickets_tbd do %>
+                        <%= if !tickets_tbd?(@event) && !external_tickets?(@event) do %>
                           <div
                             id="tickets-not-sold-online"
                             class="w-full text-center py-2"
@@ -1240,7 +1307,7 @@ defmodule YscWeb.EventDetailsLive do
                       <div class="flex items-center gap-2 mb-0.5">
                         <p class={[
                           "text-2xl text-zinc-900 type-title",
-                          if @event_sold_out_for_user && !@event.tickets_tbd do
+                          if @event_sold_out_for_user && !tickets_tbd?(@event) do
                             "line-through"
                           else
                             ""
@@ -1283,6 +1350,14 @@ defmodule YscWeb.EventDetailsLive do
                   <%= if ticket_sales_closed?(@event) do %>
                     <%!-- No action button once sales close --%>
                   <% else %>
+                    <.external_tickets_button
+                      :if={external_tickets?(@event)}
+                      id="external-tickets-mobile-bar"
+                      event={@event}
+                      class="shrink-0 px-8 py-3.5"
+                      icon_class="w-4 h-4"
+                    />
+
                     <%= if @event.partiful_link not in [nil, ""] && !@has_ticket_tiers do %>
                       <.partiful_rsvp_button
                         id="partiful-rsvp-mobile-bar"
@@ -1302,7 +1377,7 @@ defmodule YscWeb.EventDetailsLive do
                         </.button>
                       <% else %>
                         <%= if @has_ticket_tiers do %>
-                          <%= if @event_sold_out_for_user && !@event.tickets_tbd do %>
+                          <%= if @event_sold_out_for_user && !tickets_tbd?(@event) do %>
                             <div class="text-red-700 font-bold text-sm text-center">
                               Sold Out
                             </div>
@@ -1333,7 +1408,7 @@ defmodule YscWeb.EventDetailsLive do
                             <% end %>
                           <% end %>
                         <% else %>
-                          <%= if !@event.tickets_tbd do %>
+                          <%= if !tickets_tbd?(@event) && !external_tickets?(@event) do %>
                             <span
                               id="tickets-not-sold-online-mobile"
                               class="text-xs font-bold text-amber-800"
@@ -1404,7 +1479,7 @@ defmodule YscWeb.EventDetailsLive do
             </p>
           </div>
 
-          <%= if @event.tickets_tbd do %>
+          <%= if tickets_tbd?(@event) do %>
             <div class="border border-blue-200 rounded-xl p-8 bg-blue-50 text-center">
               <.icon
                 name="hero-ticket"
@@ -1967,7 +2042,7 @@ defmodule YscWeb.EventDetailsLive do
                         </span>
                         <span class={[
                           "font-medium",
-                          if @event_sold_out_for_user && !@event.tickets_tbd do
+                          if @event_sold_out_for_user && !tickets_tbd?(@event) do
                             "line-through"
                           else
                             ""
@@ -2017,7 +2092,7 @@ defmodule YscWeb.EventDetailsLive do
                   <span
                     data-ticket-order-total
                     class={[
-                      if @event_sold_out_for_user && !@event.tickets_tbd do
+                      if @event_sold_out_for_user && !tickets_tbd?(@event) do
                         "line-through"
                       else
                         ""
@@ -2049,7 +2124,7 @@ defmodule YscWeb.EventDetailsLive do
         </div>
 
         <div
-          :if={!@event.tickets_tbd}
+          :if={!tickets_tbd?(@event)}
           id="ticket-mobile-checkout-bar"
           class="fixed bottom-0 inset-x-0 z-50 border-t border-zinc-200 bg-white p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] lg:hidden"
         >
@@ -3009,8 +3084,9 @@ defmodule YscWeb.EventDetailsLive do
         _ -> []
       end
 
-    has_ticket_tiers = ticket_tiers != []
-    has_ticket_info = has_ticket_tiers || event.tickets_tbd
+    # Externally ticketed events link out; any leftover tiers are not sold here.
+    has_ticket_tiers = ticket_tiers != [] && !external_tickets?(event)
+    has_ticket_info = has_ticket_tiers || tickets_tbd?(event)
 
     # Check if we're on the tickets route (live_action == :tickets). Never open
     # the modal once sales have closed — handle_params redirects on connect,
@@ -3690,8 +3766,11 @@ defmodule YscWeb.EventDetailsLive do
       )
 
     sold_percentage = compute_sold_percentage(event, availability_data)
-    has_ticket_tiers = ticket_tiers_with_counts != []
-    has_ticket_info = has_ticket_tiers || Map.get(event, :tickets_tbd, false)
+
+    has_ticket_tiers =
+      ticket_tiers_with_counts != [] && !external_tickets?(event)
+
+    has_ticket_info = has_ticket_tiers || tickets_tbd?(event)
 
     # Update event with accurate pricing info
     event_with_pricing =

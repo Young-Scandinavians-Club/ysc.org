@@ -483,6 +483,27 @@ defmodule YscWeb.AdminEventsNewLive do
                 </p>
               </.admin_form_section>
 
+              <.admin_form_section
+                id="event-external-ticketing-section"
+                title="External Ticketing"
+                subtitle="For events organized by another group. Instead of selling tickets here, the event page links attendees to the organizer's website, and the event is no longer labeled Free. Leave blank for YSC events."
+              >
+                <.input
+                  type="text"
+                  field={@form[:external_ticket_url]}
+                  label="Ticket Link (Optional)"
+                  placeholder="https://organizer.example.com/tickets"
+                  phx-debounce="300"
+                />
+                <.input
+                  type="text"
+                  field={@form[:external_organizer]}
+                  label="Organized By (Optional)"
+                  placeholder="Swedish Club of San Francisco"
+                  phx-debounce="300"
+                />
+              </.admin_form_section>
+
               <.admin_form_section id="event-date-section" title="Date and Location">
                 <h3 class="text-lg type-subhead">Date and Time</h3>
                 <div class="flex flex-row w-full space-x-4">
