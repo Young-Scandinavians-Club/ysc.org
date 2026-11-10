@@ -72,5 +72,30 @@ defmodule YscWeb.Api.EventsControllerTest do
       response = get(conn, ~p"/api/v1/mobile/events")
       assert json_response(response, 401)
     end
+
+    test "includes external ticketing fields and pricing for events sold elsewhere",
+         %{conn: conn} do
+      organizer = user_fixture()
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          state: :published,
+          title: "SWEA Fair API #{System.unique_integer()}",
+          tickets_tbd: true,
+          external_ticket_url: "https://example.org/swea-fair",
+          external_organizer: "SWEA San Francisco"
+        })
+
+      response = get(conn, ~p"/api/v1/mobile/events?page_size=100")
+      assert %{"data" => data} = json_response(response, 200)
+
+      row = Enum.find(data, &(&1["id"] == to_string(event.id)))
+      assert row
+      assert row["external_ticket_url"] == "https://example.org/swea-fair"
+      assert row["external_organizer"] == "SWEA San Francisco"
+      assert row["pricing_info"]["display_text"] == "External Tickets"
+      assert row["tickets_tbd"] == true
+    end
   end
 end
