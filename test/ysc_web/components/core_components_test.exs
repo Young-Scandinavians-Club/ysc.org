@@ -810,6 +810,49 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "booking_cancel_modal/1" do
+    test "renders modal chrome, reason form, and refund slot" do
+      assigns = %{reason: "Weather"}
+
+      html =
+        rendered_to_string(~H"""
+        <.booking_cancel_modal cancel_reason={@reason}>
+          <.callout type="warning" id="cancel-no-refund-notice">
+            <:title>No refund available</:title>
+            You may still cancel, but you will not receive a refund.
+          </.callout>
+        </.booking_cancel_modal>
+        """)
+
+      assert html =~ ~s(id="cancel-booking-modal")
+      assert html =~ ~s(id="cancel-booking-modal-title")
+      assert html =~ ~s(id="cancel-booking-form")
+      assert html =~ ~s(id="cancel-no-refund-notice")
+      assert html =~ "Cancel this booking? This can't be undone."
+      assert html =~ "No refund available"
+      assert html =~ "You may still cancel, but you will not receive a refund."
+      assert html =~ "Cancellation Reason (Optional)"
+      assert html =~ "Weather"
+      assert html =~ "Keep Booking"
+      assert html =~ ~s(phx-click="hide-cancel-modal")
+      assert html =~ ~s(phx-submit="confirm-cancel")
+    end
+
+    test "omits refund slot markup when empty" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.booking_cancel_modal />
+        """)
+
+      refute html =~ "cancel-no-refund-notice"
+      refute html =~ "No refund available"
+      assert html =~ ~s(id="cancel-booking-form")
+      assert html =~ "Keep Booking"
+    end
+  end
+
   describe "numbered_badge/1" do
     test "renders a small info marker by default" do
       assigns = %{}

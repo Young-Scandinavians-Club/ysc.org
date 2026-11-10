@@ -452,75 +452,31 @@ defmodule YscWeb.UserBookingDetailLive do
             </div>
           <% end %>
         </div>
-        <!-- Cancel Modal -->
-        <%= if @show_cancel_modal do %>
-          <.modal
-            id="cancel-booking-modal"
-            on_cancel={JS.push("hide-cancel-modal")}
-            show
-          >
-            <.modal_title id="cancel-booking-modal-title">
-              Cancel Booking
-            </.modal_title>
-
-            <div class="space-y-4">
-              <p class="text-zinc-600">
-                Cancel this booking? This can't be undone.
-              </p>
-
-              <%= if Map.get(@refund_info, :modified) do %>
-                <div class="bg-amber-50 border border-amber-200 rounded-md p-3">
-                  <p class="text-sm text-amber-800">
-                    This booking was modified. You may cancel, but you will not receive a refund.
-                  </p>
-                </div>
-              <% else %>
-                <% estimated_refund = Map.get(@refund_info, :estimated_refund) %>
-                <%= if match?(%Money{}, estimated_refund) && Money.positive?(estimated_refund) do %>
-                  <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
-                    <p class="text-sm text-blue-800">
-                      <strong>Estimated Refund:</strong>
-                      {MoneyHelper.format_money!(estimated_refund)}
-                    </p>
-                  </div>
-                <% end %>
-              <% end %>
-
-              <.simple_form
-                for={%{}}
-                id="cancel-booking-form"
-                phx-submit="confirm-cancel"
+        <.booking_cancel_modal
+          :if={@show_cancel_modal}
+          cancel_reason={@cancel_reason}
+        >
+          <%= if @refund_info && Map.get(@refund_info, :modified) do %>
+            <.callout
+              type="warning"
+              size="compact"
+              id="cancel-no-refund-notice"
+            >
+              This booking was modified. You may cancel, but you will not receive a refund.
+            </.callout>
+          <% else %>
+            <%= if refund = positive_estimated_refund(@refund_info) do %>
+              <.callout
+                type="info"
+                size="compact"
+                id="cancel-estimated-refund-notice"
               >
-                <.input
-                  type="textarea"
-                  name="reason"
-                  label="Cancellation Reason (Optional)"
-                  value={@cancel_reason}
-                  phx-blur="update-cancel-reason"
-                  phx-debounce="300"
-                  rows="3"
-                />
-
-                <:actions>
-                  <.button
-                    type="submit"
-                    color="red"
-                    phx-disable-with="Cancelling..."
-                  >
-                    Cancel Booking
-                  </.button>
-                  <.button
-                    type="button"
-                    phx-click="hide-cancel-modal"
-                    class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
-                  >
-                    Keep Booking
-                  </.button>
-                </:actions>
-              </.simple_form>
-            </div>
-          </.modal>
-        <% end %>
+                <strong>Estimated Refund:</strong>
+                {MoneyHelper.format_money!(refund)}
+              </.callout>
+            <% end %>
+          <% end %>
+        </.booking_cancel_modal>
       </div>
     </div>
     """
@@ -863,4 +819,10 @@ defmodule YscWeb.UserBookingDetailLive do
   defp partial_cancel_post_booking_error?({:refund_failed, _}), do: true
   defp partial_cancel_post_booking_error?({:pending_refund_failed, _}), do: true
   defp partial_cancel_post_booking_error?(_), do: false
+
+  defp positive_estimated_refund(%{estimated_refund: %Money{} = amount}) do
+    if Money.positive?(amount), do: amount
+  end
+
+  defp positive_estimated_refund(_), do: nil
 end
