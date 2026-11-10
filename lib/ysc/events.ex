@@ -586,7 +586,6 @@ defmodule Ysc.Events do
   @doc """
   Insert a new event into the database.
   """
-  @dialyzer {:nowarn_function, create_event: 1}
   def create_event(attrs \\ %{}) do
     organizer_id =
       Map.get(attrs, :organizer_id) || Map.get(attrs, "organizer_id")
@@ -646,6 +645,10 @@ defmodule Ysc.Events do
     end
   end
 
+  # Ecto.Multi opacity vs MapSet triggers Dialyzer call_without_opaque (same
+  # pattern as other Multi helpers). create_event used to carry this
+  # suppression when Multi.insert lived there; the retry helper moved it.
+  @dialyzer {:nowarn_function, event_insert_multi: 2}
   defp event_insert_multi(event_changeset, organizer_id) do
     multi =
       Ecto.Multi.new()
