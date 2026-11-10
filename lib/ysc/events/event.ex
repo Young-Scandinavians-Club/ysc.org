@@ -60,6 +60,9 @@ defmodule Ysc.Events.Event do
     field :state, Ysc.Events.EventState
     field :published_at, :utc_datetime
     field :publish_at, :utc_datetime
+    # Whether publishing sends the member event-notification email. Chosen by
+    # the admin when publishing/scheduling; off unless explicitly enabled.
+    field :send_notification, :boolean, default: false
     field :notification_sent_at, :utc_datetime
     field :notification_recipient_count, :integer
 
@@ -126,6 +129,12 @@ defmodule Ysc.Events.Event do
     # Optional: Partiful event URL for external RSVP, shown alongside any ticket tiers
     field :partiful_link, :string
 
+    # Events we list on behalf of another organization: tickets are sold on
+    # their website, so the event page links out instead of selling tickets.
+    field :external_ticket_url, :string
+    # Name of that organization (e.g. "Swedish Club of San Francisco")
+    field :external_organizer, :string
+
     # When true, show "Tickets Coming Soon" until first ticket tier is added
     field :tickets_tbd, :boolean, default: false
 
@@ -163,6 +172,8 @@ defmodule Ysc.Events.Event do
     :image_id,
     :publish_at,
     :tickets_tbd,
+    :external_ticket_url,
+    :external_organizer,
     :inserted_at,
     :organizer_id
   ]
@@ -173,14 +184,45 @@ defmodule Ysc.Events.Event do
   # Public event page and staff preview on that layout.
   # Includes `rendered_details` (scrubbed body HTML the page renders). Omits
   # `raw_details` (Trix source) so Postgres does not detoast a second copy of
-  # the same body. The editor writes both columns together. Virtual fields are
-  # not columns and cannot be selected.
-  @doc false
-  def public_page_fields do
-    __schema__(:fields) -- [:raw_details | __schema__(:virtual_fields)]
-  end
+  # the same body. The editor writes both columns together.
+  #
+  # Explicit allowlist — not `__schema__(:fields) -- [:raw_details]` — so
+  # admin-only columns added later (`send_notification`, notification
+  # bookkeeping, `lock_version`, `place_id`, …) do not ride along on every
+  # public page SELECT. Virtual fields are not columns and cannot be selected.
+  @public_page_fields [
+    :id,
+    :reference_id,
+    :state,
+    :title,
+    :description,
+    :rendered_details,
+    :max_attendees,
+    :image_id,
+    :start_date,
+    :start_time,
+    :end_date,
+    :end_time,
+    :location_name,
+    :address,
+    :latitude,
+    :longitude,
+    :partiful_link,
+    :external_ticket_url,
+    :external_organizer,
+    :tickets_tbd
+  ]
 
-  @publish_control_fields [:state, :published_at, :publish_at, :organizer_id]
+  @doc false
+  def public_page_fields, do: @public_page_fields
+
+  @publish_control_fields [
+    :state,
+    :published_at,
+    :publish_at,
+    :organizer_id,
+    :send_notification
+  ]
 
   # Finding 70: tickets_tbd is a dedicated lifecycle flag (`Events.set_tickets_tbd/2`),
   # not an editorial auto-save field. Keep it on `changeset/2` so create/copy and
@@ -203,6 +245,8 @@ defmodule Ysc.Events.Event do
     :longitude,
     :place_id,
     :partiful_link,
+    :external_ticket_url,
+    :external_organizer,
     :start_date,
     :start_time,
     :end_date,
@@ -250,6 +294,7 @@ defmodule Ysc.Events.Event do
     |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
     |> validate_partiful_link()
+    |> validate_external_ticketing()
     |> validate_publish_dates()
     |> validate_start_end()
     |> optimistic_lock(:lock_version)
@@ -302,6 +347,63 @@ defmodule Ysc.Events.Event do
         )
     end
   end
+
+  @doc """
+  True when tickets for this event are sold on another organization's website.
+
+  Works on full events and on the slimmed list maps.
+  """
+  def external_ticketing?(event) do
+    Map.get(event, :external_ticket_url) not in [nil, ""]
+  end
+
+  @doc """
+  True when the event shows "Tickets Coming Soon".
+
+  Externally ticketed events never do: their tickets are already on sale on
+  the organizer's website, so the flag is ignored without clearing it (which
+  would also fire save-the-date emails).
+  """
+  def tickets_tbd?(event) do
+    Map.get(event, :tickets_tbd) == true and not external_ticketing?(event)
+  end
+
+  defp validate_external_ticketing(changeset) do
+    changeset =
+      changeset
+      |> update_change(:external_ticket_url, &trim_to_nil/1)
+      |> update_change(:external_organizer, &trim_to_nil/1)
+      |> validate_length(:external_ticket_url, max: 2000)
+      |> validate_length(:external_organizer, max: 100)
+
+    case get_field(changeset, :external_ticket_url) do
+      nil ->
+        changeset
+
+      link ->
+        case URI.parse(link) do
+          %URI{scheme: scheme, host: host, userinfo: nil}
+          when scheme in ["http", "https"] and is_binary(host) and host != "" ->
+            changeset
+
+          _ ->
+            add_error(
+              changeset,
+              :external_ticket_url,
+              "must be a valid http(s) URL"
+            )
+        end
+    end
+  end
+
+  defp trim_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp trim_to_nil(value), do: value
 
   defp validate_partiful_link(changeset) do
     partiful_link = get_field(changeset, :partiful_link)

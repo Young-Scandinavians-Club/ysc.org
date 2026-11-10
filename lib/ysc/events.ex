@@ -169,7 +169,8 @@ defmodule Ysc.Events do
   instead of raising `Ecto.Query.CastError`.
 
   Selects `Event.public_page_fields/0` so the event page never TOASTs
-  `raw_details` (Trix source). The page renders `rendered_details`.
+  `raw_details` (Trix source) and never loads admin-only columns. The page
+  renders `rendered_details`.
   """
   def get_public_event(id) do
     case Ecto.ULID.cast(id) do
@@ -770,6 +771,8 @@ defmodule Ysc.Events do
       longitude: event.longitude,
       place_id: event.place_id,
       partiful_link: event.partiful_link,
+      external_ticket_url: event.external_ticket_url,
+      external_organizer: event.external_organizer,
       tickets_tbd: event.tickets_tbd,
       start_date: event.start_date,
       start_time: event.start_time,
@@ -1142,6 +1145,8 @@ defmodule Ysc.Events do
         latitude: e.latitude,
         longitude: e.longitude,
         partiful_link: e.partiful_link,
+        external_ticket_url: e.external_ticket_url,
+        external_organizer: e.external_organizer,
         tickets_tbd: e.tickets_tbd,
         recent_tickets_count: count(t.id),
         selling_fast: fragment("count(?) >= 5", t.id)
@@ -1259,6 +1264,11 @@ defmodule Ysc.Events do
 
   # Public event cards (home, /events, EventListCache). Omits `raw_details` /
   # `rendered_details` so list/cache payloads do not pull event-body HTML.
+  # Also omits admin-only columns (`publish_at`, `organizer_id`, `place_id`,
+  # `lock_version`, `age_restriction`, `show_participants`, `updated_at`) that
+  # cards never read. Keep `published_at` / `inserted_at` for "Just Added"
+  # badges, lat/lng + `partiful_link` because EventPricingCache overlays this
+  # payload onto the public event page on a cache hit.
   defp events_list_query(limit, timeframe) do
     three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
 
@@ -1280,13 +1290,9 @@ defmodule Ysc.Events do
         reference_id: e.reference_id,
         state: e.state,
         published_at: e.published_at,
-        publish_at: e.publish_at,
-        organizer_id: e.organizer_id,
         title: e.title,
         description: e.description,
         max_attendees: e.max_attendees,
-        age_restriction: e.age_restriction,
-        show_participants: e.show_participants,
         image_id: e.image_id,
         start_date: e.start_date,
         start_time: e.start_time,
@@ -1296,12 +1302,11 @@ defmodule Ysc.Events do
         address: e.address,
         latitude: e.latitude,
         longitude: e.longitude,
-        place_id: e.place_id,
         partiful_link: e.partiful_link,
+        external_ticket_url: e.external_ticket_url,
+        external_organizer: e.external_organizer,
         tickets_tbd: e.tickets_tbd,
-        lock_version: e.lock_version,
         inserted_at: e.inserted_at,
-        updated_at: e.updated_at,
         recent_tickets_count: count(t.id),
         selling_fast: fragment("count(?) >= 5", t.id)
       })
@@ -1528,18 +1533,18 @@ defmodule Ysc.Events do
   end
 
   @doc """
-  Returns a short display string for event pricing (e.g. "Free", "From $10", "Tickets coming soon").
+  Returns a short display string for event pricing (e.g. "Free", "From $10", "Tickets coming soon", "External Tickets").
   Use for newsletters and other places that need a single line. Event can have ticket_tiers preloaded
   or they will be loaded.
   """
   def event_pricing_display_string(%{id: _} = event) do
     event = ensure_ticket_tiers_loaded(event)
 
-    if Map.get(event, :tickets_tbd) do
+    if Event.tickets_tbd?(event) do
       "Tickets coming soon"
     else
       tiers = Map.get(event, :ticket_tiers) || []
-      PricingDisplay.from_tiers(tiers).display_text
+      PricingDisplay.pricing_info(event, tiers).display_text
     end
   end
 
@@ -1582,8 +1587,13 @@ defmodule Ysc.Events do
 
   @doc """
   Publish an event by updating its state and setting `published_at`.
+
+  The member event-notification email is only scheduled when notifications are
+  enabled. Pass `send_notification: true` to opt in; without the option the
+  event's stored `send_notification` flag (set when it was scheduled) is used,
+  which defaults to `false`.
   """
-  def publish_event(%Event{} = event) do
+  def publish_event(%Event{} = event, opts \\ []) do
     cond do
       event.state not in [:draft, :scheduled] ->
         {:error, :invalid_state}
@@ -1597,8 +1607,15 @@ defmodule Ysc.Events do
       true ->
         now = DateTime.utc_now()
 
+        send_notification? =
+          Keyword.get(opts, :send_notification, event.send_notification)
+
         event
-        |> Event.changeset(%{state: "published", published_at: now})
+        |> Event.changeset(%{
+          state: "published",
+          published_at: now,
+          send_notification: send_notification?
+        })
         |> Repo.update()
         |> case do
           {:ok, updated_event} ->
@@ -1608,7 +1625,9 @@ defmodule Ysc.Events do
               event: updated_event
             })
 
-            schedule_event_notifications(updated_event, now)
+            if send_notification?,
+              do: schedule_event_notifications(updated_event, now)
+
             schedule_event_photo_reminders(updated_event)
 
             {:ok, updated_event}
@@ -1678,7 +1697,12 @@ defmodule Ysc.Events do
   defp maybe_reschedule_event_photo_reminder(_event), do: :ok
 
   defp maybe_reschedule_event_notification(
-         %Event{state: state, published_at: published_at} = event
+         %Event{
+           state: state,
+           published_at: published_at,
+           send_notification: true
+         } =
+           event
        )
        when state in [:published, "published"] and not is_nil(published_at) do
     if is_nil(event.notification_sent_at) do
@@ -1769,7 +1793,16 @@ defmodule Ysc.Events do
   defp finalize_lifecycle_broadcast({:error, changeset}),
     do: {:error, changeset}
 
-  def schedule_event(%Event{} = event, publish_at) when is_binary(publish_at) do
+  @doc """
+  Schedules an event to be published at `publish_at`.
+
+  Pass `send_notification: true` to send the member event-notification email
+  once the event goes live; it defaults to `false`.
+  """
+  def schedule_event(event, publish_at, opts \\ [])
+
+  def schedule_event(%Event{} = event, publish_at, opts)
+      when is_binary(publish_at) do
     # Try to parse as full ISO8601 first, then fall back to datetime-local format
     parsed_datetime =
       case DateTime.from_iso8601(publish_at) do
@@ -1787,13 +1820,17 @@ defmodule Ysc.Events do
           end
       end
 
-    schedule_event(event, parsed_datetime)
+    schedule_event(event, parsed_datetime, opts)
   end
 
-  def schedule_event(%Event{} = event, publish_at)
+  def schedule_event(%Event{} = event, publish_at, opts)
       when is_struct(publish_at, DateTime) do
     changeset =
-      Event.changeset(event, %{state: "scheduled", publish_at: publish_at})
+      Event.changeset(event, %{
+        state: "scheduled",
+        publish_at: publish_at,
+        send_notification: Keyword.get(opts, :send_notification, false)
+      })
 
     case Repo.update(changeset) do
       {:ok, event} ->

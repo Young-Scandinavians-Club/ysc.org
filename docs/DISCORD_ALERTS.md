@@ -503,8 +503,8 @@ end
 ## Related Documentation
 
 - [Reconciliation System](RECONCILIATION_SYSTEM.md) - Financial reconciliation overview
-- [Ledger Balance Monitoring](LEDGER_BALANCE_MONITORING.md) - Balance checking system
-- [Stripe Webhooks](STRIPE_WEBHOOK_FIXES_IMPLEMENTED_V2.md) - Payment processing
+- [Stripe Webhooks](STRIPE_WEBHOOKS.md) - Payment processing and nightly webhook checks
+- [Monitoring](MONITORING.md) - All scheduled checks and alert channels
 
 ---
 

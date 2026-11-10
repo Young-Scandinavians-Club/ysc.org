@@ -124,6 +124,20 @@ defmodule YscWeb.AdminEventsNewLive do
               </div>
 
               <div class="flex shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
+                <label
+                  :if={@event.state in [:draft, :scheduled] && @can_publish}
+                  id="publish-send-notification-label"
+                  class="flex cursor-pointer items-center gap-2 text-sm text-zinc-700"
+                >
+                  <input
+                    type="checkbox"
+                    id="publish-send-notification"
+                    class="rounded-sm border-zinc-300 text-blue-600 focus:ring-blue-500"
+                    checked={@send_notification}
+                    phx-click="toggle-send-notification"
+                  /> Send event notification email
+                </label>
+
                 <div :if={@event.state in [:draft, :scheduled]}>
                   <.tooltip
                     :if={!@can_publish}
@@ -215,6 +229,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       event={@event}
                       module={YscWeb.AdminEventsLive.ScheduleEventForm}
                       event_id={@event.id}
+                      send_notification={@send_notification}
                     />
                   </div>
                 </.dropdown>
@@ -481,6 +496,27 @@ defmodule YscWeb.AdminEventsNewLive do
                 >
                   Shown to attendees as an RSVP callout on the event page, alongside any ticket tiers.
                 </p>
+              </.admin_form_section>
+
+              <.admin_form_section
+                id="event-external-ticketing-section"
+                title="External Ticketing"
+                subtitle="For events organized by another group. Instead of selling tickets here, the event page links attendees to the organizer's website, and the event is no longer labeled Free. Leave blank for YSC events."
+              >
+                <.input
+                  type="text"
+                  field={@form[:external_ticket_url]}
+                  label="Ticket Link (Optional)"
+                  placeholder="https://organizer.example.com/tickets"
+                  phx-debounce="300"
+                />
+                <.input
+                  type="text"
+                  field={@form[:external_organizer]}
+                  label="Organized By (Optional)"
+                  placeholder="Swedish Club of San Francisco"
+                  phx-debounce="300"
+                />
               </.admin_form_section>
 
               <.admin_form_section id="event-date-section" title="Date and Location">
@@ -1639,6 +1675,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
     |> assign(:blackout_prompt, nil)
+    |> assign(:send_notification, event.send_notification)
     |> assign(:show_cancellation_refund_modal, false)
     |> assign(:location_presets, EventLocationConfig.presets())
     |> assign_check_in_path(event)
@@ -1676,6 +1713,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:start_time, nil)
     |> assign(:end_time, nil)
     |> assign(:can_publish, false)
+    |> assign(:send_notification, false)
     |> assign(:partiful_link_present, false)
     |> assign(check_errors: false)
     |> assign(:hosts, [])
@@ -2243,6 +2281,12 @@ defmodule YscWeb.AdminEventsNewLive do
            title: "Event"
          )}
     end
+  end
+
+  @impl true
+  def handle_event("toggle-send-notification", _, socket) do
+    {:noreply,
+     assign(socket, :send_notification, !socket.assigns.send_notification)}
   end
 
   @impl true
@@ -2912,7 +2956,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
   defp do_publish_event(socket) do
     if socket.assigns.can_publish do
-      case Events.publish_event(socket.assigns.event) do
+      case Events.publish_event(socket.assigns.event,
+             send_notification: socket.assigns.send_notification
+           ) do
         {:ok, _event} ->
           {:noreply,
            socket
@@ -3042,7 +3088,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
     result =
       try do
-        Events.schedule_event(socket.assigns.event, publish_at_string)
+        Events.schedule_event(socket.assigns.event, publish_at_string,
+          send_notification: socket.assigns.send_notification
+        )
       rescue
         error ->
           Ysc.Logging.error("Error scheduling event",

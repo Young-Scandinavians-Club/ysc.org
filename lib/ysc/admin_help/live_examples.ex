@@ -144,6 +144,10 @@ defmodule Ysc.AdminHelp.LiveExamples do
        when is_binary(link) and link != "",
        do: "external via Partiful"
 
+  defp event_registration(%{external_ticket_url: url})
+       when is_binary(url) and url != "",
+       do: "tickets sold on another organization's website"
+
   defp event_registration(%{tickets_tbd: true}), do: "tickets TBD"
   defp event_registration(_), do: "built-in ticketing"
 

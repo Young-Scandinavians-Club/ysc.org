@@ -2659,11 +2659,43 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         )
 
       assert has_element?(view, "#before-you-go")
+
+      assert has_element?(
+               view,
+               "#clear-lake-before-you-go-heading",
+               "At the Cabin"
+             )
+
+      assert has_element?(
+               view,
+               "#before-you-go",
+               "How the cabin works once you're there"
+             )
+
+      assert has_element?(
+               view,
+               "#before-you-go",
+               "Watch the training videos before you arrive"
+             )
+
+      refute has_element?(
+               view,
+               "#clear-lake-before-you-go-heading",
+               "Before You Go"
+             )
+
+      refute has_element?(
+               view,
+               "#before-you-go",
+               "On-site details for after you book"
+             )
+
       assert has_element?(view, "#clear-lake-training-videos")
       assert has_element?(view, "#clear-lake-water-operations")
       assert has_element?(view, "#before-you-go", "Four keys")
       assert has_element?(view, "#before-you-go", "Thursday morning sprinklers")
       assert has_element?(view, "#before-you-go", "safe to drink from")
+      assert has_element?(view, "#before-you-go", "Cabin Master Room")
 
       assert has_element?(
                view,
@@ -2765,6 +2797,13 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "No pets or smoking"
       assert html =~ "Cabin Master"
       assert has_element?(view, "#house-manual")
+
+      assert has_element?(
+               view,
+               "#clear-lake-before-you-go-heading",
+               "At the Cabin"
+             )
+
       refute has_element?(view, "#cabin-rules")
     end
 

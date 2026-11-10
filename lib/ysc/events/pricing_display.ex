@@ -6,26 +6,39 @@ defmodule Ysc.Events.PricingDisplay do
   `:pricing_info` on listings and the event page.
   """
 
+  alias Ysc.Events.Event
   alias Ysc.Events.TicketTierHelpers
   alias Ysc.MoneyHelper
 
   @tickets_coming_soon "Tickets Coming Soon"
+  @external_tickets "External Tickets"
 
   @doc """
   Pricing info for an event given its ticket tiers.
 
-  When `tickets_tbd` is true, returns the coming-soon placeholder regardless
-  of loaded tiers.
+  Events ticketed on another organization's website (`external_ticket_url`)
+  never read as "Free" or priced from tiers, and never as coming soon, since
+  attendees buy elsewhere. Otherwise, when `tickets_tbd` is true, returns the
+  coming-soon placeholder regardless of loaded tiers.
   """
   def pricing_info(event, ticket_tiers) do
-    if Map.get(event, :tickets_tbd) do
-      %{
-        display_text: @tickets_coming_soon,
-        has_free_tiers: false,
-        lowest_price: nil
-      }
-    else
-      from_tiers(ticket_tiers)
+    cond do
+      Event.external_ticketing?(event) ->
+        %{
+          display_text: @external_tickets,
+          has_free_tiers: false,
+          lowest_price: nil
+        }
+
+      Map.get(event, :tickets_tbd) ->
+        %{
+          display_text: @tickets_coming_soon,
+          has_free_tiers: false,
+          lowest_price: nil
+        }
+
+      true ->
+        from_tiers(ticket_tiers)
     end
   end
 

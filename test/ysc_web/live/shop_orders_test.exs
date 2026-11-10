@@ -121,13 +121,13 @@ defmodule YscWeb.ShopOrdersTest do
 
       {:ok, view, html} = live(other, ~p"/shop/orders/#{order.id}")
       assert html =~ ~s(id="shop-order-loading")
-      assert_redirect(view, ~p"/shop/orders")
+      assert_shop_async_redirect(view, ~p"/shop/orders")
 
       {:ok, view, _html} = live(conn, ~p"/shop/orders/#{Ecto.ULID.generate()}")
-      assert_redirect(view, ~p"/shop/orders")
+      assert_shop_async_redirect(view, ~p"/shop/orders")
 
       {:ok, view, _html} = live(conn, ~p"/shop/orders/garbage")
-      assert_redirect(view, ~p"/shop/orders")
+      assert_shop_async_redirect(view, ~p"/shop/orders")
     end
 
     test "failed orders explain the problem", %{conn: conn, member: member} do

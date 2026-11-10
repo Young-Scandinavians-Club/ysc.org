@@ -7,27 +7,41 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   def render(assigns) do
     ~H"""
     <div id={"ticket-tier-management-#{@event_id}"} class="space-y-6">
-      <div
+      <.callout
         :if={@event.partiful_link not in [nil, ""]}
-        class="border border-blue-100 rounded-lg p-4 bg-blue-50 flex items-center gap-3"
+        id="partiful-link-notice"
+        type="info"
+        icon="hero-information-circle"
       >
-        <.icon
-          name="hero-information-circle"
-          class="w-5 h-5 text-blue-600 shrink-0"
-        />
-        <p class="text-sm text-blue-800">
-          This event also has a
-          <a
-            href={@event.partiful_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="font-semibold underline"
-          >
-            Partiful link
-          </a>
-          set on the Details tab. It's shown to attendees alongside these ticket tiers.
-        </p>
-      </div>
+        This event also has a
+        <a
+          href={@event.partiful_link}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-semibold underline"
+        >
+          Partiful link
+        </a>
+        set on the Details tab. It's shown to attendees alongside these ticket tiers.
+      </.callout>
+      <.callout
+        :if={Ysc.Events.Event.external_ticketing?(@event)}
+        id="external-ticketing-notice"
+        type="warning"
+        icon="hero-exclamation-triangle"
+      >
+        This event sells tickets on an external website (set on the Details tab).
+        Ticket tiers below are ignored on the public page, which links to
+        <a
+          href={@event.external_ticket_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-semibold underline"
+        >
+          the external ticket link
+        </a>
+        instead. Clear that link to sell tickets here.
+      </.callout>
       <%!-- Ticket Tiers List --%>
       <div class="border border-zinc-200 rounded-sm p-4 sm:p-6">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4">

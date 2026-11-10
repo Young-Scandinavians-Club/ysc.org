@@ -375,7 +375,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
         event.description && HtmlSanitizeEx.strip_tags(event.description),
       short_description: short_description(event.description),
       date_str: format_event_date(event),
-      save_the_date: Map.get(event, :tickets_tbd, false),
+      save_the_date: Ysc.Events.Event.tickets_tbd?(event),
       selling_fast: Events.event_selling_fast?(event.id),
       pricing_str: Events.event_pricing_display_string(event),
       tickets_on_sale_str: format_tickets_on_sale(event),

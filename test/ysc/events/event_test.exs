@@ -43,6 +43,89 @@ defmodule Ysc.Events.EventTest do
       assert Keyword.has_key?(cs.errors, :publish_at)
     end
 
+    test "accepts and trims an external ticket link and organizer", %{
+      organizer: organizer
+    } do
+      cs =
+        Event.changeset(%Event{}, %{
+          state: :draft,
+          organizer_id: organizer.id,
+          title: "T",
+          external_ticket_url: "  https://example.org/tickets  ",
+          external_organizer: "  Norwegian Club  "
+        })
+
+      assert cs.valid?
+
+      assert Ecto.Changeset.get_field(cs, :external_ticket_url) ==
+               "https://example.org/tickets"
+
+      assert Ecto.Changeset.get_field(cs, :external_organizer) ==
+               "Norwegian Club"
+    end
+
+    test "tickets_tbd?/1 is off for externally ticketed events" do
+      assert Event.tickets_tbd?(%{tickets_tbd: true})
+
+      refute Event.tickets_tbd?(%{
+               tickets_tbd: true,
+               external_ticket_url: "https://example.org"
+             })
+
+      refute Event.tickets_tbd?(%{tickets_tbd: false})
+    end
+
+    test "clearing an existing external ticket link with nil removes it", %{
+      organizer: organizer
+    } do
+      event = %Event{
+        state: :draft,
+        organizer_id: organizer.id,
+        title: "T",
+        external_ticket_url: "https://example.org/tickets",
+        external_organizer: "Norwegian Club"
+      }
+
+      cs =
+        Event.changeset(event, %{
+          external_ticket_url: nil,
+          external_organizer: nil
+        })
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :external_ticket_url) == nil
+      assert Ecto.Changeset.get_field(cs, :external_organizer) == nil
+      refute Event.external_ticketing?(Ecto.Changeset.apply_changes(cs))
+    end
+
+    test "blank external ticket link is cleared", %{organizer: organizer} do
+      cs =
+        Event.changeset(%Event{}, %{
+          state: :draft,
+          organizer_id: organizer.id,
+          title: "T",
+          external_ticket_url: "   "
+        })
+
+      assert cs.valid?
+      assert Ecto.Changeset.get_field(cs, :external_ticket_url) == nil
+    end
+
+    test "rejects non-http external ticket links", %{organizer: organizer} do
+      for bad <- ["javascript:alert(1)", "ftp://example.org/x", "not a url"] do
+        cs =
+          Event.changeset(%Event{}, %{
+            state: :draft,
+            organizer_id: organizer.id,
+            title: "T",
+            external_ticket_url: bad
+          })
+
+        refute cs.valid?, "expected #{bad} to be rejected"
+        assert Keyword.has_key?(cs.errors, :external_ticket_url)
+      end
+    end
+
     test "accepts valid partiful.com https link", %{organizer: organizer} do
       cs =
         Event.changeset(%Event{}, %{
@@ -225,6 +308,31 @@ defmodule Ysc.Events.EventTest do
         })
 
       assert Ecto.Changeset.get_field(cs, :reference_id) == "EVT-CUSTOM-1"
+    end
+  end
+
+  describe "public_page_fields/0" do
+    test "is an explicit subset of persisted columns used on the public page" do
+      fields = Event.public_page_fields()
+      schema_fields = Event.__schema__(:fields)
+
+      assert fields -- schema_fields == []
+      assert :rendered_details in fields
+      assert :external_ticket_url in fields
+      assert :external_organizer in fields
+      assert :tickets_tbd in fields
+      refute :raw_details in fields
+      refute :send_notification in fields
+      refute :notification_sent_at in fields
+      refute :notification_recipient_count in fields
+      refute :lock_version in fields
+      refute :place_id in fields
+      refute :organizer_id in fields
+      refute :updated_by_id in fields
+      refute :published_at in fields
+      refute :publish_at in fields
+      refute :age_restriction in fields
+      refute :show_participants in fields
     end
   end
 end

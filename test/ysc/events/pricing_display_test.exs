@@ -16,6 +16,36 @@ defmodule Ysc.Events.PricingDisplayTest do
              }
     end
 
+    test "external ticketing is never free, even with no tiers" do
+      event = %{external_ticket_url: "https://example.org/tickets"}
+
+      assert PricingDisplay.pricing_info(event, []) == %{
+               display_text: "External Tickets",
+               has_free_tiers: false,
+               lowest_price: nil
+             }
+    end
+
+    test "external ticketing ignores leftover tiers" do
+      event = %{external_ticket_url: "https://example.org/tickets"}
+      tier = %TicketTier{type: :paid, price: Money.new(25, :USD)}
+
+      assert PricingDisplay.pricing_info(event, [tier]).display_text ==
+               "External Tickets"
+    end
+
+    test "blank external link falls back to tiers" do
+      assert PricingDisplay.pricing_info(%{external_ticket_url: ""}, []).display_text ==
+               "Free"
+    end
+
+    test "external ticketing wins over tickets_tbd" do
+      event = %{tickets_tbd: true, external_ticket_url: "https://example.org"}
+
+      assert PricingDisplay.pricing_info(event, []).display_text ==
+               "External Tickets"
+    end
+
     test "uses from_tiers/1 when tickets_tbd is false" do
       event = %{tickets_tbd: false}
       tier = %TicketTier{type: :paid, price: Money.new(25, :USD)}

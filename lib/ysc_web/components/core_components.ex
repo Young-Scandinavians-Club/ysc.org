@@ -5076,14 +5076,21 @@ defmodule YscWeb.CoreComponents do
         <p class="text-base text-zinc-700 leading-relaxed mb-6">Sign in to view availability.</p>
         <.link navigate={~p"/users/log-in"}>Sign In to Book</.link>
       </.feature_card>
+
+      <.feature_card id="events-stay-connected" title="Stay Connected" title_tone={:surface}>
+        <p class="text-base text-zinc-600 leading-relaxed mb-4">
+          Read club news, or join the groups where members post informal get-togethers.
+        </p>
+      </.feature_card>
   """
+  attr :id, :string, default: nil
   attr :title, :string, required: true
 
   attr :title_tone, :atom,
     default: :muted,
-    values: [:muted, :accent],
+    values: [:muted, :accent, :surface],
     doc:
-      "`:muted` uses zinc eyebrow styling; `:accent` uses blue eyebrow styling"
+      "`:muted` is a zinc fill; `:accent` is a blue fill; `:surface` is a white card on a light page"
 
   attr :class, :any, default: nil
 
@@ -5091,11 +5098,14 @@ defmodule YscWeb.CoreComponents do
 
   def feature_card(assigns) do
     ~H"""
-    <div class={[
-      "p-6 md:p-8 rounded-xl border",
-      feature_card_container_class(@title_tone),
-      @class
-    ]}>
+    <div
+      id={@id}
+      class={[
+        "p-6 md:p-8 rounded-xl border",
+        feature_card_container_class(@title_tone),
+        @class
+      ]}
+    >
       <h4 class={feature_card_title_class(@title_tone)}>
         {@title}
       </h4>
@@ -5109,11 +5119,16 @@ defmodule YscWeb.CoreComponents do
   defp feature_card_container_class(:accent),
     do: "bg-blue-50/40 border-blue-200"
 
+  defp feature_card_container_class(:surface), do: "bg-white border-zinc-100"
+
   defp feature_card_title_class(:muted),
     do: "text-sm text-zinc-500 mb-4 md:mb-6 type-eyebrow"
 
   defp feature_card_title_class(:accent),
     do: "text-sm text-blue-600 mb-3 md:mb-4 type-eyebrow"
+
+  defp feature_card_title_class(:surface),
+    do: "text-sm text-zinc-500 mb-3 md:mb-4 type-eyebrow"
 
   @doc """
   Responsive grid wrapper for `at_glance_stat/1` tiles on booking landing pages.

@@ -2540,6 +2540,106 @@ defmodule YscWeb.EventDetailsLiveTest do
     end
   end
 
+  describe "External ticketing - event ticketed by another organization" do
+    test "links to the organizer's site and is not labeled Free", %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "Midsommar With Friends",
+            external_ticket_url: "https://example.org/midsommar/tickets",
+            external_organizer: "Swedish Club of SF"
+          }
+        )
+
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(
+               view,
+               ~s(#external-tickets-sidebar[href="https://example.org/midsommar/tickets"])
+             )
+
+      assert has_element?(view, "#external-tickets-spotlight")
+      assert html =~ "Swedish Club of SF"
+      assert html =~ "External Tickets"
+      refute html =~ ">Free<"
+      refute has_element?(view, "#tickets-not-sold-online")
+    end
+
+    test "overrides Tickets Coming Soon instead of showing Save the Date", %{
+      conn: conn
+    } do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "SWEA Christmas Fair",
+            tickets_tbd: true,
+            external_ticket_url: "https://example.org/fair",
+            external_organizer: "SWEA San Francisco"
+          }
+        )
+
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "#external-tickets-sidebar")
+      refute html =~ "Save the Date"
+      refute html =~ "Notify me when tickets open"
+      refute html =~ "Tickets Coming Soon"
+    end
+
+    test "does not show the external CTA for regular events", %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Our Own Event"}
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      refute has_element?(view, "#external-tickets-sidebar")
+      refute has_element?(view, "#external-tickets-spotlight")
+    end
+
+    test "deep link to /tickets does not open YSC checkout", %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "SWEA Christmas Fair",
+            external_ticket_url: "https://example.org/fair"
+          }
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#ticket-modal")
+      assert has_element?(view, "#external-tickets-sidebar")
+    end
+
+    test "leftover YSC tiers are not sold on the public page", %{conn: conn} do
+      event =
+        event_with_tickets(
+          tier_count: 1,
+          event_attrs: %{
+            title: "SWEA Fair leftover tiers",
+            external_ticket_url: "https://example.org/fair"
+          }
+        )
+
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "#external-tickets-sidebar")
+      refute html =~ "phx-click=\"open-ticket-modal\""
+      refute has_element?(view, "#ticket-modal")
+
+      {:ok, tickets_view, _html} = live(conn, ~p"/events/#{event.id}/tickets")
+
+      refute has_element?(tickets_view, "#ticket-modal")
+      assert has_element?(tickets_view, "#external-tickets-sidebar")
+    end
+  end
+
   describe "Partiful - event with external registration" do
     test "displays RSVP on Partiful button and link when event has partiful_link",
          %{
