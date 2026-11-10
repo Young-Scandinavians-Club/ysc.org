@@ -127,6 +127,21 @@ defmodule YscWeb.EventBadgeHelpersTest do
       assert :just_added in kinds
       assert :going_fast in kinds
     end
+
+    test "does not add save the date when tickets are sold elsewhere" do
+      event =
+        base_event(%{
+          tickets_tbd: true,
+          external_ticket_url: "https://example.org/tickets",
+          published_at: DateTime.add(DateTime.utc_now(), -12, :hour),
+          start_date: utc_midnight(Date.add(pacific_today(), 10))
+        })
+
+      kinds = EventBadgeHelpers.exclusive_badge_kinds(event)
+      refute :save_the_date in kinds
+
+      refute :save_the_date in EventBadgeHelpers.hero_badge_kinds(event)
+    end
   end
 
   describe "hero_badge_kinds/1" do

@@ -2277,6 +2277,73 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "external ticketing - editor auto-save" do
+    setup [:create_admin]
+
+    test "persists ticket link and organizer, and clears them when blanked", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "External Ticketing Editor",
+          description: "Summary text"
+        })
+
+      {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "#event-external-ticketing-section")
+      assert html =~ "Ticket Link (Optional)"
+
+      view
+      |> element("#new_event_form")
+      |> render_change(%{
+        "event" => %{
+          "title" => "External Ticketing Editor",
+          "description" => "Summary text",
+          "external_ticket_url" => "  https://example.org/fair/tickets  ",
+          "external_organizer" => "  SWEA San Francisco  "
+        }
+      })
+
+      saved = Events.get_event!(event.id)
+      assert saved.external_ticket_url == "https://example.org/fair/tickets"
+      assert saved.external_organizer == "SWEA San Francisco"
+
+      html =
+        view
+        |> element("#new_event_form")
+        |> render_change(%{
+          "event" => %{
+            "title" => "External Ticketing Editor",
+            "description" => "Summary text",
+            "external_ticket_url" => "javascript:alert(1)",
+            "external_organizer" => "SWEA San Francisco"
+          }
+        })
+
+      assert html =~ "must be a valid http(s) URL"
+      unchanged = Events.get_event!(event.id)
+      assert unchanged.external_ticket_url == "https://example.org/fair/tickets"
+
+      view
+      |> element("#new_event_form")
+      |> render_change(%{
+        "event" => %{
+          "title" => "External Ticketing Editor",
+          "description" => "Summary text",
+          "external_ticket_url" => "   ",
+          "external_organizer" => "   "
+        }
+      })
+
+      cleared = Events.get_event!(event.id)
+      assert cleared.external_ticket_url == nil
+      assert cleared.external_organizer == nil
+    end
+  end
+
   describe "publish - cabin blackout prompt" do
     setup [:create_admin]
 

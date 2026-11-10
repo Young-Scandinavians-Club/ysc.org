@@ -84,6 +84,25 @@ defmodule YscWeb.Emails.EventNotificationTest do
       subject = EventNotification.get_subject(event)
       assert String.starts_with?(subject, "[YSC] ")
       assert subject =~ event.title
+
+      assert save_the_date_subject?(subject),
+             "expected a save-the-date subject, got: #{subject}"
+    end
+
+    test "does not use a save-the-date subject when tickets are sold elsewhere",
+         %{organizer: organizer} do
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          tickets_tbd: true,
+          external_ticket_url: "https://example.org/tickets",
+          external_organizer: "Swedish Club"
+        })
+
+      subject = EventNotification.get_subject(event)
+      assert String.starts_with?(subject, "[YSC] ")
+      assert subject =~ event.title
+      refute save_the_date_subject?(subject)
     end
 
     test "returns a prefixed non-empty string when event is nil" do
@@ -435,5 +454,12 @@ defmodule YscWeb.Emails.EventNotificationTest do
       assert email_data.event.id == event.id
       assert email_data.event.title == event.title
     end
+  end
+
+  defp save_the_date_subject?(subject) when is_binary(subject) do
+    String.contains?(subject, "Save the date") or
+      String.contains?(subject, "Mark your calendar") or
+      String.contains?(subject, "save your spot") or
+      String.contains?(subject, "is on the way")
   end
 end
