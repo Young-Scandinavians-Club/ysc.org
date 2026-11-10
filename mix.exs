@@ -17,20 +17,11 @@ defmodule Ysc.MixProject do
         plt_add_apps: [:mix, :credo, :stripity_stripe],
         list_unused_filters: true
       ],
-      # cowlib 2.21.0 still reports EEF-CVE-2026-43966 (structured-fields
-      # encoder). Cowboy 2.16+ rejects CR/LF in response headers
-      # (invalid_response_headers). EEF-CVE-2026-43969 is patched in 2.21.0.
-      # EEF-CVE-2026-115701 (cowboy HTTP/1.1 pipelined buffering) and
-      # EEF-CVE-2026-113431 (cowlib HPACK header-list size) are fixed on
-      # master only — no Hex release yet. Revisit by 2026-12-07. Requires
-      # Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
+      # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
+      # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
+      # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
       hex: [
         ignore_advisories: [
-          "EEF-CVE-2026-43966",
-          "EEF-CVE-2026-115701",
-          "EEF-CVE-2026-113431",
-          # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
-          # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
           "EEF-CVE-2026-95105",
           "EEF-CVE-2026-94206"
         ]
@@ -270,15 +261,18 @@ defmodule Ysc.MixProject do
       # ChromicPDF.capture_screenshot/2 for TV posters, not print_to_pdf.
       {:chromic_pdf, "~> 1.17.2"},
       {:cloak_ecto, "~> 1.3"},
-      # Official Hex cowlib 2.21.0 (cowboy 2.20 needs >= 2.21). Cowboy 2.20
-      # requires OTP 27+ (we run OTP 27/28). Maintenance release: Cowlib
-      # 2.21 cookie encoder validates Cookie names/values (EEF-CVE-2026-43969),
-      # RFC6265bis cookies, no obsolete Set-Cookie Expires, HPACK decode after
-      # RST_STREAM, stricter HTTP dates, and ignore x-webkit-deflate-frame
-      # (permessage-deflate is unchanged). We serve HTTP via
-      # Phoenix.Endpoint.Cowboy2Adapter and do not call Cowboy/Cowlib APIs.
-      {:cowboy, "~> 2.20", override: true},
-      {:cowlib, "~> 2.21", override: true},
+      # Official Hex cowlib 2.22.0 (cowboy 2.21 needs >= 2.22). Cowboy 2.21
+      # requires OTP 27+ (we run OTP 27/28). Maintenance: HTTP/2
+      # max_header_list_size defaults to 32768 (EEF-CVE-2026-113431 HPACK
+      # amplification), HTTP/1.1 stops reading pipelined bytes until the
+      # current stream finishes (EEF-CVE-2026-115701), structured-field
+      # strings reject non-VCHAR (EEF-CVE-2026-43966), cowboy_static no
+      # longer reads code archives. We serve HTTP via
+      # Phoenix.Endpoint.Cowboy2Adapter and Plug.Static; we do not call
+      # Cowboy/Cowlib APIs, cowboy_static, Unix sockets, or structured
+      # field encoders. Ranch stays 2.3.0 (cowboy still allows >= 1.8).
+      {:cowboy, "~> 2.21", override: true},
+      {:cowlib, "~> 2.22", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
