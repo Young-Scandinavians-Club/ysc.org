@@ -321,4 +321,29 @@ defmodule Ysc.Events.EventTest do
       assert ref =~ ~r/^EVT-\d{6}-[A-Z0-9]{5}$/
     end
   end
+
+  describe "public_page_fields/0" do
+    test "is an explicit subset of persisted columns used on the public page" do
+      fields = Event.public_page_fields()
+      schema_fields = Event.__schema__(:fields)
+
+      assert fields -- schema_fields == []
+      assert :rendered_details in fields
+      assert :external_ticket_url in fields
+      assert :external_organizer in fields
+      assert :tickets_tbd in fields
+      refute :raw_details in fields
+      refute :send_notification in fields
+      refute :notification_sent_at in fields
+      refute :notification_recipient_count in fields
+      refute :lock_version in fields
+      refute :place_id in fields
+      refute :organizer_id in fields
+      refute :updated_by_id in fields
+      refute :published_at in fields
+      refute :publish_at in fields
+      refute :age_restriction in fields
+      refute :show_participants in fields
+    end
+  end
 end

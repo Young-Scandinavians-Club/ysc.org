@@ -60,6 +60,9 @@ defmodule Ysc.Events.Event do
     field :state, Ysc.Events.EventState
     field :published_at, :utc_datetime
     field :publish_at, :utc_datetime
+    # Whether publishing sends the member event-notification email. Chosen by
+    # the admin when publishing/scheduling; off unless explicitly enabled.
+    field :send_notification, :boolean, default: false
     field :notification_sent_at, :utc_datetime
     field :notification_recipient_count, :integer
 
@@ -181,14 +184,45 @@ defmodule Ysc.Events.Event do
   # Public event page and staff preview on that layout.
   # Includes `rendered_details` (scrubbed body HTML the page renders). Omits
   # `raw_details` (Trix source) so Postgres does not detoast a second copy of
-  # the same body. The editor writes both columns together. Virtual fields are
-  # not columns and cannot be selected.
-  @doc false
-  def public_page_fields do
-    __schema__(:fields) -- [:raw_details | __schema__(:virtual_fields)]
-  end
+  # the same body. The editor writes both columns together.
+  #
+  # Explicit allowlist — not `__schema__(:fields) -- [:raw_details]` — so
+  # admin-only columns added later (`send_notification`, notification
+  # bookkeeping, `lock_version`, `place_id`, …) do not ride along on every
+  # public page SELECT. Virtual fields are not columns and cannot be selected.
+  @public_page_fields [
+    :id,
+    :reference_id,
+    :state,
+    :title,
+    :description,
+    :rendered_details,
+    :max_attendees,
+    :image_id,
+    :start_date,
+    :start_time,
+    :end_date,
+    :end_time,
+    :location_name,
+    :address,
+    :latitude,
+    :longitude,
+    :partiful_link,
+    :external_ticket_url,
+    :external_organizer,
+    :tickets_tbd
+  ]
 
-  @publish_control_fields [:state, :published_at, :publish_at, :organizer_id]
+  @doc false
+  def public_page_fields, do: @public_page_fields
+
+  @publish_control_fields [
+    :state,
+    :published_at,
+    :publish_at,
+    :organizer_id,
+    :send_notification
+  ]
 
   # Finding 70: tickets_tbd is a dedicated lifecycle flag (`Events.set_tickets_tbd/2`),
   # not an editorial auto-save field. Keep it on `changeset/2` so create/copy and

@@ -138,10 +138,16 @@ defmodule YscWeb.EventsLiveTest do
     end
 
     test "includes Stay Connected section", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/events")
+      {:ok, view, _html} = live(conn, ~p"/events")
 
-      assert html =~ "Stay Connected"
-      assert html =~ "Read Club News"
+      assert has_element?(view, "#events-stay-connected")
+      assert has_element?(view, "#events-stay-connected", "Stay Connected")
+
+      assert has_element?(
+               view,
+               "#events-stay-connected a[href='/news']",
+               "Read Club News"
+             )
     end
 
     test "has link to contact page", %{conn: conn} do

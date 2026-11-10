@@ -1463,6 +1463,35 @@ defmodule Ysc.EventsTest do
       assert loaded.title == event.title
       refute Map.has_key?(loaded, :raw_details)
       refute Map.has_key?(loaded, :rendered_details)
+      refute Map.has_key?(loaded, :publish_at)
+      refute Map.has_key?(loaded, :organizer_id)
+      refute Map.has_key?(loaded, :age_restriction)
+      refute Map.has_key?(loaded, :show_participants)
+      refute Map.has_key?(loaded, :place_id)
+      refute Map.has_key?(loaded, :lock_version)
+      refute Map.has_key?(loaded, :updated_at)
+      refute Map.has_key?(loaded, :send_notification)
+      assert Map.has_key?(loaded, :published_at)
+      assert Map.has_key?(loaded, :inserted_at)
+      assert Map.has_key?(loaded, :external_ticket_url)
+
+      {sql, _params} =
+        Ecto.Adapters.SQL.to_sql(
+          :all,
+          Repo,
+          Events.ci_query_explain_upcoming_events_list_query()
+        )
+
+      refute sql =~ "age_restriction"
+      refute sql =~ "show_participants"
+      refute sql =~ "place_id"
+      refute sql =~ "lock_version"
+      refute sql =~ "organizer_id"
+      refute sql =~ ~s("publish_at")
+      refute sql =~ "raw_details"
+      refute sql =~ "rendered_details"
+      assert sql =~ ~s("published_at")
+      assert sql =~ "external_ticket_url"
     end
 
     test "list_upcoming_events_for_feed/1 includes rendered_details without pricing joins" do
@@ -1530,6 +1559,13 @@ defmodule Ysc.EventsTest do
       assert loaded
       refute Map.has_key?(loaded, :raw_details)
       refute Map.has_key?(loaded, :rendered_details)
+      refute Map.has_key?(loaded, :publish_at)
+      refute Map.has_key?(loaded, :organizer_id)
+      refute Map.has_key?(loaded, :age_restriction)
+      refute Map.has_key?(loaded, :show_participants)
+      refute Map.has_key?(loaded, :place_id)
+      refute Map.has_key?(loaded, :lock_version)
+      refute Map.has_key?(loaded, :updated_at)
     end
 
     test "list_recent_and_upcoming_events/0 returns recent and upcoming events" do
@@ -4476,10 +4512,49 @@ defmodule Ysc.EventsTest do
       assert Repo.get!(Event, published.id).state == :published
     end
 
-    test "publish_event schedules the notification and photo-reminder jobs independently",
+    test "publish_event does not schedule the notification by default",
          %{event: event} do
       Oban.Testing.with_testing_mode(:manual, fn ->
         assert {:ok, published} = Events.publish_event(event)
+
+        refute published.send_notification
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        # Editing the live event must not enqueue the notification either.
+        assert {:ok, _} = Events.update_event(published, %{title: "Renamed"})
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+      end)
+    end
+
+    test "publish_event uses the flag stored by schedule_event", %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        publish_at = DateTime.add(DateTime.utc_now(), 1, :day)
+
+        assert {:ok, scheduled} =
+                 Events.schedule_event(event, publish_at,
+                   send_notification: true
+                 )
+
+        assert scheduled.send_notification
+        assert {:ok, published} = Events.publish_event(scheduled)
+        assert published.send_notification
+
+        assert [_job] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+      end)
+    end
+
+    test "schedule_event defaults send_notification to false", %{event: event} do
+      publish_at = DateTime.add(DateTime.utc_now(), 1, :day)
+      assert {:ok, scheduled} = Events.schedule_event(event, publish_at)
+      refute scheduled.send_notification
+    end
+
+    test "publish_event schedules the notification and photo-reminder jobs independently",
+         %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, published} =
+                 Events.publish_event(event, send_notification: true)
 
         assert [notification_job] =
                  all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
@@ -4510,7 +4585,8 @@ defmodule Ysc.EventsTest do
     test "updating a published event's dates keeps both jobs independently scheduled",
          %{event: event} do
       Oban.Testing.with_testing_mode(:manual, fn ->
-        assert {:ok, published} = Events.publish_event(event)
+        assert {:ok, published} =
+                 Events.publish_event(event, send_notification: true)
 
         assert [_notification_job] =
                  all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)

@@ -1894,8 +1894,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                 <.info_section
                   id="before-you-go"
                   heading_id="clear-lake-before-you-go-heading"
-                  title="Before You Go"
-                  description="On-site details for after you book. The dumpster padlock code is in your check-in email."
+                  title="At the Cabin"
+                  description="How the cabin works once you're there. Watch the training videos before you arrive. The dumpster padlock code is in your check-in email."
                 >
                   <.icon_list>
                     <:item
