@@ -1,24 +1,24 @@
 defmodule Ysc.HackneyUpgradeTest do
   @moduledoc """
-  Guards the hackney 4.9.1 → 4.10.0 upgrade (tightly coupled with h2 0.15.0).
+  Guards the hackney 4.10.0 → 4.10.2 upgrade (tightly coupled with h2 0.15.1).
 
-  4.10.0 patches HTTP/1.1 chunked `max_body_size`: the cap is checked as
-  chunk data arrives, so one huge chunk can no longer bypass it. Chunk-size
-  lines longer than 4096 bytes or more than 16 hex digits are refused.
-  HTTP/2 and HTTP/3 wait for a free stream (`checkout_timeout`) instead of
-  failing at the peer's concurrent-stream limit, and retry a GOAWAY /
-  refused / rejected request once on a fresh connection.
+  4.10.1 makes `insecure` / `{verify, verify_none}` actually disable TLS
+  verification. We do not pass `insecure`.
 
-  extras: h2 0.15.0 (MadeYouReset + SETTINGS flood), quic 2.6.1 (HTTP/3
-  header-block CPU DoS), webtransport 0.5.3 (unused draft-17/16),
-  ssl_verify_fun 1.1.9 (non-ASCII dNSName). certifi stays 2.18.0.
+  4.10.2 releases pooled checkout slots if the caller dies or times out,
+  returns from `close/1` within about a second (`abort_read/1`), resumes
+  TLS 1.3 session tickets one-at-a-time per host, keeps `connect_options`
+  socket opts on pooled connections, and sends streamed `Content-Length`
+  bodies as declared instead of chunk-framing them.
 
-  4.9.1 is docs-only over 4.9.0 (`max_body_size`, pinned CA trust,
-  same-origin redirects, IP-literal SSRF spellings, proxy_auth_fun
-  CR/LF/NUL). App HTTP uses Req (`ExAws.Request.Req`,
-  `Ysc.Stripe.HttpClient`, `Ysc.Tzdata.HttpClient`). We do not call
-  hackney APIs, pin cacerts, follow redirects with `basic_auth`, use
-  `proxy_auth_fun`, HTTP/3, or WebTransport. tzdata still lists `~> 1.17`.
+  extras: h2 0.15.1 (TLS close without waiting for the peer),
+  webtransport 0.5.5 (unused; needs h2 0.15.1), quic 2.6.1, ssl_verify_fun
+  1.1.9. certifi stays 2.18.0. phoenix_template stays 1.0.4.
+
+  App HTTP uses Req (`ExAws.Request.Req`, `Ysc.Stripe.HttpClient`,
+  `Ysc.Tzdata.HttpClient`). We do not call hackney APIs, pin cacerts,
+  follow redirects with `basic_auth`, use `proxy_auth_fun`, HTTP/3,
+  WebTransport, or `insecure`. tzdata still lists `~> 1.17`.
   """
   use ExUnit.Case, async: false
 
@@ -35,6 +35,7 @@ defmodule Ysc.HackneyUpgradeTest do
                           __DIR__
                         )
   @hackney_http Path.expand("../../deps/hackney/src/hackney_http.erl", __DIR__)
+  @hackney_pool Path.expand("../../deps/hackney/src/hackney_pool.erl", __DIR__)
   @hackney_rebar Path.expand("../../deps/hackney/rebar.config", __DIR__)
   @webtransport_rebar Path.expand(
                         "../../deps/webtransport/rebar.config",
@@ -56,14 +57,15 @@ defmodule Ysc.HackneyUpgradeTest do
     :ok
   end
 
-  describe "4.10.0 Hex lock and public APIs" do
-    test "locks the Hex package to 4.10.0" do
-      assert to_string(Application.spec(:hackney, :vsn)) == "4.10.0"
+  describe "4.10.2 Hex lock and public APIs" do
+    test "locks the Hex package to 4.10.2" do
+      assert to_string(Application.spec(:hackney, :vsn)) == "4.10.2"
     end
 
-    test "mix.exs pins the 4.10.0 floor" do
+    test "mix.exs pins the 4.10.2 floor" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s({:hackney, "~> 4.10.0", override: true})
+      assert mix_exs =~ ~s({:hackney, "~> 4.10.2", override: true})
+      refute mix_exs =~ ~s({:hackney, "~> 4.10.0", override: true})
       refute mix_exs =~ ~s({:hackney, "~> 4.9.1", override: true})
 
       ignore =
@@ -80,29 +82,29 @@ defmodule Ysc.HackneyUpgradeTest do
       refute ignore =~ "EEF-CVE-2026-113440"
     end
 
-    test "companion extras are h2 0.15.0, webtransport 0.5.3, quic 2.6.1" do
+    test "companion extras are h2 0.15.1, webtransport 0.5.5, quic 2.6.1" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"hackney": {:hex, :hackney, "4.10.0"|
-      refute lock =~ ~s|"hackney": {:hex, :hackney, "4.9.1"|
-      assert lock =~ ~s|"webtransport": {:hex, :webtransport, "0.5.3"|
-      refute lock =~ ~s|"webtransport": {:hex, :webtransport, "0.4.8"|
+      assert lock =~ ~s|"hackney": {:hex, :hackney, "4.10.2"|
+      refute lock =~ ~s|"hackney": {:hex, :hackney, "4.10.0"|
+      assert lock =~ ~s|"webtransport": {:hex, :webtransport, "0.5.5"|
+      refute lock =~ ~s|"webtransport": {:hex, :webtransport, "0.5.3"|
       assert lock =~ ~s|"certifi": {:hex, :certifi, "2.18.0"|
       assert lock =~ ~s|"quic": {:hex, :quic, "2.6.1"|
       refute lock =~ ~s|"quic": {:hex, :quic, "2.1.3"|
-      assert lock =~ ~s|"h2": {:hex, :h2, "0.15.0"|
-      refute lock =~ ~s|"h2": {:hex, :h2, "0.12.5"|
+      assert lock =~ ~s|"h2": {:hex, :h2, "0.15.1"|
+      refute lock =~ ~s|"h2": {:hex, :h2, "0.15.0"|
       assert lock =~ ~s|"ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.9"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
     end
 
-    test "rebar deps match the extras hackney 4.10.0 requires" do
+    test "rebar deps match the extras hackney 4.10.2 requires" do
       rebar = File.read!(@hackney_rebar)
       assert rebar =~ ~s|{quic, "~>2.6.1"}|
       assert rebar =~ ~s|{h2, "~>0.15.0"}|
       assert rebar =~ ~s|{webtransport, "~>0.5.3"}|
       assert rebar =~ ~s|{certifi, "~>2.18.0"}|
       assert File.read!(@webtransport_rebar) =~ ~s|{quic, "~> 2.6.1"}|
-      assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.15.0"}|
+      assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.15.1"}|
     end
 
     test "request APIs still exist" do
@@ -112,6 +114,9 @@ defmodule Ysc.HackneyUpgradeTest do
       assert function_exported?(:hackney, :request, 5)
       assert function_exported?(:hackney, :body, 1)
       assert function_exported?(:hackney, :close, 1)
+      assert function_exported?(:hackney, :send_body, 2)
+      assert function_exported?(:hackney, :finish_send_body, 1)
+      assert function_exported?(:hackney, :start_response, 1)
       assert function_exported?(:hackney_url, :normalize, 1)
       assert function_exported?(:hackney_url, :normalize, 2)
       assert function_exported?(:hackney_url, :same_origin, 2)
@@ -149,6 +154,29 @@ defmodule Ysc.HackneyUpgradeTest do
       assert news =~ "SETTINGS flood"
       assert news =~ "quic 2.6.1"
       assert news =~ "webtransport 0.5.3"
+    end
+  end
+
+  describe "4.10.1 NEWS" do
+    test "documents insecure and verify_none actually disabling TLS checks" do
+      news = File.read!(@news)
+      assert news =~ "4.10.1 - 2026-11-10"
+      assert news =~ "insecure"
+      assert news =~ "{verify, verify_none}"
+      assert news =~ "connect_options"
+    end
+  end
+
+  describe "4.10.2 NEWS" do
+    test "documents pool slot leaks, close abort, TLS tickets, and Content-Length" do
+      news = File.read!(@news)
+      assert news =~ "4.10.2 - 2026-11-10"
+      assert news =~ "now returns within about a"
+      assert news =~ "checkout_timeout"
+      assert news =~ "bad_record_mac"
+      assert news =~ "Content-Length"
+      assert news =~ "h2 0.15.1"
+      assert news =~ "webtransport 0.5.5"
     end
   end
 
@@ -361,6 +389,158 @@ defmodule Ysc.HackneyUpgradeTest do
     end
   end
 
+  describe "4.10.1 insecure TLS" do
+    test "fold_insecure copies the option into ssl_options and verify_none skips hostname checks" do
+      erl = File.read!(@hackney_erl)
+      ssl = File.read!(@hackney_ssl)
+
+      assert erl =~ "fold_insecure(Options0)"
+      assert erl =~ "proplists:is_defined(insecure, ConnectOpts)"
+      assert ssl =~ "proplists:get_value(verify, OverrideOpts) =:= verify_none"
+      assert ssl =~ "would reject the peer the caller asked not to verify"
+    end
+
+    test "app HTTP adapters do not pass insecure" do
+      stripe = File.read!(@stripe_client)
+      tzdata = File.read!(@tzdata_client)
+      refute stripe =~ "insecure"
+      refute tzdata =~ "insecure"
+      refute stripe =~ "verify_none"
+      refute tzdata =~ "verify_none"
+    end
+  end
+
+  describe "4.10.2 close, pool slots, and TLS tickets" do
+    test "close aborts a pending read so it cannot hang on a silent server" do
+      erl = File.read!(@hackney_erl)
+      conn = File.read!(@hackney_conn)
+
+      assert erl =~ "ok = hackney_conn:abort_read(ConnPid)"
+      assert erl =~ "the close does not wait for it (#996)"
+      assert conn =~ "{?MODULE, abort_read}"
+      assert conn =~ "never (#996)"
+      assert function_exported?(:hackney_conn, :abort_read, 1)
+    end
+
+    test "pool releases a slot when the requester dies while queued" do
+      pool = File.read!(@hackney_pool)
+      assert pool =~ "#974"
+      assert pool =~ "leaking the slot"
+    end
+
+    test "TLS 1.3 session tickets are claimed one host at a time" do
+      ssl = File.read!(@hackney_ssl)
+      assert ssl =~ "claim_resumption(Host, SslOpts)"
+      assert ssl =~ "bad_record_mac"
+      assert ssl =~ "#995"
+    end
+  end
+
+  describe "4.10.2 streamed Content-Length bodies" do
+    test "source sends a declared length raw and refuses a mismatch" do
+      conn = File.read!(@hackney_conn)
+      assert conn =~ "stream_body_framing(Headers)"
+      assert conn =~ "a Content-Length alone: the body is written raw"
+      assert conn =~ "an empty piece sends nothing"
+      assert conn =~ "{error, {content_length_mismatch,"
+    end
+
+    test "a streamed Content-Length body is sent raw, not chunked" do
+      {:ok, lsock} =
+        :gen_tcp.listen(0, [
+          :binary,
+          packet: :raw,
+          active: false,
+          reuseaddr: true,
+          ip: {127, 0, 0, 1}
+        ])
+
+      {:ok, port} = :inet.port(lsock)
+
+      server =
+        Task.async(fn ->
+          {:ok, sock} = :gen_tcp.accept(lsock, 2_000)
+          {:ok, req} = recv_until_body(sock, 4, 2_000)
+
+          :ok =
+            :gen_tcp.send(
+              sock,
+              "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"
+            )
+
+          :gen_tcp.close(sock)
+          req
+        end)
+
+      url = "http://127.0.0.1:#{port}/"
+
+      try do
+        assert {:ok, client} =
+                 :hackney.request(
+                   :post,
+                   url,
+                   [{"Content-Length", "4"}],
+                   :stream,
+                   pool: false
+                 )
+
+        assert :ok = :hackney.send_body(client, "abcd")
+        assert :ok = :hackney.finish_send_body(client)
+        assert {:ok, 200, _headers, ^client} = :hackney.start_response(client)
+        assert {:ok, "ok"} = :hackney.body(client)
+
+        req = Task.await(server, 3_000)
+        refute req =~ "Transfer-Encoding: chunked"
+        assert req =~ "Content-Length: 4"
+        assert String.contains?(req, "\r\n\r\nabcd")
+      after
+        _ = Task.shutdown(server, :brutal_kill)
+        :gen_tcp.close(lsock)
+      end
+    end
+
+    test "finishing a short streamed Content-Length body is a mismatch" do
+      {:ok, lsock} =
+        :gen_tcp.listen(0, [
+          :binary,
+          packet: :raw,
+          active: false,
+          reuseaddr: true,
+          ip: {127, 0, 0, 1}
+        ])
+
+      {:ok, port} = :inet.port(lsock)
+
+      server =
+        Task.async(fn ->
+          {:ok, sock} = :gen_tcp.accept(lsock, 2_000)
+          _ = :gen_tcp.recv(sock, 0, 2_000)
+          :gen_tcp.close(sock)
+        end)
+
+      url = "http://127.0.0.1:#{port}/"
+
+      try do
+        assert {:ok, client} =
+                 :hackney.request(
+                   :post,
+                   url,
+                   [{"Content-Length", "4"}],
+                   :stream,
+                   pool: false
+                 )
+
+        assert :ok = :hackney.send_body(client, "ab")
+
+        assert {:error, {:content_length_mismatch, 4, 2}} =
+                 :hackney.finish_send_body(client)
+      after
+        _ = Task.shutdown(server, :brutal_kill)
+        :gen_tcp.close(lsock)
+      end
+    end
+  end
+
   describe "certifi 2.18.0 extra" do
     test "locks 2.18.0 and drops the distrusted emSign C1/C3/G3 roots" do
       assert to_string(Application.spec(:certifi, :vsn)) == "2.18.0"
@@ -372,6 +552,23 @@ defmodule Ysc.HackneyUpgradeTest do
       refute pem =~ "CN=emSign ECC Root CA - G3"
       {:module, :certifi} = Code.ensure_loaded(:certifi)
       assert length(:certifi.cacerts()) == 118
+    end
+  end
+
+  defp recv_until_body(sock, body_size, timeout) do
+    recv_until_body(sock, body_size, timeout, <<>>)
+  end
+
+  defp recv_until_body(sock, body_size, timeout, acc) do
+    case :binary.split(acc, "\r\n\r\n") do
+      [_headers, rest] when byte_size(rest) >= body_size ->
+        {:ok, acc}
+
+      _ ->
+        case :gen_tcp.recv(sock, 0, timeout) do
+          {:ok, data} -> recv_until_body(sock, body_size, timeout, acc <> data)
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 

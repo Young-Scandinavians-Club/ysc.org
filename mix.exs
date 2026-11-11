@@ -194,13 +194,19 @@ defmodule Ysc.MixProject do
       # concurrent-stream limit; a GOAWAY / refused / rejected request is
       # retried once on a fresh connection (function bodies are not sent
       # twice). Function request bodies work on HTTP/2 and HTTP/3.
-      # extras: h2 0.15.0 (MadeYouReset + SETTINGS flood), quic 2.6.1
-      # (HTTP/3 header-block CPU DoS, GHSA-224p-pchv-5r3r), webtransport
-      # 0.5.3 (draft-17/16; unused), ssl_verify_fun 1.1.9 (non-ASCII
-      # dNSName). We do not use HTTP/3, WebTransport, unix sockets,
-      # cookies/1, or function request bodies. Requires webtransport
-      # ~> 0.5.3, certifi ~> 2.18.0, quic ~> 2.6.1, h2 ~> 0.15.0.
-      {:hackney, "~> 4.10.0", override: true},
+      # 4.10.1: insecure / {verify, verify_none} actually disable TLS
+      # verification (they were ignored). We do not pass insecure.
+      # 4.10.2: pooled checkout slots are released if the caller dies or
+      # times out; close returns within ~1s; TLS 1.3 session tickets are
+      # resumed one-at-a-time per host; connect_options socket opts stick
+      # on pooled connections; streamed Content-Length bodies are sent as
+      # declared. extras: h2 0.15.1 (TLS close without waiting for the
+      # peer), webtransport 0.5.5 (unused; needs h2 0.15.1), quic 2.6.1,
+      # ssl_verify_fun 1.1.9, certifi 2.18.0. We do not use HTTP/3,
+      # WebTransport, unix sockets, cookies/1, function request bodies,
+      # or insecure. Requires webtransport ~> 0.5.3, certifi ~> 2.18.0,
+      # quic ~> 2.6.1, h2 ~> 0.15.0 (we pin 0.15.1).
+      {:hackney, "~> 4.10.2", override: true},
       # 0.12.0: serve_socket/2 for embedders that own the TLS listener; handshake
       # now runs in the per-connection process. We do not start h2 servers;
       # hackney talks to h2_connection client APIs only, so those are unused.
@@ -235,10 +241,14 @@ defmodule Ysc.MixProject do
       # 0.14.0: peercert/1; server owns its listen socket; stop_server/1
       # waits. We do not start h2 servers in production.
       # 0.15.0: optional notify_stream_available for clients (off by
-      # default). Public client APIs unchanged. Pin the floor so
-      # hackney's ~> 0.15.0 cannot resolve below the SETTINGS-flood
-      # fix.
-      {:h2, "~> 0.15.0", override: true},
+      # default). Public client APIs unchanged.
+      # 0.15.1: owner/stream handlers learn the peer is gone before the
+      # socket closes; TLS close no longer waits ~5s for the peer.
+      # Unused in app code; hackney 4.10.2 needs it. Pin the floor so
+      # hackney's ~> 0.15.0 cannot resolve below the close fix. Do not
+      # take 0.16.0: hackney still lists ~> 0.15.0; 0.16.0 is opt-in
+      # max_body_size (default infinity).
+      {:h2, "~> 0.15.1", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},
