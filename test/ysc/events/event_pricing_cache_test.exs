@@ -180,4 +180,85 @@ defmodule Ysc.Events.EventPricingCacheTest do
     assert length(enriched_again) == 3
     assert Enum.all?(enriched_again, &Map.has_key?(&1, :pricing_info))
   end
+
+  test "enrich_event skips ticket-tier and sold-count queries for external ticketing" do
+    event =
+      event_fixture(%{
+        title: "External Pricing #{System.unique_integer()}",
+        external_ticket_url: "https://example.org/tickets",
+        external_organizer: "Norwegian Club"
+      })
+
+    _leftover = ticket_tier_fixture(%{event_id: event.id})
+
+    tier_list_pattern = ~r/FROM "ticket_tiers".*GROUP BY/s
+    sold_count_pattern = ~r/FROM "tickets".*JOIN "ticket_tiers"/s
+
+    {enriched, tier_queries} =
+      Ysc.QueryCounter.with_query_counter(
+        fn -> EventPricingCache.enrich_event(event) end,
+        pattern: tier_list_pattern,
+        caller_pids: [self()]
+      )
+
+    {_again, sold_count_queries} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          EventPricingCache.invalidate()
+          EventPricingCache.enrich_event(event)
+        end,
+        pattern: sold_count_pattern,
+        caller_pids: [self()]
+      )
+
+    assert tier_queries == 0
+    assert sold_count_queries == 0
+    assert enriched.ticket_tiers == []
+    assert enriched.ticket_count == 0
+    assert enriched.pricing_info.display_text == "External Tickets"
+  end
+
+  test "enrich_events still batches internally ticketed events in one tier query" do
+    internal =
+      event_fixture(%{title: "Internal Mix #{System.unique_integer()}"})
+
+    _tier = ticket_tier_fixture(%{event_id: internal.id})
+
+    external =
+      event_fixture(%{
+        title: "External Mix #{System.unique_integer()}",
+        external_ticket_url: "https://example.org/fair"
+      })
+
+    _leftover = ticket_tier_fixture(%{event_id: external.id})
+
+    events = [internal, external]
+    tier_list_pattern = ~r/FROM "ticket_tiers".*GROUP BY/s
+    sold_count_pattern = ~r/FROM "tickets".*JOIN "ticket_tiers"/s
+
+    {enriched, tier_queries} =
+      Ysc.QueryCounter.with_query_counter(
+        fn -> EventPricingCache.enrich_events(events) end,
+        pattern: tier_list_pattern,
+        caller_pids: [self()]
+      )
+
+    {_again, sold_count_queries} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          EventPricingCache.invalidate()
+          EventPricingCache.enrich_events(events)
+        end,
+        pattern: sold_count_pattern,
+        caller_pids: [self()]
+      )
+
+    assert tier_queries == 1
+    assert sold_count_queries == 1
+
+    by_id = Map.new(enriched, &{&1.id, &1})
+    assert by_id[internal.id].ticket_tiers != []
+    assert by_id[external.id].ticket_tiers == []
+    assert by_id[external.id].pricing_info.display_text == "External Tickets"
+  end
 end

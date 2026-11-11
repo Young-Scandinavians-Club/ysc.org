@@ -236,6 +236,64 @@ defmodule YscWeb.EventDetailsQueryTest do
       assert html =~ "Norwegian Club"
       assert html =~ "https://example.org/tickets"
     end
+
+    test "dead render skips ticket-tier inventory for external ticketing", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "External Inventory Skip Event",
+          state: :published,
+          external_ticket_url: "https://example.org/tickets",
+          external_organizer: "Norwegian Club"
+        })
+
+      ticket_tier_fixture(%{event_id: event.id})
+
+      {html, tier_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/events/#{event.id}")
+            |> html_response(200)
+          end,
+          pattern: @tier_list_pattern,
+          caller_pids: [self()]
+        )
+
+      assert tier_queries == 0
+      assert html =~ "External Inventory Skip Event"
+      assert html =~ "External Tickets"
+      assert html =~ "https://example.org/tickets"
+    end
+
+    test "connect skips selling-fast and leftover tier inventory for external ticketing",
+         %{conn: conn} do
+      event =
+        event_fixture(%{
+          title: "External Connect Skip Event",
+          state: :published,
+          external_ticket_url: "https://example.org/tickets"
+        })
+
+      ticket_tier_fixture(%{event_id: event.id})
+
+      {{:ok, view, _html}, tier_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+            render_async(view)
+            {:ok, view, html}
+          end,
+          pattern: @tier_list_pattern,
+          caller_pids: [self()]
+        )
+
+      assert tier_queries == 0
+      assert render(view) =~ "External Tickets"
+      refute has_element?(view, "#ticket-modal")
+    end
   end
 
   describe "membership extras on first paint" do
