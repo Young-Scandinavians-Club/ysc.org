@@ -661,6 +661,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
 
       assert donation_row
       assert donation_row.quantity == 1
+      refute data.donation_only
     end
 
     test "render/1 produces HTML", %{ticket_order: ticket_order} do
@@ -672,12 +673,101 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
     end
   end
 
+  describe "prepare_email_data/1 donation-only orders" do
+    setup do
+      Ledgers.ensure_basic_accounts()
+      user = user_fixture()
+
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+
+      organizer = user_fixture()
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Donation only #{System.unique_integer([:positive])}",
+          description: "D",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 30, :day)
+            |> DateTime.truncate(:second),
+          max_attendees: 100,
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, donation_tier} =
+        Events.create_ticket_tier(%{
+          name: "Donation",
+          type: :donation,
+          price: nil,
+          quantity: nil,
+          event_id: event.id
+        })
+
+      {:ok, ticket_order} =
+        Tickets.create_ticket_order(user.id, event.id, %{
+          donation_tier.id => 2_500
+        })
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_event_payment_with_donations(%{
+          user_id: user.id,
+          total_amount: ticket_order.total_amount,
+          event_amount: Money.new(0, :USD),
+          donation_amount: ticket_order.total_amount,
+          event_id: event.id,
+          external_payment_id:
+            "pi_tpc_dononly_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(200, :USD),
+          description: "Event donation",
+          payment_method_id: nil
+        })
+
+      ticket_order =
+        ticket_order
+        |> Ecto.Changeset.change(%{
+          payment_id: payment.id,
+          completed_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      %{ticket_order: Tickets.get_ticket_order(ticket_order.id)}
+    end
+
+    test "marks donation-only orders and omits door-ticket cards", %{
+      ticket_order: ticket_order
+    } do
+      data = TicketPurchaseConfirmation.prepare_email_data(ticket_order)
+
+      assert data.donation_only
+      assert data.ticket_cards == []
+      refute data.granted
+
+      html = TicketPurchaseConfirmation.render(data)
+      assert html =~ "receipt for your donation"
+      refute html =~ "View all tickets"
+      refute html =~ "show the tickets on your phone"
+    end
+  end
+
   describe "URL helpers" do
     test "get_template_name, get_subject, event_url, tickets_qr_url" do
       assert TicketPurchaseConfirmation.get_template_name() ==
                "ticket_purchase_confirmation"
 
       assert TicketPurchaseConfirmation.get_subject() =~ "confirmed"
+
+      assert TicketPurchaseConfirmation.get_subject(%{granted: true}) =~
+               "ready"
+
+      refute TicketPurchaseConfirmation.get_subject(%{granted: true}) =~
+               "confirmed"
 
       id = Ecto.ULID.generate()
       assert YscWeb.Emails.Helpers.event_url(id) =~ "/events/#{id}"

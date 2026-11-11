@@ -40,6 +40,7 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
     TahoeWinterWeekendAvailable,
     TicketOrderRefund,
     TicketPurchaseConfirmation,
+    TicketRecipientNotification,
     TicketReservationCreated,
     WelcomeEmail
   }
@@ -846,6 +847,17 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
               ticket_tier_name: "Member GA"
             }
           ],
+          ticket_cards: [
+            %{
+              reference_id: "TKT-001",
+              ticket_tier_name: "Member GA",
+              holder_name: "Jane Member",
+              qr_image_url: "https://example.com/t/tok-1/qr.png",
+              ticket_url: "https://example.com/t/tok-1",
+              apple_wallet_url: nil,
+              google_wallet_url: nil
+            }
+          ],
           tickets_qr_url: "https://example.com/tickets/order-123/qr"
         })
 
@@ -853,8 +865,10 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       assert text =~ "Your tickets are confirmed"
       assert text =~ "See event details"
+      assert text =~ "View all tickets"
       assert text =~ "show the tickets on your phone"
       assert text =~ "Order number:"
+      assert text =~ "Purchase Date:"
       assert text =~ "Payment number:"
       assert text =~ "Your ticket numbers"
 
@@ -868,6 +882,194 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "Transaction ID:"
       refute text =~ "Ticket Purchase Confirmation"
       refute text =~ "View Event Details"
+      refute text =~ "Issued on:"
+    end
+
+    test "admin-granted tickets are not framed as a purchase" do
+      html =
+        TicketPurchaseConfirmation.render(%{
+          first_name: "Jane",
+          event: %{
+            title: "Nordic Night",
+            description: "Join us.",
+            location_name: "Golden Gate Park",
+            address: "123 Main St",
+            age_restriction: nil
+          },
+          event_date_time: "Dec 1, 2026 at 7:00 PM PST",
+          event_url: "https://example.com/events/preview",
+          agenda: [],
+          ticket_order: %{reference_id: "TKT-123"},
+          purchase_date: "Nov 1, 2026",
+          payment: %{reference_id: "N/A"},
+          payment_date: "N/A",
+          payment_method: "Free",
+          paid_in_person: false,
+          granted: true,
+          donation_only: false,
+          total_amount: "$0.00",
+          gross_total: "$0.00",
+          total_discount: "$0.00",
+          has_discounts: false,
+          ticket_summaries: [
+            %{
+              ticket_tier_name: "Volunteer",
+              quantity: 1,
+              price_per_ticket: "$0.00",
+              total_price: "$0.00",
+              original_price: nil,
+              discount_amount: nil,
+              discount_percentage: nil
+            }
+          ],
+          tickets: [
+            %{
+              reference_id: "TKT-001",
+              ticket_tier_name: "Volunteer"
+            }
+          ],
+          ticket_cards: [
+            %{
+              reference_id: "TKT-001",
+              ticket_tier_name: "Volunteer",
+              holder_name: "Jane Member",
+              qr_image_url: "https://example.com/t/tok-1/qr.png",
+              ticket_url: "https://example.com/t/tok-1",
+              apple_wallet_url: nil,
+              google_wallet_url: nil
+            }
+          ],
+          tickets_qr_url: "https://example.com/t/order-123"
+        })
+
+      text = html_text(html)
+
+      assert TicketPurchaseConfirmation.get_subject(%{granted: true}) ==
+               "Your tickets are ready! 🎫"
+
+      assert text =~ "Your tickets are ready"
+      assert text =~ "YSC has issued you tickets"
+      assert text =~ "Issued on:"
+      refute text =~ "Your tickets are confirmed"
+      refute text =~ "Thank you for your ticket purchase"
+      refute text =~ "Purchase Date:"
+    end
+
+    test "donation-only orders are a receipt, not door tickets" do
+      html =
+        TicketPurchaseConfirmation.render(%{
+          first_name: "Jane",
+          event: %{
+            title: "Nordic Night",
+            description: "Join us.",
+            location_name: "Golden Gate Park",
+            address: "123 Main St",
+            age_restriction: nil
+          },
+          event_date_time: "Dec 1, 2026 at 7:00 PM PST",
+          event_url: "https://example.com/events/preview",
+          agenda: [],
+          ticket_order: %{reference_id: "TKT-123"},
+          purchase_date: "Nov 1, 2026",
+          payment: %{reference_id: "PMT-123"},
+          payment_date: "Nov 1, 2026",
+          payment_method: "Visa ending in 4242",
+          paid_in_person: false,
+          granted: false,
+          donation_only: true,
+          total_amount: "$25.00",
+          gross_total: "$25.00",
+          total_discount: "$0.00",
+          has_discounts: false,
+          ticket_summaries: [
+            %{
+              ticket_tier_name: "Donation",
+              quantity: 1,
+              price_per_ticket: "$25.00",
+              total_price: "$25.00",
+              original_price: nil,
+              discount_amount: nil,
+              discount_percentage: nil
+            }
+          ],
+          tickets: [
+            %{
+              reference_id: "DON-001",
+              ticket_tier_name: "Donation"
+            }
+          ],
+          ticket_cards: [],
+          tickets_qr_url: "https://example.com/t/order-123"
+        })
+
+      text = html_text(html)
+
+      assert text =~ "Your tickets are confirmed"
+      assert text =~ "See event details"
+      assert text =~ "Your Donations"
+      assert text =~ "Your donation numbers"
+      assert text =~ "write to us about this donation"
+      assert text =~ "receipt for your donation"
+      assert text =~ "not a ticket for the door"
+      assert text =~ "Thank you for supporting the Young Scandinavians Club"
+      refute text =~ "View all tickets"
+      refute text =~ "show the tickets on your phone"
+      refute text =~ "You'll receive a reminder email"
+      refute text =~ "We look forward to seeing you at the event"
+      refute text =~ "Your ticket numbers"
+      refute text =~ "Your Tickets"
+    end
+
+    test "guest recipient email pluralizes when someone received more than one ticket" do
+      html =
+        TicketRecipientNotification.render(%{
+          first_name: "Guest",
+          purchaser_name: "Pat Member",
+          ticket_count: 2,
+          event: %{
+            title: "Nordic Night",
+            location_name: "Golden Gate Park",
+            address: "123 Main St",
+            age_restriction: nil
+          },
+          event_date_time: "Dec 1, 2026 at 7:00 PM PST",
+          event_url: "https://example.com/events/preview",
+          ticket_cards: [
+            %{
+              reference_id: "TKT-001",
+              ticket_tier_name: "Member GA",
+              holder_name: "Guest One",
+              qr_image_url: "https://example.com/t/tok-1/qr.png",
+              ticket_url: "https://example.com/t/tok-1",
+              apple_wallet_url: nil,
+              google_wallet_url: nil
+            },
+            %{
+              reference_id: "TKT-002",
+              ticket_tier_name: "Member GA",
+              holder_name: "Guest Two",
+              qr_image_url: "https://example.com/t/tok-2/qr.png",
+              ticket_url: "https://example.com/t/tok-2",
+              apple_wallet_url: nil,
+              google_wallet_url: nil
+            }
+          ]
+        })
+
+      text = html_text(html)
+
+      assert TicketRecipientNotification.get_subject(%{
+               event: %{title: "Nordic Night"},
+               ticket_count: 2
+             }) == "Your tickets to Nordic Night 🎫"
+
+      assert text =~ "Your tickets are ready"
+      assert text =~ "got 2 tickets"
+      assert text =~ "show the QR codes at the door"
+      assert text =~ "add them to your phone's wallet"
+      refute text =~ "Your ticket is ready"
+      refute text =~ "show the QR code at the door"
+      refute text =~ "add it to your phone's wallet"
     end
   end
 
