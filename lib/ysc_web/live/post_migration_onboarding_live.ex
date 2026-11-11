@@ -529,41 +529,36 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         </:subtitle>
       </.header>
 
-      <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div class="flex gap-3">
-          <.icon
-            name="hero-user-group"
-            class="h-5 w-5 text-blue-500 shrink-0 mt-0.5"
-          />
-          <div>
-            <h3 class="text-sm text-blue-800 type-subhead">
-              <%= if @primary_user do %>
-                Membership shared through {@primary_user.first_name} {@primary_user.last_name}
-              <% else %>
-                Membership shared through your family account
-              <% end %>
-            </h3>
-            <p class="text-sm text-blue-700 mt-1">
-              You are a family member. You share membership benefits from <strong>
-                <%= if @primary_user do %>
-                  {@primary_user.first_name} {@primary_user.last_name}
-                <% else %>
-                  the member who manages your family account
-                <% end %>
-              </strong>. Family members cannot purchase or manage their own membership.
-            </p>
+      <.callout
+        type="info"
+        icon="hero-user-group"
+        id="inherited-membership-notice"
+        class="mt-6"
+      >
+        <:title>
+          <%= if @primary_user do %>
+            Membership shared through {@primary_user.first_name} {@primary_user.last_name}
+          <% else %>
+            Membership shared through your family account
+          <% end %>
+        </:title>
+        <p>
+          You are a family member. You share membership benefits from <strong>
             <%= if @primary_user do %>
-              <p class="text-sm text-blue-700 mt-1">
-                Contact
-                <strong>
-                  {@primary_user.first_name} {@primary_user.last_name}
-                </strong>
-                if you need changes to billing or membership.
-              </p>
+              {@primary_user.first_name} {@primary_user.last_name}
+            <% else %>
+              the member who manages your family account
             <% end %>
-          </div>
-        </div>
-      </div>
+          </strong>. Family members cannot purchase or manage their own membership.
+        </p>
+        <p :if={@primary_user}>
+          Contact
+          <strong>
+            {@primary_user.first_name} {@primary_user.last_name}
+          </strong>
+          if you need changes to billing or membership.
+        </p>
+      </.callout>
 
       <div class="mt-6 flex justify-end">
         <.button

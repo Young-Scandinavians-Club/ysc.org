@@ -791,34 +791,26 @@ defmodule YscWeb.UserSettingsLive do
               class="rounded-sm border border-zinc-100 p-6 flex flex-col gap-4"
             >
               <h2 class="text-zinc-900 text-xl type-subhead">Membership</h2>
-              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div class="flex gap-3">
-                  <.icon
-                    name="hero-user-group"
-                    class="h-5 w-5 text-blue-500 shrink-0 mt-0.5"
-                  />
-                  <div>
-                    <h3 class="text-sm text-blue-800 type-subhead">
-                      Family Account
-                    </h3>
-                    <p class="text-sm text-blue-700 mt-1">
-                      You are a family member. You share membership benefits from <strong><%= if @primary_user,
-                        do: "#{@primary_user.first_name} #{@primary_user.last_name}",
-                        else: "the member who manages your family account" %></strong>.
-                      Family members cannot purchase or manage their own membership.
-                    </p>
-                    <%= if @primary_user do %>
-                      <p class="text-sm text-blue-700 mt-1">
-                        Contact
-                        <strong>
-                          {@primary_user.first_name} {@primary_user.last_name}
-                        </strong>
-                        to make any changes.
-                      </p>
-                    <% end %>
-                  </div>
-                </div>
-              </div>
+              <.callout
+                type="info"
+                icon="hero-user-group"
+                id="family-account-notice"
+              >
+                <:title>Family Account</:title>
+                <p>
+                  You are a family member. You share membership benefits from <strong><%= if @primary_user,
+                    do: "#{@primary_user.first_name} #{@primary_user.last_name}",
+                    else: "the member who manages your family account" %></strong>.
+                  Family members cannot purchase or manage their own membership.
+                </p>
+                <p :if={@primary_user}>
+                  Contact
+                  <strong>
+                    {@primary_user.first_name} {@primary_user.last_name}
+                  </strong>
+                  to make any changes.
+                </p>
+              </.callout>
               <div class="pt-4 border-t border-zinc-200">
                 <p class="text-sm text-zinc-600 mb-2">
                   You can leave this family membership at any time. You will no longer share membership benefits and can purchase your own membership or join another family later.
@@ -844,54 +836,13 @@ defmodule YscWeb.UserSettingsLive do
                 is_sub_account={@is_sub_account}
                 timezone={@timezone}
               />
-              <div
+              <.scheduled_plan_change_notice
                 :if={@scheduled_downgrade_info}
-                data-testid="scheduled-downgrade-notice"
-                class="bg-amber-50 border border-amber-200 rounded-lg p-4"
-              >
-                <div class="flex gap-3">
-                  <.icon
-                    name="hero-arrow-trending-down"
-                    class="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
-                  />
-                  <div class="flex-1">
-                    <h3 class="text-sm text-amber-800 type-subhead">
-                      Plan change scheduled
-                    </h3>
-                    <p class="text-sm text-amber-700 mt-1">
-                      <%= if @primary_user do %>
-                        The membership from
-                        <strong>
-                          {@primary_user.first_name} {@primary_user.last_name}
-                        </strong>
-                        will change to
-                      <% else %>
-                        Your family membership will change to
-                      <% end %>
-                      <strong>
-                        {String.capitalize(
-                          to_string(@scheduled_downgrade_info.target_plan)
-                        )}
-                      </strong>
-                      after <strong>
-                        <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y", @timezone) %>
-                      </strong>. You will keep your current benefits until that date.
-                    </p>
-                    <div class="mt-3">
-                      <.button
-                        id="cancel-scheduled-downgrade-btn"
-                        phx-click="cancel-scheduled-downgrade"
-                        phx-disable-with="Updating..."
-                        variant="outline"
-                        color="amber"
-                        data-confirm="Cancel your scheduled plan change and keep your current membership? You will stay on your current plan and will not switch on the date shown above."
-                      >
-                        Keep my current plan
-                      </.button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                info={@scheduled_downgrade_info}
+                timezone={@timezone}
+                family?={true}
+                primary_user={@primary_user}
+              />
               <.button
                 :if={@current_membership != nil}
                 phx-click="show_membership_qr"
@@ -945,46 +896,11 @@ defmodule YscWeb.UserSettingsLive do
                 is_sub_account={@is_sub_account}
                 timezone={@timezone}
               />
-              <div
+              <.scheduled_plan_change_notice
                 :if={@scheduled_downgrade_info}
-                data-testid="scheduled-downgrade-notice"
-                class="bg-amber-50 border border-amber-200 rounded-lg p-4"
-              >
-                <div class="flex gap-3">
-                  <.icon
-                    name="hero-arrow-trending-down"
-                    class="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
-                  />
-                  <div class="flex-1">
-                    <h3 class="text-sm text-amber-800 type-subhead">
-                      Plan change scheduled
-                    </h3>
-                    <p class="text-sm text-amber-700 mt-1">
-                      Your membership will change to
-                      <strong>
-                        {String.capitalize(
-                          to_string(@scheduled_downgrade_info.target_plan)
-                        )}
-                      </strong>
-                      after <strong>
-                        <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y", @timezone) %>
-                      </strong>. You will keep your current benefits until that date.
-                    </p>
-                    <div class="mt-3">
-                      <.button
-                        id="cancel-scheduled-downgrade-btn"
-                        phx-click="cancel-scheduled-downgrade"
-                        phx-disable-with="Updating..."
-                        variant="outline"
-                        color="amber"
-                        data-confirm="Cancel your scheduled plan change and keep your current membership? You will stay on your current plan and will not switch on the date shown above."
-                      >
-                        Keep my current plan
-                      </.button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                info={@scheduled_downgrade_info}
+                timezone={@timezone}
+              />
               <.button phx-click="show_membership_qr">
                 <.icon name="hero-qr-code" class="w-5 h-5" /> My Membership QR
               </.button>
@@ -1382,46 +1298,11 @@ defmodule YscWeb.UserSettingsLive do
                   </div>
                 </div>
 
-                <div
+                <.scheduled_plan_change_notice
                   :if={@scheduled_downgrade_info}
-                  data-testid="scheduled-downgrade-notice"
-                  class="bg-amber-50 border border-amber-200 rounded-lg p-4"
-                >
-                  <div class="flex gap-3">
-                    <.icon
-                      name="hero-arrow-trending-down"
-                      class="h-5 w-5 text-amber-500 shrink-0 mt-0.5"
-                    />
-                    <div class="flex-1">
-                      <h3 class="text-sm text-amber-800 type-subhead">
-                        Plan change scheduled
-                      </h3>
-                      <p class="text-sm text-amber-700 mt-1">
-                        Your membership will change to
-                        <strong>
-                          {String.capitalize(
-                            to_string(@scheduled_downgrade_info.target_plan)
-                          )}
-                        </strong>
-                        after <strong>
-                          <%= format_utc_date(@scheduled_downgrade_info.effective_date, "%B %d, %Y", @timezone) %>
-                        </strong>. You will keep your current benefits until that date.
-                      </p>
-                      <div class="mt-3">
-                        <.button
-                          id="cancel-scheduled-downgrade-btn"
-                          phx-click="cancel-scheduled-downgrade"
-                          phx-disable-with="Updating..."
-                          variant="outline"
-                          color="amber"
-                          data-confirm="Cancel your scheduled plan change and keep your current membership? You will stay on your current plan and will not switch on the date shown above."
-                        >
-                          Keep my current plan
-                        </.button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  info={@scheduled_downgrade_info}
+                  timezone={@timezone}
+                />
 
                 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 pt-4 border-t border-zinc-100">
                   <.button
@@ -6335,18 +6216,6 @@ defmodule YscWeb.UserSettingsLive do
       avatar -> Avatars.avatar_url(avatar, :profile)
     end
   end
-
-  defp format_utc_date(%DateTime{} = dt, format, timezone) do
-    dt
-    |> YscWeb.TimeZone.shift(timezone)
-    |> DateTime.to_date()
-    |> Calendar.strftime(format)
-  end
-
-  defp format_utc_date(%Date{} = date, format, _timezone),
-    do: Calendar.strftime(date, format)
-
-  defp format_utc_date(_, _, _), do: ""
 
   defp format_payment_date(%DateTime{} = dt, timezone) do
     dt

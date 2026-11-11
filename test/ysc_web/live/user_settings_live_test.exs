@@ -204,6 +204,15 @@ defmodule YscWeb.UserSettingsLiveTest do
                |> element("[data-testid=\"scheduled-downgrade-notice\"]")
                |> has_element?(),
                "Expected scheduled downgrade notice to be visible"
+
+        assert has_element?(view, "#scheduled-downgrade-notice")
+        assert has_element?(view, "#cancel-scheduled-downgrade-btn")
+
+        assert has_element?(
+                 view,
+                 "#scheduled-downgrade-notice",
+                 "Plan change scheduled"
+               )
       after
         Application.delete_env(:ysc, :get_scheduled_downgrade_info_callback)
       end
@@ -1661,6 +1670,10 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/membership")
       render(view)
+
+      assert has_element?(view, "#family-account-notice")
+      assert has_element?(view, "#family-account-notice", "Family Account")
+      assert has_element?(view, "#family-account-notice .hero-user-group")
 
       assert {:error, {:redirect, %{to: to}}} =
                view

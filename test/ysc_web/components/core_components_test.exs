@@ -810,6 +810,86 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "scheduled_plan_change_notice/1" do
+    test "renders owner copy, date, and cancel action" do
+      assigns = %{
+        info: %{
+          target_plan: :single,
+          effective_date: ~U[2026-12-15 08:00:00Z]
+        }
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.scheduled_plan_change_notice
+          info={@info}
+          timezone="America/Los_Angeles"
+        />
+        """)
+
+      assert html =~ ~s(id="scheduled-downgrade-notice")
+      assert html =~ ~s(data-testid="scheduled-downgrade-notice")
+      assert html =~ "hero-arrow-trending-down"
+      assert html =~ "Plan change scheduled"
+      assert html =~ "Your membership will change to"
+      assert html =~ "Single"
+      assert html =~ "December 15, 2026"
+      assert html =~ ~s(id="cancel-scheduled-downgrade-btn")
+      assert html =~ ~s(phx-click="cancel-scheduled-downgrade")
+      assert html =~ "Keep my current plan"
+      refute html =~ "family membership"
+    end
+
+    test "renders family copy with primary member name" do
+      assigns = %{
+        info: %{
+          target_plan: :single,
+          effective_date: ~D[2026-12-20]
+        },
+        primary: %{first_name: "Ada", last_name: "Lovelace"}
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.scheduled_plan_change_notice
+          info={@info}
+          timezone="America/Los_Angeles"
+          family?={true}
+          primary_user={@primary}
+        />
+        """)
+
+      assert html =~ "The membership from"
+      assert html =~ "Ada"
+      assert html =~ "Lovelace"
+      assert html =~ "will change to"
+      assert html =~ "December 20, 2026"
+      refute html =~ "Your membership will change to"
+    end
+
+    test "renders family copy without a primary user" do
+      assigns = %{
+        info: %{
+          target_plan: :family,
+          effective_date: ~D[2027-01-05]
+        }
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.scheduled_plan_change_notice
+          info={@info}
+          timezone="America/Los_Angeles"
+          family?={true}
+        />
+        """)
+
+      assert html =~ "Your family membership will change to"
+      assert html =~ "Family"
+      assert html =~ "January 05, 2027"
+    end
+  end
+
   describe "booking_cancel_modal/1" do
     test "renders modal chrome, reason form, and refund slot" do
       assigns = %{reason: "Weather"}
