@@ -1071,6 +1071,17 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute text =~ "show the QR code at the door"
       refute text =~ "add it to your phone's wallet"
     end
+
+    test "guest recipient subject falls back for a title string or empty assigns" do
+      assert TicketRecipientNotification.get_subject() ==
+               "Your ticket is ready! 🎫"
+
+      assert TicketRecipientNotification.get_subject("Nordic Night") ==
+               "Your ticket to Nordic Night 🎫"
+
+      assert TicketRecipientNotification.get_subject(%{}) ==
+               "Your ticket is ready! 🎫"
+    end
   end
 
   describe "refund emails" do
