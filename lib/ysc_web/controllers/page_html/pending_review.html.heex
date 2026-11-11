@@ -37,13 +37,22 @@
         Thanks for applying to the Young Scandinavians Club! We're excited to have you. Our board is currently reviewing your details to ensure everything is in order.
       </p>
 
-      <%= if @has_payment_method do %>
-        <div class="my-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-900 text-sm">
-          <strong>You've saved a payment method.</strong>
-          If the board approves you, we'll charge your dues and turn on membership automatically — no extra steps.
-        </div>
-      <% else %>
-        <div class="my-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-sm space-y-2">
+      <.callout
+        :if={@has_payment_method}
+        type="success"
+        class="my-4 not-prose"
+        id="pending-review-payment-saved"
+      >
+        <strong>You've saved a payment method.</strong>
+        If the board approves you, we'll charge your dues and turn on membership automatically — no extra steps.
+      </.callout>
+      <.callout
+        :if={!@has_payment_method}
+        type="info"
+        class="my-4 not-prose"
+        id="pending-review-save-payment"
+      >
+        <div class="space-y-2">
           <p>
             You haven't saved a payment method yet. Add one so your dues can be charged automatically if you're approved. You won't be charged unless the board approves your application.
           </p>
@@ -60,44 +69,32 @@
             If you prefer to wait, we will email you a secure link to pay your dues after approval.
           </p>
         </div>
-      <% end %>
+      </.callout>
 
       <h3 class="text-left">What to expect next</h3>
 
-      <ol class="list-none pl-0 space-y-3 text-left">
-        <li class="flex gap-3 items-start pl-0">
-          <span class="shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
-            1
-          </span>
-          <span class="min-w-0 pt-0.5">
-            <strong>Board review:</strong>
-            We typically review applications within 14 days.
-          </span>
-        </li>
-        <li class="flex gap-3 items-start pl-0">
-          <span class="shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
-            2
-          </span>
-          <span class="min-w-0 pt-0.5">
-            <strong>Email notification:</strong>
-            You'll receive an update via email as soon as a decision is made.
-          </span>
-        </li>
-        <li class="flex gap-3 items-start pl-0">
-          <span class="shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold flex items-center justify-center leading-none mt-0.5">
-            3
-          </span>
-          <span class="min-w-0 pt-0.5">
-            <%= if @has_payment_method do %>
-              <strong>Membership starts:</strong>
-              If approved, we'll charge the payment method you saved and turn on membership automatically — no extra steps.
-            <% else %>
-              <strong>Membership starts:</strong>
-              If approved, you'll be prompted to pay your dues online. Once paid, you'll get full access to cabin bookings and member-only event tickets.
-            <% end %>
-          </span>
-        </li>
-      </ol>
+      <.step_list
+        id="pending-review-next-steps"
+        class="text-left pl-0 not-prose"
+      >
+        <:step>
+          <strong>Board review:</strong>
+          We typically review applications within 14 days.
+        </:step>
+        <:step>
+          <strong>Email notification:</strong>
+          You'll receive an update via email as soon as a decision is made.
+        </:step>
+        <:step>
+          <%= if @has_payment_method do %>
+            <strong>Membership starts:</strong>
+            If approved, we'll charge the payment method you saved and turn on membership automatically — no extra steps.
+          <% else %>
+            <strong>Membership starts:</strong>
+            If approved, you'll be prompted to pay your dues online. Once paid, you'll get full access to cabin bookings and member-only event tickets.
+          <% end %>
+        </:step>
+      </.step_list>
 
       <h3 class="text-left">Need help?</h3>
 

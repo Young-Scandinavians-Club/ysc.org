@@ -137,26 +137,29 @@ defmodule YscWeb.AccountSetupLive do
             </.header>
           <% end %>
 
-          <%= if @signup_plan do %>
-            <div class="mt-4 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <p class="text-sm font-semibold text-blue-900 mb-1">
-                Membership type on your application
-              </p>
-              <p class="text-base font-bold text-blue-800">
-                {@signup_plan.name} &mdash; {Money.to_string!(
-                  Money.new(:USD, @signup_plan.amount)
-                )}/year
-              </p>
-            </div>
-          <% end %>
+          <.callout
+            :if={@signup_plan}
+            type="info"
+            class="mt-4 mb-6"
+            id="account-setup-signup-plan"
+          >
+            <:title>Membership type on your application</:title>
+            <p class="text-base font-bold text-blue-800">
+              {@signup_plan.name} &mdash; {Money.to_string!(
+                Money.new(:USD, @signup_plan.amount)
+              )}/year
+            </p>
+          </.callout>
 
           <%= if @user.state == :active do %>
-            <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-900 space-y-2">
-              <p>
-                <strong>You're approved.</strong>
-                We'll charge your payment method now for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal from Membership (click your name in the top-right corner).
-              </p>
-            </div>
+            <.callout
+              type="success"
+              class="mb-6"
+              id="account-setup-approved-notice"
+            >
+              <strong>You're approved.</strong>
+              We'll charge your payment method now for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal from Membership (click your name in the top-right corner).
+            </.callout>
 
             <div
               :if={@user_needs.membership_activation}
@@ -180,20 +183,17 @@ defmodule YscWeb.AccountSetupLive do
               </.link>
             </div>
           <% else %>
-            <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900 space-y-2">
-              <p>
-                <.icon
-                  name="hero-shield-check"
-                  class="w-4 h-4 inline-block mr-1 -mt-0.5"
-                />
-                <strong>
-                  Your payment method will not be charged until your application is approved.
-                </strong>
-              </p>
-              <p>
-                If your application is approved, we'll charge this payment method for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal from Membership (click your name in the top-right corner).
-              </p>
-            </div>
+            <.callout
+              type="warning"
+              icon="hero-shield-check"
+              class="mb-6"
+              id="account-setup-not-charged-notice"
+            >
+              <:title>
+                Your payment method will not be charged until your application is approved.
+              </:title>
+              If your application is approved, we'll charge this payment method for your first year of membership. Your membership renews automatically each year unless you turn off automatic renewal from Membership (click your name in the top-right corner).
+            </.callout>
           <% end %>
 
           <%= if @payment_intent_secret do %>

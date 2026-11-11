@@ -1769,6 +1769,85 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Confirm-cancel modal for cabin bookings.
+
+  Used on the booking receipt and booking-detail pages. Put refund notices
+  in the default slot; they render above the optional reason form.
+
+  LiveView events (same names on both pages):
+
+    * `confirm-cancel` — form submit
+    * `hide-cancel-modal` — keep-booking button and overlay close
+    * `update-cancel-reason` — textarea blur
+
+  ## Examples
+
+      <.booking_cancel_modal :if={@show_cancel_modal} cancel_reason={@cancel_reason}>
+        <.callout type="warning" icon="hero-exclamation-triangle" id="cancel-no-refund-notice">
+          <:title>No refund available</:title>
+          You may still cancel, but you will not receive a refund.
+        </.callout>
+      </.booking_cancel_modal>
+  """
+  attr :id, :string, default: "cancel-booking-modal"
+
+  attr :form_id, :string,
+    default: "cancel-booking-form",
+    doc: "DOM id on the cancellation reason form"
+
+  attr :title_id, :string,
+    default: "cancel-booking-modal-title",
+    doc: "DOM id on the modal heading"
+
+  attr :cancel_reason, :string, default: ""
+
+  slot :inner_block,
+    doc: "Optional refund / policy notices rendered above the reason form"
+
+  def booking_cancel_modal(assigns) do
+    ~H"""
+    <.modal id={@id} on_cancel={JS.push("hide-cancel-modal")} show>
+      <.modal_title id={@title_id}>
+        Cancel Booking
+      </.modal_title>
+
+      <div class="space-y-4">
+        <p class="text-zinc-600">
+          Cancel this booking? This can't be undone.
+        </p>
+
+        {render_slot(@inner_block)}
+
+        <.simple_form for={%{}} id={@form_id} phx-submit="confirm-cancel">
+          <.input
+            type="textarea"
+            name="reason"
+            label="Cancellation Reason (Optional)"
+            value={@cancel_reason}
+            phx-blur="update-cancel-reason"
+            phx-debounce="300"
+            rows="3"
+          />
+
+          <:actions>
+            <.button type="submit" color="red" phx-disable-with="Cancelling...">
+              Cancel Booking
+            </.button>
+            <.button
+              type="button"
+              phx-click="hide-cancel-modal"
+              class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
+            >
+              Keep Booking
+            </.button>
+          </:actions>
+        </.simple_form>
+      </div>
+    </.modal>
+    """
+  end
+
   @doc ~S"""
   Renders a table with generic styling.
 

@@ -25,7 +25,6 @@ defmodule YscWeb.BookingReceiptLive do
   alias Ysc.Stripe.PaymentIntentHelpers
   require Ysc.Logging
   import Ecto.Query
-  alias Phoenix.LiveView.JS
 
   @impl true
   def mount(%{"booking_id" => booking_id} = params, _session, socket) do
@@ -984,116 +983,70 @@ defmodule YscWeb.BookingReceiptLive do
           </div>
         </aside>
       </div>
-      <!-- Cancel Booking Modal -->
-      <%= if @show_cancel_modal do %>
-        <.modal
-          id="cancel-booking-modal"
-          on_cancel={JS.push("hide-cancel-modal")}
-          show
-        >
-          <.modal_title id="cancel-booking-modal-title">
-            Cancel Booking
-          </.modal_title>
-
-          <div class="space-y-4">
-            <p class="text-zinc-600">
-              Cancel this booking? This can't be undone.
-            </p>
-            <!-- Refund Information -->
-            <%= if @refund_info && Map.get(@refund_info, :modified) do %>
-              <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <div class="flex items-center gap-2 text-amber-800">
-                  <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
-                  <p class="font-semibold">No refund available</p>
-                </div>
-                <p class="text-sm text-amber-700 mt-2 pl-7">
-                  This booking was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
-                </p>
-              </div>
-            <% else %>
-              <%= if @refund_info && @refund_info.estimated_refund do %>
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                  <div class="flex items-center gap-2 text-blue-800">
-                    <.icon name="hero-information-circle" class="w-5 h-5" />
-                    <p class="font-semibold">Estimated Refund</p>
-                  </div>
-                  <div class="pl-7 space-y-2">
-                    <div class="flex justify-between items-baseline">
-                      <span class="text-sm text-blue-700">Original Payment:</span>
-                      <span class="text-sm font-medium text-blue-900">
-                        <%= if receipt_total_paid_amount(assigns) do %>
-                          {MoneyHelper.format_money!(
-                            receipt_total_paid_amount(assigns)
-                          )}
-                        <% else %>
-                          —
-                        <% end %>
-                      </span>
-                    </div>
-                    <div class="flex justify-between items-baseline">
-                      <span class="text-sm text-blue-700">Estimated Refund:</span>
-                      <span class="text-lg font-bold text-blue-900">
-                        {MoneyHelper.format_money!(@refund_info.estimated_refund)}
-                      </span>
-                    </div>
-                    <%= if @refund_info.applied_rule do %>
-                      <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
-                        Based on cancellation policy: {RefundPolicyDisplay.applied_rule_summary(
-                          @refund_info.applied_rule,
-                          @refund_info.policy_rules || []
-                        )}
-                      </p>
-                    <% else %>
-                      <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
-                        Full refund based on cancellation policy.
-                      </p>
-                    <% end %>
-                  </div>
-                </div>
-              <% else %>
-                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <div class="flex items-center gap-2 text-amber-800">
-                    <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
-                    <p class="font-semibold">No refund available</p>
-                  </div>
-                  <p class="text-sm text-amber-700 mt-2 pl-7">
-                    Based on the cancellation policy and timing of your cancellation, no refund is available for this booking.
-                  </p>
-                </div>
-              <% end %>
-            <% end %>
-
-            <.simple_form
-              for={%{}}
-              id="cancel-booking-form"
-              phx-submit="confirm-cancel"
+      <.booking_cancel_modal
+        :if={@show_cancel_modal}
+        cancel_reason={@cancel_reason}
+      >
+        <%= if @refund_info && Map.get(@refund_info, :modified) do %>
+          <.callout
+            type="warning"
+            icon="hero-exclamation-triangle"
+            id="cancel-no-refund-notice"
+          >
+            <:title>No refund available</:title>
+            This booking was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
+          </.callout>
+        <% else %>
+          <%= if @refund_info && @refund_info.estimated_refund do %>
+            <.callout
+              type="info"
+              icon="hero-information-circle"
+              id="cancel-estimated-refund-notice"
             >
-              <.input
-                type="textarea"
-                name="reason"
-                label="Cancellation Reason (Optional)"
-                value={@cancel_reason}
-                phx-blur="update-cancel-reason"
-                phx-debounce="300"
-                rows="3"
-              />
-
-              <:actions>
-                <.button type="submit" color="red" phx-disable-with="Cancelling...">
-                  Cancel Booking
-                </.button>
-                <.button
-                  type="button"
-                  phx-click="hide-cancel-modal"
-                  class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
-                >
-                  Keep Booking
-                </.button>
-              </:actions>
-            </.simple_form>
-          </div>
-        </.modal>
-      <% end %>
+              <:title>Estimated Refund</:title>
+              <div class="space-y-2">
+                <div class="flex justify-between items-baseline">
+                  <span>Original Payment:</span>
+                  <span class="font-medium text-blue-900">
+                    <%= if receipt_total_paid_amount(assigns) do %>
+                      {MoneyHelper.format_money!(receipt_total_paid_amount(assigns))}
+                    <% else %>
+                      —
+                    <% end %>
+                  </span>
+                </div>
+                <div class="flex justify-between items-baseline">
+                  <span>Estimated Refund:</span>
+                  <span class="text-lg font-bold text-blue-900">
+                    {MoneyHelper.format_money!(@refund_info.estimated_refund)}
+                  </span>
+                </div>
+                <%= if @refund_info.applied_rule do %>
+                  <p class="text-xs text-blue-600 pt-2 border-t border-blue-200">
+                    Based on cancellation policy: {RefundPolicyDisplay.applied_rule_summary(
+                      @refund_info.applied_rule,
+                      @refund_info.policy_rules || []
+                    )}
+                  </p>
+                <% else %>
+                  <p class="text-xs text-blue-600 pt-2 border-t border-blue-200">
+                    Full refund based on cancellation policy.
+                  </p>
+                <% end %>
+              </div>
+            </.callout>
+          <% else %>
+            <.callout
+              type="warning"
+              icon="hero-exclamation-triangle"
+              id="cancel-no-refund-notice"
+            >
+              <:title>No refund available</:title>
+              Based on the cancellation policy and timing of your cancellation, no refund is available for this booking.
+            </.callout>
+          <% end %>
+        <% end %>
+      </.booking_cancel_modal>
       <!-- Footer Note -->
       <div class="mt-12 pt-8 border-t border-zinc-100">
         <p class="text-sm text-zinc-500 text-center">

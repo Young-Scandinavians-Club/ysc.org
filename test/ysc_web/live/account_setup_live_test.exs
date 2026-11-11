@@ -630,6 +630,8 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       html = render(view)
 
+      assert has_element?(view, "#account-setup-not-charged-notice")
+      assert html =~ "hero-shield-check"
       assert html =~ "not be charged until your application is approved"
     end
 

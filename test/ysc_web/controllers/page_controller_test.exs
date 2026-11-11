@@ -247,6 +247,11 @@ defmodule YscWeb.PageControllerTest do
       refute html =~ "Account Pending Review"
       assert html =~ "You haven't saved a payment method yet"
       assert html =~ "Save a payment method"
+      assert html =~ ~s(id="pending-review-save-payment")
+      assert html =~ ~s(id="pending-review-next-steps")
+      assert html =~ ~s(id="pending-review-next-steps-step-1")
+      assert html =~ ~s(id="pending-review-next-steps-step-3")
+      assert html =~ "Board review:"
       assert html =~ "Membership starts:"
       refute html =~ "Continue account setup"
       refute html =~ "Activation:"
@@ -293,6 +298,9 @@ defmodule YscWeb.PageControllerTest do
 
       assert html =~ "You've saved a payment method"
       assert html =~ "we'll charge the payment method you saved"
+      assert html =~ ~s(id="pending-review-payment-saved")
+      refute html =~ ~s(id="pending-review-save-payment")
+      assert html =~ ~s(id="pending-review-next-steps")
       assert html =~ "Membership starts:"
       refute html =~ "Continue account setup"
       refute html =~ "Activation:"
