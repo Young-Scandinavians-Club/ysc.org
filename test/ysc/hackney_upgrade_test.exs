@@ -53,6 +53,7 @@ defmodule Ysc.HackneyUpgradeTest do
     {:ok, _} = Application.ensure_all_started(:certifi)
     {:module, :hackney} = Code.ensure_loaded(:hackney)
     {:module, :hackney_url} = Code.ensure_loaded(:hackney_url)
+    {:module, :hackney_conn} = Code.ensure_loaded(:hackney_conn)
     {:module, :certifi} = Code.ensure_loaded(:certifi)
     :ok
   end
@@ -419,6 +420,7 @@ defmodule Ysc.HackneyUpgradeTest do
       assert erl =~ "the close does not wait for it (#996)"
       assert conn =~ "{?MODULE, abort_read}"
       assert conn =~ "never (#996)"
+      {:module, :hackney_conn} = Code.ensure_loaded(:hackney_conn)
       assert function_exported?(:hackney_conn, :abort_read, 1)
     end
 
