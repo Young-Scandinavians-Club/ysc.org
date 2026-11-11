@@ -28,10 +28,10 @@ defmodule Ysc.EventsFixtures do
     |> create_event_retrying_reference_id()
   end
 
-  # `Events.create_event/1` does not retry on `events_reference_id_index`
-  # collisions. The 4-character random suffix is shared by every event
-  # inserted on a given UTC day, so a 51-event pagination loop running
-  # alongside other async tests can collide. Retry with a fresh id.
+  # `Events.create_event/1` retries `events_reference_id_index` collisions
+  # (4-character random suffix, shared by every event inserted on a UTC day).
+  # Extra fixture retries cover the case where those insert attempts still
+  # collide under a busy async suite.
   defp create_event_retrying_reference_id(attrs, attempts \\ 5) do
     case Events.create_event(attrs) do
       {:ok, event} ->

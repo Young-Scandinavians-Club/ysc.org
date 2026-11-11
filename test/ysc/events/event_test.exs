@@ -311,6 +311,17 @@ defmodule Ysc.Events.EventTest do
     end
   end
 
+  describe "put_new_reference_id/1" do
+    test "generates a new EVT reference id" do
+      cs =
+        Ecto.Changeset.change(%Event{}, %{}) |> Event.put_new_reference_id()
+
+      ref = Ecto.Changeset.get_field(cs, :reference_id)
+      assert is_binary(ref)
+      assert ref =~ ~r/^EVT-\d{6}-[A-Z0-9]{5}$/
+    end
+  end
+
   describe "public_page_fields/0" do
     test "is an explicit subset of persisted columns used on the public page" do
       fields = Event.public_page_fields()

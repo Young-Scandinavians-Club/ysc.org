@@ -278,6 +278,35 @@ defmodule Ysc.EventsTest do
       assert event.organizer_id == user.id
     end
 
+    test "create_event/1 retries when reference_id is already taken", %{
+      user: user
+    } do
+      {:ok, first} =
+        Events.create_event(%{
+          title: "First Collision Event",
+          description: "Event description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      assert {:ok, second} =
+               Events.create_event(%{
+                 title: "Second Collision Event",
+                 description: "Event description",
+                 state: :published,
+                 organizer_id: user.id,
+                 start_date: DateTime.add(DateTime.utc_now(), 31, :day),
+                 published_at: DateTime.utc_now(),
+                 reference_id: first.reference_id
+               })
+
+      assert second.id != first.id
+      assert second.reference_id != first.reference_id
+      assert second.reference_id =~ ~r/^EVT-\d{6}-[A-Z0-9]{5}$/
+    end
+
     test "create_event/1 returns error changeset when required fields are missing",
          %{
            user: user
