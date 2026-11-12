@@ -1645,26 +1645,17 @@ defmodule YscWeb.ExpenseReportLive do
               </div>
             </div>
           </div>
-          <!-- Confirmation Email Notice -->
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div class="flex">
-              <div class="shrink-0">
-                <.icon name="hero-envelope" class="w-5 h-5 text-blue-600" />
-              </div>
-              <div class="ml-3">
-                <h3 class="text-sm text-blue-800 type-subhead">
-                  Confirmation Email
-                </h3>
-                <div class="mt-2 text-sm text-blue-700">
-                  <p>
-                    You will receive a confirmation email at
-                    <strong>{@current_user.email}</strong>
-                    with the details of your submitted expense report.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <.callout
+            type="info"
+            icon="hero-envelope"
+            id="expense-report-confirmation-email-notice"
+            class="mb-6"
+          >
+            <:title>Confirmation Email</:title>
+            You will receive a confirmation email at
+            <strong>{@current_user.email}</strong>
+            with the details of your submitted expense report.
+          </.callout>
           <!-- Actions -->
           <div class="print-hide mt-8">
             <!-- Primary Actions -->

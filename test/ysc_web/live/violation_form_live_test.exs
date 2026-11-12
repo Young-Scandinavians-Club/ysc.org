@@ -32,6 +32,12 @@ defmodule YscWeb.ViolationFormLiveTest do
       assert has_element?(view, "#report-privacy-choice")
       assert has_element?(view, "#report-privacy-choice-help")
       assert has_element?(view, "#board-member-notice")
+
+      assert has_element?(
+               view,
+               "#board-member-notice .hero-exclamation-triangle"
+             )
+
       assert has_element?(view, "#board-member-notice a[href='/contact']")
 
       assert render(view) =~

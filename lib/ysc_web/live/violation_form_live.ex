@@ -88,33 +88,22 @@ defmodule YscWeb.ConductViolationReportLive do
               </.link>
             </p>
 
-            <%!-- Board member conflict notice --%>
-            <div
+            <.callout
+              type="warning"
+              icon="hero-exclamation-triangle"
               id="board-member-notice"
-              class="mt-6 mx-auto p-4 bg-amber-50 border border-amber-200 rounded-lg max-w-xl text-left"
+              class="mt-6 mx-auto max-w-xl text-left"
             >
-              <div class="flex gap-3">
-                <.icon
-                  name="hero-exclamation-triangle"
-                  class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"
-                />
-                <div>
-                  <p class="text-sm font-semibold text-amber-900 mb-1">
-                    Is your report about a board member?
-                  </p>
-                  <p class="text-sm text-amber-800">
-                    You can still use this form. If you want only the club president to handle it, use
-                    <.link
-                      navigate={~p"/contact"}
-                      class="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950"
-                    >
-                      our contact page
-                    </.link>
-                    and ask for that in your message.
-                  </p>
-                </div>
-              </div>
-            </div>
+              <:title>Is your report about a board member?</:title>
+              You can still use this form. If you want only the club president to handle it, use
+              <.link
+                navigate={~p"/contact"}
+                class="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950"
+              >
+                our contact page
+              </.link>
+              and ask for that in your message.
+            </.callout>
           </div>
 
           <%!-- Form Card --%>
