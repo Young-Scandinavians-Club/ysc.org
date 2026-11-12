@@ -143,6 +143,9 @@
     <%= if event[:pricing_str] do %>
     <mj-text align="left" font-size="13px" color="#64748b" padding="0 20px 6px 20px"><%= event[:pricing_str] %><%= if event[:tickets_on_sale_str] do %> · <%= event[:tickets_on_sale_str] %><% end %></mj-text>
     <% end %>
+    <%= if event[:external_note] do %>
+    <mj-text align="left" font-size="13px" font-weight="bold" color="#92400e" padding="0 20px 8px 20px" container-background-color="#fffbeb" css-class="external-ticketing-note"><%= event[:external_note] %></mj-text>
+    <% end %>
     <%= if event[:location_name] && event[:location_name] != "" do %>
     <mj-text align="left" font-size="13px" color="#64748b" padding="0 20px 8px 20px">📍 <%= event[:location_name] %></mj-text>
     <% end %>
@@ -150,7 +153,7 @@
     <mj-text align="left" font-size="14px" color="#475569" line-height="1.5" padding="0 20px 12px 20px"><%= event[:short_description] %></mj-text>
     <% end %>
     <mj-button href="<%= event[:url] %>" css-class="btn_block" background-color="#1447e6" color="#ffffff" font-size="14px" padding="12px 20px 20px 20px" border-radius="6px" align="left">
-      View event →
+      <%= if event[:external_note] do %>View event &amp; tickets →<% else %>View event →<% end %>
     </mj-button>
   </mj-column>
 </mj-section>

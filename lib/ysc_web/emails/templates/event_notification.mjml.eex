@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>New YSC Event: <%= @event.title %></strong>
+      <strong><%= if Map.get(assigns, :external_note) do %>New Event<% else %>New YSC Event<% end %>: <%= @event.title %></strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -31,6 +31,12 @@
     </mj-text>
     <mj-spacer height="20px"></mj-spacer>
     <% end %>
+    <%= if Map.get(assigns, :external_note) do %>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="12px 16px" color="#92400e" container-background-color="#fffbeb" css-class="external-ticketing-note">
+      <strong><%= Map.get(assigns, :external_note) %></strong>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+    <% end %>
     <mj-text align="left" font-size="16px" line-height="1.6" padding="0px">
       <%= if @event_date_time do %>
       <strong>📅 Date &amp; Time:</strong> <%= @event_date_time %><br />
@@ -47,7 +53,7 @@
     </mj-text>
     <mj-spacer height="32px"></mj-spacer>
     <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="16px 32px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" font-weight="bold" border-radius="6px">
-      See event details →
+      <%= if Map.get(assigns, :external_note) do %>See event details &amp; tickets →<% else %>See event details →<% end %>
     </mj-button>
     <mj-spacer height="32px"></mj-spacer>
     <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#555555">
