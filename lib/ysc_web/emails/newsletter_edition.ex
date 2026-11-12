@@ -381,10 +381,8 @@ defmodule YscWeb.Emails.NewsletterEdition do
       date_str: format_event_date(event),
       save_the_date: Ysc.Events.Event.tickets_tbd?(event),
       selling_fast: not external? and Events.event_selling_fast?(event.id),
-      # External events never sell tickets here, so the YSC-style pricing and
-      # on-sale lines are replaced by the "organized by / tickets elsewhere" note.
-      pricing_str:
-        if(external?, do: nil, else: Events.event_pricing_display_string(event)),
+      pricing_str: Events.event_pricing_display_string(event),
+      # No on-sale date for external events: attendees buy on the organizer's site.
       tickets_on_sale_str:
         if(external?, do: nil, else: format_tickets_on_sale(event)),
       external_note: external_note,

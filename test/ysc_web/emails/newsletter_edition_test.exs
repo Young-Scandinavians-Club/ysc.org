@@ -654,7 +654,7 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
 
       assert em.external_note =~ "organized by SWEA, not YSC"
       assert em.external_note =~ "Tickets are sold on their website"
-      assert em.pricing_str == nil
+      assert em.pricing_str == "External Tickets"
       assert em.tickets_on_sale_str == nil
       assert em.selling_fast == false
 
