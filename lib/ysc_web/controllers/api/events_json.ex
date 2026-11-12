@@ -25,7 +25,7 @@ defmodule YscWeb.Api.EventsJSON do
       address: e.address,
       latitude: e.latitude,
       longitude: e.longitude,
-      age_restriction: e.age_restriction,
+      age_restriction: Map.get(e, :age_restriction),
       max_attendees: e.max_attendees,
       tickets_tbd: e.tickets_tbd,
       partiful_link: e.partiful_link,

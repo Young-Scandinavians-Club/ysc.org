@@ -9,7 +9,15 @@ defmodule Ysc.Events.EventPricingCache do
 
   # Fields computed in list_upcoming_events_from_db / list_past_events_from_db — not part of
   # pricing enrichment but must not be dropped when serving a cached pricing payload.
-  @transient_list_fields [:selling_fast, :recent_tickets_count]
+  #
+  # `:age_restriction` is here because the public list/card query omits it, so a
+  # cached payload seeded from that query lacks the key, while the mobile app
+  # list query selects it and `YscWeb.Api.EventsJSON` renders it.
+  @transient_list_fields [
+    :selling_fast,
+    :recent_tickets_count,
+    :age_restriction
+  ]
 
   # Event-body HTML. The public list/card queries omit these columns, so the
   # cached pricing payload keyed by event id can be seeded body-less by list
