@@ -33,8 +33,18 @@ defmodule YscWeb.Emails.TicketRecipientNotification do
   end
 
   def get_subject(event_title) when is_binary(event_title) do
-    "Your ticket to #{event_title} 🎫"
+    ticket_subject(event_title, 1)
   end
+
+  def get_subject(%{event: %{title: title}, ticket_count: count})
+      when is_binary(title) and is_integer(count) do
+    ticket_subject(title, count)
+  end
+
+  def get_subject(_email_data), do: get_subject()
+
+  defp ticket_subject(title, 1), do: "Your ticket to #{title} 🎫"
+  defp ticket_subject(title, _count), do: "Your tickets to #{title} 🎫"
 
   @doc """
   The people besides the purchaser who should get their own email for this

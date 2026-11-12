@@ -4003,7 +4003,7 @@ defmodule Ysc.Tickets do
         YscWeb.Emails.Notifier.schedule_email(
           ticket_order.user.email,
           idempotency_key,
-          YscWeb.Emails.TicketPurchaseConfirmation.get_subject(),
+          YscWeb.Emails.TicketPurchaseConfirmation.get_subject(email_data),
           "ticket_purchase_confirmation",
           email_data,
           "",
@@ -4068,7 +4068,7 @@ defmodule Ysc.Tickets do
             YscWeb.Emails.Notifier.schedule_email(
               email,
               "ticket_recipient_#{ticket_order.id}_#{email_hash(email)}",
-              TicketRecipientNotification.get_subject(ticket_order.event.title),
+              TicketRecipientNotification.get_subject(email_data),
               "ticket_recipient_notification",
               email_data,
               "",
