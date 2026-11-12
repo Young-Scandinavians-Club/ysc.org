@@ -6627,6 +6627,99 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Notice that a membership plan change is scheduled.
+
+  Used three times on the membership settings page (family member, lifetime,
+  and regular membership cards). Set `family?` on the family-member card so
+  the copy names the primary member.
+
+  ## Examples
+
+      <.scheduled_plan_change_notice
+        info={@scheduled_downgrade_info}
+        timezone={@timezone}
+      />
+
+      <.scheduled_plan_change_notice
+        info={@scheduled_downgrade_info}
+        timezone={@timezone}
+        family?={true}
+        primary_user={@primary_user}
+      />
+  """
+  attr :info, :map, required: true
+  attr :timezone, :string, required: true
+  attr :primary_user, :any, default: nil
+  attr :family?, :boolean, default: false
+  attr :id, :string, default: "scheduled-downgrade-notice"
+
+  def scheduled_plan_change_notice(assigns) do
+    assigns =
+      assign(assigns, %{
+        plan_label: plan_change_label(assigns.info.target_plan),
+        date_label:
+          format_plan_change_date(assigns.info.effective_date, assigns.timezone)
+      })
+
+    ~H"""
+    <.callout
+      type="warning"
+      icon="hero-arrow-trending-down"
+      id={@id}
+      data-testid="scheduled-downgrade-notice"
+    >
+      <:title>Plan change scheduled</:title>
+      <p>
+        <%= cond do %>
+          <% @family? && @primary_user -> %>
+            The membership from
+            <strong>
+              {@primary_user.first_name} {@primary_user.last_name}
+            </strong>
+            will change to
+          <% @family? -> %>
+            Your family membership will change to
+          <% true -> %>
+            Your membership will change to
+        <% end %>
+        <strong>{@plan_label}</strong>
+        after <strong>{@date_label}</strong>. You will keep your current benefits until that date.
+      </p>
+      <:actions>
+        <.button
+          id="cancel-scheduled-downgrade-btn"
+          phx-click="cancel-scheduled-downgrade"
+          phx-disable-with="Updating..."
+          variant="outline"
+          color="amber"
+          data-confirm="Cancel your scheduled plan change and keep your current membership? You will stay on your current plan and will not switch on the date shown above."
+        >
+          Keep my current plan
+        </.button>
+      </:actions>
+    </.callout>
+    """
+  end
+
+  defp plan_change_label(plan) when is_atom(plan),
+    do: plan |> Atom.to_string() |> String.capitalize()
+
+  defp plan_change_label(plan) when is_binary(plan), do: String.capitalize(plan)
+  defp plan_change_label(_), do: ""
+
+  defp format_plan_change_date(%DateTime{} = dt, timezone) do
+    dt
+    |> YscWeb.TimeZone.shift(timezone)
+    |> DateTime.to_date()
+    |> DateDisplay.format_date_long()
+  end
+
+  defp format_plan_change_date(%Date{} = date, _timezone),
+    do: DateDisplay.format_date_long(date)
+
+  defp format_plan_change_date(_, _), do: ""
+
+  @doc """
   Renders a membership status display component.
 
   ## Examples

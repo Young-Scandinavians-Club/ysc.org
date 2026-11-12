@@ -632,6 +632,8 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       render_click(view, "set-step", %{"step" => "2"})
 
       assert has_element?(view, "#inherited-membership-step")
+      assert has_element?(view, "#inherited-membership-notice")
+      assert has_element?(view, "#inherited-membership-notice .hero-user-group")
       assert has_element?(view, "#continue-inherited-membership")
 
       assert has_element?(
