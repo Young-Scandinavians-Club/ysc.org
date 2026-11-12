@@ -2277,6 +2277,46 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "unified publish menu" do
+    setup [:create_admin]
+
+    test "holds the notification checkbox, publish now and schedule form", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "#publish-menu #publish-send-notification")
+      assert has_element?(view, "#publish-menu #publish-now-btn")
+      assert has_element?(view, "#publish-menu #schedule_form-#{event.id}")
+    end
+
+    test "scheduling honors the notification checkbox", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        cabin_event(admin, %{
+          location_name: "Swedish American Hall",
+          address: "2174 Market St, San Francisco, CA 94114"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view |> element("#publish-send-notification") |> render_click()
+
+      view
+      |> element("#schedule_form-#{event.id}")
+      |> render_submit(%{"event" => %{"publish_at" => "2030-07-01T09:00"}})
+
+      render(view)
+      reloaded = Repo.get!(Event, event.id)
+      assert reloaded.state == :scheduled
+      assert reloaded.send_notification
+    end
+  end
+
   describe "publish - cabin blackout prompt" do
     setup [:create_admin]
 

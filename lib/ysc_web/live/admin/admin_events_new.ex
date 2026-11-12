@@ -124,20 +124,6 @@ defmodule YscWeb.AdminEventsNewLive do
               </div>
 
               <div class="flex shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
-                <label
-                  :if={@event.state in [:draft, :scheduled] && @can_publish}
-                  id="publish-send-notification-label"
-                  class="flex cursor-pointer items-center gap-2 text-sm text-zinc-700"
-                >
-                  <input
-                    type="checkbox"
-                    id="publish-send-notification"
-                    class="rounded-sm border-zinc-300 text-blue-600 focus:ring-blue-500"
-                    checked={@send_notification}
-                    phx-click="toggle-send-notification"
-                  /> Send event notification email
-                </label>
-
                 <div :if={@event.state in [:draft, :scheduled]}>
                   <.tooltip
                     :if={!@can_publish}
@@ -154,15 +140,81 @@ defmodule YscWeb.AdminEventsNewLive do
                       />Publish
                     </.button>
                   </.tooltip>
-                  <.button
+
+                  <.dropdown
                     :if={@can_publish}
-                    class="whitespace-nowrap"
-                    color="blue"
-                    phx-click="publish-event"
-                    phx-disable-with="Publishing..."
+                    id="publish-menu"
+                    right={true}
+                    wide={true}
+                    class={
+                      Enum.join(
+                        [
+                          "min-h-[44px] whitespace-nowrap text-zinc-100 px-3 leading-6 py-2 text-sm font-semibold transition duration-300",
+                          @event.state == :scheduled &&
+                            "bg-green-700 hover:bg-green-800",
+                          @event.state != :scheduled &&
+                            "bg-blue-700 hover:bg-blue-800"
+                        ],
+                        " "
+                      )
+                    }
                   >
-                    <.icon name="hero-document-arrow-up" class="w-5 h-5" />Publish
-                  </.button>
+                    <:button_block>
+                      <.icon
+                        name={publish_button_icon(@event.state)}
+                        class="w-5 h-5 me-1"
+                      />{publish_button_text(@event.state)}
+                      <.icon name="hero-chevron-down" class="ms-2" />
+                    </:button_block>
+
+                    <div class="w-full divide-y divide-zinc-100 text-sm text-zinc-700">
+                      <label class="flex cursor-pointer items-start gap-2 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          id="publish-send-notification"
+                          class="mt-0.5 rounded-sm border-zinc-300 text-blue-600 focus:ring-blue-500"
+                          checked={@send_notification}
+                          phx-click="toggle-send-notification"
+                        />
+                        <span>
+                          <span class="block font-semibold text-zinc-800">
+                            Send event notification email
+                          </span>
+                          <span class="block text-xs text-zinc-500">
+                            Emails members who opted in. Off by default.
+                          </span>
+                        </span>
+                      </label>
+
+                      <div class="px-2 py-2">
+                        <button
+                          type="button"
+                          id="publish-now-btn"
+                          class="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left font-semibold text-zinc-800 transition-colors hover:bg-zinc-100"
+                          phx-click="publish-event"
+                          phx-disable-with="Publishing..."
+                        >
+                          <.icon name="hero-document-arrow-up" class="w-5 h-5" />
+                          Publish now
+                        </button>
+                      </div>
+
+                      <div class="px-4 py-4">
+                        <p class="mb-2 flex items-center gap-2 font-semibold text-zinc-800">
+                          <.icon name="hero-clock" class="w-5 h-5" />
+                          {if @event.state == :scheduled,
+                            do: "Reschedule",
+                            else: "Schedule for later"}
+                        </p>
+                        <.live_component
+                          id={@event.id}
+                          event={@event}
+                          module={YscWeb.AdminEventsLive.ScheduleEventForm}
+                          event_id={@event.id}
+                        />
+                      </div>
+                    </div>
+                  </.dropdown>
                 </div>
 
                 <div
@@ -198,41 +250,6 @@ defmodule YscWeb.AdminEventsNewLive do
                     />Check In
                   </.button>
                 </div>
-
-                <.dropdown
-                  :if={@event.state in [:draft, :scheduled] && @can_publish}
-                  id="edit-post-more"
-                  right={true}
-                  class={
-                    Enum.join(
-                      [
-                        "min-h-[44px] text-zinc-100 px-3 leading-6 py-2 text-sm font-semibold transition duration-300",
-                        @event.state == :scheduled &&
-                          "bg-green-700 hover:bg-green-800",
-                        @event.state != :scheduled &&
-                          "bg-blue-700 hover:bg-blue-800"
-                      ],
-                      " "
-                    )
-                  }
-                >
-                  <:button_block>
-                    <.icon name="hero-clock" class="w-5 h-5 me-1" />{schedule_button_text(
-                      @event.state
-                    )}
-                    <.icon name="hero-chevron-down" class="ms-2" />
-                  </:button_block>
-
-                  <div class="w-full px-2 py-4">
-                    <.live_component
-                      id={@event.id}
-                      event={@event}
-                      module={YscWeb.AdminEventsLive.ScheduleEventForm}
-                      event_id={@event.id}
-                      send_notification={@send_notification}
-                    />
-                  </div>
-                </.dropdown>
 
                 <.dropdown
                   id="edit-event-more"
@@ -3961,8 +3978,11 @@ defmodule YscWeb.AdminEventsNewLive do
   defp description_length(nil), do: 0
   defp description_length(description), do: String.length(description)
 
-  defp schedule_button_text(:scheduled), do: "Scheduled"
-  defp schedule_button_text(_), do: "Schedule"
+  defp publish_button_text(:scheduled), do: "Scheduled"
+  defp publish_button_text(_), do: "Publish"
+
+  defp publish_button_icon(:scheduled), do: "hero-clock"
+  defp publish_button_icon(_), do: "hero-document-arrow-up"
 
   defp event_help_topic(:tickets), do: "events/tickets"
   defp event_help_topic(:updates), do: "events/updates"
