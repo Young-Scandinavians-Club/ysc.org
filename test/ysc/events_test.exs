@@ -4526,6 +4526,33 @@ defmodule Ysc.EventsTest do
       end)
     end
 
+    test "editing a published event after the notification has been sent does not re-queue",
+         %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, published} =
+                 Events.publish_event(event, send_notification: true)
+
+        assert [_job] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert {:ok, marked} =
+                 Events.mark_event_notification_sent(published, 10)
+
+        Repo.delete_all(
+          from(j in Oban.Job,
+            where: j.worker == "YscWeb.Workers.EventNotificationWorker"
+          )
+        )
+
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert {:ok, _} =
+                 Events.update_event(marked, %{title: "Renamed after send"})
+
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+      end)
+    end
+
     test "publish_event uses the flag stored by schedule_event", %{event: event} do
       Oban.Testing.with_testing_mode(:manual, fn ->
         publish_at = DateTime.add(DateTime.utc_now(), 1, :day)

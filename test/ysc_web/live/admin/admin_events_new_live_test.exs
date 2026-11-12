@@ -2277,6 +2277,68 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "schedule - event notification checkbox" do
+    setup [:create_admin]
+
+    test "defaults to off and schedules without notification", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        cabin_event(admin, %{
+          location_name: "Swedish American Hall",
+          address: "2174 Market St, San Francisco, CA 94114"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "#schedule-send-notification-#{event.id}")
+
+      refute has_element?(
+               view,
+               "#schedule-send-notification-#{event.id}[checked]"
+             )
+
+      view
+      |> element("#schedule_form-#{event.id}")
+      |> render_submit(%{"event" => %{"publish_at" => "2030-07-01T09:00"}})
+
+      reloaded = Repo.get!(Event, event.id)
+      assert reloaded.state == :scheduled
+      refute reloaded.send_notification
+    end
+
+    test "checking the box schedules with notification", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        cabin_event(admin, %{
+          location_name: "Swedish American Hall",
+          address: "2174 Market St, San Francisco, CA 94114"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#schedule-send-notification-#{event.id}")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#schedule-send-notification-#{event.id}[checked]"
+             )
+
+      view
+      |> element("#schedule_form-#{event.id}")
+      |> render_submit(%{"event" => %{"publish_at" => "2030-07-01T09:00"}})
+
+      reloaded = Repo.get!(Event, event.id)
+      assert reloaded.state == :scheduled
+      assert reloaded.send_notification
+    end
+  end
+
   describe "external ticketing - editor auto-save" do
     setup [:create_admin]
 
