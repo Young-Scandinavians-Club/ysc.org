@@ -436,4 +436,98 @@ defmodule YscWeb.Emails.EventNotificationTest do
       assert email_data.event.title == event.title
     end
   end
+
+  describe "external ticketing" do
+    setup %{event: event, user: user} do
+      external =
+        event
+        |> Event.changeset(%{
+          external_ticket_url: "https://swea.example.org/tickets",
+          external_organizer: "Swedish Women's Educational Association"
+        })
+        |> Repo.update!()
+
+      %{external: external, user: user}
+    end
+
+    test "subject names the organizer and does not imply YSC hosts", %{
+      external: event
+    } do
+      for _ <- 1..20 do
+        subject = EventNotification.get_subject(event)
+        assert subject =~ event.title
+        assert subject =~ "Swedish Women's Educational Association"
+        refute subject =~ "Will we see you"
+      end
+    end
+
+    test "subject without an organizer still flags a community event", %{
+      external: event
+    } do
+      event = %{event | external_organizer: nil}
+
+      for _ <- 1..20 do
+        subject = EventNotification.get_subject(event)
+        assert subject =~ event.title
+        refute subject =~ "Will we see you"
+        assert subject =~ ~r/Community event|organizer|another group/
+      end
+    end
+
+    test "external subject wins over tickets_tbd", %{external: event} do
+      event = %{event | tickets_tbd: true}
+      subject = EventNotification.get_subject(event)
+      refute subject =~ "Save the date"
+    end
+
+    test "email data carries the external note", %{external: event, user: user} do
+      data = EventNotification.prepare_email_data(event, user)
+
+      assert data.external_note =~
+               "organized by Swedish Women's Educational Association, not YSC"
+
+      assert data.external_note =~ "Tickets are sold on their website"
+    end
+
+    test "external note falls back when no organizer name is given", %{
+      external: event,
+      user: user
+    } do
+      event = %{event | external_organizer: nil}
+      data = EventNotification.prepare_email_data(event, user)
+      assert data.external_note =~ "organized by another organization, not YSC"
+    end
+
+    test "rendered email makes clear it is not a YSC event", %{
+      external: event,
+      user: user
+    } do
+      html =
+        event
+        |> EventNotification.prepare_email_data(user)
+        |> EventNotification.render()
+
+      assert html =~ "New Event: #{Plug.HTML.html_escape(event.title)}"
+      refute html =~ "New YSC Event"
+      assert html =~ "not YSC"
+      assert html =~ "Tickets are sold on their website"
+      assert html =~ "See event details &amp; tickets"
+      assert html =~ "external-ticketing-note"
+    end
+
+    test "regular YSC events render exactly as before", %{
+      event: event,
+      user: user
+    } do
+      data = EventNotification.prepare_email_data(event, user)
+      assert data.external_note == nil
+
+      html = EventNotification.render(data)
+
+      assert html =~ "New YSC Event: #{Plug.HTML.html_escape(event.title)}"
+      assert html =~ "See event details →"
+      refute html =~ "not YSC"
+      refute html =~ "external-ticketing-note"
+    end
+  end
 end

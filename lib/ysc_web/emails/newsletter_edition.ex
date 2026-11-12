@@ -5,6 +5,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
   alias Ysc.Events
   alias Ysc.Media.Image
   alias HtmlSanitizeEx
+  alias YscWeb.Emails.EventHelpers
 
   use MjmlEEx,
     mjml_template: "templates/newsletter_edition.mjml.eex",
@@ -369,6 +370,9 @@ defmodule YscWeb.Emails.NewsletterEdition do
   defp post_image_url(image), do: Image.display_path(image)
 
   defp event_render_map(event) do
+    external_note = EventHelpers.external_ticketing_note(event)
+    external? = external_note != nil
+
     %{
       title: event.title,
       description:
@@ -376,9 +380,14 @@ defmodule YscWeb.Emails.NewsletterEdition do
       short_description: short_description(event.description),
       date_str: format_event_date(event),
       save_the_date: Ysc.Events.Event.tickets_tbd?(event),
-      selling_fast: Events.event_selling_fast?(event.id),
-      pricing_str: Events.event_pricing_display_string(event),
-      tickets_on_sale_str: format_tickets_on_sale(event),
+      selling_fast: not external? and Events.event_selling_fast?(event.id),
+      # External events never sell tickets here, so the YSC-style pricing and
+      # on-sale lines are replaced by the "organized by / tickets elsewhere" note.
+      pricing_str:
+        if(external?, do: nil, else: Events.event_pricing_display_string(event)),
+      tickets_on_sale_str:
+        if(external?, do: nil, else: format_tickets_on_sale(event)),
+      external_note: external_note,
       location_name: event.location_name,
       url: event_url(event.id),
       image_url: event_cover_image_url(event)

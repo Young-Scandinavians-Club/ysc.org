@@ -37,6 +37,20 @@ defmodule YscWeb.Emails.EventNotification do
     "Heads up: {title} is on the way"
   ]
 
+  # External events are run by another organization, so avoid wording that
+  # implies YSC is hosting them.
+  @subjects_external_with_organizer [
+    "{title}, organized by {organizer}",
+    "Community event: {title} ({organizer})",
+    "On the calendar: {title}, hosted by {organizer}"
+  ]
+
+  @subjects_external [
+    "Community event: {title}",
+    "Heads up: {title} (tickets sold by the organizer)",
+    "On the calendar: {title}, hosted by another group"
+  ]
+
   @subjects_without_event [
     "New on the calendar",
     "Something new just dropped",
@@ -50,6 +64,9 @@ defmodule YscWeb.Emails.EventNotification do
         is_nil(event) ->
           Enum.random(@subjects_without_event)
 
+        Ysc.Events.Event.external_ticketing?(event) ->
+          external_subject(event)
+
         Ysc.Events.Event.tickets_tbd?(event) ->
           @subjects_save_the_date
           |> Enum.random()
@@ -62,6 +79,24 @@ defmodule YscWeb.Emails.EventNotification do
       end
 
     "[YSC] " <> subject
+  end
+
+  defp external_subject(event) do
+    organizer =
+      case Map.get(event, :external_organizer) do
+        name when is_binary(name) -> String.trim(name)
+        _ -> ""
+      end
+
+    pool =
+      if organizer == "",
+        do: @subjects_external,
+        else: @subjects_external_with_organizer
+
+    pool
+    |> Enum.random()
+    |> String.replace("{title}", event.title)
+    |> String.replace("{organizer}", organizer)
   end
 
   @doc """
@@ -90,6 +125,8 @@ defmodule YscWeb.Emails.EventNotification do
   we do not re-render dates, URLs, and organizer data for every member.
   """
   def prepare_shared_email_data(event) do
-    EventHelpers.event_display(event, organizer: true)
+    event
+    |> EventHelpers.event_display(organizer: true)
+    |> Map.put(:external_note, EventHelpers.external_ticketing_note(event))
   end
 end

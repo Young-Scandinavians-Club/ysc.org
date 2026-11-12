@@ -630,6 +630,56 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
     end
   end
 
+  describe "build_assigns/4 external ticketing events" do
+    defp newsletter_assigns(events) do
+      events = Enum.map(events, &Repo.preload(&1, :cover_image))
+
+      NewsletterEdition.build_assigns(
+        %{title: "Ed", intro_text: "", cover_image: nil},
+        %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+        [],
+        events
+      )
+    end
+
+    test "labels external events with organizer and ticket source" do
+      event =
+        event_fixture(%{
+          external_ticket_url: "https://swea.example.org/tickets",
+          external_organizer: "SWEA"
+        })
+
+      assigns = newsletter_assigns([event])
+      [em] = assigns.events
+
+      assert em.external_note =~ "organized by SWEA, not YSC"
+      assert em.external_note =~ "Tickets are sold on their website"
+      assert em.pricing_str == nil
+      assert em.tickets_on_sale_str == nil
+      assert em.selling_fast == false
+
+      html = NewsletterEdition.render(assigns)
+      assert html =~ "organized by SWEA, not YSC"
+      assert html =~ "View event &amp; tickets"
+      assert html =~ "external-ticketing-note"
+    end
+
+    test "regular YSC events have no external note and keep their button" do
+      event = event_fixture()
+
+      assigns = newsletter_assigns([event])
+      [em] = assigns.events
+
+      assert em.external_note == nil
+      assert em.pricing_str != nil
+
+      html = NewsletterEdition.render(assigns)
+      assert html =~ "View event →"
+      refute html =~ "not YSC"
+      refute html =~ "external-ticketing-note"
+    end
+  end
+
   describe "build_assigns/4 with events from database" do
     test "maps event fields including long description truncation" do
       event =

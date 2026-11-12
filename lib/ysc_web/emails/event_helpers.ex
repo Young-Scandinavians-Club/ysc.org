@@ -47,6 +47,26 @@ defmodule YscWeb.Emails.EventHelpers do
   ]
 
   @doc """
+  Sentence telling recipients an externally ticketed event is not run by YSC and
+  where tickets are sold, or `nil` for regular YSC events.
+
+  Works on full events, slimmed list maps, and the nested `@event` summary.
+  """
+  def external_ticketing_note(event) do
+    if Event.external_ticketing?(event) do
+      organizer =
+        case Map.get(event, :external_organizer) do
+          name when is_binary(name) -> String.trim(name)
+          _ -> ""
+        end
+
+      who = if organizer == "", do: "another organization", else: organizer
+
+      "This event is organized by #{who}, not YSC. Tickets are sold on their website."
+    end
+  end
+
+  @doc """
   Raises when `event` is nil so blast workers fail with a clear error.
   """
   def require_event!(nil) do
