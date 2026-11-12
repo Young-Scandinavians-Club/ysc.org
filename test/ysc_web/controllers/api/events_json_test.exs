@@ -45,6 +45,13 @@ defmodule YscWeb.Api.EventsJSONTest do
     assert row[:external_organizer] == nil
   end
 
+  test "index/1 tolerates events without an age_restriction key" do
+    event = Map.delete(@base_event, :age_restriction)
+
+    assert %{data: [row]} = EventsJSON.index(%{events: [event], meta: %{}})
+    assert row[:age_restriction] == nil
+  end
+
   test "index/1 includes external ticketing fields when present" do
     event = %{
       @base_event

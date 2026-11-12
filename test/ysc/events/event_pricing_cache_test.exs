@@ -69,6 +69,30 @@ defmodule Ysc.Events.EventPricingCacheTest do
     assert Map.has_key?(enriched, :pricing_info)
   end
 
+  test "enrich_event preserves age_restriction from the caller on a cache primed without it" do
+    event =
+      event_fixture(%{
+        title: "Age Restriction #{System.unique_integer()}",
+        age_restriction: 21
+      })
+
+    _tier = ticket_tier_fixture(%{event_id: event.id})
+
+    # Public list/card queries omit age_restriction, so the shared per-event
+    # cache can be seeded from a row without it.
+    slim_row = event |> Map.from_struct() |> Map.drop([:age_restriction])
+
+    refute Map.has_key?(
+             EventPricingCache.enrich_event(slim_row),
+             :age_restriction
+           )
+
+    # The mobile app list query selects it and must get it back on a cache hit.
+    app_row = Map.from_struct(event)
+
+    assert EventPricingCache.enrich_event(app_row).age_restriction == 21
+  end
+
   test "enrich_event restores event body HTML when cache was primed from a body-less list row" do
     event = event_fixture(%{title: "Body HTML #{System.unique_integer()}"})
     _tier = ticket_tier_fixture(%{event_id: event.id})
