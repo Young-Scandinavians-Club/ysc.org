@@ -47,6 +47,7 @@ defmodule YscWeb.PostLiveQueryTest do
   @post_query_pattern ~r/FROM "posts"/i
   @raw_body_pattern ~r/raw_body/i
   @secret_pattern ~r/hashed_password|board_bio|upload_data/i
+  @unused_column_pattern ~r/deleted_on|featured_post|updated_by_id|"updated_at"/i
 
   describe "mount query deduplication" do
     test "dead render and connect avoid duplicate post fetches", %{conn: conn} do
@@ -120,6 +121,28 @@ defmodule YscWeb.PostLiveQueryTest do
       assert raw_cols == 0
       assert html =~ "rendered #{marker}"
       refute html =~ "raw #{marker}"
+    end
+
+    test "dead render does not SELECT unused admin columns", %{conn: conn} do
+      author = user_fixture()
+      post = post_fixture(author, %{title: "Public Slim Columns Post"})
+
+      {html, unused_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/posts/#{post.id}")
+            |> html_response(200)
+          end,
+          pattern: @unused_column_pattern,
+          caller_pids: [self()]
+        )
+
+      # Before: public_page_fields was schema minus raw_body, so deleted_on,
+      # featured_post, updated_by_id, and updated_at rode along on first paint.
+      # After: explicit allowlist.
+      assert unused_cols == 0
+      assert html =~ "Public Slim Columns Post"
     end
 
     test "dead render author preload skips hashed_password", %{conn: conn} do
