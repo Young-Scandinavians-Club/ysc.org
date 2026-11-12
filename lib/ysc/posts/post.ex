@@ -82,12 +82,29 @@ defmodule Ysc.Posts.Post do
   # Public post page and staff preview on that layout.
   # Includes `rendered_body` (scrubbed body HTML the page renders). Omits
   # `raw_body` (Trix source) so Postgres does not detoast a second copy of
-  # the same body. The editor writes both columns together. Virtual fields are
-  # not columns and cannot be selected.
+  # the same body. The editor writes both columns together.
+  #
+  # Explicit allowlist — not `__schema__(:fields) -- [:raw_body]` — so
+  # admin-only columns (`deleted_on`, `featured_post`, `updated_by_id`,
+  # `updated_at`) do not ride along on every public page SELECT. Virtual
+  # fields are not columns and cannot be selected.
+  @public_page_fields [
+    :id,
+    :user_id,
+    :state,
+    :title,
+    :url_name,
+    :rendered_body,
+    :preview_text,
+    :image_id,
+    :published_on,
+    :board_position_at_publish,
+    :comment_count,
+    :inserted_at
+  ]
+
   @doc false
-  def public_page_fields do
-    __schema__(:fields) -- [:raw_body | __schema__(:virtual_fields)]
-  end
+  def public_page_fields, do: @public_page_fields
 
   @editor_fields [
     :title,

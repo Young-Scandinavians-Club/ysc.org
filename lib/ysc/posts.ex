@@ -152,8 +152,9 @@ defmodule Ysc.Posts do
   Returns `nil` for invalid ULID values instead of raising `Ecto.Query.CastError`.
 
   Selects `Post.public_page_fields/0` so the post page never TOASTs
-  `raw_body` (Trix source). The page renders `rendered_body`. Author and
-  featured image are slim-preloaded (no `hashed_password` / `upload_data`).
+  `raw_body` (Trix source) and never loads admin-only columns. The page
+  renders `rendered_body`. Author and featured image are slim-preloaded
+  (no `hashed_password` / `upload_data`).
   """
   def get_public_post(id) do
     case Ecto.ULID.cast(id) do
