@@ -17,7 +17,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventFormTest do
           event_id: event.id
         })
 
-      assert html =~ "Scheduled At"
+      assert html =~ "Publish at"
       assert html =~ "Set Schedule"
     end
 
@@ -39,7 +39,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventFormTest do
           event_id: event.id
         })
 
-      assert html =~ "Scheduled At"
+      assert html =~ "Publish at"
     end
 
     test "displays save button" do
@@ -121,7 +121,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventFormTest do
           event_id: event.id
         })
 
-      assert html =~ "Scheduled At"
+      assert html =~ "Publish at"
     end
   end
 
@@ -136,7 +136,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventFormTest do
           event_id: event.id
         })
 
-      assert html =~ "Scheduled At"
+      assert html =~ "Publish at"
     end
 
     test "can reschedule a scheduled event" do
@@ -157,7 +157,7 @@ defmodule YscWeb.AdminEventsLive.ScheduleEventFormTest do
           event_id: event.id
         })
 
-      assert html =~ "Scheduled At"
+      assert html =~ "Publish at"
     end
   end
 end

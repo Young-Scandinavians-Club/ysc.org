@@ -2277,27 +2277,34 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
-  describe "schedule - event notification checkbox" do
+  describe "unified publish menu" do
     setup [:create_admin]
 
-    test "defaults to off and schedules without notification", %{
+    defp non_cabin_event(admin) do
+      cabin_event(admin, %{
+        location_name: "Swedish American Hall",
+        address: "2174 Market St, San Francisco, CA 94114"
+      })
+    end
+
+    test "holds the notification checkbox, publish now and schedule form", %{
       conn: conn,
       admin: admin
     } do
-      event =
-        cabin_event(admin, %{
-          location_name: "Swedish American Hall",
-          address: "2174 Market St, San Francisco, CA 94114"
-        })
-
+      event = cabin_event(admin)
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      assert has_element?(view, "#schedule-send-notification-#{event.id}")
+      assert has_element?(view, "#publish-menu #publish-send-notification")
+      assert has_element?(view, "#publish-menu #publish-now-btn")
+      assert has_element?(view, "#publish-menu #schedule_form-#{event.id}")
+    end
 
-      refute has_element?(
-               view,
-               "#schedule-send-notification-#{event.id}[checked]"
-             )
+    test "schedules without notification by default", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = non_cabin_event(admin)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
       view
       |> element("#schedule_form-#{event.id}")
@@ -2308,26 +2315,14 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       refute reloaded.send_notification
     end
 
-    test "checking the box schedules with notification", %{
+    test "scheduling honors the notification checkbox", %{
       conn: conn,
       admin: admin
     } do
-      event =
-        cabin_event(admin, %{
-          location_name: "Swedish American Hall",
-          address: "2174 Market St, San Francisco, CA 94114"
-        })
-
+      event = non_cabin_event(admin)
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      view
-      |> element("#schedule-send-notification-#{event.id}")
-      |> render_click()
-
-      assert has_element?(
-               view,
-               "#schedule-send-notification-#{event.id}[checked]"
-             )
+      view |> element("#publish-send-notification") |> render_click()
 
       view
       |> element("#schedule_form-#{event.id}")
