@@ -662,6 +662,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
       html = render(view)
+      assert has_element?(view, "#cancel-booking-modal")
+      assert has_element?(view, "#cancel-booking-form")
       assert html =~ "Cancel this booking?"
       assert html =~ "be undone"
     end

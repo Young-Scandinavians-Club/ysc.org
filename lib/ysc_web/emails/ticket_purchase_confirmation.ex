@@ -21,6 +21,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
       member_greeting_name: 1
     ]
 
+  alias Ysc.Events.TicketTierHelpers
   alias Ysc.Tickets
   alias YscWeb.Emails.TicketAccessHelpers
   alias YscWeb.Emails.TicketOrderHelpers
@@ -29,9 +30,11 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     "ticket_purchase_confirmation"
   end
 
-  def get_subject() do
-    "Your tickets are confirmed! 🎫"
-  end
+  def get_subject(email_data \\ %{})
+
+  def get_subject(%{granted: true}), do: "Your tickets are ready! 🎫"
+
+  def get_subject(_email_data), do: "Your tickets are confirmed! 🎫"
 
   @doc """
   Link to the order's tickets (QR codes and wallet buttons) that opens without
@@ -162,6 +165,8 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
 
     agenda_data = prepare_agenda_data(agendas)
 
+    ticket_cards = TicketAccessHelpers.ticket_cards(ticket_order.tickets)
+
     %{
       first_name: member_greeting_name(ticket_order.user),
       event: %{
@@ -201,6 +206,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
       payment_method: payment_method,
       paid_in_person: paid_in_person?,
       granted: granted_by_admin?(ticket_order),
+      donation_only: donation_only?(ticket_order.tickets),
       total_amount: total_amount,
       gross_total: gross_total_str,
       total_discount: total_discount_str,
@@ -208,8 +214,12 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
       ticket_summaries: ticket_summaries,
       tickets:
         TicketOrderHelpers.ticket_refs(ticket_order.tickets, status: true),
-      ticket_cards: TicketAccessHelpers.ticket_cards(ticket_order.tickets)
+      ticket_cards: ticket_cards
     }
+  end
+
+  defp donation_only?(tickets) do
+    tickets != [] and Enum.all?(tickets, &TicketTierHelpers.donation_ticket?/1)
   end
 
   # Complimentary tickets assigned by an admin (volunteers, comps), as opposed

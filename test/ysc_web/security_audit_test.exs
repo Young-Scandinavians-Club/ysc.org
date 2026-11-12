@@ -1501,7 +1501,7 @@ defmodule YscWeb.SecurityAuditTest do
 
     import Ysc.EventsFixtures
 
-    test "editor_changeset ignores forged state, published_at, organizer_id, and tickets_tbd" do
+    test "editor_changeset ignores forged state, published_at, organizer_id, tickets_tbd, and send_notification" do
       organizer = user_fixture()
       other = user_fixture()
       event = event_fixture(%{state: :draft, organizer_id: organizer.id})
@@ -1512,7 +1512,8 @@ defmodule YscWeb.SecurityAuditTest do
           "state" => "published",
           "published_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
           "organizer_id" => other.id,
-          "tickets_tbd" => "true"
+          "tickets_tbd" => "true",
+          "send_notification" => "true"
         })
 
       assert Ecto.Changeset.get_change(changeset, :title) == "Updated title"
@@ -1520,6 +1521,23 @@ defmodule YscWeb.SecurityAuditTest do
       refute Map.has_key?(changeset.changes, :published_at)
       refute Map.has_key?(changeset.changes, :organizer_id)
       refute Map.has_key?(changeset.changes, :tickets_tbd)
+      refute Map.has_key?(changeset.changes, :send_notification)
+    end
+
+    test "update_event_editor cannot flip send_notification on a live event" do
+      event = event_fixture(%{state: :draft})
+      assert {:ok, published} = Events.publish_event(event)
+      refute published.send_notification
+
+      assert {:ok, updated} =
+               Events.update_event_editor(published, %{
+                 "title" => "Still live",
+                 "send_notification" => "true"
+               })
+
+      assert updated.title == "Still live"
+      refute updated.send_notification
+      refute Repo.get!(Event, published.id).send_notification
     end
 
     test "update_event_editor cannot resurrect a deleted event via forged publish params" do

@@ -1,18 +1,14 @@
 defmodule Ysc.H2UpgradeTest do
   @moduledoc """
-  Guards the h2 0.12.5 → 0.15.0 upgrade (pulled by hackney 4.10.0).
+  Guards the h2 0.15.0 → 0.15.1 upgrade (pulled by hackney 4.10.2).
 
-  0.12.7 MadeYouReset (CVE-2025-8671) caps server stream resets per
-  second. 0.13.0 SETTINGS flood (CVE-2019-9515) accepts at most 20
-  SETTINGS frames per second from a peer, then closes the connection.
-  0.14.0 adds `peercert/1` and makes the server own its listen socket.
-  0.15.0 adds optional `notify_stream_available` (off by default).
-  0.12.5 `connection_window_size` is unchanged.
-
-  We do not start h2 servers in production. hackney 4.10.0 still
-  calls `h2_connection:start_link/4` with `connection_window_size`
-  32 MiB and now sets `notify_stream_available => true` so HTTP/2
-  can wait for a free stream. Public client APIs are unchanged.
+  0.15.1 tells the owner and stream handlers the peer is gone before
+  the socket closes, and TLS close no longer waits ~5s for the peer.
+  0.15.0 optional `notify_stream_available` (off by default) is
+  unchanged. We do not start h2 servers in production. hackney 4.10.2
+  still calls `h2_connection:start_link/4` with `connection_window_size`
+  32 MiB and `notify_stream_available => true`. Public client APIs are
+  unchanged. Do not take 0.16.0: hackney still lists `h2 ~> 0.15.0`.
   """
   use ExUnit.Case, async: false
 
@@ -44,24 +40,24 @@ defmodule Ysc.H2UpgradeTest do
     :ok
   end
 
-  describe "0.15.0 Hex lock and public APIs" do
-    test "locks the Hex package to 0.15.0" do
-      assert to_string(Application.spec(:h2, :vsn)) == "0.15.0"
+  describe "0.15.1 Hex lock and public APIs" do
+    test "locks the Hex package to 0.15.1" do
+      assert to_string(Application.spec(:h2, :vsn)) == "0.15.1"
     end
 
-    test "companion lock is 0.15.0" do
+    test "companion lock is 0.15.1" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"h2": {:hex, :h2, "0.15.0"|
-      refute lock =~ ~s|"h2": {:hex, :h2, "0.12.5"|
+      assert lock =~ ~s|"h2": {:hex, :h2, "0.15.1"|
+      refute lock =~ ~s|"h2": {:hex, :h2, "0.15.0"|
     end
 
     test "mix.exs override matches hackney and webtransport" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s|{:h2, "~> 0.15.0", override: true}|
-      refute mix_exs =~ ~s|{:h2, "~> 0.12.5", override: true}|
+      assert mix_exs =~ ~s|{:h2, "~> 0.15.1", override: true}|
+      refute mix_exs =~ ~s|{:h2, "~> 0.15.0", override: true}|
 
       assert File.read!(@hackney_rebar) =~ ~s|{h2, "~>0.15.0"}|
-      assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.15.0"}|
+      assert File.read!(@webtransport_rebar) =~ ~s|{h2, "~> 0.15.1"}|
     end
 
     test "client APIs hackney and webtransport use still exist" do
@@ -736,6 +732,40 @@ defmodule Ysc.H2UpgradeTest do
       conn = File.read!(@hackney_conn)
       assert conn =~ "notify_stream_available => true"
       assert conn =~ "handle_h2_event(stream_available, Data)"
+    end
+  end
+
+  describe "0.15.1 TLS close without waiting for the peer" do
+    test "changelog documents the five-second close delay fix" do
+      changelog = File.read!(@h2_changelog)
+
+      v0151 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.find(&String.starts_with?(&1, "[0.15.1]"))
+
+      assert v0151
+      assert v0151 =~ "five seconds"
+      assert v0151 =~ "TLS"
+      refute v0151 =~ "Breaking"
+    end
+
+    test "terminate notifies owner and handlers before closing the socket" do
+      source = File.read!(@h2_connection_src)
+
+      assert source =~
+               "notify_owner({h2, self(), {closed, PeeledReason}}, State)"
+
+      assert source =~ "notify_all_handlers({closed, PeeledReason}, State)"
+
+      assert source =~
+               "Close last, so a slow close never delays the notifications"
+    end
+
+    test "ssl close shuts down both directions instead of waiting 5s" do
+      source = File.read!(@h2_connection_src)
+      assert source =~ "ssl:close/1 sends close_notify, then waits up to 5 s"
+      assert source =~ "ssl:shutdown(Socket, read_write)"
     end
   end
 

@@ -75,10 +75,10 @@ The email signature loads the logo from `https://ysc.org/images/brand/logos/ysc-
 The "Open in Google Slides" button on `/brand` appears only when `BRAND_GOOGLE_SLIDES_TEMPLATE_ID` is set (read in `config/runtime.exs`). To set it up:
 
 1. Upload `YSC-presentation-template.pptx` to the club's Google Drive and open it with Google Slides.
-2. Choose File, Save as Google Slides, then Share, General access: **Anyone with the link**, Viewer.
-3. Copy the file ID from the URL (`docs.google.com/presentation/d/<ID>/edit`) and set `BRAND_GOOGLE_SLIDES_TEMPLATE_ID=<ID>` in production.
+2. Choose File, Save as Google Slides, then Share, General access: **Anyone with the link**, Viewer, and use "Publish as template" if you want Google's template page.
+3. Copy the file ID from the URL (`docs.google.com/presentation/d/<ID>/edit`) and set `BRAND_GOOGLE_SLIDES_TEMPLATE_ID=<ID>` in production. It is set in `etc/fly/fly-prod.toml` and `etc/fly/fly-sandbox.toml` (currently the club's Slides template).
 
-The button links to `.../presentation/d/<ID>/copy`, which asks the visitor to make their own copy in their Google account. After updating the template, repeat these steps; if the file ID changes, update the environment variable.
+The button links to `.../presentation/d/<ID>/template/preview`, Google's "Use template" page, which lets the visitor make their own copy in their Google account. After updating the template, repeat these steps; if the file ID changes, update the environment variable.
 
 ## What comes from the code and what is proposed
 

@@ -21,6 +21,8 @@ defmodule YscWeb.Api.EventsJSONTest do
     max_attendees: 50,
     tickets_tbd: false,
     partiful_link: nil,
+    external_ticket_url: nil,
+    external_organizer: nil,
     selling_fast: false,
     recent_tickets_count: 0,
     ticket_count: 10,
@@ -39,6 +41,28 @@ defmodule YscWeb.Api.EventsJSONTest do
     assert row[:pricing_info] == nil
     assert row[:ticket_tiers] == []
     assert row[:cover_image] == nil
+    assert row[:external_ticket_url] == nil
+    assert row[:external_organizer] == nil
+  end
+
+  test "index/1 includes external ticketing fields when present" do
+    event = %{
+      @base_event
+      | external_ticket_url: "https://example.org/tickets",
+        external_organizer: "Swedish Club of SF",
+        pricing_info: %{
+          display_text: "External Tickets",
+          has_free_tiers: false,
+          lowest_price: nil
+        }
+    }
+
+    result = EventsJSON.index(%{events: [event], meta: %{}})
+
+    assert %{data: [row]} = result
+    assert row[:external_ticket_url] == "https://example.org/tickets"
+    assert row[:external_organizer] == "Swedish Club of SF"
+    assert row[:pricing_info][:display_text] == "External Tickets"
   end
 
   test "index/1 includes pricing_info and ticket tier fields when present" do

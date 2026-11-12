@@ -184,12 +184,37 @@ defmodule Ysc.Events.Event do
   # Public event page and staff preview on that layout.
   # Includes `rendered_details` (scrubbed body HTML the page renders). Omits
   # `raw_details` (Trix source) so Postgres does not detoast a second copy of
-  # the same body. The editor writes both columns together. Virtual fields are
-  # not columns and cannot be selected.
+  # the same body. The editor writes both columns together.
+  #
+  # Explicit allowlist — not `__schema__(:fields) -- [:raw_details]` — so
+  # admin-only columns added later (`send_notification`, notification
+  # bookkeeping, `lock_version`, `place_id`, …) do not ride along on every
+  # public page SELECT. Virtual fields are not columns and cannot be selected.
+  @public_page_fields [
+    :id,
+    :reference_id,
+    :state,
+    :title,
+    :description,
+    :rendered_details,
+    :max_attendees,
+    :image_id,
+    :start_date,
+    :start_time,
+    :end_date,
+    :end_time,
+    :location_name,
+    :address,
+    :latitude,
+    :longitude,
+    :partiful_link,
+    :external_ticket_url,
+    :external_organizer,
+    :tickets_tbd
+  ]
+
   @doc false
-  def public_page_fields do
-    __schema__(:fields) -- [:raw_details | __schema__(:virtual_fields)]
-  end
+  def public_page_fields, do: @public_page_fields
 
   @publish_control_fields [
     :state,
@@ -258,6 +283,14 @@ defmodule Ysc.Events.Event do
     |> cast(attrs, @editor_fields)
     |> validate_required([:title])
     |> shared_validations()
+  end
+
+  @doc """
+  Puts a new reference_id on the changeset (for retry after unique constraint).
+  Call this when insert fails with a reference_id unique constraint.
+  """
+  def put_new_reference_id(changeset) do
+    ReferenceGenerator.put_new_reference_id(changeset, @reference_prefix)
   end
 
   defp shared_validations(changeset) do

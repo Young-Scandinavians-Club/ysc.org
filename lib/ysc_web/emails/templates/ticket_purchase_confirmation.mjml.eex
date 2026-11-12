@@ -2,7 +2,11 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <%= if assigns[:granted] do %>
+      <strong>Your tickets are ready</strong>
+      <% else %>
       <strong>Your tickets are confirmed</strong>
+      <% end %>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -71,8 +75,10 @@
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <mj-button href="<%= @event_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">See event details → </mj-button>
+    <%= if assigns[:ticket_cards] != [] do %>
     <mj-spacer height="4px"></mj-spacer>
     <mj-button href="<%= @tickets_qr_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#18181b" color="#ffffff" align="center" font-size="18px" border-radius="4px">🎫 View all tickets</mj-button>
+    <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <!-- Event Agenda -->
     <%= if @agenda && length(@agenda) > 0 do %>
@@ -120,14 +126,15 @@
     <% end %>
 
     <!-- Ticket Summary -->
-    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> Your Tickets </mj-text>
+    <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold"> <%= if assigns[:donation_only] do %>Your Donations<% else %>Your Tickets<% end %> </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Order number:
       <span style="background-color: #DBEAFE; color: #1E40AF; font-weight: 500; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
         <%= @ticket_order.reference_id %>
       </span>
     </mj-text>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Purchase Date: <strong><%= @purchase_date %></strong>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <%= if assigns[:granted] do %>Issued on:<% else %>Purchase Date:<% end %> <strong><%= @purchase_date %></strong>
     </mj-text>
     <mj-spacer height="16px"></mj-spacer>
     <!-- Ticket Details Table -->
@@ -197,9 +204,15 @@
     <mj-spacer height="24px"></mj-spacer>
     <% end %>
     <!-- Individual ticket numbers -->
+    <%= if assigns[:donation_only] do %>
+    <mj-text align="left" font-size="20px" line-height="1.4" padding="0px" font-weight="bold"> Your donation numbers </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Keep these numbers if you write to us about this donation: </mj-text>
+    <% else %>
     <mj-text align="left" font-size="20px" line-height="1.4" padding="0px" font-weight="bold"> Your ticket numbers </mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Keep these ticket numbers if you write to us about this order: </mj-text>
+    <% end %>
     <mj-spacer height="8px"></mj-spacer>
     <mj-text align="left" font-size="14px" line-height="1.5" padding="0px" padding-left="16px">
       <%= for ticket <- @tickets do %>
@@ -217,11 +230,21 @@
       <strong>What's Next?</strong>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
+    <%= if assigns[:donation_only] do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • This is a receipt for your donation — it is not a ticket for the door </mj-text>
+    <% else %>
+    <%= if assigns[:ticket_cards] != [] do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • At the event, show the tickets on your phone (the QR codes above, or the ticket in your wallet) so staff can check you in </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • You'll receive a reminder email 24 hours before the event </mj-text>
+    <% end %>
+    <% end %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> • If you have any questions, reply to this email or write to us at <a href="mailto:info@ysc.org">info@ysc.org</a> </mj-text>
     <mj-spacer height="36px"></mj-spacer>
+    <%= if assigns[:donation_only] do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Thank you for supporting the Young Scandinavians Club. </mj-text>
+    <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> We look forward to seeing you at the event! </mj-text>
+    <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Vi ses snart! (See you soon!) 👋</mj-text>
     <mj-spacer height="24px"></mj-spacer>

@@ -288,6 +288,9 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
           admin_role: :admin
         })
 
+      assert html =~ ~s(id="partiful-link-notice")
+      assert html =~ "hero-information-circle"
+      assert html =~ "border-blue-200"
       assert html =~ "Partiful link"
       assert html =~ "https://partiful.com/e/test-event-xyz"
       assert html =~ "General Admission"
@@ -306,8 +309,54 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
           admin_role: :admin
         })
 
+      refute html =~ ~s(id="partiful-link-notice")
       refute html =~ "Partiful link"
       assert html =~ "Add Ticket Tier"
+    end
+  end
+
+  describe "external ticketing notice" do
+    test "shows an external ticketing callout when event has external_ticket_url" do
+      event =
+        event_fixture(%{
+          external_ticket_url: "https://example.org/tickets"
+        })
+
+      _tier =
+        ticket_tier_fixture(%{event_id: event.id, name: "General Admission"})
+
+      user = user_fixture()
+
+      html =
+        render_component(TicketTierManagement, %{
+          id: "tier-management",
+          event_id: event.id,
+          current_user: user,
+          admin_role: :admin
+        })
+
+      assert html =~ ~s(id="external-ticketing-notice")
+      assert html =~ "hero-exclamation-triangle"
+      assert html =~ "border-amber-200"
+      assert html =~ "https://example.org/tickets"
+      assert html =~ "the external ticket link"
+      assert html =~ "General Admission"
+    end
+
+    test "does not show the external ticketing callout without an external_ticket_url" do
+      event = event_fixture()
+      user = user_fixture()
+
+      html =
+        render_component(TicketTierManagement, %{
+          id: "tier-management",
+          event_id: event.id,
+          current_user: user,
+          admin_role: :admin
+        })
+
+      refute html =~ ~s(id="external-ticketing-notice")
+      refute html =~ "the external ticket link"
     end
   end
 

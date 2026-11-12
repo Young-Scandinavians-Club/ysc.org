@@ -275,7 +275,13 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
       assert data.granted
       html = TicketPurchaseConfirmation.render(data)
       assert html =~ "YSC has issued you tickets"
+      assert html =~ "Your tickets are ready"
+      assert html =~ "Issued on:"
       refute html =~ "Thank you for your ticket purchase"
+      refute html =~ "Your tickets are confirmed"
+      refute html =~ "Purchase Date:"
+
+      assert TicketPurchaseConfirmation.get_subject(data) =~ "ready"
     end
 
     test "donation and unconfirmed tickets get no QR code" do
@@ -327,6 +333,9 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
 
         assert length(guest1.args["params"]["ticket_cards"]) == 2
         assert guest1.args["params"]["purchaser_name"] == "Pat Purchaser"
+        assert guest1.args["params"]["ticket_count"] == 2
+        assert guest1.args["subject"] =~ "Your tickets to"
+        refute guest1.args["subject"] =~ "Your ticket to"
         assert guest1.args["user_id"] == nil
       end)
     end
@@ -377,6 +386,8 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
         assert [job] = jobs_for("ticket_purchase_confirmation")
         assert job.args["recipient"] == volunteer.email
         assert length(job.args["params"]["ticket_cards"]) == 2
+        assert job.args["subject"] =~ "ready"
+        refute job.args["subject"] =~ "confirmed"
         assert [] = jobs_for("ticket_recipient_notification")
       end)
     end
@@ -400,6 +411,29 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
       # Text fallback link for clients that block the images
       assert html =~ ~s(href="#{card.ticket_url}")
       assert html =~ "see the QR code"
+      assert html =~ "Your ticket is ready"
+      refute html =~ "Your tickets are ready"
+    end
+
+    test "pluralizes the heading and door instructions when a guest gets two tickets" do
+      %{order: order} =
+        order_with_attendees(["guest@example.com", "guest@example.com"])
+
+      order = Tickets.get_ticket_order_for_email(order.id)
+
+      assert [recipient] = TicketRecipientNotification.recipients(order)
+      data = TicketRecipientNotification.prepare_email_data(order, recipient)
+      assert data.ticket_count == 2
+
+      html = TicketRecipientNotification.render(data)
+      assert html =~ "Your tickets are ready"
+      assert html =~ "2 tickets"
+      assert html =~ "show the QR codes at the door"
+      assert html =~ "add them to your phone"
+      refute html =~ "Your ticket is ready"
+      refute html =~ "show the QR code at the door"
+
+      assert TicketRecipientNotification.get_subject(data) =~ "Your tickets to"
     end
   end
 

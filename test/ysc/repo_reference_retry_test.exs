@@ -9,6 +9,7 @@ defmodule Ysc.RepoReferenceRetryTest do
   alias Ysc.Repo
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Bookings.Booking
+  alias Ysc.Events.Event
   alias Ysc.Events.Ticket
   import Ysc.AccountsFixtures
 
@@ -292,6 +293,41 @@ defmodule Ysc.RepoReferenceRetryTest do
     end
   end
 
+  describe "insert_with_reference_retry/3 with Event" do
+    test "retries on reference_id collision and succeeds", %{event: event} do
+      first_ref = event.reference_id
+      organizer_id = event.organizer_id
+
+      collision_changeset =
+        Event.changeset(%Event{}, %{
+          title: "Collision Event",
+          description: "For repo retry tests",
+          state: :published,
+          organizer_id: organizer_id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              31,
+              :day
+            ),
+          max_attendees: 100,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+        |> put_change(:reference_id, first_ref)
+
+      assert {:error, %Ecto.Changeset{} = failed} =
+               Repo.insert(collision_changeset)
+
+      assert reference_id_unique_constraint?(failed)
+
+      assert {:ok, %Event{} = second_event} =
+               Repo.insert_with_reference_retry(collision_changeset, Event)
+
+      assert second_event.reference_id != first_ref
+      assert second_event.reference_id =~ ~r/^EVT-\d{6}-[A-Z0-9]{5}$/
+    end
+  end
+
   describe "put_new_reference_id/1" do
     test "TicketOrder.put_new_reference_id sets a new reference_id" do
       cs =
@@ -330,6 +366,19 @@ defmodule Ysc.RepoReferenceRetryTest do
 
       assert new_ref != "TKT-260101-OLD1X"
       assert new_ref =~ ~r/^TKT-\d{6}-[A-Z0-9]{5}$/
+    end
+
+    test "Event.put_new_reference_id sets a new reference_id" do
+      cs =
+        %Event{}
+        |> change(%{})
+        |> put_change(:reference_id, "EVT-260101-OLD1X")
+
+      new_cs = Event.put_new_reference_id(cs)
+      new_ref = get_change(new_cs, :reference_id)
+
+      assert new_ref != "EVT-260101-OLD1X"
+      assert new_ref =~ ~r/^EVT-\d{6}-[A-Z0-9]{5}$/
     end
   end
 

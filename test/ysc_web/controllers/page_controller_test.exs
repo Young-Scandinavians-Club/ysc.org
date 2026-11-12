@@ -247,6 +247,11 @@ defmodule YscWeb.PageControllerTest do
       refute html =~ "Account Pending Review"
       assert html =~ "You haven't saved a payment method yet"
       assert html =~ "Save a payment method"
+      assert html =~ ~s(id="pending-review-save-payment")
+      assert html =~ ~s(id="pending-review-next-steps")
+      assert html =~ ~s(id="pending-review-next-steps-step-1")
+      assert html =~ ~s(id="pending-review-next-steps-step-3")
+      assert html =~ "Board review:"
       assert html =~ "Membership starts:"
       refute html =~ "Continue account setup"
       refute html =~ "Activation:"
@@ -293,6 +298,9 @@ defmodule YscWeb.PageControllerTest do
 
       assert html =~ "You've saved a payment method"
       assert html =~ "we'll charge the payment method you saved"
+      assert html =~ ~s(id="pending-review-payment-saved")
+      refute html =~ ~s(id="pending-review-save-payment")
+      assert html =~ ~s(id="pending-review-next-steps")
       assert html =~ "Membership starts:"
       refute html =~ "Continue account setup"
       refute html =~ "Activation:"
@@ -565,7 +573,7 @@ defmodule YscWeb.PageControllerTest do
       assert Enum.empty?(LazyHTML.query(document, "#open-in-google-slides"))
     end
 
-    test "shows a Google Slides copy link when a template is configured", %{
+    test "shows a Google Slides template link when a template is configured", %{
       conn: conn
     } do
       Application.put_env(:ysc, :brand_google_slides_template_id, "abc_123-XYZ")
@@ -580,7 +588,7 @@ defmodule YscWeb.PageControllerTest do
       assert Enum.count(
                LazyHTML.query(
                  document,
-                 "a#open-in-google-slides[href='https://docs.google.com/presentation/d/abc_123-XYZ/copy'][target='_blank']"
+                 "a#open-in-google-slides[href='https://docs.google.com/presentation/d/abc_123-XYZ/template/preview'][target='_blank']"
                )
              ) == 1
     end
@@ -597,7 +605,7 @@ defmodule YscWeb.PageControllerTest do
         Application.delete_env(:ysc, :brand_google_slides_template_id)
       end)
 
-      assert YscWeb.BrandGuide.google_slides_copy_url() == nil
+      assert YscWeb.BrandGuide.google_slides_template_url() == nil
 
       html = conn |> get(~p"/brand") |> html_response(200)
       document = LazyHTML.from_fragment(html)

@@ -205,6 +205,95 @@ defmodule YscWeb.EventDetailsQueryTest do
       assert html =~ "rendered #{marker}"
       refute html =~ "raw #{marker}"
     end
+
+    test "dead render does not SELECT admin-only event columns", %{conn: conn} do
+      event =
+        event_fixture(%{
+          title: "Public Slim Columns Event",
+          state: :published,
+          external_ticket_url: "https://example.org/tickets",
+          external_organizer: "Norwegian Club"
+        })
+
+      {html, admin_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/events/#{event.id}")
+            |> html_response(200)
+          end,
+          pattern:
+            ~r/send_notification|notification_sent_at|notification_recipient_count|show_participants|age_restriction|"place_id"|updated_by_id|"publish_at"/i,
+          caller_pids: [self()]
+        )
+
+      # Before: public_page_fields was schema minus raw_details, so #1821's
+      # send_notification and other admin columns rode along on first paint.
+      # After: explicit allowlist. Ticket-tier lock_version may still appear
+      # in the pricing-cache query, so it is not in this pattern.
+      assert admin_cols == 0
+      assert html =~ "Public Slim Columns Event"
+      assert html =~ "Norwegian Club"
+      assert html =~ "https://example.org/tickets"
+    end
+
+    test "dead render skips ticket-tier inventory for external ticketing", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "External Inventory Skip Event",
+          state: :published,
+          external_ticket_url: "https://example.org/tickets",
+          external_organizer: "Norwegian Club"
+        })
+
+      ticket_tier_fixture(%{event_id: event.id})
+
+      {html, tier_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/events/#{event.id}")
+            |> html_response(200)
+          end,
+          pattern: @tier_list_pattern,
+          caller_pids: [self()]
+        )
+
+      assert tier_queries == 0
+      assert html =~ "External Inventory Skip Event"
+      assert html =~ "External Tickets"
+      assert html =~ "https://example.org/tickets"
+    end
+
+    test "connect skips selling-fast and leftover tier inventory for external ticketing",
+         %{conn: conn} do
+      event =
+        event_fixture(%{
+          title: "External Connect Skip Event",
+          state: :published,
+          external_ticket_url: "https://example.org/tickets"
+        })
+
+      ticket_tier_fixture(%{event_id: event.id})
+
+      {{:ok, view, _html}, tier_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+            render_async(view)
+            {:ok, view, html}
+          end,
+          pattern: @tier_list_pattern,
+          caller_pids: [self()]
+        )
+
+      assert tier_queries == 0
+      assert render(view) =~ "External Tickets"
+      refute has_element?(view, "#ticket-modal")
+    end
   end
 
   describe "membership extras on first paint" do

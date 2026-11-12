@@ -169,7 +169,8 @@ defmodule Ysc.Events do
   instead of raising `Ecto.Query.CastError`.
 
   Selects `Event.public_page_fields/0` so the event page never TOASTs
-  `raw_details` (Trix source). The page renders `rendered_details`.
+  `raw_details` (Trix source) and never loads admin-only columns. The page
+  renders `rendered_details`.
   """
   def get_public_event(id) do
     case Ecto.ULID.cast(id) do
@@ -585,7 +586,6 @@ defmodule Ysc.Events do
   @doc """
   Insert a new event into the database.
   """
-  @dialyzer {:nowarn_function, create_event: 1}
   def create_event(attrs \\ %{}) do
     organizer_id =
       Map.get(attrs, :organizer_id) || Map.get(attrs, "organizer_id")
@@ -595,34 +595,16 @@ defmodule Ysc.Events do
       |> Event.changeset(attrs)
       |> maybe_put_updated_by(organizer_id)
 
-    multi =
-      Ecto.Multi.new()
-      |> Ecto.Multi.insert(:event, event_changeset)
+    # Retry the whole Multi after a unique-constraint rollback. Retrying
+    # inside the open transaction (insert_with_reference_retry in Multi.run)
+    # hits PostgreSQL 25P02: the failed insert aborts the savepoint.
+    insert_event_retrying_reference_id(event_changeset, organizer_id, 5)
+  end
 
-    multi =
-      if organizer_id do
-        Ecto.Multi.run(multi, :add_host, fn repo, %{event: event} ->
-          case repo.get(User, organizer_id) do
-            nil ->
-              {:ok, nil}
-
-            organizer ->
-              event
-              |> repo.preload(:hosts)
-              |> Ecto.Changeset.change()
-              |> Ecto.Changeset.put_assoc(:hosts, [organizer])
-              |> repo.update()
-          end
-        end)
-      else
-        multi
-      end
-
-    case Repo.transaction(multi) do
+  defp insert_event_retrying_reference_id(event_changeset, organizer_id, 0) do
+    case Repo.transaction(event_insert_multi(event_changeset, organizer_id)) do
       {:ok, %{event: event}} ->
-        maybe_invalidate_event_caches(event)
-        broadcast(%Ysc.MessagePassingEvents.EventAdded{event: event})
-        {:ok, event}
+        finalize_created_event(event)
 
       {:error, :event, changeset, _} ->
         {:error, changeset}
@@ -630,6 +612,86 @@ defmodule Ysc.Events do
       {:error, :add_host, error, _} ->
         {:error, error}
     end
+  end
+
+  defp insert_event_retrying_reference_id(
+         event_changeset,
+         organizer_id,
+         attempts
+       )
+       when attempts > 0 do
+    case Repo.transaction(event_insert_multi(event_changeset, organizer_id)) do
+      {:ok, %{event: event}} ->
+        finalize_created_event(event)
+
+      {:error, :event, changeset, _} ->
+        if reference_id_unique_constraint?(changeset) do
+          new_changeset =
+            changeset
+            |> clear_reference_id_error()
+            |> Event.put_new_reference_id()
+
+          insert_event_retrying_reference_id(
+            new_changeset,
+            organizer_id,
+            attempts - 1
+          )
+        else
+          {:error, changeset}
+        end
+
+      {:error, :add_host, error, _} ->
+        {:error, error}
+    end
+  end
+
+  # Ecto.Multi opacity vs MapSet triggers Dialyzer call_without_opaque (same
+  # pattern as other Multi helpers). create_event used to carry this
+  # suppression when Multi.insert lived there; the retry helper moved it.
+  @dialyzer {:nowarn_function, event_insert_multi: 2}
+  defp event_insert_multi(event_changeset, organizer_id) do
+    multi =
+      Ecto.Multi.new()
+      |> Ecto.Multi.insert(:event, event_changeset)
+
+    if organizer_id do
+      Ecto.Multi.run(multi, :add_host, fn repo, %{event: event} ->
+        case repo.get(User, organizer_id) do
+          nil ->
+            {:ok, nil}
+
+          organizer ->
+            event
+            |> repo.preload(:hosts)
+            |> Ecto.Changeset.change()
+            |> Ecto.Changeset.put_assoc(:hosts, [organizer])
+            |> repo.update()
+        end
+      end)
+    else
+      multi
+    end
+  end
+
+  defp finalize_created_event(event) do
+    maybe_invalidate_event_caches(event)
+    broadcast(%Ysc.MessagePassingEvents.EventAdded{event: event})
+    {:ok, event}
+  end
+
+  defp reference_id_unique_constraint?(changeset) do
+    Enum.any?(changeset.errors, fn
+      {:reference_id, {_, opts}} when is_list(opts) ->
+        Keyword.get(opts, :constraint) == :unique
+
+      _ ->
+        false
+    end)
+  end
+
+  defp clear_reference_id_error(changeset) do
+    new_errors = Keyword.delete(changeset.errors, :reference_id)
+    %{changeset | errors: new_errors, valid?: new_errors == []}
   end
 
   # Event page "Who's going" chips and host pills: name, country for default
@@ -1263,6 +1325,11 @@ defmodule Ysc.Events do
 
   # Public event cards (home, /events, EventListCache). Omits `raw_details` /
   # `rendered_details` so list/cache payloads do not pull event-body HTML.
+  # Also omits admin-only columns (`publish_at`, `organizer_id`, `place_id`,
+  # `lock_version`, `age_restriction`, `show_participants`, `updated_at`) that
+  # cards never read. Keep `published_at` / `inserted_at` for "Just Added"
+  # badges, lat/lng + `partiful_link` because EventPricingCache overlays this
+  # payload onto the public event page on a cache hit.
   defp events_list_query(limit, timeframe) do
     three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
 
@@ -1284,13 +1351,9 @@ defmodule Ysc.Events do
         reference_id: e.reference_id,
         state: e.state,
         published_at: e.published_at,
-        publish_at: e.publish_at,
-        organizer_id: e.organizer_id,
         title: e.title,
         description: e.description,
         max_attendees: e.max_attendees,
-        age_restriction: e.age_restriction,
-        show_participants: e.show_participants,
         image_id: e.image_id,
         start_date: e.start_date,
         start_time: e.start_time,
@@ -1300,14 +1363,11 @@ defmodule Ysc.Events do
         address: e.address,
         latitude: e.latitude,
         longitude: e.longitude,
-        place_id: e.place_id,
         partiful_link: e.partiful_link,
         external_ticket_url: e.external_ticket_url,
         external_organizer: e.external_organizer,
         tickets_tbd: e.tickets_tbd,
-        lock_version: e.lock_version,
         inserted_at: e.inserted_at,
-        updated_at: e.updated_at,
         recent_tickets_count: count(t.id),
         selling_fast: fragment("count(?) >= 5", t.id)
       })
@@ -1389,13 +1449,13 @@ defmodule Ysc.Events do
   end
 
   defp enrich_events_with_pricing_info(events) do
-    event_ids = Enum.map(events, & &1.id)
+    # Externally ticketed events never sell on ysc.org (`PricingDisplay`
+    # returns "External Tickets" without reading tiers), so skip the
+    # grouped ticket-tier / sold-count queries. Cover images still load.
+    internally_ticketed_ids = internally_ticketed_event_ids(events)
 
-    # Batch load all ticket tiers for all events
-    ticket_tiers_by_event = batch_load_ticket_tiers(event_ids)
-
-    # Batch load ticket counts for all events
-    ticket_counts_by_event = batch_load_ticket_counts(event_ids)
+    ticket_tiers_by_event = batch_load_ticket_tiers(internally_ticketed_ids)
+    ticket_counts_by_event = batch_load_ticket_counts(internally_ticketed_ids)
 
     # Batch load images for all events (extract unique image_ids)
     image_ids =
@@ -1444,6 +1504,12 @@ defmodule Ysc.Events do
     else
       nil
     end
+  end
+
+  defp internally_ticketed_event_ids(events) do
+    Enum.flat_map(events, fn event ->
+      if Event.external_ticketing?(event), do: [], else: [event.id]
+    end)
   end
 
   # Batch load images for multiple image IDs

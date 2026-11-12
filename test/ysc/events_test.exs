@@ -278,6 +278,35 @@ defmodule Ysc.EventsTest do
       assert event.organizer_id == user.id
     end
 
+    test "create_event/1 retries when reference_id is already taken", %{
+      user: user
+    } do
+      {:ok, first} =
+        Events.create_event(%{
+          title: "First Collision Event",
+          description: "Event description",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now()
+        })
+
+      assert {:ok, second} =
+               Events.create_event(%{
+                 title: "Second Collision Event",
+                 description: "Event description",
+                 state: :published,
+                 organizer_id: user.id,
+                 start_date: DateTime.add(DateTime.utc_now(), 31, :day),
+                 published_at: DateTime.utc_now(),
+                 reference_id: first.reference_id
+               })
+
+      assert second.id != first.id
+      assert second.reference_id != first.reference_id
+      assert second.reference_id =~ ~r/^EVT-\d{6}-[A-Z0-9]{5}$/
+    end
+
     test "create_event/1 returns error changeset when required fields are missing",
          %{
            user: user
@@ -1434,6 +1463,35 @@ defmodule Ysc.EventsTest do
       assert loaded.title == event.title
       refute Map.has_key?(loaded, :raw_details)
       refute Map.has_key?(loaded, :rendered_details)
+      refute Map.has_key?(loaded, :publish_at)
+      refute Map.has_key?(loaded, :organizer_id)
+      refute Map.has_key?(loaded, :age_restriction)
+      refute Map.has_key?(loaded, :show_participants)
+      refute Map.has_key?(loaded, :place_id)
+      refute Map.has_key?(loaded, :lock_version)
+      refute Map.has_key?(loaded, :updated_at)
+      refute Map.has_key?(loaded, :send_notification)
+      assert Map.has_key?(loaded, :published_at)
+      assert Map.has_key?(loaded, :inserted_at)
+      assert Map.has_key?(loaded, :external_ticket_url)
+
+      {sql, _params} =
+        Ecto.Adapters.SQL.to_sql(
+          :all,
+          Repo,
+          Events.ci_query_explain_upcoming_events_list_query()
+        )
+
+      refute sql =~ "age_restriction"
+      refute sql =~ "show_participants"
+      refute sql =~ "place_id"
+      refute sql =~ "lock_version"
+      refute sql =~ "organizer_id"
+      refute sql =~ ~s("publish_at")
+      refute sql =~ "raw_details"
+      refute sql =~ "rendered_details"
+      assert sql =~ ~s("published_at")
+      assert sql =~ "external_ticket_url"
     end
 
     test "list_upcoming_events_for_feed/1 includes rendered_details without pricing joins" do
@@ -1501,6 +1559,13 @@ defmodule Ysc.EventsTest do
       assert loaded
       refute Map.has_key?(loaded, :raw_details)
       refute Map.has_key?(loaded, :rendered_details)
+      refute Map.has_key?(loaded, :publish_at)
+      refute Map.has_key?(loaded, :organizer_id)
+      refute Map.has_key?(loaded, :age_restriction)
+      refute Map.has_key?(loaded, :show_participants)
+      refute Map.has_key?(loaded, :place_id)
+      refute Map.has_key?(loaded, :lock_version)
+      refute Map.has_key?(loaded, :updated_at)
     end
 
     test "list_recent_and_upcoming_events/0 returns recent and upcoming events" do
@@ -2189,6 +2254,32 @@ defmodule Ysc.EventsTest do
 
       enriched = Events.enrich_single_event_with_pricing_from_db(event)
       assert enriched.ticket_count == 1
+    end
+
+    test "enrich_single_event_with_pricing_from_db skips leftover tiers on external events" do
+      {:ok, event} =
+        create_event_fixture(%{
+          external_ticket_url: "https://example.org/tickets",
+          external_organizer: "Norwegian Club"
+        })
+
+      user = user_fixture()
+
+      {:ok, leftover_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: leftover_tier.id,
+        status: :confirmed
+      })
+
+      enriched = Events.enrich_single_event_with_pricing_from_db(event)
+
+      assert enriched.ticket_tiers == []
+      assert enriched.ticket_count == 0
+      assert enriched.pricing_info.display_text == "External Tickets"
     end
 
     test "list_unique_attendees_for_event/1 returns unique attendees" do
@@ -4457,6 +4548,33 @@ defmodule Ysc.EventsTest do
 
         # Editing the live event must not enqueue the notification either.
         assert {:ok, _} = Events.update_event(published, %{title: "Renamed"})
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+      end)
+    end
+
+    test "editing a published event after the notification has been sent does not re-queue",
+         %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, published} =
+                 Events.publish_event(event, send_notification: true)
+
+        assert [_job] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert {:ok, marked} =
+                 Events.mark_event_notification_sent(published, 10)
+
+        Repo.delete_all(
+          from(j in Oban.Job,
+            where: j.worker == "YscWeb.Workers.EventNotificationWorker"
+          )
+        )
+
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert {:ok, _} =
+                 Events.update_event(marked, %{title: "Renamed after send"})
+
         assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
       end)
     end

@@ -846,6 +846,28 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert hd(assigns.events).save_the_date == true
     end
 
+    test "does not set save_the_date when tickets are sold on another site" do
+      event =
+        event_fixture(%{
+          tickets_tbd: true,
+          external_ticket_url: "https://example.org/fair",
+          external_organizer: "SWEA San Francisco"
+        })
+        |> Repo.preload(:cover_image)
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          %{title: "Ed", intro_text: "", cover_image: nil},
+          %{first_name: "A", email: "a@a.com", subscription_token: "t"},
+          [],
+          [event]
+        )
+
+      mapped = hd(assigns.events)
+      assert mapped.save_the_date == false
+      assert mapped.pricing_str == "External Tickets"
+    end
+
     test "post featured_image uses optimized path when set" do
       post = %{
         title: "P",

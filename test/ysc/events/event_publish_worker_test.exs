@@ -132,6 +132,43 @@ defmodule Ysc.Events.EventPublishWorkerTest do
       assert Repo.get(Event, past_event.id).state == :published
       assert Repo.get(Event, other.id).state == :published
     end
+
+    test "queues the member notification when the scheduled row opted in", %{
+      past_event: past_event
+    } do
+      past_event
+      |> Ecto.Changeset.change(send_notification: true)
+      |> Repo.update!()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok = EventPublishWorker.publish_scheduled_events()
+
+        published = Repo.get!(Event, past_event.id)
+        assert published.state == :published
+        assert published.send_notification
+
+        # The worker calls publish_event/1 with no opts, so the stored flag
+        # is the only thing that may enqueue EventNotificationWorker.
+        assert [job] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert job.args["event_id"] == published.id
+      end)
+    end
+
+    test "does not queue the member notification when the scheduled row left the flag off",
+         %{past_event: past_event} do
+      refute past_event.send_notification
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok = EventPublishWorker.publish_scheduled_events()
+
+        published = Repo.get!(Event, past_event.id)
+        assert published.state == :published
+        refute published.send_notification
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+      end)
+    end
   end
 
   describe "timeout/1" do

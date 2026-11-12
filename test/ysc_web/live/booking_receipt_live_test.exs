@@ -819,6 +819,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       view |> element(~s(button), "Cancel Booking") |> render_click()
 
       html = render(view)
+      assert has_element?(view, "#cancel-booking-modal")
+      assert has_element?(view, "#cancel-no-refund-notice")
+      assert html =~ "hero-exclamation-triangle"
+      refute has_element?(view, "#cancel-estimated-refund-notice")
       assert html =~ "booking was modified"
       assert html =~ "will not receive a refund"
     end
