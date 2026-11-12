@@ -138,6 +138,52 @@ defmodule Ysc.SeedsProdTest do
       assert stderr =~ "old public placeholder password"
       assert stderr =~ "ysc-sandbox"
     end
+
+    test "sandbox continues when FLY_APP_NAME is ysc-sandbox and ADMIN_PASSWORD is unset" do
+      admin =
+        user_fixture(%{
+          email: "admin@ysc.org",
+          password: "change_me_in_production",
+          role: :admin,
+          state: :active
+        })
+
+      System.put_env("FLY_APP_NAME", "ysc-sandbox")
+
+      stderr =
+        capture_io(:stderr, fn ->
+          capture_io(fn -> Code.eval_file(@seeds) end)
+        end)
+
+      reloaded = Repo.get!(User, admin.id)
+      assert User.valid_password?(reloaded, "change_me_in_production")
+      assert reloaded.role == :admin
+      assert stderr =~ "old public placeholder password"
+      assert stderr =~ "ysc-sandbox"
+    end
+
+    test "sandbox continues when APP_ENV is sandbox and ADMIN_PASSWORD is unset" do
+      admin =
+        user_fixture(%{
+          email: "admin@ysc.org",
+          password: "change_me_in_production",
+          role: :admin,
+          state: :active
+        })
+
+      System.put_env("APP_ENV", "sandbox")
+
+      stderr =
+        capture_io(:stderr, fn ->
+          capture_io(fn -> Code.eval_file(@seeds) end)
+        end)
+
+      reloaded = Repo.get!(User, admin.id)
+      assert User.valid_password?(reloaded, "change_me_in_production")
+      assert reloaded.role == :admin
+      assert stderr =~ "old public placeholder password"
+      assert stderr =~ "ysc-sandbox"
+    end
   end
 
   defp capture_io(fun) when is_function(fun, 0),

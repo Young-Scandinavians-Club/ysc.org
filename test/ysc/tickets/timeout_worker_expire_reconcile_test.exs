@@ -87,6 +87,24 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
     end)
   end
 
+  defp fully_refunded_payment_intent(payment_intent_id, order, amount_cents) do
+    %Stripe.PaymentIntent{
+      id: payment_intent_id,
+      status: "succeeded",
+      amount: amount_cents,
+      latest_charge: %Stripe.Charge{
+        id: "ch_#{payment_intent_id}",
+        amount: amount_cents,
+        amount_refunded: amount_cents,
+        refunded: true
+      },
+      metadata: %{
+        "ticket_order_id" => order.id,
+        "user_id" => order.user_id
+      }
+    }
+  end
+
   # PI is already succeeded when TimeoutWorker runs (webhook fulfill failed
   # but acked; member never hit payment-success). expire must fulfill — the
   # old pending_order_safe_to_cancel? pre-check skipped these forever.
@@ -262,6 +280,41 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
 
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
+
+    test "expires instead of fulfilling when the succeeded PaymentIntent is fully refunded" do
+      order = ticket_order_fixture() |> past_due_order()
+      payment_intent_id = "pi_timeout_fully_refunded_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+      expect_expire_pi_already_succeeded(
+        payment_intent_id,
+        fully_refunded_payment_intent(payment_intent_id, order, amount_cents)
+      )
+
+      assert {:ok, "Expired specific ticket order"} =
+               TimeoutWorker.perform(%Oban.Job{
+                 args: %{"ticket_order_id" => order.id}
+               })
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :expired
+      assert reloaded.cancellation_reason == "Payment timeout"
+      refute reloaded.payment_id
+      refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+
+      tickets =
+        Ysc.Repo.all(
+          from t in Ysc.Events.Ticket,
+            where: t.ticket_order_id == ^order.id
+        )
+
+      assert tickets != []
+      assert Enum.all?(tickets, &(&1.status == :expired))
+    end
   end
 
   # Oban.Cron runs TimeoutWorker with empty args every 5 minutes. That batch
@@ -370,6 +423,30 @@ defmodule Ysc.Tickets.TimeoutWorkerExpireReconcileTest do
       assert message =~ "timed out ticket orders"
 
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "expires a succeeded fully-refunded payment and counts it as timed out" do
+      order = ticket_order_fixture() |> past_due_order()
+      payment_intent_id = "pi_cron_fully_refunded_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+      expect_expire_cancel_reveals_succeeded(
+        payment_intent_id,
+        fully_refunded_payment_intent(payment_intent_id, order, amount_cents)
+      )
+
+      assert {:ok, "Expired 1 timed out ticket orders (0 failed)"} =
+               TimeoutWorker.perform(%Oban.Job{args: %{}})
+
+      released = Ysc.Repo.get!(TicketOrder, order.id)
+      assert released.status == :expired
+      assert released.cancellation_reason == "Payment timeout"
+      refute released.payment_id
+      refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
     end
   end
 end
