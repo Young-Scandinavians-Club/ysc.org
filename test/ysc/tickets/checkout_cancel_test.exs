@@ -670,6 +670,58 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       end)
     end
 
+    test "expires instead of fulfilling when the succeeded PaymentIntent is fully refunded" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_expire_fully_refunded_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+      expect(Ysc.StripeMock, :cancel_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:error, stripe_unexpected_state_error()}
+      end)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           latest_charge: %Stripe.Charge{
+             id: "ch_#{payment_intent_id}",
+             amount: amount_cents,
+             amount_refunded: amount_cents,
+             refunded: true
+           },
+           metadata: %{
+             "ticket_order_id" => order.id,
+             "user_id" => order.user_id
+           }
+         }}
+      end)
+
+      assert {:ok, expired} = Tickets.expire_ticket_order(order)
+      assert expired.status == :expired
+      assert expired.cancellation_reason == "Payment timeout"
+      refute expired.payment_id
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :expired
+      refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+
+      tickets =
+        Ysc.Repo.all(
+          from t in Ysc.Events.Ticket,
+            where: t.ticket_order_id == ^order.id
+        )
+
+      assert tickets != []
+      assert Enum.all?(tickets, &(&1.status == :expired))
+    end
+
     test "skips expiration when Stripe cancel is refused because payment is still processing" do
       order = ticket_order_fixture()
       payment_intent_id = "pi_expire_now_processing_#{order.id}"

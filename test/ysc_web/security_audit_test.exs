@@ -6714,6 +6714,51 @@ defmodule YscWeb.SecurityAuditTest do
       refute feed =~ "<script"
       refute feed =~ "onerror="
     end
+
+    test "volunteer validate-capacity with _target and no event key ignores leftover HTML",
+         %{conn: conn} do
+      volunteer = user_fixture(%{role: "volunteer"})
+
+      original_title =
+        "Finding 96 Target #{System.unique_integer([:positive])}"
+
+      original_html = "<p>Original overview</p>"
+
+      injected_html =
+        "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+
+      event =
+        event_fixture(%{
+          organizer_id: volunteer.id,
+          title: original_title,
+          raw_details: original_html,
+          rendered_details: original_html,
+          max_attendees: 100
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_user(volunteer)
+        |> live(~p"/admin/events/#{event.id}/tickets")
+
+      # LiveView phx-change includes `_target`. Without an `event` nest this
+      # clause fail-closes to `%{}` instead of taking leftover editor fields.
+      render_change(view, "validate-capacity", %{
+        "_target" => ["rendered_details"],
+        "max_attendees" => "150",
+        "title" => "Hacked Emergency Dues",
+        "rendered_details" => injected_html,
+        "raw_details" => injected_html,
+        "partiful_link" => "https://evil.example/phish"
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.max_attendees == 100
+      assert reloaded.title == original_title
+      assert reloaded.rendered_details == original_html
+      assert reloaded.raw_details == original_html
+      assert reloaded.partiful_link in [nil, ""]
+    end
   end
 
   # ---------------------------------------------------------------------------

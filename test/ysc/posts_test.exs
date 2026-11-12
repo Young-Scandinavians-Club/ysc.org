@@ -886,6 +886,48 @@ defmodule Ysc.PostsTest do
       refute Enum.any?(drain_emails(), &sent_to?(&1, commenter.email))
     end
 
+    test "walks up a reply-to-reply so the root author is notified, not the intermediate",
+         %{
+           post: post,
+           root: root,
+           commenter: commenter
+         } do
+      intermediate = user_fixture()
+      nested_replier = user_fixture()
+
+      {:ok, reply} =
+        Posts.add_comment_to_post(
+          %{
+            "post_id" => post.id,
+            "text" => "Middle",
+            "comment_id" => root.id
+          },
+          intermediate
+        )
+
+      drain_emails()
+
+      {:ok, nested} =
+        Posts.add_comment_to_post(
+          %{
+            "post_id" => post.id,
+            "text" => "Nested walk-up",
+            "comment_id" => reply.id
+          },
+          nested_replier
+        )
+
+      emails = drain_emails()
+
+      email = Enum.find(emails, &sent_to?(&1, commenter.email))
+      assert email.subject =~ "reply to your comment"
+      assert email.html_body =~ "#comments-#{nested.id}"
+      assert email.html_body =~ "Nested walk-up"
+
+      refute Enum.any?(emails, &sent_to?(&1, intermediate.email))
+      assert Enum.any?(emails, &sent_to?(&1, Ysc.EmailConfig.board_email()))
+    end
+
     test "ignores a comment_id from another article", %{
       author: author,
       root: root
