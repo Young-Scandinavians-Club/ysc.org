@@ -2,7 +2,7 @@ defmodule YscWeb.EventDetailsLive.ReservationPurchasingTest do
   @moduledoc """
   LiveView tests for reservation-aware availability display and purchasing UI.
 
-  Covers Get Tickets visibility, tier remaining counts, spots available, quantity
+  Covers Get Tickets visibility, tier remaining counts, tickets left, quantity
   controls, and checkout when inventory is publicly exhausted but the viewer holds
   active reservations.
   """
@@ -159,7 +159,7 @@ defmodule YscWeb.EventDetailsLive.ReservationPurchasingTest do
       refute html =~ "remaining"
     end
 
-    test "holder sees Spots Available when event is publicly full", %{
+    test "holder sees tickets left when event is publicly full", %{
       conn: conn
     } do
       ctx = setup_single_tier_event(max_attendees: 5, tier_quantity: 20)
@@ -169,13 +169,14 @@ defmodule YscWeb.EventDetailsLive.ReservationPurchasingTest do
       insert_reservation!(ctx, 2)
 
       conn = log_in(conn, holder)
-      {_view, html} = open_tickets_modal(conn, event)
+      {view, html} = open_tickets_modal(conn, event)
 
-      assert html =~ "Spots Available"
-      assert html =~ "2 Spots Available"
+      assert has_element?(view, "#event-tickets-available", "2 tickets left")
+      refute html =~ "Spots Available"
+      refute html =~ "spots remaining"
     end
 
-    test "stranger does not see Spots Available when event is publicly full", %{
+    test "stranger does not see tickets left when event is publicly full", %{
       conn: conn
     } do
       ctx = setup_single_tier_event(max_attendees: 5, tier_quantity: 20)
@@ -185,9 +186,9 @@ defmodule YscWeb.EventDetailsLive.ReservationPurchasingTest do
       insert_reservation!(ctx, 2)
 
       conn = log_in(conn, stranger)
-      {_view, html} = open_tickets_modal(conn, event)
+      {view, _html} = open_tickets_modal(conn, event)
 
-      refute html =~ "Spots Available"
+      refute has_element?(view, "#event-tickets-available")
     end
   end
 

@@ -171,6 +171,21 @@ defmodule Ysc.Tickets.DisplayTest do
     end
   end
 
+  describe "tickets_left_label/1" do
+    test "uses ticket, not spot, and pluralizes" do
+      assert Display.tickets_left_label(1) == "1 ticket left"
+      assert Display.tickets_left_label(2) == "2 tickets left"
+      assert Display.tickets_left_label(48) == "48 tickets left"
+    end
+  end
+
+  describe "tickets_left_demand_label/1" do
+    test "states the remaining count instead of less than N" do
+      assert Display.tickets_left_demand_label(1) == "Only 1 ticket left"
+      assert Display.tickets_left_demand_label(5) == "Only 5 tickets left"
+    end
+  end
+
   describe "format_ledger_order_description/1" do
     test "includes tier summary when tickets are present" do
       ticket_order = %{
