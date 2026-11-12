@@ -447,13 +447,16 @@ defmodule Ysc.MixProject do
       # opts; assign_async falsy keys; caret restore for search/url/tel.
       {:phoenix_live_view, "~> 1.2.13"},
       {:phoenix_test, "~> 0.12", only: :test, runtime: false},
-      # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
-      # SVG and MathML on to_html/2 so a parse/serialize round-trip cannot
-      # turn encoded markup into live tags (mutation XSS). Phoenix.LiveView.Test.DOM
-      # serializes with LazyHTML.to_html/2; we query HTML in tests and do not
-      # sanitize untrusted HTML with lazy_html (that's html_sanitize_ex).
+      # 0.1.14: from_document/2 and from_fragment/2 accept optional
+      # :max_depth, :max_memory, :max_attributes, :timeout (default
+      # unlimited). extras: fine 0.1.6 → 0.2.0 (lazy_html 0.1.14 requires
+      # fine ~> 0.2.0) and elixir_make 0.10.0 → 0.10.1. We use lazy_html
+      # only in tests via LiveViewTest (from_fragment/from_document
+      # without limits); we do not parse untrusted HTML with lazy_html
+      # (that's html_sanitize_ex). 0.1.13: EEF-CVE-2026-92106 (LOW)
+      # escapes <style>/<script> text inside SVG and MathML on to_html/2.
       # phoenix_live_view lists it optional ~> 0.1.0; pin the patched floor.
-      {:lazy_html, "~> 0.1.13", only: :test},
+      {:lazy_html, "~> 0.1.14", only: :test},
       {:phoenix_turnstile, "~> 1.2"},
       # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+.
       # 1.8.12: clear return_to after login; drop channel messages without a join_ref.
