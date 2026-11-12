@@ -137,6 +137,28 @@ defmodule Ysc.Tickets.Display do
   defp count_noun(count, word), do: "#{count} #{word}s"
 
   @doc """
+  How many event tickets can still be bought, for the public event sidebar.
+
+  Uses "tickets" (not "spots") so it matches Get Tickets and the quantity
+  picker. Singular: `"1 ticket left"`.
+  """
+  def tickets_left_label(1), do: "1 ticket left"
+
+  def tickets_left_label(count) when is_integer(count) and count > 1,
+    do: "#{count} tickets left"
+
+  @doc """
+  Urgency line when demand is high and remaining count is 10 or fewer.
+
+  States the actual remaining count (`"Only 5 tickets left"`), not
+  `"Less than 5"` which would mean fewer than remain.
+  """
+  def tickets_left_demand_label(count)
+      when is_integer(count) and count > 0 do
+    "Only #{tickets_left_label(count)}"
+  end
+
+  @doc """
   True when the order total is $0 (free RSVP, $0 tiers, or fully discounted).
   """
   def complimentary_order?(%{total_amount: %Money{} = total}),

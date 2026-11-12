@@ -1038,11 +1038,12 @@ defmodule YscWeb.EventDetailsLive do
                           </div>
                         <% else %>
                           <p class="text-[11px] text-orange-700 font-medium">
-                            {if available_capacity != :unlimited &&
-                                  available_capacity <= 10 do
-                              "Less than #{available_capacity} spot#{if available_capacity == 1, do: "", else: "s"} remaining"
-                            else
-                              "Going Fast"
+                            {case available_capacity do
+                              n when is_integer(n) and n > 0 and n <= 10 ->
+                                TicketDisplay.tickets_left_demand_label(n)
+
+                              _ ->
+                                "Going Fast"
                             end}
                           </p>
                         <% end %>
@@ -1109,10 +1110,11 @@ defmodule YscWeb.EventDetailsLive do
                                 @available_capacity != :unlimited &&
                                 @available_capacity > 0
                             }
+                            id="event-tickets-available"
                             class="flex items-center gap-3 text-sm text-zinc-600 font-medium"
                           >
                             <.icon name="hero-users" class="w-5 h-5 text-blue-500" />
-                            {@available_capacity} Spots Available
+                            {TicketDisplay.tickets_left_label(@available_capacity)}
                           </div>
                         <% end %>
                       <% end %>

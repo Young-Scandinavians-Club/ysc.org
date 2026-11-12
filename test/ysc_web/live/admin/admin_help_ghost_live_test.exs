@@ -160,7 +160,7 @@ defmodule YscWeb.AdminHelpGhostLiveTest do
     assert has_element?(
              view,
              "#ghost-public-ticket-sidebar",
-             "48 Spots Available"
+             "48 tickets left"
            )
 
     assert has_element?(view, "#ghost-public-get-tickets")

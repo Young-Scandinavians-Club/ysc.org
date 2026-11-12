@@ -939,7 +939,7 @@ defmodule YscWeb.AdminHelp.Guides do
               y: 10,
               w: 34,
               h: 52,
-              label: "Spots available and pricing headline"
+              label: "Tickets left and pricing headline"
             }
           ]
         },

@@ -10,6 +10,8 @@ defmodule YscWeb.AdminGhostComponents do
   import YscWeb.AdminComponents
   import YscWeb.CoreComponents
 
+  alias Ysc.Tickets.Display, as: TicketDisplay
+
   attr :class, :string, default: nil
   attr :width, :string, default: "w-full", doc: "Tailwind width class"
   attr :height, :string, default: "h-3", doc: "Tailwind height class"
@@ -1445,7 +1447,7 @@ defmodule YscWeb.AdminGhostComponents do
           class="flex items-center gap-3 text-sm text-zinc-600 font-medium"
         >
           <.icon name="hero-users" class="w-5 h-5 text-blue-500 shrink-0" />
-          {@spots_available} Spots Available
+          {TicketDisplay.tickets_left_label(@spots_available)}
         </div>
         <.button
           :if={!@tickets_tbd?}
