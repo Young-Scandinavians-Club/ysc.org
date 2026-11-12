@@ -2640,7 +2640,45 @@ defmodule YscWeb.AdminComponents do
     default: nil,
     doc: "Additional Tailwind classes merged onto the section"
 
+  attr :collapsible, :boolean,
+    default: false,
+    doc:
+      "Render as a `<details>` disclosure so rarely used sections stay out of the way"
+
+  attr :open, :boolean,
+    default: false,
+    doc:
+      "Initial state when `collapsible`. Later toggles are kept client-side across LiveView patches"
+
   slot :inner_block, required: true
+
+  def admin_form_section(%{collapsible: true} = assigns) do
+    ~H"""
+    <details
+      id={@id}
+      open={@open}
+      phx-mounted={JS.ignore_attributes(["open"])}
+      class={[
+        "group border border-zinc-200 rounded-sm bg-white",
+        @class
+      ]}
+    >
+      <summary class="list-none cursor-pointer select-none flex items-start justify-between gap-4 py-6 px-4 [&::-webkit-details-marker]:hidden">
+        <div>
+          <h2 class="text-xl type-subhead">{@title}</h2>
+          <p :if={@subtitle} class="text-zinc-600 text-sm">{@subtitle}</p>
+        </div>
+        <.icon
+          name="hero-chevron-down"
+          class="w-5 h-5 mt-1 shrink-0 text-zinc-500 transition-transform duration-200 group-open:-rotate-180"
+        />
+      </summary>
+      <div class="px-4 pb-6 space-y-4">
+        {render_slot(@inner_block)}
+      </div>
+    </details>
+    """
+  end
 
   def admin_form_section(assigns) do
     ~H"""
