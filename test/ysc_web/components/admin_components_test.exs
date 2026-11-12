@@ -785,6 +785,36 @@ defmodule YscWeb.AdminComponentsTest do
 
       assert html =~ ~s(<p class="text-zinc-600 text-sm")
     end
+
+    test "collapsible renders a closed details disclosure by default" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_form_section id="ext" title="External Ticketing" collapsible>
+          <input id="ext-input" />
+        </.admin_form_section>
+        """)
+
+      assert html =~ "<details"
+      assert html =~ "<summary"
+      assert html =~ ~s(id="ext-input")
+      assert html =~ "External Ticketing"
+      refute html =~ ~r/<details[^>]*\sopen/
+    end
+
+    test "collapsible with open renders the details expanded" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_form_section id="ext" title="External Ticketing" collapsible open>
+          <input id="ext-input" />
+        </.admin_form_section>
+        """)
+
+      assert html =~ ~r/<details[^>]*\sopen/
+    end
   end
 
   describe "admin_dashboard_panel/1" do

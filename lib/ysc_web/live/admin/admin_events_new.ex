@@ -501,6 +501,8 @@ defmodule YscWeb.AdminEventsNewLive do
               <.admin_form_section
                 id="event-external-ticketing-section"
                 title="External Ticketing"
+                collapsible
+                open={external_ticketing_present?(@form)}
                 subtitle="For events organized by another group. Instead of selling tickets here, the event page links attendees to the organizer's website, and the event is no longer labeled Free. Leave blank for YSC events."
               >
                 <.input
@@ -3994,6 +3996,17 @@ defmodule YscWeb.AdminEventsNewLive do
   # `@editor_fields` value — including `rendered_details` without TrixScrubber.
   # LiveView events can include keys that are not in `#capacity_form`.
   @capacity_fields ~w(max_attendees unlimited_capacity)a
+
+  # Open the (normally collapsed) external ticketing section when it already has
+  # content or a validation error, so admins never miss it on external events.
+  defp external_ticketing_present?(form) do
+    Enum.any?([:external_ticket_url, :external_organizer], fn field ->
+      value = form[field].value
+
+      (is_binary(value) and String.trim(value) != "") or
+        form[field].errors != []
+    end)
+  end
 
   defp capacity_attrs(%{"event" => event_params}) when is_map(event_params) do
     take_capacity_fields(event_params)
