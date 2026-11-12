@@ -1449,13 +1449,13 @@ defmodule Ysc.Events do
   end
 
   defp enrich_events_with_pricing_info(events) do
-    event_ids = Enum.map(events, & &1.id)
+    # Externally ticketed events never sell on ysc.org (`PricingDisplay`
+    # returns "External Tickets" without reading tiers), so skip the
+    # grouped ticket-tier / sold-count queries. Cover images still load.
+    internally_ticketed_ids = internally_ticketed_event_ids(events)
 
-    # Batch load all ticket tiers for all events
-    ticket_tiers_by_event = batch_load_ticket_tiers(event_ids)
-
-    # Batch load ticket counts for all events
-    ticket_counts_by_event = batch_load_ticket_counts(event_ids)
+    ticket_tiers_by_event = batch_load_ticket_tiers(internally_ticketed_ids)
+    ticket_counts_by_event = batch_load_ticket_counts(internally_ticketed_ids)
 
     # Batch load images for all events (extract unique image_ids)
     image_ids =
@@ -1504,6 +1504,12 @@ defmodule Ysc.Events do
     else
       nil
     end
+  end
+
+  defp internally_ticketed_event_ids(events) do
+    Enum.flat_map(events, fn event ->
+      if Event.external_ticketing?(event), do: [], else: [event.id]
+    end)
   end
 
   # Batch load images for multiple image IDs

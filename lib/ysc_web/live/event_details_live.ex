@@ -3305,27 +3305,43 @@ defmodule YscWeb.EventDetailsLive do
     # Run queries in parallel using Task.async_stream
     # Note: We removed check_availability_with_lock as it's expensive (runs transaction with locks
     # and re-fetches event/ticket_tiers). Instead, we compute availability from ticket_tiers data.
+    skip_ysc_ticket_inventory? = external_tickets?(event)
     reuse_ticket_tiers? = tiers_reusable_for_async?(existing_ticket_tiers)
 
-    tier_task =
-      if reuse_ticket_tiers? do
+    # Tickets are sold elsewhere — leftover YSC tiers / holds / "selling
+    # fast" counts are unused on this page. Skip those queries after connect.
+    ysc_ticket_tasks =
+      if skip_ysc_ticket_inventory? do
         []
       else
-        [
-          {:ticket_tiers,
-           fn -> Events.list_ticket_tiers_for_event(event_id) end}
+        selling_fast = [
+          {:selling_fast, fn -> Events.event_selling_fast?(event_id) end}
         ]
+
+        reservations = [
+          {:user_reservations,
+           fn -> load_user_reservations(current_user, event_id) end}
+        ]
+
+        tiers =
+          if reuse_ticket_tiers? do
+            []
+          else
+            [
+              {:ticket_tiers,
+               fn -> Events.list_ticket_tiers_for_event(event_id) end}
+            ]
+          end
+
+        selling_fast ++ reservations ++ tiers
       end
 
     tasks =
       [
         {:agendas, fn -> Agendas.list_agendas_for_event(event_id) end},
-        {:selling_fast, fn -> Events.event_selling_fast?(event_id) end},
         {:user_tickets, fn -> load_user_tickets(current_user, event_id) end},
         {:attendees,
          fn -> load_attendees(active_membership?, current_user, event_id) end},
-        {:user_reservations,
-         fn -> load_user_reservations(current_user, event_id) end},
         {:event_updates, fn -> Events.list_visible_event_updates(event_id) end},
         {:save_the_date_subscription,
          fn ->
@@ -3339,7 +3355,7 @@ defmodule YscWeb.EventDetailsLive do
              false
            end
          end}
-      ] ++ tier_task
+      ] ++ ysc_ticket_tasks
 
     results =
       tasks
@@ -3350,26 +3366,31 @@ defmodule YscWeb.EventDetailsLive do
         Map.put(acc, key, value)
       end)
 
-    # Compute availability from ticket_tiers data (avoids expensive locking transaction)
-    # list_ticket_tiers_for_event already includes sold_tickets_count via LEFT JOIN
-    ticket_tiers =
-      if reuse_ticket_tiers? do
-        existing_ticket_tiers
+    {ticket_tiers, reserved_counts_by_tier, availability} =
+      if skip_ysc_ticket_inventory? do
+        {[], %{}, nil}
       else
-        Map.get(results, :ticket_tiers, [])
+        ticket_tiers =
+          if reuse_ticket_tiers? do
+            existing_ticket_tiers
+          else
+            Map.get(results, :ticket_tiers, [])
+          end
+
+        reserved_counts_by_tier =
+          Events.batch_count_reserved_tickets_for_tiers(
+            Enum.map(ticket_tiers, & &1.id)
+          )
+
+        availability =
+          compute_availability_from_tiers(
+            event,
+            ticket_tiers,
+            reserved_counts_by_tier
+          )
+
+        {ticket_tiers, reserved_counts_by_tier, availability}
       end
-
-    tier_ids = Enum.map(ticket_tiers, & &1.id)
-
-    reserved_counts_by_tier =
-      Events.batch_count_reserved_tickets_for_tiers(tier_ids)
-
-    availability =
-      compute_availability_from_tiers(
-        event,
-        ticket_tiers,
-        reserved_counts_by_tier
-      )
 
     results
     |> Map.put(:availability, availability)

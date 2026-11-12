@@ -2256,6 +2256,32 @@ defmodule Ysc.EventsTest do
       assert enriched.ticket_count == 1
     end
 
+    test "enrich_single_event_with_pricing_from_db skips leftover tiers on external events" do
+      {:ok, event} =
+        create_event_fixture(%{
+          external_ticket_url: "https://example.org/tickets",
+          external_organizer: "Norwegian Club"
+        })
+
+      user = user_fixture()
+
+      {:ok, leftover_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: leftover_tier.id,
+        status: :confirmed
+      })
+
+      enriched = Events.enrich_single_event_with_pricing_from_db(event)
+
+      assert enriched.ticket_tiers == []
+      assert enriched.ticket_count == 0
+      assert enriched.pricing_info.display_text == "External Tickets"
+    end
+
     test "list_unique_attendees_for_event/1 returns unique attendees" do
       {:ok, event} = create_event_fixture()
       user1 = user_fixture()
