@@ -428,15 +428,10 @@ defmodule YscWeb.BookingCheckoutLive do
             submit_label={checkout_guest_info_submit_label(@complimentary_checkout)}
           >
             <:actions>
-              <button
-                type="button"
-                phx-click="cancel-booking"
-                phx-disable-with="Cancelling..."
-                phx-confirm={leave_checkout_confirm()}
-                class="px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-              >
-                Cancel
-              </button>
+              <.leave_checkout_button
+                id="checkout-guest-info-leave"
+                full_width={false}
+              />
             </:actions>
           </.booking_guest_info_form>
           <!-- Payment Section -->
@@ -471,16 +466,7 @@ defmodule YscWeb.BookingCheckoutLive do
               <span class="sr-only">Loading payment form…</span>
               <.payment_element_loading id="checkout-payment-intent-loading" />
               <div class="pt-6 border-t border-zinc-100">
-                <button
-                  id="checkout-payment-loading-cancel"
-                  type="button"
-                  phx-click="cancel-booking"
-                  phx-disable-with="Cancelling..."
-                  phx-confirm={leave_checkout_confirm()}
-                  class="w-full sm:w-auto px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-                >
-                  Cancel
-                </button>
+                <.leave_checkout_button id="checkout-payment-loading-cancel" />
               </div>
             </div>
             <!-- Complimentary checkout (entitlement / discount covers full amount) -->
@@ -493,15 +479,7 @@ defmodule YscWeb.BookingCheckoutLive do
               </p>
               <div class="pt-2 border-t border-zinc-100 space-y-4">
                 <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-4">
-                  <button
-                    type="button"
-                    phx-click="cancel-booking"
-                    phx-disable-with="Cancelling..."
-                    phx-confirm={leave_checkout_confirm()}
-                    class="w-full sm:w-auto px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
+                  <.leave_checkout_button id="checkout-complimentary-leave" />
                   <.button
                     id="confirm-complimentary-booking"
                     type="button"
@@ -538,15 +516,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
               <div class="pt-6 border-t border-zinc-100 space-y-4">
                 <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-4">
-                  <button
-                    type="button"
-                    phx-click="cancel-booking"
-                    phx-disable-with="Cancelling..."
-                    phx-confirm={leave_checkout_confirm()}
-                    class="w-full sm:w-auto px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
+                  <.leave_checkout_button id="checkout-payment-leave" />
                   <.button
                     id="submit-payment"
                     type="button"
@@ -3263,5 +3233,26 @@ defmodule YscWeb.BookingCheckoutLive do
 
   defp leave_checkout_confirm do
     BookingUserMessages.leave_unpaid_checkout_confirm()
+  end
+
+  attr :id, :string, required: true
+  attr :full_width, :boolean, default: true
+
+  defp leave_checkout_button(assigns) do
+    ~H"""
+    <button
+      id={@id}
+      type="button"
+      phx-click="cancel-booking"
+      phx-disable-with={BookingUserMessages.leave_unpaid_checkout_busy()}
+      phx-confirm={leave_checkout_confirm()}
+      class={[
+        "px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors",
+        @full_width && "w-full sm:w-auto"
+      ]}
+    >
+      {BookingUserMessages.leave_unpaid_checkout_button()}
+    </button>
+    """
   end
 end

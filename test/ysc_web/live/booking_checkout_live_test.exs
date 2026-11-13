@@ -118,12 +118,24 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "Booking Summary"
       assert html =~ ~s(id="checkout-payment-loading")
       assert html =~ ~s(id="checkout-payment-loading-cancel")
+
+      assert html =~
+               ~r/id="checkout-payment-loading-cancel"[\s\S]*?>\s*Leave without booking/
+
       refute html =~ ~s(id="stripe-payment-container")
 
       render(view)
 
       refute has_element?(view, "#checkout-payment-loading")
       assert has_element?(view, "#stripe-payment-container")
+
+      assert has_element?(
+               view,
+               "#checkout-payment-leave",
+               "Leave without booking"
+             )
+
+      refute has_element?(view, "#checkout-payment-leave", "Cancel")
       assert Repo.reload!(booking).payment_intent_id == "pi_test_123"
     end
 
@@ -319,10 +331,10 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       case result do
         {:error, {:redirect, %{to: _path, flash: flash}}} ->
-          assert flash["info"] =~ "cancelled"
+          assert flash["info"] =~ "left without booking"
 
         html when is_binary(html) ->
-          assert html =~ "cancel" or html =~ "Cancel" or html =~ "error"
+          assert html =~ "left without booking" or html =~ "error"
       end
     end
 
@@ -1005,6 +1017,14 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       assert html =~ "No payment is required"
       assert html =~ "confirm-complimentary-booking"
+
+      assert has_element?(
+               view,
+               "#checkout-complimentary-leave",
+               "Leave without booking"
+             )
+
+      refute has_element?(view, "#checkout-complimentary-leave", "Cancel")
       refute has_element?(view, "#stripe-payment-container")
       refute html =~ "Failed to initialize payment"
 
@@ -1357,7 +1377,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         |> element("button[phx-click=\"cancel-booking\"]")
         |> render_click()
 
-      assert html =~ "cancel this booking from here"
+      assert html =~ "go back from this page"
       assert Repo.get!(Booking, booking.id).status == :hold
     end
   end
@@ -1783,6 +1803,14 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "held temporarily"
       assert html =~ "not confirmed yet"
       assert html =~ "go back on the calendar"
+
+      assert has_element?(
+               view,
+               "#checkout-guest-info-leave",
+               "Leave without booking"
+             )
+
+      refute has_element?(view, "#checkout-guest-info-leave", "Cancel")
 
       assert has_element?(
                view,

@@ -43,15 +43,23 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  def leave_unpaid_checkout_button do
+    "Leave without booking"
+  end
+
+  def leave_unpaid_checkout_busy do
+    "Leaving..."
+  end
+
   def leave_unpaid_checkout_confirm do
     trim("""
-    Cancel this unfinished booking? These dates will go back on the calendar. Your stay is not booked yet.
+    Leave without booking? These dates will go back on the calendar. Your stay is not booked yet.
     """)
   end
 
   def leave_unpaid_checkout_toast do
     trim("""
-    We cancelled this unfinished booking. Those dates are open again if you want to start over.
+    You left without booking. Those dates are open again if you want to start over.
     """)
   end
 
@@ -383,13 +391,13 @@ defmodule YscWeb.BookingUserMessages do
 
   def checkout_cancel_failed do
     trim("""
-    We couldn't cancel this booking from here. Please try again, or email info@ysc.org if you need help.
+    We couldn't go back from this page. Please try again, or email info@ysc.org if you need help.
     """)
   end
 
   def checkout_cancel_payment_in_progress do
     trim("""
-    Your payment is still processing, so we can't cancel this booking yet. Stay on this page — if the payment goes through, your stay will be confirmed.
+    Your payment is still processing, so we can't go back yet. Stay on this page — if the payment goes through, your stay will be confirmed.
     """)
   end
 
