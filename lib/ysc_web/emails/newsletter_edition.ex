@@ -3,6 +3,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
   Email template for newsletter editions (curated: cover, intro, posts, events).
   """
   alias Ysc.Events
+  alias Ysc.Events.Event
   alias Ysc.Media.Image
   alias HtmlSanitizeEx
   alias YscWeb.Emails.EventHelpers
@@ -248,35 +249,49 @@ defmodule YscWeb.Emails.NewsletterEdition do
   end
 
   @doc """
-  Builds the assign map for the newsletter edition template.
+  Edition, post, and event fields shared by every recipient of a newsletter blast.
 
-  Use with `NewsletterEdition.render(NewsletterEdition.build_assigns(edition, subscriber, posts, events))`.
+  Compute this once per send, then `personalize/3` per subscriber so we do not
+  re-run `selling_fast` queries, HTML sanitization, or event mapping for every
+  email. Matches `EventNotification.prepare_shared_email_data/1`.
   """
   # intro_html is produced by email_safe_html/1 which strips all attributes and
   # unknown tags via Floki; content is admin-authored only.
   # sobelow_skip ["XSS.Raw"]
-  def build_assigns(edition, subscriber, posts, events) do
-    first_name = attendee_greeting_name(subscriber)
-
-    unsubscribe_url =
-      build_unsubscribe_url(
-        subscriber.subscription_token,
-        Map.get(edition, :id)
-      )
-
+  def build_shared_assigns(edition, posts, events) do
     intro_html = email_safe_html(edition.intro_text)
 
     %{
-      first_name: first_name,
       edition_title: edition.title,
       edition_date: edition_date_label(Map.get(edition, :sent_at)),
       intro_text: Phoenix.HTML.raw(intro_html),
       intro_text?: intro_html != "",
       cover_image_url: cover_image_url(edition),
       posts: Enum.map(posts, &post_render_map/1),
-      events: Enum.map(events, &event_render_map/1),
-      unsubscribe_url: unsubscribe_url
+      events: event_render_maps(events)
     }
+  end
+
+  @doc """
+  Adds the subscriber-specific greeting and unsubscribe URL to shared assigns.
+  """
+  def personalize(shared, subscriber, edition_id \\ nil) do
+    Map.merge(shared, %{
+      first_name: attendee_greeting_name(subscriber),
+      unsubscribe_url:
+        build_unsubscribe_url(subscriber.subscription_token, edition_id)
+    })
+  end
+
+  @doc """
+  Builds the assign map for the newsletter edition template.
+
+  Use with `NewsletterEdition.render(NewsletterEdition.build_assigns(edition, subscriber, posts, events))`.
+  """
+  def build_assigns(edition, subscriber, posts, events) do
+    edition
+    |> build_shared_assigns(posts, events)
+    |> personalize(subscriber, Map.get(edition, :id))
   end
 
   @doc """
@@ -324,7 +339,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
       intro_text?: intro_html != "",
       cover_image_url: cover_image_url,
       posts: Enum.map(posts, &post_render_map/1),
-      events: Enum.map(events, &event_render_map/1),
+      events: event_render_maps(events),
       unsubscribe_url: "/newsletter/unsubscribe/preview"
     }
   end
@@ -369,7 +384,19 @@ defmodule YscWeb.Emails.NewsletterEdition do
 
   defp post_image_url(image), do: Image.display_path(image)
 
-  defp event_render_map(event) do
+  defp event_render_maps([]), do: []
+
+  defp event_render_maps(events) do
+    selling_fast_ids =
+      events
+      |> Enum.reject(&Event.external_ticketing?/1)
+      |> Enum.map(& &1.id)
+      |> Events.selling_fast_event_ids()
+
+    Enum.map(events, &event_render_map(&1, selling_fast_ids))
+  end
+
+  defp event_render_map(event, selling_fast_ids) do
     external_note = EventHelpers.external_ticketing_note(event)
     external? = external_note != nil
 
@@ -379,8 +406,9 @@ defmodule YscWeb.Emails.NewsletterEdition do
         event.description && HtmlSanitizeEx.strip_tags(event.description),
       short_description: short_description(event.description),
       date_str: format_event_date(event),
-      save_the_date: Ysc.Events.Event.tickets_tbd?(event),
-      selling_fast: not external? and Events.event_selling_fast?(event.id),
+      save_the_date: Event.tickets_tbd?(event),
+      selling_fast:
+        not external? and MapSet.member?(selling_fast_ids, event.id),
       pricing_str: Events.event_pricing_display_string(event),
       # No on-sale date for external events: attendees buy on the organizer's site.
       tickets_on_sale_str:

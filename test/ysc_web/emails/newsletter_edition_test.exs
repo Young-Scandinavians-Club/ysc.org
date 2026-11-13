@@ -245,6 +245,36 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert assigns.edition_title == "Spring Update"
     end
 
+    test "personalize/3 only swaps greeting and unsubscribe url" do
+      edition = Map.put(base_edition(), :id, Ecto.ULID.generate())
+      shared = NewsletterEdition.build_shared_assigns(edition, [], [])
+
+      refute Map.has_key?(shared, :first_name)
+      refute Map.has_key?(shared, :unsubscribe_url)
+
+      alice =
+        NewsletterEdition.personalize(
+          shared,
+          %{first_name: "Alice", subscription_token: "token-a"},
+          edition.id
+        )
+
+      bob =
+        NewsletterEdition.personalize(
+          shared,
+          %{first_name: "Bob", subscription_token: "token-b"},
+          edition.id
+        )
+
+      assert alice.first_name == "Alice"
+      assert bob.first_name == "Bob"
+      assert alice.edition_title == bob.edition_title
+      assert alice.events == bob.events
+      assert alice.unsubscribe_url =~ "token-a"
+      assert bob.unsubscribe_url =~ "token-b"
+      refute alice.unsubscribe_url == bob.unsubscribe_url
+    end
+
     test "includes edition_id in unsubscribe url when edition has an id" do
       edition_id = Ecto.ULID.generate()
       edition = Map.put(base_edition(), :id, edition_id)

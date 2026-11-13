@@ -321,12 +321,7 @@ defmodule Ysc.Events do
   defp put_tv_poster_selling_fast([]), do: []
 
   defp put_tv_poster_selling_fast(events) do
-    selling_fast_ids =
-      events
-      |> Enum.map(& &1.id)
-      |> tv_poster_selling_fast_query()
-      |> Repo.all()
-      |> MapSet.new()
+    selling_fast_ids = selling_fast_event_ids(Enum.map(events, & &1.id))
 
     Enum.map(events, fn event ->
       Map.put(event, :selling_fast, MapSet.member?(selling_fast_ids, event.id))
@@ -335,7 +330,7 @@ defmodule Ysc.Events do
 
   # Same rule as `event_selling_fast?/1` and the public list badge: at least 5
   # confirmed, non-donation tickets sold in the last 3 days.
-  defp tv_poster_selling_fast_query(event_ids) do
+  defp selling_fast_event_ids_query(event_ids) do
     three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
 
     from(t in Ticket,
@@ -2398,9 +2393,31 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Event IDs that currently qualify as "selling fast": 5+ confirmed,
+  non-donation tickets in the last 3 days.
+
+  One grouped query for the whole list. Prefer this over calling
+  `event_selling_fast?/1` per event (newsletters, posters, cards).
+  """
+  def selling_fast_event_ids(event_ids) when is_list(event_ids) do
+    event_ids = event_ids |> Enum.reject(&is_nil/1) |> Enum.uniq()
+
+    case event_ids do
+      [] ->
+        MapSet.new()
+
+      ids ->
+        ids
+        |> selling_fast_event_ids_query()
+        |> Repo.all()
+        |> MapSet.new()
+    end
+  end
+
+  @doc """
   Check if an event is selling fast based on recent ticket sales.
 
-  An event is considered "selling fast" if it has sold 10 or more tickets
+  An event is considered "selling fast" if it has sold 5 or more tickets
   in the last 3 days.
 
   ## Parameters:
@@ -3075,6 +3092,9 @@ defmodule Ysc.Events do
   Loads events by id in one query. Returns records in the same order as `ids`
   (skipping missing ids).
 
+  Used by newsletter send/preview. Selects `Event.summary_fields/0` so the
+  blast never detoasts `raw_details` / `rendered_details`.
+
   ## Options
 
     * `:preloads` - association preloads (default `[]`)
@@ -3086,11 +3106,19 @@ defmodule Ysc.Events do
     if ids == [] do
       []
     else
-      from(e in Event, where: e.id in ^ids)
-      |> preload(^preloads)
+      ids
+      |> events_by_ids_query(preloads)
       |> Repo.all()
       |> order_records_by_ids(ids)
     end
+  end
+
+  defp events_by_ids_query(ids, preloads) do
+    from(e in Event,
+      where: e.id in ^ids,
+      select: struct(e, ^Event.summary_fields()),
+      preload: ^preloads
+    )
   end
 
   @doc """
@@ -4564,7 +4592,12 @@ defmodule Ysc.Events do
 
   @doc false
   def ci_query_explain_tv_poster_selling_fast_query do
-    tv_poster_selling_fast_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
+    selling_fast_event_ids_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_events_by_ids_query do
+    events_by_ids_query([Ysc.Ci.QueryExplain.Fixtures.ulid()], [])
   end
 
   @doc false
