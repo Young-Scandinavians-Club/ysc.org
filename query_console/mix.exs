@@ -95,10 +95,15 @@ defmodule QueryConsole.MixProject do
       # (`/auth/ysc`, `/workbooks/:id`); we do not forward user input to
       # `redirect/2`.
       {:phoenix_live_view, "~> 1.2.13"},
-      # 0.1.13: EEF-CVE-2026-92106 (LOW) escapes <style>/<script> text inside
-      # SVG and MathML on to_html/2 (mutation XSS). We use lazy_html only in
-      # tests via LiveViewTest; pin the patched floor.
-      {:lazy_html, "~> 0.1.13", only: :test},
+      # 0.1.14: from_document/2 and from_fragment/2 accept optional
+      # :max_depth, :max_memory, :max_attributes, :timeout (default
+      # unlimited). extras: fine 0.1.6 → 0.2.0 (lazy_html 0.1.14 requires
+      # fine ~> 0.2.0). elixir_make already 0.10.1. We use lazy_html
+      # only in tests via LiveViewTest (from_fragment/from_document
+      # without limits). 0.1.13: EEF-CVE-2026-92106 (LOW) escapes
+      # <style>/<script> text inside SVG and MathML on to_html/2.
+      # phoenix_live_view lists it optional ~> 0.1.0; pin the patched floor.
+      {:lazy_html, "~> 0.1.14", only: :test},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
       {:heroicons,
