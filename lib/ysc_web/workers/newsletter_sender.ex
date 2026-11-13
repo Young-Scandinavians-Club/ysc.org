@@ -88,10 +88,12 @@ defmodule YscWeb.Workers.NewsletterSender do
     pending_subscribers =
       Newsletter.subscribers_needing_newsletter_delivery(edition, subscribers)
 
+    shared = NewsletterEdition.build_shared_assigns(edition, posts, events)
+
     result =
       Enum.reduce_while(pending_subscribers, %{failures: 0}, fn subscriber,
                                                                 acc ->
-        case send_to_subscriber(edition, subscriber, posts, events) do
+        case send_to_subscriber(edition, subscriber, shared) do
           :ok ->
             pace_next_delivery()
             {:cont, acc}
@@ -125,9 +127,8 @@ defmodule YscWeb.Workers.NewsletterSender do
     handle_send_result(result, edition, posts, events, subscribers)
   end
 
-  defp send_to_subscriber(edition, subscriber, posts, events) do
-    assigns =
-      NewsletterEdition.build_assigns(edition, subscriber, posts, events)
+  defp send_to_subscriber(edition, subscriber, shared) do
+    assigns = NewsletterEdition.personalize(shared, subscriber, edition.id)
 
     html = NewsletterEdition.render(assigns)
 

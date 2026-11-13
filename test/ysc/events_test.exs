@@ -70,6 +70,46 @@ defmodule Ysc.EventsTest do
       assert Events.event_selling_fast?(event.id) == true
     end
 
+    test "selling_fast_event_ids/1 returns only events at the threshold" do
+      user = user_fixture()
+      fast = event_fixture()
+      slow = event_fixture()
+      tier = ticket_tier_fixture(%{event_id: fast.id})
+
+      recent_time =
+        DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.truncate(:second)
+
+      for _i <- 1..5 do
+        Repo.insert!(%Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: fast.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          inserted_at: recent_time,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        })
+      end
+
+      ids = Events.selling_fast_event_ids([fast.id, slow.id, nil, fast.id])
+      assert MapSet.member?(ids, fast.id)
+      refute MapSet.member?(ids, slow.id)
+    end
+
+    test "selling_fast_event_ids/1 does not query for an empty list" do
+      {ids, count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.selling_fast_event_ids([]) end,
+          pattern: ~r/FROM "tickets"/i,
+          caller_pids: [self()]
+        )
+
+      assert ids == MapSet.new()
+      assert count == 0
+    end
+
     test "is_event_selling_fast? returns false when less than 10 tickets sold in last 3 days" do
       # Create a user and event
       user = user_fixture()
@@ -2197,6 +2237,32 @@ defmodule Ysc.EventsTest do
         )
 
       assert Enum.map(events, & &1.id) == [event_b.id, event_a.id]
+    end
+
+    test "list_events_by_ids/2 omits event-body HTML columns" do
+      event =
+        event_fixture(%{
+          title: "Newsletter slim event",
+          raw_details: "<p>must not load this body</p>",
+          rendered_details: "<p>must not load this html</p>"
+        })
+
+      {events, body_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Events.list_events_by_ids([event.id], preloads: [:cover_image])
+          end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      [loaded] = events
+      assert loaded.id == event.id
+      assert loaded.title == "Newsletter slim event"
+      assert loaded.description == event.description
+      assert is_nil(loaded.raw_details)
+      assert is_nil(loaded.rendered_details)
+      assert body_cols == 0
     end
 
     test "count_tickets_sold_excluding_donations/1 counts non-donation tickets" do
