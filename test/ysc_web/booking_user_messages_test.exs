@@ -61,8 +61,15 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute BookingUserMessages.clear_lake_no_booking_options() =~
              "select dates to see available"
 
+    assert BookingUserMessages.leave_unpaid_checkout_button() ==
+             "Leave without booking"
+
+    refute BookingUserMessages.leave_unpaid_checkout_button() == "Cancel"
+
+    assert BookingUserMessages.leave_unpaid_checkout_busy() == "Leaving..."
+
     assert BookingUserMessages.leave_unpaid_checkout_confirm() =~
-             "unfinished booking"
+             "Leave without booking?"
 
     assert BookingUserMessages.leave_unpaid_checkout_confirm() =~
              "not booked yet"
@@ -73,11 +80,20 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute BookingUserMessages.leave_unpaid_checkout_confirm() =~
              "release these dates"
 
+    refute BookingUserMessages.leave_unpaid_checkout_confirm() =~
+             "Cancel this unfinished booking"
+
+    assert BookingUserMessages.leave_unpaid_checkout_toast() =~
+             "left without booking"
+
     assert BookingUserMessages.leave_unpaid_checkout_toast() =~
              "dates are open again"
 
     refute BookingUserMessages.leave_unpaid_checkout_toast() =~
              "availability has been released"
+
+    refute BookingUserMessages.leave_unpaid_checkout_toast() =~
+             "We cancelled this unfinished booking"
   end
 
   test "clear lake blackout message" do
@@ -496,8 +512,20 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.checkout_payment_setup_failed() =~ "info@ysc.org"
     assert BookingUserMessages.checkout_cancel_failed() =~ "info@ysc.org"
 
+    assert BookingUserMessages.checkout_cancel_failed() =~
+             "couldn't go back from this page"
+
+    refute BookingUserMessages.checkout_cancel_failed() =~
+             "cancel this booking from here"
+
     assert BookingUserMessages.checkout_cancel_payment_in_progress() =~
              "still processing"
+
+    assert BookingUserMessages.checkout_cancel_payment_in_progress() =~
+             "can't go back yet"
+
+    refute BookingUserMessages.checkout_cancel_payment_in_progress() =~
+             "can't cancel this booking yet"
 
     assert BookingUserMessages.checkout_booking_confirmation_failed() =~
              "info@ysc.org"
