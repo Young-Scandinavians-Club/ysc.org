@@ -31,6 +31,20 @@ defmodule YscWeb.TrixUploadsControllerTest do
     <<0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00>>
   end
 
+  defp utf16_le_html(html) do
+    <<0xFF, 0xFE>> <>
+      :unicode.characters_to_binary(html, :utf8, {:utf16, :little})
+  end
+
+  defp utf16_be_html(html) do
+    <<0xFE, 0xFF>> <>
+      :unicode.characters_to_binary(html, :utf8, {:utf16, :big})
+  end
+
+  defp utf16_le_html_without_bom(html) do
+    :unicode.characters_to_binary(html, :utf8, {:utf16, :little})
+  end
+
   defp write_tmp(content, filename) do
     path = "/tmp/trix_test_#{System.unique_integer([:positive])}_#{filename}"
     File.write!(path, content)
@@ -266,6 +280,42 @@ defmodule YscWeb.TrixUploadsControllerTest do
 
       assert json_response(conn, 422)["error"] =~ "not allowed"
     end
+
+    test "returns 422 for HTML hidden past a 4KB whitespace pad (Finding 79)",
+         %{
+           conn: conn
+         } do
+      path =
+        write_tmp(
+          String.duplicate(" ", 5000) <>
+            "<html><body><script>alert(1)</script></body></html>",
+          "invoice.pdf"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "invoice.pdf")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
+
+    test "returns 422 for UTF-16 HTML renamed as a PDF (Finding 79)", %{
+      conn: conn
+    } do
+      path =
+        write_tmp(
+          utf16_le_html("<html><script>alert(1)</script></html>"),
+          "invoice.pdf"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "invoice.pdf")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
   end
 
   describe "FileValidator — image?/1" do
@@ -381,7 +431,12 @@ defmodule YscWeb.TrixUploadsControllerTest do
         "<!-- --><svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>",
         "Please review\n<html><script>alert(1)</script></html>",
         "<!--" <>
-          String.duplicate("x", 200) <> "<html><body>phish</body></html>"
+          String.duplicate("x", 200) <> "<html><body>phish</body></html>",
+        String.duplicate(" ", 5000) <>
+          "<html><body><script>alert(1)</script></body></html>",
+        utf16_le_html("<html><script>alert(1)</script></html>"),
+        utf16_be_html("<html><script>alert(1)</script></html>"),
+        utf16_le_html_without_bom("<html><body>phish</body></html>")
       ]
 
       Enum.each(bypass_payloads, fn payload ->

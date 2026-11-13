@@ -8,6 +8,10 @@ defmodule YscWeb.Validators.FileValidator do
 
   alias FileType
 
+  # Trix attachments cap at 25 MB. Scan that much so padding cannot hide
+  # `<html` / `<svg` past a short prefix window.
+  @markup_scan_limit 25 * 1024 * 1024
+
   # Dangerous MIME types detected via magic bytes (layer 1)
   @blocked_mimes MapSet.new([
                    "application/x-msdownload",
@@ -305,19 +309,21 @@ defmodule YscWeb.Validators.FileValidator do
     end
   end
 
-  # FileType often returns :unknown for HTML/SVG. Block by leading markup so a
-  # renamed `invoice.pdf` that is actually HTML cannot land on the public CDN.
-  # Prefix checks must survive BOM / NUL / whitespace / HTML-comment camouflage
-  # (Finding 79 incomplete fix: comment- and <script>-prefixed payloads).
+  # FileType often returns :unknown for HTML/SVG. Block by markup so a renamed
+  # `invoice.pdf` that is actually HTML cannot land on the public CDN.
+  # Prefix checks must survive BOM / UTF-16 / NUL / whitespace / HTML-comment
+  # camouflage, and padding that pushes tags past a short window (Finding 79).
   # sobelow_skip ["Traversal.FileModule"]
   defp check_active_web_content(file_path) do
     case File.open(file_path, [:read, :binary]) do
       {:ok, file} ->
-        # Read enough that a long leading comment cannot hide markup past 512.
-        prefix = IO.binread(file, 4096)
+        prefix = IO.binread(file, @markup_scan_limit)
         File.close(file)
 
-        if active_web_markup?(prefix) do
+        truncated? =
+          is_binary(prefix) and byte_size(prefix) == @markup_scan_limit
+
+        if active_web_markup?(prefix, truncated?) do
           {:error, "File type not allowed"}
         else
           :ok
@@ -328,7 +334,7 @@ defmodule YscWeb.Validators.FileValidator do
     end
   end
 
-  defp active_web_markup?(data) when is_binary(data) do
+  defp active_web_markup?(data, truncated?) when is_binary(data) do
     # Real PDF / Office / OLE binaries can contain the ASCII substring "<html"
     # or "<script" in streams; skip markup heuristics for those prefixes.
     prefix_for_magic =
@@ -339,17 +345,24 @@ defmodule YscWeb.Validators.FileValidator do
     if binary_document_prefix?(prefix_for_magic) do
       false
     else
-      case normalize_markup_prefix(data) do
+      decoded =
+        data
+        |> strip_known_boms()
+        |> strip_leading_nulls()
+        |> maybe_collapse_utf16_ascii()
+
+      case normalize_markup_prefix(decoded) do
         :blocked ->
           true
 
         trimmed when is_binary(trimmed) ->
-          htmlish_prefix?(trimmed) or htmlish_payload?(trimmed)
+          htmlish_prefix?(trimmed) or htmlish_payload?(trimmed) or
+            padding_concealed_markup?(trimmed, truncated?)
       end
     end
   end
 
-  defp active_web_markup?(_), do: false
+  defp active_web_markup?(_, _), do: false
 
   defp binary_document_prefix?(<<"%PDF", _::binary>>), do: true
   # ZIP-based Office / OpenDocument / EPUB
@@ -360,14 +373,72 @@ defmodule YscWeb.Validators.FileValidator do
 
   defp normalize_markup_prefix(data) do
     data
-    |> strip_utf8_bom()
-    |> strip_leading_nulls()
+    |> to_searchable_utf8()
     |> strip_leading_whitespace_and_comments()
     |> case do
       :blocked -> :blocked
       trimmed -> String.downcase(trimmed)
     end
   end
+
+  # String.* requires valid UTF-8. Invalid bytes from UTF-16 leftovers or
+  # arbitrary binaries must not crash the upload path — collapse them to
+  # spaces so ASCII tags are still visible to the markup heuristics.
+  defp to_searchable_utf8(data) when is_binary(data) do
+    if String.valid?(data) do
+      data
+    else
+      for <<byte <- data>>, into: "" do
+        if byte in [?\t, ?\n, ?\r] or byte in 32..126 do
+          <<byte>>
+        else
+          <<?\s>>
+        end
+      end
+    end
+  end
+
+  defp padding_concealed_markup?(trimmed, true), do: String.trim(trimmed) == ""
+  defp padding_concealed_markup?(_, _), do: false
+
+  defp strip_known_boms(<<0xEF, 0xBB, 0xBF, rest::binary>>), do: rest
+
+  defp strip_known_boms(<<0xFF, 0xFE, rest::binary>>) do
+    utf16_to_binary(rest, :little)
+  end
+
+  defp strip_known_boms(<<0xFE, 0xFF, rest::binary>>) do
+    utf16_to_binary(rest, :big)
+  end
+
+  defp strip_known_boms(other), do: other
+
+  defp utf16_to_binary(rest, endian) do
+    case :unicode.characters_to_binary(rest, {:utf16, endian}) do
+      bin when is_binary(bin) -> bin
+      _ -> rest
+    end
+  end
+
+  # UTF-16 HTML without a BOM (`<\0h\0t\0m\0l\0`). Collapse NUL-padded ASCII
+  # so markup heuristics still match. Skipped for PDF/Office via magic bytes.
+  defp maybe_collapse_utf16_ascii(data) do
+    if utf16_ascii_like?(data) do
+      :binary.replace(data, <<0>>, "", [:global])
+    else
+      data
+    end
+  end
+
+  defp utf16_ascii_like?(<<a, 0, b, 0, c, 0, _::binary>>)
+       when a in 32..126 and b in 32..126 and c in 32..126,
+       do: true
+
+  defp utf16_ascii_like?(<<0, a, 0, b, 0, c, _::binary>>)
+       when a in 32..126 and b in 32..126 and c in 32..126,
+       do: true
+
+  defp utf16_ascii_like?(_), do: false
 
   defp strip_utf8_bom(<<0xEF, 0xBB, 0xBF, rest::binary>>), do: rest
   defp strip_utf8_bom(other), do: other
