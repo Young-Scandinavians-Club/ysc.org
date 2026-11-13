@@ -233,6 +233,39 @@ defmodule YscWeb.TrixUploadsControllerTest do
 
       assert json_response(conn, 422)["error"] =~ "not allowed"
     end
+
+    test "returns 422 for HTML camouflaged with a leading comment (Finding 79)",
+         %{conn: conn} do
+      path =
+        write_tmp(
+          "<!-- innocuous --><!DOCTYPE html><html><body onload=alert(1)>phish</body></html>",
+          "invoice.pdf"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "invoice.pdf")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
+
+    test "returns 422 for a script-only payload as notes.txt (Finding 79)", %{
+      conn: conn
+    } do
+      path =
+        write_tmp(
+          "<script>document.location='https://evil.example/'</script>",
+          "notes.txt"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "notes.txt")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
   end
 
   describe "FileValidator — image?/1" do
@@ -335,6 +368,38 @@ defmodule YscWeb.TrixUploadsControllerTest do
 
       assert {:error, _reason} =
                FileValidator.validate_attachment(path, "logo.pdf")
+    end
+
+    test "blocks HTML after leading comments, NULs, or script/body prefixes" do
+      bypass_payloads = [
+        "<!--x--><html><body><script>alert(1)</script></body></html>",
+        "<script>alert(1)</script>",
+        "<body onload=alert(1)>x</body>",
+        "<img src=x onerror=alert(1)>",
+        <<0, 0, 0>> <> "<html><script>alert(1)</script></html>",
+        "   \n<!--c--><svg onload=alert(1)>",
+        "<!-- --><svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>",
+        "Please review\n<html><script>alert(1)</script></html>",
+        "<!--" <>
+          String.duplicate("x", 200) <> "<html><body>phish</body></html>"
+      ]
+
+      Enum.each(bypass_payloads, fn payload ->
+        path = write_tmp(payload, "invoice.pdf")
+
+        assert {:error, "File type not allowed"} =
+                 FileValidator.validate_attachment(path, "invoice.pdf")
+      end)
+    end
+
+    test "still allows real PDF bytes that mention HTML in a stream" do
+      path =
+        write_tmp(
+          "%PDF-1.4\n1 0 obj<< /Note (see <html><script>) >>endobj\ntrailer<<>>\n%%EOF",
+          "invoice.pdf"
+        )
+
+      assert {:ok, _} = FileValidator.validate_attachment(path, "invoice.pdf")
     end
 
     test "returns an error when the temp file cannot be opened" do

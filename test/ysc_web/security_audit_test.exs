@@ -5295,10 +5295,35 @@ defmodule YscWeb.SecurityAuditTest do
                  renamed,
                  "invoice.pdf"
                )
+
+      # Camouflage that previously bypassed the leading-prefix check must fail.
+      camouflaged = Path.join(tmp, "finding79-camouflage.pdf")
+
+      File.write!(
+        camouflaged,
+        "<!--x--><!DOCTYPE html><html><body>phish</body></html>"
+      )
+
+      assert {:error, _} =
+               YscWeb.Validators.FileValidator.validate_attachment(
+                 camouflaged,
+                 "invoice.pdf"
+               )
+
+      script_txt = Path.join(tmp, "finding79-script.txt")
+      File.write!(script_txt, "<script>alert(1)</script>")
+
+      assert {:error, _} =
+               YscWeb.Validators.FileValidator.validate_attachment(
+                 script_txt,
+                 "notes.txt"
+               )
     after
       File.rm(Path.join(System.tmp_dir!(), "finding79.html"))
       File.rm(Path.join(System.tmp_dir!(), "finding79.svg"))
       File.rm(Path.join(System.tmp_dir!(), "finding79.pdf"))
+      File.rm(Path.join(System.tmp_dir!(), "finding79-camouflage.pdf"))
+      File.rm(Path.join(System.tmp_dir!(), "finding79-script.txt"))
     end
   end
 
