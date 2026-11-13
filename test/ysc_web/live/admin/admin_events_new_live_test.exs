@@ -2334,6 +2334,72 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "external ticketing - collapsed section" do
+    setup [:create_admin]
+
+    test "stays collapsed on a regular YSC event", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Regular Event Editor",
+          description: "Summary text"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "details#event-external-ticketing-section")
+
+      refute has_element?(
+               view,
+               "details#event-external-ticketing-section[open]"
+             )
+    end
+
+    test "opens when the event already has a ticket link", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "External Event Editor",
+          description: "Summary text",
+          external_ticket_url: "https://example.org/tickets",
+          external_organizer: "SWEA"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(
+               view,
+               "details#event-external-ticketing-section[open]"
+             )
+    end
+
+    test "opens when only the organizer name is set", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Organizer Only Editor",
+          description: "Summary text",
+          external_organizer: "Norwegian Club"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(
+               view,
+               "details#event-external-ticketing-section[open]"
+             )
+    end
+  end
+
   describe "external ticketing - editor auto-save" do
     setup [:create_admin]
 
@@ -2351,6 +2417,12 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
       assert has_element?(view, "#event-external-ticketing-section")
+
+      refute has_element?(
+               view,
+               "details#event-external-ticketing-section[open]"
+             )
+
       assert html =~ "Ticket Link (Optional)"
 
       view
@@ -2381,6 +2453,12 @@ defmodule YscWeb.AdminEventsNewLiveTest do
         })
 
       assert html =~ "must be a valid http(s) URL"
+
+      assert has_element?(
+               view,
+               "details#event-external-ticketing-section[open]"
+             )
+
       unchanged = Events.get_event!(event.id)
       assert unchanged.external_ticket_url == "https://example.org/fair/tickets"
 

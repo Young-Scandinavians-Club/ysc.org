@@ -9,6 +9,56 @@ defmodule YscWeb.Emails.EventHelpersTest do
   alias Ysc.Repo
   alias YscWeb.Emails.EventHelpers
 
+  describe "external_ticketing_note/1" do
+    test "names the organizer on a full event" do
+      event =
+        event_fixture(%{
+          external_ticket_url: "https://swea.example.org/tickets",
+          external_organizer: "SWEA San Francisco"
+        })
+
+      note = EventHelpers.external_ticketing_note(event)
+
+      assert note =~ "organized by SWEA San Francisco, not YSC"
+      assert note =~ "Tickets are sold on their website"
+    end
+
+    test "falls back when the organizer is blank or whitespace" do
+      event =
+        event_fixture(%{external_ticket_url: "https://example.org/tickets"})
+
+      assert EventHelpers.external_ticketing_note(event) =~
+               "organized by another organization, not YSC"
+
+      assert EventHelpers.external_ticketing_note(%{
+               event
+               | external_organizer: "   "
+             }) =~ "organized by another organization, not YSC"
+    end
+
+    test "works on a slim public-list map" do
+      note =
+        EventHelpers.external_ticketing_note(%{
+          id: "evt-1",
+          title: "Midsummer Fair",
+          external_ticket_url: "https://example.org/tickets",
+          external_organizer: "Norwegian Club"
+        })
+
+      assert note =~ "organized by Norwegian Club, not YSC"
+    end
+
+    test "returns nil for regular YSC events" do
+      assert EventHelpers.external_ticketing_note(event_fixture()) == nil
+
+      assert EventHelpers.external_ticketing_note(%{
+               id: "evt-1",
+               title: "YSC Picnic",
+               external_ticket_url: nil
+             }) == nil
+    end
+  end
+
   describe "require_event!/1" do
     test "returns the event struct" do
       event = event_fixture()
