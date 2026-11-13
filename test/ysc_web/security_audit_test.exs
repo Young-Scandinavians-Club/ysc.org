@@ -91,7 +91,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 94 (MEDIUM)   Volunteer→member demotion did not disconnect LiveViews. Finding 87 only force-closed sockets when the previous role was `:admin`, so an already-open volunteer scanner / event editor / check-in / posts LiveView kept frozen `admin_role` and `current_user.role` and continued handling staff events after revocation.
   Finding 95 (HIGH)     Password reset and password change deleted `users_tokens` but never broadcast LiveView `"disconnect"`. Finding 87/94 already showed `mount_current_user/2` only runs on mount, so a stolen session with an already-open bookings/tickets/settings LiveView kept `current_user` and could keep acting after the victim recovered the account. First-password set (`set_user_initial_password/2`) was the leftover: OAuth / family-invite / WP-migration users who added a password left other sessions valid.
   Finding 96 (MEDIUM)   Event Tickets-tab leftover `validate-capacity`/`save-capacity` forwarded the full event param map into `update_event_editor/3`, persisting client `rendered_details` without TrixScrubber. Public `/feeds/events.atom` emits that HTML unsanitized.
-  Finding 97 (HIGH)     OAuth reauth resume tokens (`reauth_resume`) were encrypted but not bound to the initiating user. `UserAuth.log_in_user/6` always starts a 5-minute `reauth_verified_at` grace window, so a member who minted a token (email/phone/password intent) could send another signed-in member `/users/settings?reauth_resume=…` during that window. Phone changes to non-US/CA numbers skip OTP and persist immediately, including `profile_params` (name/DOB).
+  Finding 97 (HIGH)     OAuth reauth resume tokens (`reauth_resume`) were encrypted but not bound to the initiating user. `UserAuth.log_in_user/6` always starts a 5-minute `reauth_verified_at` grace window, so a member who minted a token (email/phone/password intent) could send another signed-in member `/users/settings?reauth_resume=…` during that window. Phone changes to numbers outside US/CA/Nordic skip OTP and persist immediately, including `profile_params` (name/DOB).
   Finding 98 (MEDIUM)   Volunteer dashboard magic search (`Ysc.Search.global_search/2`) had no role filter, so typing on `/admin` returned cabin bookings (member name, property, stay dates, reference) and user emails. Users and Bookings are full-admin-only (`ensure_full_admin`); clicking through was blocked, but the dropdown already disclosed the data. Same class as Finding 76.
   Finding 99 (MEDIUM)   Volunteer door-sale `POST /api/v1/app/events/:id/tickets/payment_intent` accepted unbounded `tiers` quantities while `bypass_guards: true` skipped capacity. Pending tickets count as sold, so one JSON body could insert unbounded ticket rows and lock the event until the 5-minute timeout (repeatable).
   Finding 100 (MEDIUM)  Event photo direct-to-S3 presign used LiveView's 20 GB video cap for every file (including photos) and public-read ACL. A ticket holder could POST a multi-GB `.jpg` before `Limits.validate_upload/2` ran; cancel/abandon never deleted the object, so untrusted bytes stayed on the club CDN. S3 policy is now per-type, unsupported names are not presigned, cancel deletes the object, and the worker HEADs Content-Length before downloading.
@@ -6870,7 +6870,7 @@ defmodule YscWeb.SecurityAuditTest do
       assert reloaded.last_name == "Member"
     end
 
-    test "same-user phone-change resume still applies a non-US number without OTP",
+    test "same-user phone-change resume for a Swedish number opens OTP instead of saving immediately",
          %{conn: conn} do
       user =
         user_fixture(%{
@@ -6881,6 +6881,46 @@ defmodule YscWeb.SecurityAuditTest do
         })
 
       new_phone = unique_swedish_mobile()
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "user_id" => user.id,
+          "purpose" => "phone_change",
+          "phone" => new_phone,
+          "profile_params" => %{
+            "first_name" => user.first_name,
+            "last_name" => user.last_name
+          }
+        })
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> Plug.Conn.put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {:ok, view, _html} = live(conn, resume_path)
+
+      assert has_element?(view, "#phone_verification_form")
+      refute render(view) =~ "We can&#39;t send a verification text"
+
+      reloaded = Repo.reload!(user)
+      assert reloaded.phone_number == "+14159098268"
+    end
+
+    test "same-user phone-change resume still applies an unsupported number without OTP",
+         %{conn: conn} do
+      user =
+        user_fixture(%{
+          state: :active,
+          first_name: "Owner",
+          last_name: "Member",
+          phone_number: "+14159098268"
+        })
+
+      new_phone = unique_german_mobile()
 
       resume_path =
         YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
@@ -7188,6 +7228,17 @@ defmodule YscWeb.SecurityAuditTest do
       |> String.pad_leading(7, "0")
 
     "+4670#{suffix}"
+  end
+
+  defp unique_german_mobile do
+    suffix =
+      System.unique_integer([:positive])
+      |> rem(100_000_000)
+      |> Integer.to_string()
+      |> String.pad_leading(8, "0")
+
+    # DE mobiles on 151 need 8 subscriber digits (e.g. +4915112345678).
+    "+49151#{suffix}"
   end
 
   defp volunteer_app_conn(conn, volunteer) do

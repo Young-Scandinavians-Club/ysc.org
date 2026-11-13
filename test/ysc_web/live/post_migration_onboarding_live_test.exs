@@ -269,7 +269,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       assert html =~ new_first
     end
 
-    test "saving a non-US/CA phone number persists it without sending an SMS verification code",
+    test "saving a Swedish phone number advances to SMS verification",
          %{conn: conn} do
       user = user_needing_post_migration_onboarding()
       conn = log_in_user(conn, user)
@@ -290,12 +290,34 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       updated_user = Accounts.get_user!(user.id)
       assert updated_user.phone_number == "+46701234567"
       assert updated_user.phone_verified_at == nil
+      assert has_element?(view, "#onboarding-phone-form")
+      assert render(view) =~ "Verify Your Phone Number"
+    end
 
-      # Saving completes onboarding or advances past the profile step outright
-      # (rather than routing through the unreachable OTP step), so the
-      # LiveView may have already redirected by this point.
+    test "saving an unsupported international phone number persists it without sending an SMS verification code",
+         %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      render_submit(view, "save_profile", %{
+        "user" => %{
+          "first_name" => user.first_name,
+          "last_name" => user.last_name,
+          "phone_number" => "+4915112345678",
+          "date_of_birth" => "",
+          "most_connected_country" => user.most_connected_country || ""
+        }
+      })
+
+      updated_user = Accounts.get_user!(user.id)
+      assert updated_user.phone_number == "+4915112345678"
+      assert updated_user.phone_verified_at == nil
+
       if Process.alive?(view.pid) do
-        refute has_element?(view, "#phone_verification_form")
+        refute has_element?(view, "#onboarding-phone-form")
       end
     end
   end

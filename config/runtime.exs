@@ -70,6 +70,20 @@ if config_env() != :test do
     webhook_token: System.get_env("FLOWROUTE_WEBHOOK_TOKEN")
 end
 
+# ## Twilio SMS Configuration
+#
+# Twilio delivers SMS to international (Nordic) numbers that FlowRoute cannot
+# reach; see Ysc.Extensions.PhoneNumber.sms_provider/1. Like FlowRoute, the
+# client is a no-op in dev/test/sandbox unless TWILIO_FORCE_ENABLE is set.
+# Not applied in :test so config/test.exs wins.
+if config_env() != :test do
+  config :ysc, :twilio,
+    account_sid: System.get_env("TWILIO_ACCOUNT_SID"),
+    auth_token: System.get_env("TWILIO_AUTH_TOKEN"),
+    messaging_service_sid: System.get_env("TWILIO_MESSAGING_SERVICE_SID"),
+    sender: System.get_env("TWILIO_SENDER")
+end
+
 # ## Printful (merch fulfillment)
 #
 # Without PRINTFUL_API_TOKEN the client returns {:error, :not_configured}
