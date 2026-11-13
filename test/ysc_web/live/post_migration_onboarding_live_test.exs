@@ -521,6 +521,12 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       html = render(view)
 
       assert html =~ "Set up automatic renewal"
+      assert has_element?(view, "#onboarding-plan-billing-notice")
+
+      assert has_element?(
+               view,
+               "#onboarding-plan-billing-notice .hero-information-circle"
+             )
 
       assert html =~
                "add a payment method later from Membership (click your name in the top-right corner)"

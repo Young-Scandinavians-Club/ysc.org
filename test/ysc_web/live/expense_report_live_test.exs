@@ -318,6 +318,38 @@ defmodule YscWeb.ExpenseReportLiveTest do
              )
     end
 
+    test "success page shows confirmation email notice", %{
+      conn: conn,
+      user: user
+    } do
+      report =
+        insert_member_report!(user, %{
+          purpose: "Cabin groceries",
+          status: "submitted"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/expensereport/#{report.id}/success")
+
+      assert has_element?(view, "#expense-report-confirmation-email-notice")
+
+      assert has_element?(
+               view,
+               "#expense-report-confirmation-email-notice .hero-envelope"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-confirmation-email-notice",
+               "Confirmation Email"
+             )
+
+      assert has_element?(
+               view,
+               "#expense-report-confirmation-email-notice",
+               user.email
+             )
+    end
+
     test "My Reports lists a rejected report with the Rejected badge", %{
       conn: conn,
       user: user

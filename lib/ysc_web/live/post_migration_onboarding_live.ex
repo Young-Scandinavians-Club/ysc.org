@@ -743,13 +743,15 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         </p>
 
         <%= if @payment_method_saved || not is_nil(@default_payment_method) do %>
-          <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
-            <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
-            <div class="text-sm">
-              <span class="font-medium">Saved payment:</span>
-              {payment_method_display(@default_payment_method)}
-            </div>
-          </div>
+          <.callout
+            type="success"
+            icon="hero-check-circle"
+            id="onboarding-saved-payment-notice"
+            class="mt-6"
+          >
+            <span class="font-medium">Saved payment:</span>
+            {payment_method_display(@default_payment_method)}
+          </.callout>
           <div class="mt-6 flex justify-end">
             <.button
               phx-click="confirm_payment_step"
@@ -760,12 +762,14 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             </.button>
           </div>
         <% else %>
-          <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800 text-sm">
-            <.icon name="hero-exclamation-triangle" class="w-5 h-5 mt-0.5 shrink-0" />
-            <span>
-              You haven't saved a payment method yet. Add one so your membership can renew automatically.
-            </span>
-          </div>
+          <.callout
+            type="warning"
+            icon="hero-exclamation-triangle"
+            id="onboarding-missing-payment-notice"
+            class="mt-6"
+          >
+            You haven't saved a payment method yet. Add one so your membership can renew automatically.
+          </.callout>
           <%= if is_nil(@payment_intent_secret) do %>
             <div class="mt-6 flex justify-end">
               <.button phx-click="load_payment_form" phx-disable-with="Loading...">
@@ -805,24 +809,25 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           </:subtitle>
         </.header>
 
-        <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 text-sm text-blue-800">
-          <div class="flex items-start gap-3">
-            <.icon name="hero-information-circle" class="w-5 h-5 mt-0.5 shrink-0" />
-            <div>
-              <strong>Plan: {plan_name(@membership_plan)}</strong>
-              <br />
-              You'll be billed once a year. You can turn off automatic renewal anytime from Membership (click your name in the top-right corner).
-            </div>
-          </div>
-        </div>
+        <.callout
+          type="info"
+          icon="hero-information-circle"
+          id="onboarding-plan-billing-notice"
+          class="mt-4"
+        >
+          <:title>Plan: {plan_name(@membership_plan)}</:title>
+          You'll be billed once a year. You can turn off automatic renewal anytime from Membership (click your name in the top-right corner).
+        </.callout>
 
         <%= if @payment_method_saved || not is_nil(@default_payment_method) do %>
-          <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
-            <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
-            <span class="text-sm font-medium">
-              Payment method saved. Click Continue to turn on automatic renewal for next year.
-            </span>
-          </div>
+          <.callout
+            type="success"
+            icon="hero-check-circle"
+            id="onboarding-renewal-payment-saved-notice"
+            class="mt-6"
+          >
+            Payment method saved. Click Continue to turn on automatic renewal for next year.
+          </.callout>
           <p class="mt-2 text-sm text-zinc-600">
             If your renewal date is still in the future, you won't be charged today.
           </p>

@@ -102,6 +102,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
       assert has_element?(view, "#add-family-member-button")
       assert has_element?(view, "#pending-invites-empty")
       refute has_element?(view, "#invite-form")
+      refute has_element?(view, "#family-invite-blocked-notice")
     end
 
     test "shows warning when user cannot send invites", %{conn: conn} do
@@ -111,6 +112,13 @@ defmodule YscWeb.FamilyManagementLiveTest do
       {:ok, view, _html} = live(conn, ~p"/users/settings/family")
 
       html = render_loaded(view)
+
+      assert has_element?(view, "#family-invite-blocked-notice")
+
+      assert has_element?(
+               view,
+               "#family-invite-blocked-notice .hero-exclamation-triangle"
+             )
 
       assert html =~ "send family invites right now"
       assert html =~ "Invites you send will appear here"
@@ -620,12 +628,21 @@ defmodule YscWeb.FamilyManagementLiveTest do
 
   describe "sub-account view" do
     test "shows primary holder section and leave button", %{conn: conn} do
-      {_primary, sub} = primary_with_linked_sub()
+      {primary, sub} = primary_with_linked_sub()
       conn = log_in_user(conn, sub)
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/family")
 
       assert render_loaded(view) =~ "Family membership manager"
+      assert has_element?(view, "#family-membership-manager-notice")
+      assert has_element?(view, "#family-membership-manager-notice .hero-star")
+
+      assert has_element?(
+               view,
+               "#family-membership-manager-notice",
+               primary.email
+             )
+
       assert has_element?(view, "button[phx-click='leave-family-membership']")
     end
 

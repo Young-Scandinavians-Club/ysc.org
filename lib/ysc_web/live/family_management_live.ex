@@ -484,15 +484,16 @@ defmodule YscWeb.FamilyManagementLive do
       Limit: 1 spouse or partner, up to 9 children
     </p>
 
-    <%= if not @can_send_invite do %>
-      <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <p class="text-sm text-amber-800">
-          You can't send family invites right now. Invites require an active Family or Lifetime
-          membership, and you can invite up to 10 family members to create their own sign-in. If you have a
-          Single membership or unpaid dues, update your membership first.
-        </p>
-      </div>
-    <% end %>
+    <.callout
+      :if={not @can_send_invite}
+      type="warning"
+      icon="hero-exclamation-triangle"
+      id="family-invite-blocked-notice"
+    >
+      You can't send family invites right now. Invites require an active Family or Lifetime
+      membership, and you can invite up to 10 family members to create their own sign-in. If you have a
+      Single membership or unpaid dues, update your membership first.
+    </.callout>
 
     <.settings_section title="Family Members" count={length(@active_rows)}>
       <p id="family-members-help" class="text-sm text-zinc-500">
@@ -754,16 +755,19 @@ defmodule YscWeb.FamilyManagementLive do
 
     <.settings_section title="Family membership manager">
       <%= if @primary_user do %>
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p class="text-sm font-semibold text-blue-900">
+        <.callout
+          type="info"
+          icon="hero-star"
+          id="family-membership-manager-notice"
+        >
+          <:title>
             {@primary_user.first_name} {@primary_user.last_name}
-          </p>
-          <p class="text-sm text-blue-700 mt-1">{@primary_user.email}</p>
+          </:title>
+          <p>{@primary_user.email}</p>
           <p class="text-xs text-blue-600 mt-2">
-            <.icon name="hero-star" class="w-4 h-4 inline-block -mt-0.5 me-1" />
             Manages your family membership and billing
           </p>
-        </div>
+        </.callout>
       <% else %>
         <p class="text-zinc-500 text-sm italic">
           Family membership manager information is not available.
