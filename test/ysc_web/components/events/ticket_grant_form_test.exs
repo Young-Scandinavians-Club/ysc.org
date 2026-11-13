@@ -41,6 +41,10 @@ defmodule YscWeb.AdminEventsLive.TicketGrantFormTest do
       assert doc |> LazyHTML.query("#ticket-grant-form") |> Enum.any?()
 
       assert doc
+             |> LazyHTML.query("#ticket-grant-form-actions")
+             |> Enum.any?()
+
+      assert doc
              |> LazyHTML.query("#ticket-grant-user-autocomplete-input")
              |> Enum.any?()
 

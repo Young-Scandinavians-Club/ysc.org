@@ -104,7 +104,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
           placeholder="e.g. Paid $40 cash at the door, or migrated from legacy order #12345"
         />
 
-        <div class="flex justify-end gap-3 border-t border-zinc-200 pt-6">
+        <.form_actions id="ticket-grant-form-actions" spacing={:compact}>
           <.button
             type="button"
             variant="outline"
@@ -116,7 +116,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
           <.button type="submit" phx-disable-with="Granting...">
             Grant Tickets
           </.button>
-        </div>
+        </.form_actions>
       </.form>
     </div>
     """
