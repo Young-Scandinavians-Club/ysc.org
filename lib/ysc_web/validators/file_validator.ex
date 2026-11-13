@@ -8,6 +8,10 @@ defmodule YscWeb.Validators.FileValidator do
 
   alias FileType
 
+  # Trix attachments cap at 25 MB. Scan that much so padding cannot hide
+  # `<html` / `<svg` past a short prefix window.
+  @markup_scan_limit 25 * 1024 * 1024
+
   # Dangerous MIME types detected via magic bytes (layer 1)
   @blocked_mimes MapSet.new([
                    "application/x-msdownload",
@@ -305,16 +309,21 @@ defmodule YscWeb.Validators.FileValidator do
     end
   end
 
-  # FileType often returns :unknown for HTML/SVG. Block by leading markup so a
-  # renamed `invoice.pdf` that is actually HTML cannot land on the public CDN.
+  # FileType often returns :unknown for HTML/SVG. Block by markup so a renamed
+  # `invoice.pdf` that is actually HTML cannot land on the public CDN.
+  # Prefix checks must survive BOM / UTF-16 / NUL / whitespace / HTML-comment
+  # camouflage, and padding that pushes tags past a short window (Finding 79).
   # sobelow_skip ["Traversal.FileModule"]
   defp check_active_web_content(file_path) do
     case File.open(file_path, [:read, :binary]) do
       {:ok, file} ->
-        prefix = IO.binread(file, 512)
+        prefix = IO.binread(file, @markup_scan_limit)
         File.close(file)
 
-        if active_web_markup?(prefix) do
+        truncated? =
+          is_binary(prefix) and byte_size(prefix) == @markup_scan_limit
+
+        if active_web_markup?(prefix, truncated?) do
           {:error, "File type not allowed"}
         else
           :ok
@@ -325,25 +334,172 @@ defmodule YscWeb.Validators.FileValidator do
     end
   end
 
-  defp active_web_markup?(data) when is_binary(data) do
-    trimmed =
+  defp active_web_markup?(data, truncated?) when is_binary(data) do
+    # Real PDF / Office / OLE binaries can contain the ASCII substring "<html"
+    # or "<script" in streams; skip markup heuristics for those prefixes.
+    prefix_for_magic =
       data
       |> strip_utf8_bom()
-      |> String.trim_leading()
-      |> String.downcase()
+      |> strip_leading_nulls()
 
-    String.starts_with?(trimmed, "<!doctype html") or
-      String.starts_with?(trimmed, "<html") or
-      String.starts_with?(trimmed, "<svg") or
-      (String.starts_with?(trimmed, "<?xml") and
-         (String.contains?(trimmed, "<html") or
-            String.contains?(trimmed, "<svg")))
+    if binary_document_prefix?(prefix_for_magic) do
+      false
+    else
+      decoded =
+        data
+        |> strip_known_boms()
+        |> strip_leading_nulls()
+        |> maybe_collapse_utf16_ascii()
+
+      case normalize_markup_prefix(decoded) do
+        :blocked ->
+          true
+
+        trimmed when is_binary(trimmed) ->
+          htmlish_prefix?(trimmed) or htmlish_payload?(trimmed) or
+            padding_concealed_markup?(trimmed, truncated?)
+      end
+    end
   end
 
-  defp active_web_markup?(_), do: false
+  defp active_web_markup?(_, _), do: false
+
+  defp binary_document_prefix?(<<"%PDF", _::binary>>), do: true
+  # ZIP-based Office / OpenDocument / EPUB
+  defp binary_document_prefix?(<<"PK", _::binary>>), do: true
+  # Legacy OLE Compound File (old .doc / .xls / .ppt)
+  defp binary_document_prefix?(<<0xD0, 0xCF, 0x11, 0xE0, _::binary>>), do: true
+  defp binary_document_prefix?(_), do: false
+
+  defp normalize_markup_prefix(data) do
+    data
+    |> to_searchable_utf8()
+    |> strip_leading_whitespace_and_comments()
+    |> case do
+      :blocked -> :blocked
+      trimmed -> String.downcase(trimmed)
+    end
+  end
+
+  # String.* requires valid UTF-8. Invalid bytes from UTF-16 leftovers or
+  # arbitrary binaries must not crash the upload path — collapse them to
+  # spaces so ASCII tags are still visible to the markup heuristics.
+  defp to_searchable_utf8(data) when is_binary(data) do
+    if String.valid?(data) do
+      data
+    else
+      for <<byte <- data>>, into: "" do
+        if byte in [?\t, ?\n, ?\r] or byte in 32..126 do
+          <<byte>>
+        else
+          <<?\s>>
+        end
+      end
+    end
+  end
+
+  defp padding_concealed_markup?(trimmed, true), do: String.trim(trimmed) == ""
+  defp padding_concealed_markup?(_, _), do: false
+
+  defp strip_known_boms(<<0xEF, 0xBB, 0xBF, rest::binary>>), do: rest
+
+  defp strip_known_boms(<<0xFF, 0xFE, rest::binary>>) do
+    utf16_to_binary(rest, :little)
+  end
+
+  defp strip_known_boms(<<0xFE, 0xFF, rest::binary>>) do
+    utf16_to_binary(rest, :big)
+  end
+
+  defp strip_known_boms(other), do: other
+
+  defp utf16_to_binary(rest, endian) do
+    case :unicode.characters_to_binary(rest, {:utf16, endian}) do
+      bin when is_binary(bin) -> bin
+      _ -> rest
+    end
+  end
+
+  # UTF-16 HTML without a BOM (`<\0h\0t\0m\0l\0`). Collapse NUL-padded ASCII
+  # so markup heuristics still match. Skipped for PDF/Office via magic bytes.
+  defp maybe_collapse_utf16_ascii(data) do
+    if utf16_ascii_like?(data) do
+      :binary.replace(data, <<0>>, "", [:global])
+    else
+      data
+    end
+  end
+
+  defp utf16_ascii_like?(<<a, 0, b, 0, c, 0, _::binary>>)
+       when a in 32..126 and b in 32..126 and c in 32..126,
+       do: true
+
+  defp utf16_ascii_like?(<<0, a, 0, b, 0, c, _::binary>>)
+       when a in 32..126 and b in 32..126 and c in 32..126,
+       do: true
+
+  defp utf16_ascii_like?(_), do: false
 
   defp strip_utf8_bom(<<0xEF, 0xBB, 0xBF, rest::binary>>), do: rest
   defp strip_utf8_bom(other), do: other
+
+  defp strip_leading_nulls(<<0, rest::binary>>), do: strip_leading_nulls(rest)
+  defp strip_leading_nulls(other), do: other
+
+  defp strip_leading_whitespace_and_comments(data) do
+    trimmed = String.trim_leading(data)
+
+    case trimmed do
+      <<"<!--", rest::binary>> ->
+        case String.split(rest, "-->", parts: 2) do
+          [_comment, after_comment] ->
+            strip_leading_whitespace_and_comments(after_comment)
+
+          _ ->
+            # Unclosed leading comment is classic markup camouflage.
+            :blocked
+        end
+
+      _ ->
+        trimmed
+    end
+  end
+
+  defp htmlish_prefix?(trimmed) do
+    String.starts_with?(trimmed, "<!doctype html") or
+      String.starts_with?(trimmed, "<html") or
+      String.starts_with?(trimmed, "<svg") or
+      String.starts_with?(trimmed, "<script") or
+      String.starts_with?(trimmed, "<body") or
+      String.starts_with?(trimmed, "<head") or
+      String.starts_with?(trimmed, "<iframe") or
+      String.starts_with?(trimmed, "<object") or
+      String.starts_with?(trimmed, "<embed") or
+      String.starts_with?(trimmed, "<img") or
+      String.starts_with?(trimmed, "<math") or
+      (String.starts_with?(trimmed, "<?xml") and
+         (String.contains?(trimmed, "<html") or
+            String.contains?(trimmed, "<svg") or
+            String.contains?(trimmed, "<script")))
+  end
+
+  # After stripping camouflage, catch markup that does not start at byte 0
+  # (e.g. a short text decoy then <html>). Limit false positives by requiring
+  # a clear active-document marker rather than any angle bracket.
+  defp htmlish_payload?(trimmed) do
+    Enum.any?(
+      [
+        "<!doctype html",
+        "<html",
+        "<svg",
+        "<script",
+        "<iframe",
+        "<object",
+        "<embed"
+      ],
+      &String.contains?(trimmed, &1)
+    )
+  end
 
   # Checks the final extension AND all intermediate extensions (double-extension attack defence).
   # e.g. "report.exe.pdf" has intermediate ".exe" which is blocked.

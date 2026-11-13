@@ -100,7 +100,10 @@ defmodule YscWeb.TrixUploadsController do
         storage_key = Media.trix_attachment_storage_key(filename)
 
         upload_result =
-          Media.upload_file_to_s3(path, storage_key, content_type: mime)
+          Media.upload_file_to_s3(path, storage_key,
+            content_type: mime,
+            content_disposition: attachment_content_disposition(filename)
+          )
 
         conn
         |> put_status(201)
@@ -172,6 +175,19 @@ defmodule YscWeb.TrixUploadsController do
   # Paths are always under @temp_dir, using only fixed suffixes/extensions and a DB id.
   defp rm_temp_image_output_if_present(file_path) when is_binary(file_path) do
     if File.exists?(file_path), do: File.rm(file_path)
+  end
+
+  defp attachment_content_disposition(filename) when is_binary(filename) do
+    safe =
+      filename
+      |> Path.basename()
+      |> String.replace(~r/[^A-Za-z0-9._-]/, "_")
+      |> case do
+        "" -> "download"
+        name -> name
+      end
+
+    ~s[attachment; filename="#{safe}"]
   end
 
   defp check_file_size(path) do

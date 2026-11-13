@@ -5295,10 +5295,69 @@ defmodule YscWeb.SecurityAuditTest do
                  renamed,
                  "invoice.pdf"
                )
+
+      # Camouflage that previously bypassed the leading-prefix check must fail.
+      camouflaged = Path.join(tmp, "finding79-camouflage.pdf")
+
+      File.write!(
+        camouflaged,
+        "<!--x--><!DOCTYPE html><html><body>phish</body></html>"
+      )
+
+      assert {:error, _} =
+               YscWeb.Validators.FileValidator.validate_attachment(
+                 camouflaged,
+                 "invoice.pdf"
+               )
+
+      script_txt = Path.join(tmp, "finding79-script.txt")
+      File.write!(script_txt, "<script>alert(1)</script>")
+
+      assert {:error, _} =
+               YscWeb.Validators.FileValidator.validate_attachment(
+                 script_txt,
+                 "notes.txt"
+               )
+
+      padded = Path.join(tmp, "finding79-padded.pdf")
+
+      File.write!(
+        padded,
+        String.duplicate(" ", 5000) <>
+          "<html><body><script>alert(1)</script></body></html>"
+      )
+
+      assert {:error, _} =
+               YscWeb.Validators.FileValidator.validate_attachment(
+                 padded,
+                 "invoice.pdf"
+               )
+
+      utf16 = Path.join(tmp, "finding79-utf16.pdf")
+
+      File.write!(
+        utf16,
+        <<0xFF, 0xFE>> <>
+          :unicode.characters_to_binary(
+            "<html><script>alert(1)</script></html>",
+            :utf8,
+            {:utf16, :little}
+          )
+      )
+
+      assert {:error, _} =
+               YscWeb.Validators.FileValidator.validate_attachment(
+                 utf16,
+                 "invoice.pdf"
+               )
     after
       File.rm(Path.join(System.tmp_dir!(), "finding79.html"))
       File.rm(Path.join(System.tmp_dir!(), "finding79.svg"))
       File.rm(Path.join(System.tmp_dir!(), "finding79.pdf"))
+      File.rm(Path.join(System.tmp_dir!(), "finding79-camouflage.pdf"))
+      File.rm(Path.join(System.tmp_dir!(), "finding79-script.txt"))
+      File.rm(Path.join(System.tmp_dir!(), "finding79-padded.pdf"))
+      File.rm(Path.join(System.tmp_dir!(), "finding79-utf16.pdf"))
     end
   end
 

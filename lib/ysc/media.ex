@@ -514,6 +514,9 @@ defmodule Ysc.Media do
   ## Options
   - `:content_type` - The MIME type to set on the S3 object (e.g. `"application/pdf"`).
     When omitted, S3 infers the content type from the file extension.
+  - `:content_disposition` - Optional `Content-Disposition` (Trix attachments
+    use `attachment` so HTML/SVG that slipped detection is not navigated as a
+    document on the public CDN).
   """
   def upload_file_to_s3(path, key) when is_binary(key),
     do: upload_file_to_s3(path, key, [])
@@ -571,6 +574,7 @@ defmodule Ysc.Media do
     upload_opts =
       [cache_control: "public, max-age=86400"]
       |> maybe_add_content_type(opts)
+      |> maybe_add_content_disposition(opts)
 
     result =
       path
@@ -592,6 +596,13 @@ defmodule Ysc.Media do
     case Keyword.get(extra_opts, :content_type) do
       nil -> opts
       ct -> Keyword.put(opts, :content_type, ct)
+    end
+  end
+
+  defp maybe_add_content_disposition(opts, extra_opts) do
+    case Keyword.get(extra_opts, :content_disposition) do
+      nil -> opts
+      cd -> Keyword.put(opts, :content_disposition, cd)
     end
   end
 
