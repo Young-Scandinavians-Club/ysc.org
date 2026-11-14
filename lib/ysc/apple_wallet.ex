@@ -174,6 +174,8 @@ defmodule Ysc.AppleWallet do
 
   defp ticket_for_wallet_query(ticket_id, user_id) do
     from(t in Ticket,
+      join: tt in TicketTier,
+      on: t.ticket_tier_id == tt.id and tt.type != :donation,
       where: t.id == ^ticket_id and t.status == :confirmed,
       select: struct(t, ^@wallet_ticket_fields),
       preload: [

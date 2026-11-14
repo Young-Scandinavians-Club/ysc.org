@@ -78,6 +78,25 @@ defmodule YscWeb.PublicTicketControllerTest do
       assert conn |> get("/t/#{token}/google") |> response(404)
     end
 
+    test "does not query tickets when the wallet isn't configured", %{
+      conn: conn
+    } do
+      %{tickets: [ticket]} = granted_tickets()
+      token = AccessToken.sign_ticket(ticket.id)
+
+      {_result, ticket_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            get(conn, "/t/#{token}/apple")
+            get(conn, "/t/#{token}/google")
+          end,
+          pattern: ~r/FROM "tickets"/i,
+          caller_pids: [self()]
+        )
+
+      assert ticket_queries == 0
+    end
+
     test "404 on an order-wide token, which doesn't identify one ticket", %{
       conn: conn
     } do

@@ -5,6 +5,9 @@ defmodule YscWeb.TicketQrLive do
   Signed-in members open their own tickets by order or event. Everyone else
   (volunteers, guests a member bought a ticket for) opens `/t/:token` from their
   ticket email, which needs no account; see `Ysc.Tickets.AccessToken`.
+
+  Wallet buttons are hrefs to download/redirect endpoints. Google save-URL JWTs
+  are generated on click, not while this page loads.
   """
   use YscWeb, :live_view
 
@@ -230,11 +233,8 @@ defmodule YscWeb.TicketQrLive do
                             <.add_to_wallet_button href={ticket.apple_href} />
                           <% end %>
                           <%= if @google_wallet_enabled? &&
-                                @wallet_platform in [:google_only, :both] &&
-                                Map.get(@google_wallet_ticket_urls, ticket.id) do %>
-                            <.add_to_google_wallet_button href={
-                              Map.get(@google_wallet_ticket_urls, ticket.id)
-                            } />
+                                @wallet_platform in [:google_only, :both] do %>
+                            <.add_to_google_wallet_button href={ticket.google_href} />
                           <% end %>
                         </div>
                       </div>
@@ -412,7 +412,6 @@ defmodule YscWeb.TicketQrLive do
     |> assign(:order_reference, nil)
     |> assign(:apple_wallet_enabled?, AppleWallet.configured?(:ticket))
     |> assign(:google_wallet_enabled?, GoogleWallet.configured?(:ticket))
-    |> assign(:google_wallet_ticket_urls, %{})
     |> assign(:wallet_platform, WalletPlatform.from_socket(socket))
   end
 
@@ -456,16 +455,6 @@ defmodule YscWeb.TicketQrLive do
   end
 
   def handle_async(:load_ticket_data, {:ok, data}, socket) do
-    google_wallet_urls =
-      if socket.assigns.google_wallet_enabled? do
-        generate_google_wallet_ticket_urls(
-          data.tickets,
-          wallet_owner(socket)
-        )
-      else
-        %{}
-      end
-
     {:noreply,
      socket
      |> assign(:loading, false)
@@ -474,8 +463,7 @@ defmodule YscWeb.TicketQrLive do
      |> assign(:tickets, data.tickets)
      |> assign(:ticket_count, data.ticket_count)
      |> assign(:order_id, data.order_id)
-     |> assign(:order_reference, data.order_reference)
-     |> assign(:google_wallet_ticket_urls, google_wallet_urls)}
+     |> assign(:order_reference, data.order_reference)}
   end
 
   def handle_async(:load_ticket_data, {:exit, reason}, socket) do
@@ -586,11 +574,6 @@ defmodule YscWeb.TicketQrLive do
     "None of these tickets can be used at the door. They may have been cancelled or refunded. Write to info@ysc.org if that looks wrong."
   end
 
-  # Google Wallet loads tickets by owner; the public page has already
-  # authorized every ticket it shows via the signed token.
-  defp wallet_owner(%{assigns: %{public?: true}}), do: :any
-  defp wallet_owner(socket), do: socket.assigns.current_user.id
-
   defp tickets_for_qr_display(tickets, mode \\ :member) do
     tickets
     |> Enum.filter(&TicketTierHelpers.check_in_ticket?/1)
@@ -614,7 +597,8 @@ defmodule YscWeb.TicketQrLive do
       tier_name: ticket.ticket_tier.name,
       holder_name: holder,
       qr_token: QrToken.sign_ticket(ticket.id),
-      apple_href: apple_wallet_href(ticket, mode)
+      apple_href: apple_wallet_href(ticket, mode),
+      google_href: google_wallet_href(ticket, mode)
     }
   end
 
@@ -622,6 +606,12 @@ defmodule YscWeb.TicketQrLive do
 
   defp apple_wallet_href(ticket, :public),
     do: ~p"/t/#{AccessToken.sign_ticket(ticket.id)}/apple"
+
+  defp google_wallet_href(ticket, :member),
+    do: ~p"/wallet/tickets/#{ticket.id}/google"
+
+  defp google_wallet_href(ticket, :public),
+    do: ~p"/t/#{AccessToken.sign_ticket(ticket.id)}/google"
 
   defp safe_return_to(path)
        when is_binary(path) and byte_size(path) > 0 do
@@ -638,30 +628,6 @@ defmodule YscWeb.TicketQrLive do
     case DateTimeFormatter.format_time(start_time) do
       nil -> date_str
       time -> "#{date_str} at #{time}"
-    end
-  end
-
-  defp generate_google_wallet_ticket_urls(tickets, owner) do
-    ticket_ids = Enum.map(tickets, & &1.id)
-
-    case GoogleWallet.generate_ticket_save_urls(ticket_ids, owner) do
-      {:error, :not_configured} ->
-        %{}
-
-      {:ok, results} ->
-        Enum.reduce(results, %{}, fn
-          {ticket_id, {:ok, url}}, acc ->
-            Map.put(acc, ticket_id, url)
-
-          {ticket_id, {:error, reason}}, acc ->
-            Ysc.Logging.error(
-              "Failed to generate Google Wallet URL for ticket",
-              ticket_id: ticket_id,
-              error: inspect(reason)
-            )
-
-            acc
-        end)
     end
   end
 end
