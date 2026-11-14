@@ -107,6 +107,29 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLiveTest do
                ~p"/family-invite/#{invite.token}/accept"
     end
 
+    test "treats a Gmail alias on a legacy invite row as the invited mailbox",
+         %{
+           conn: conn
+         } do
+      n = System.unique_integer([:positive])
+      canonical = "invitee#{n}@gmail.com"
+      dotted = "in.vite.e#{n}+ysc@gmail.com"
+
+      invite = create_family_invite(%{email: canonical})
+
+      invite
+      |> Ecto.Changeset.change(%{email: dotted})
+      |> Repo.update!()
+
+      invited_user = user_fixture(%{email: canonical})
+      conn = log_in_user(conn, invited_user)
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               live(conn, ~p"/family-invite/#{invite.token}/logout-required")
+
+      assert to == ~p"/family-invite/#{invite.token}/accept"
+    end
+
     test "sends an already-linked invited user back to the accept page", %{
       conn: conn
     } do

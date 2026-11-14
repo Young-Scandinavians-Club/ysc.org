@@ -34,9 +34,10 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         current_user = socket.assigns[:current_user]
 
         invite_email_matches_current_user? =
-          current_user &&
-            String.downcase(String.trim(current_user.email)) ==
-              String.downcase(String.trim(invite.email))
+          FamilyInvites.emails_match?(
+            current_user && current_user.email,
+            invite.email
+          )
 
         already_on_family? =
           case current_user do
