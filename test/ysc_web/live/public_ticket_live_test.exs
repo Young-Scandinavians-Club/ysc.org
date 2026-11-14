@@ -97,8 +97,8 @@ defmodule YscWeb.PublicTicketLiveTest do
       html = render_async(view)
       {:ok, doc} = Floki.parse_fragment(html)
 
-      assert length(Floki.find(doc, "a[href*='pay.google.com/gp/v/save/']")) ==
-               2
+      assert length(Floki.find(doc, "a[href$='/google']")) == 2
+      refute html =~ "pay.google.com"
     end)
   end
 
@@ -108,9 +108,17 @@ defmodule YscWeb.PublicTicketLiveTest do
     %{tickets: [ticket]} = granted_tickets(1)
 
     with_google_wallet_credentials(fn ->
-      conn = get(conn, "/t/#{AccessToken.sign_ticket(ticket.id)}/google")
+      {conn, ticket_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            get(conn, "/t/#{AccessToken.sign_ticket(ticket.id)}/google")
+          end,
+          pattern: ~r/FROM "tickets"/i,
+          caller_pids: [self()]
+        )
 
       assert redirected_to(conn) =~ "https://pay.google.com/gp/v/save/"
+      assert ticket_queries == 1
     end)
   end
 end

@@ -67,6 +67,22 @@ defmodule Ysc.AppleWalletTest do
     {user, ticket}
   end
 
+  defp confirmed_donation_ticket(user, event_id) do
+    tier = ticket_tier_fixture(%{event_id: event_id, type: :donation})
+
+    %Ysc.Events.Ticket{
+      id: Ecto.ULID.generate(),
+      event_id: event_id,
+      user_id: user.id,
+      ticket_tier_id: tier.id,
+      status: :confirmed,
+      expires_at:
+        DateTime.add(DateTime.utc_now(), 1, :day)
+        |> DateTime.truncate(:second)
+    }
+    |> Repo.insert!()
+  end
+
   # ---------------------------------------------------------------------------
   # configured?/1
   # ---------------------------------------------------------------------------
@@ -193,6 +209,19 @@ defmodule Ysc.AppleWalletTest do
       with_fake_certs(fn ->
         assert {:error, :not_found} =
                  AppleWallet.generate_ticket_pass(cancelled.id, :any)
+      end)
+    end
+
+    test "rejects a confirmed donation ticket" do
+      {user, ticket} = member_with_confirmed_ticket()
+      donation = confirmed_donation_ticket(user, ticket.event_id)
+
+      with_fake_certs(fn ->
+        assert {:error, :not_found} =
+                 AppleWallet.generate_ticket_pass(donation.id, user.id)
+
+        assert {:error, :not_found} =
+                 AppleWallet.generate_ticket_pass(donation.id, :any)
       end)
     end
 
