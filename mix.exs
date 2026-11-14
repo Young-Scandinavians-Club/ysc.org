@@ -206,6 +206,9 @@ defmodule Ysc.MixProject do
       # WebTransport, unix sockets, cookies/1, function request bodies,
       # or insecure. Requires webtransport ~> 0.5.3, certifi ~> 2.18.0,
       # quic ~> 2.6.1, h2 ~> 0.15.0 (we pin 0.15.1).
+      # 4.11.0/4.11.1 need idna ~> 8.0.0; swoosh still lists
+      # idna >= 6.0.0 and < 8.0.0 (1.28.1 and 1.29.3). Do not override
+      # idna 8 until swoosh allows it.
       {:hackney, "~> 4.10.2", override: true},
       # 0.12.0: serve_socket/2 for embedders that own the TLS listener; handshake
       # now runs in the per-connection process. We do not start h2 servers;
@@ -247,7 +250,8 @@ defmodule Ysc.MixProject do
       # Unused in app code; hackney 4.10.2 needs it. Pin the floor so
       # hackney's ~> 0.15.0 cannot resolve below the close fix. Do not
       # take 0.16.0: hackney still lists ~> 0.15.0; 0.16.0 is opt-in
-      # max_body_size (default infinity).
+      # max_body_size (default infinity). hackney 4.11.x needs h2 0.17
+      # and idna 8; blocked on swoosh's idna < 8.0.0.
       {:h2, "~> 0.15.1", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
@@ -303,7 +307,13 @@ defmodule Ysc.MixProject do
       {:ecto_sql, "~> 3.13"},
       {:ecto_ulid, "~> 0.3"},
       {:eqrcode, "~> 0.2"},
-      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
+      # 0.10.1: bin_path/0 no longer calls target/0 when :path is set, so
+      # start does not raise on an architecture without an esbuild build
+      # if MIX_ESBUILD_PATH (or config :esbuild, :path) points at a
+      # working executable. We do not set :path; the Mix wrapper still
+      # downloads into _build. Public APIs (bin_path/0, run/2,
+      # install_and_run/2, configured_version/0) are unchanged.
+      {:esbuild, "~> 0.10.1", runtime: Mix.env() == :dev},
       {:ex_aws_s3, "~> 2.5"},
       {:ex_aws, "~> 2.7"},
       {:ex_cldr_calendars, "~> 2.4"},
