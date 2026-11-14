@@ -2170,6 +2170,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       html = render(view)
 
       assert has_element?(view, "#update-payment-method-modal")
+      assert has_element?(view, "#payment-method-modal-actions")
       assert has_element?(view, "#payment-add-new-divider")
       assert html =~ "Payment method"
       assert html =~ "Add a payment method"

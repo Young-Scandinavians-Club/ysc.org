@@ -341,7 +341,7 @@ defmodule YscWeb.UserSettingsLive do
             </div>
           </div>
           <%!-- Modal footer --%>
-          <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-200">
+          <.form_actions id="payment-method-modal-actions">
             <.button
               patch={~p"/users/membership"}
               variant="outline"
@@ -361,7 +361,7 @@ defmodule YscWeb.UserSettingsLive do
             >
               Save payment method
             </.button>
-          </div>
+          </.form_actions>
         </.modal>
 
         <.account_settings_nav

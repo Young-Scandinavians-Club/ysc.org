@@ -10,13 +10,14 @@ defmodule Ysc.LoggingTest do
           Ysc.Logging.quiet(fn -> Ysc.Logging.error("quiet boom") end)
         end)
 
-      assert quiet_log =~ "[warning]"
-      refute quiet_log =~ "[error]"
+      # capture_log is process-global; match this message, not any concurrent [error].
+      assert quiet_log =~ "[warning] quiet boom"
+      refute quiet_log =~ "[error] quiet boom"
 
       loud_log =
         ExUnit.CaptureLog.capture_log(fn -> Ysc.Logging.error("loud boom") end)
 
-      assert loud_log =~ "[error]"
+      assert loud_log =~ "[error] loud boom"
     end
 
     test "is only active inside the function and restores afterwards" do

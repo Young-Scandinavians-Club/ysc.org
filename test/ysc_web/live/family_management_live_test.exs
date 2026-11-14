@@ -137,6 +137,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
 
       assert has_element?(view, "#family-member-modal")
       assert has_element?(view, "#family-member-form")
+      assert has_element?(view, "#family-member-form-actions")
 
       view
       |> form("#family-member-form",
@@ -387,6 +388,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
       |> render_click()
 
       assert has_element?(view, "#invite-family-member-modal")
+      assert has_element?(view, "#invite-family-member-form-actions")
 
       view
       |> form("#invite-family-member-form",

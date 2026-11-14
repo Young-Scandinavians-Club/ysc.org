@@ -662,7 +662,7 @@ defmodule YscWeb.FamilyManagementLive do
           />
         </div>
 
-        <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-200">
+        <.form_actions id="family-member-form-actions">
           <.button
             type="button"
             variant="outline"
@@ -674,7 +674,7 @@ defmodule YscWeb.FamilyManagementLive do
           <.button type="submit" phx-disable-with="Saving...">
             Save family member
           </.button>
-        </div>
+        </.form_actions>
       </.form>
     </.modal>
 
@@ -720,7 +720,7 @@ defmodule YscWeb.FamilyManagementLive do
           disabled={not @can_send_invite}
         />
 
-        <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-200">
+        <.form_actions id="invite-family-member-form-actions">
           <.button
             type="button"
             variant="outline"
@@ -736,7 +736,7 @@ defmodule YscWeb.FamilyManagementLive do
           >
             Send Invitation
           </.button>
-        </div>
+        </.form_actions>
       </.form>
     </.modal>
     """
