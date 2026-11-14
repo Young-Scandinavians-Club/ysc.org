@@ -2,9 +2,12 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <%= if assigns[:granted] do %>
+      <%= cond do %>
+      <% assigns[:donation_only] -> %>
+      <strong>Your donation is confirmed</strong>
+      <% assigns[:granted] -> %>
       <strong>Your tickets are ready</strong>
-      <% else %>
+      <% true -> %>
       <strong>Your tickets are confirmed</strong>
       <% end %>
     </mj-text>
@@ -16,9 +19,12 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Hej <%= @first_name %>, </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <%!-- Jobs queued before QR cards existed lack these assigns; keep them renderable. --%>
-    <%= if assigns[:granted] do %>
+    <%= cond do %>
+    <% assigns[:donation_only] -> %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Thank you for your donation to the Young Scandinavians Club. This email is your receipt. </mj-text>
+    <% assigns[:granted] -> %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> YSC has issued you tickets for the event below. Your tickets are ready, and you can show them at the door straight from this email. </mj-text>
-    <% else %>
+    <% true -> %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Thank you for your ticket purchase! Your order has been confirmed and your tickets are ready. </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
@@ -134,13 +140,17 @@
       </span>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <%= if assigns[:granted] do %>Issued on:<% else %>Purchase Date:<% end %> <strong><%= @purchase_date %></strong>
+      <%= cond do %>
+      <% assigns[:donation_only] -> %>Donation Date:
+      <% assigns[:granted] -> %>Issued on:
+      <% true -> %>Purchase Date:
+      <% end %> <strong><%= @purchase_date %></strong>
     </mj-text>
     <mj-spacer height="16px"></mj-spacer>
     <!-- Ticket Details Table -->
     <mj-table css-class="table" padding="12px 0">
       <tr style="border-bottom:1px solid #e0e0e0;">
-        <td style="padding: 12px 16px; font-weight:bold; font-size:16px;">Ticket</td>
+        <td style="padding: 12px 16px; font-weight:bold; font-size:16px;"><%= if assigns[:donation_only], do: "Donation", else: "Ticket" %></td>
         <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:center;">Qty</td>
         <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Price</td>
         <td style="padding: 12px 16px; font-weight:bold; font-size:16px; text-align:right;">Total</td>
@@ -246,7 +256,11 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> We look forward to seeing you at the event! </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
+    <%= if assigns[:donation_only] do %>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Tack så mycket! (Thank you so much!) </mj-text>
+    <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"> Vi ses snart! (See you soon!) 👋</mj-text>
+    <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">The Young Scandinavians Club</mj-text>
     <mj-spacer height="12px"></mj-spacer>

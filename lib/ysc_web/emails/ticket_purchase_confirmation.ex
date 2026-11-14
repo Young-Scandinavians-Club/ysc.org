@@ -32,6 +32,8 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
 
   def get_subject(email_data \\ %{})
 
+  def get_subject(%{donation_only: true}), do: "Your donation is confirmed"
+
   def get_subject(%{granted: true}), do: "Your tickets are ready! 🎫"
 
   def get_subject(_email_data), do: "Your tickets are confirmed! 🎫"
