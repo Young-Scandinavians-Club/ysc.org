@@ -45,6 +45,10 @@ defmodule YscWeb.TrixUploadsControllerTest do
     :unicode.characters_to_binary(html, :utf8, {:utf16, :little})
   end
 
+  defp utf16_be_html_without_bom(html) do
+    :unicode.characters_to_binary(html, :utf8, {:utf16, :big})
+  end
+
   defp write_tmp(content, filename) do
     path = "/tmp/trix_test_#{System.unique_integer([:positive])}_#{filename}"
     File.write!(path, content)
@@ -67,6 +71,30 @@ defmodule YscWeb.TrixUploadsControllerTest do
     |> Map.put(:secret_key_base, secret_key_base)
     |> Plug.Test.init_test_session(%{})
     |> Plug.Conn.put_session(:user_token, token)
+  end
+
+  defp with_recording_uploader(fun) do
+    original = Application.get_env(:ysc, :media_s3_uploader)
+    Ysc.Media.RecordingTestS3Uploader.reset()
+
+    Application.put_env(
+      :ysc,
+      :media_s3_uploader,
+      Ysc.Media.RecordingTestS3Uploader
+    )
+
+    try do
+      fun.()
+    after
+      Application.put_env(:ysc, :media_s3_uploader, original)
+    end
+  end
+
+  defp uploaded_content_disposition do
+    case Ysc.Media.RecordingTestS3Uploader.last_upload() do
+      {_path, _key, opts} -> Keyword.get(opts, :content_disposition)
+      _ -> nil
+    end
   end
 
   describe "create/2 — no file" do
@@ -316,6 +344,23 @@ defmodule YscWeb.TrixUploadsControllerTest do
 
       assert json_response(conn, 422)["error"] =~ "not allowed"
     end
+
+    test "returns 422 for an iframe-only payload as notes.txt (Finding 79)", %{
+      conn: conn
+    } do
+      path =
+        write_tmp(
+          ~s|<iframe src="javascript:alert(1)"></iframe>|,
+          "notes.txt"
+        )
+
+      conn =
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "notes.txt")
+        })
+
+      assert json_response(conn, 422)["error"] =~ "not allowed"
+    end
   end
 
   describe "FileValidator — image?/1" do
@@ -436,7 +481,14 @@ defmodule YscWeb.TrixUploadsControllerTest do
           "<html><body><script>alert(1)</script></body></html>",
         utf16_le_html("<html><script>alert(1)</script></html>"),
         utf16_be_html("<html><script>alert(1)</script></html>"),
-        utf16_le_html_without_bom("<html><body>phish</body></html>")
+        utf16_le_html_without_bom("<html><body>phish</body></html>"),
+        utf16_be_html_without_bom("<html><body>phish</body></html>"),
+        "<iframe src=javascript:alert(1)></iframe>",
+        ~s|<object data="javascript:alert(1)"></object>|,
+        ~s|<embed src="javascript:alert(1)">|,
+        "<head><title>phish</title></head>",
+        ~s|<math><mi href="javascript:alert(1)">x</mi></math>|,
+        "notes" <> <<0x80, 0xFF>> <> "<html><script>alert(1)</script></html>"
       ]
 
       Enum.each(bypass_payloads, fn payload ->
@@ -455,6 +507,24 @@ defmodule YscWeb.TrixUploadsControllerTest do
         )
 
       assert {:ok, _} = FileValidator.validate_attachment(path, "invoice.pdf")
+    end
+
+    test "still allows ZIP and OLE documents whose streams mention HTML" do
+      zip =
+        write_tmp(
+          "PK" <> <<3, 4>> <> "see <html><script>alert(1)</script></html>",
+          "notes.docx"
+        )
+
+      ole =
+        write_tmp(
+          <<0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1>> <>
+            "see <html><script>alert(1)</script>",
+          "notes.doc"
+        )
+
+      assert {:ok, _} = FileValidator.validate_attachment(zip, "notes.docx")
+      assert {:ok, _} = FileValidator.validate_attachment(ole, "notes.doc")
     end
 
     test "returns an error when the temp file cannot be opened" do
@@ -509,6 +579,85 @@ defmodule YscWeb.TrixUploadsControllerTest do
       url2 = json_response(conn2, 201)["url"]
 
       assert url1 != url2
+    end
+  end
+
+  describe "create/2 — Content-Disposition attachment (Finding 79)" do
+    test "stores non-image attachments as downloads, not inline documents", %{
+      conn: conn
+    } do
+      path = write_tmp("hello world", "report.pdf")
+
+      conn =
+        with_recording_uploader(fn ->
+          post(conn, ~p"/admin/trix-uploads", %{
+            "file" => plain_text_upload(path, "report.pdf")
+          })
+        end)
+
+      assert json_response(conn, 201)["filename"] == "report.pdf"
+
+      assert uploaded_content_disposition() ==
+               ~s[attachment; filename="report.pdf"]
+    end
+
+    test "sanitizes quotes, newlines, and spaces in the download filename", %{
+      conn: conn
+    } do
+      path = write_tmp("hello world", "notes.txt")
+
+      conn =
+        with_recording_uploader(fn ->
+          post(conn, ~p"/admin/trix-uploads", %{
+            "file" => plain_text_upload(path, "Q3 report (final).\"\r\n.txt")
+          })
+        end)
+
+      assert json_response(conn, 201)
+      disposition = uploaded_content_disposition()
+      assert disposition =~ ~r/^attachment; filename="[^"]+"$/
+      refute disposition =~ "\r"
+      refute disposition =~ "\n"
+      refute disposition =~ ~s[filename="Q3 report]
+      assert disposition == ~s[attachment; filename="Q3_report__final_.___.txt"]
+    end
+
+    test "uses a fallback download name when the client filename is empty", %{
+      conn: conn
+    } do
+      path = write_tmp("hello world", "notes.txt")
+
+      conn =
+        with_recording_uploader(fn ->
+          post(conn, ~p"/admin/trix-uploads", %{
+            "file" => plain_text_upload(path, "")
+          })
+        end)
+
+      assert json_response(conn, 201)
+
+      assert uploaded_content_disposition() ==
+               ~s[attachment; filename="download"]
+    end
+
+    test "does not force image uploads to download", %{conn: conn} do
+      path =
+        write_tmp(File.read!("test/support/fixtures/tiny.png"), "photo.png")
+
+      with_recording_uploader(fn ->
+        post(conn, ~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "photo.png")
+        })
+      end)
+
+      dispositions =
+        Enum.map(
+          Ysc.Media.RecordingTestS3Uploader.uploads(),
+          fn {_path, _key, opts} -> Keyword.get(opts, :content_disposition) end
+        )
+
+      assert dispositions != []
+      assert Enum.all?(dispositions, &is_nil/1)
     end
   end
 
