@@ -7602,7 +7602,6 @@ defmodule YscWeb.CoreComponents do
         timezone={@timezone}
         apple_wallet_enabled?={@apple_wallet_membership_enabled?}
         google_wallet_enabled?={@google_wallet_membership_enabled?}
-        google_wallet_url={@google_wallet_membership_url}
         wallet_platform={@wallet_platform}
       />
   """
@@ -7612,7 +7611,6 @@ defmodule YscWeb.CoreComponents do
   attr :timezone, :string, required: true
   attr :apple_wallet_enabled?, :boolean, default: false
   attr :google_wallet_enabled?, :boolean, default: false
-  attr :google_wallet_url, :string, default: nil
   attr :wallet_platform, :atom, required: true
 
   def membership_qr_modal(assigns) do
@@ -7637,10 +7635,9 @@ defmodule YscWeb.CoreComponents do
           </div>
         <% end %>
         <%= if @google_wallet_enabled? &&
-            @wallet_platform in [:google_only, :both] &&
-            @google_wallet_url do %>
+            @wallet_platform in [:google_only, :both] do %>
           <div class="flex justify-center mt-2">
-            <.add_to_google_wallet_button href={@google_wallet_url} />
+            <.add_to_google_wallet_button href={~p"/wallet/membership/google"} />
           </div>
         <% end %>
         <%= if @details do %>

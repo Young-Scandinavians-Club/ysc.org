@@ -161,23 +161,28 @@ defmodule Ysc.GoogleWallet do
   Returns `{:ok, url}` or `{:error, :not_configured | reason}`.
   """
   def generate_membership_save_url(user) do
-    membership_info = membership_wallet_info(user)
+    # Credentials first so an unconfigured environment never hits subscriptions.
+    # Ticket save URLs already skip the DB when Wallet isn't set up.
+    case Credentials.get_credentials() do
+      {:ok, creds} ->
+        membership_info = membership_wallet_info(user)
 
-    with {:creds, {:ok, creds}} <- {:creds, Credentials.get_credentials()},
-         {:ok, jwt} <- sign_membership_jwt(user, creds, membership_info) do
-      {:ok, "#{@save_url_base}/#{jwt}"}
-    else
-      {:creds, {:error, :not_configured}} ->
+        case sign_membership_jwt(user, creds, membership_info) do
+          {:ok, jwt} ->
+            {:ok, "#{@save_url_base}/#{jwt}"}
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "Google Wallet: failed to generate membership save URL",
+              user_id: user.id,
+              error: inspect(reason)
+            )
+
+            {:error, reason}
+        end
+
+      {:error, :not_configured} ->
         {:error, :not_configured}
-
-      {:error, reason} ->
-        Ysc.Logging.error(
-          "Google Wallet: failed to generate membership save URL",
-          user_id: user.id,
-          error: inspect(reason)
-        )
-
-        {:error, reason}
     end
   end
 

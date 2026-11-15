@@ -422,16 +422,39 @@ defmodule Ysc.GoogleWalletTest do
     test "returns {:error, :not_configured} when credentials are not set" do
       user = user_fixture()
 
-      assert {:error, :not_configured} =
-               GoogleWallet.generate_membership_save_url(user)
+      {result, subscription_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> GoogleWallet.generate_membership_save_url(user) end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
+        )
+
+      assert result == {:error, :not_configured}
+      assert subscription_queries == 0
     end
 
     test "returns {:ok, url} with a pay.google.com save URL" do
       user = user_with_active_subscription()
 
       with_fake_credentials(fn ->
-        assert {:ok, url} = GoogleWallet.generate_membership_save_url(user)
+        {result, item_queries} =
+          Ysc.QueryCounter.with_query_counter(
+            fn -> GoogleWallet.generate_membership_save_url(user) end,
+            pattern: ~r/FROM "subscription_items"/i,
+            caller_pids: [self()]
+          )
+
+        {_result, subscription_queries} =
+          Ysc.QueryCounter.with_query_counter(
+            fn -> GoogleWallet.generate_membership_save_url(user) end,
+            pattern: ~r/FROM "subscriptions"/i,
+            caller_pids: [self()]
+          )
+
+        assert {:ok, url} = result
         assert String.starts_with?(url, "https://pay.google.com/gp/v/save/")
+        assert item_queries == 0
+        assert subscription_queries == 1
       end)
     end
 

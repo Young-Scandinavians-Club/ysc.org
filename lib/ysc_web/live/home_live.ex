@@ -104,7 +104,6 @@ defmodule YscWeb.HomeLive do
       apple_wallet_membership_enabled?:
         Ysc.AppleWallet.configured?(:membership),
       google_wallet_membership_enabled?: GoogleWallet.configured?(:membership),
-      google_wallet_membership_url: nil,
       wallet_platform: WalletPlatform.from_socket(socket),
       show_passkey_prompt: false,
       newsletter_subscribed: false
@@ -1463,7 +1462,6 @@ defmodule YscWeb.HomeLive do
               timezone={@timezone}
               apple_wallet_enabled?={@apple_wallet_membership_enabled?}
               google_wallet_enabled?={@google_wallet_membership_enabled?}
-              google_wallet_url={@google_wallet_membership_url}
               wallet_platform={@wallet_platform}
             />
 

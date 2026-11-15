@@ -33,8 +33,8 @@ defmodule Ysc.Subscriptions do
 
   """
   def list_subscriptions(user) do
-    Subscription
-    |> where([s], s.user_id == ^user.id)
+    user
+    |> subscriptions_for_user_query()
     |> preload(:subscription_items)
     |> Repo.all()
   end
@@ -939,6 +939,9 @@ defmodule Ysc.Subscriptions do
   @doc """
   Gets the active subscription for a user (if any).
 
+  Does not preload `:subscription_items`. Callers that need items (admin
+  membership tab) should `Repo.preload(sub, :subscription_items)` themselves.
+
   ## Examples
 
       iex> get_active_subscription(user)
@@ -950,7 +953,8 @@ defmodule Ysc.Subscriptions do
   """
   def get_active_subscription(%Ysc.Accounts.User{} = user) do
     user
-    |> list_subscriptions()
+    |> subscriptions_for_user_query()
+    |> Repo.all()
     |> Enum.find(&active?/1)
   end
 
@@ -2716,6 +2720,10 @@ defmodule Ysc.Subscriptions do
     end)
   end
 
+  defp subscriptions_for_user_query(%{id: user_id}) do
+    from(s in Subscription, where: s.user_id == ^user_id)
+  end
+
   @doc false
   def ci_query_explain_query do
     alias Ysc.Ci.QueryExplain.Fixtures
@@ -2726,6 +2734,13 @@ defmodule Ysc.Subscriptions do
       where: s.user_id == ^user_id,
       preload: :subscription_items
     )
+  end
+
+  @doc false
+  def ci_query_explain_subscriptions_for_user_query do
+    subscriptions_for_user_query(%{
+      id: Ysc.Ci.QueryExplain.Fixtures.ulid()
+    })
   end
 
   @doc false

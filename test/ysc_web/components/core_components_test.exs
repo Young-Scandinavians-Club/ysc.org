@@ -1392,8 +1392,7 @@ defmodule YscWeb.CoreComponentsTest do
           renewal_date: ~U[2027-03-05 06:00:00Z],
           is_sub_account: true,
           primary_name: "Pat Primary"
-        },
-        google_url: "https://pay.google.com/gp/v/save/example"
+        }
       }
 
       html =
@@ -1405,7 +1404,6 @@ defmodule YscWeb.CoreComponentsTest do
           timezone="America/New_York"
           apple_wallet_enabled?={true}
           google_wallet_enabled?={true}
-          google_wallet_url={@google_url}
           wallet_platform={:both}
         />
         """)
@@ -1419,13 +1417,13 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "Add to Apple Wallet"
       assert html =~ ~s(href="/wallet/membership")
       assert html =~ "Add to Google Wallet"
-      assert html =~ "https://pay.google.com/gp/v/save/example"
+      assert html =~ ~s(href="/wallet/membership/google")
+      refute html =~ "pay.google.com"
     end
 
     test "hides wallet badges when the detected platform does not match" do
       assigns = %{
-        token: "membership-qr-token",
-        google_url: "https://pay.google.com/gp/v/save/example"
+        token: "membership-qr-token"
       }
 
       html =
@@ -1436,13 +1434,13 @@ defmodule YscWeb.CoreComponentsTest do
           timezone="Etc/UTC"
           apple_wallet_enabled?={true}
           google_wallet_enabled?={true}
-          google_wallet_url={@google_url}
           wallet_platform={:google_only}
         />
         """)
 
       refute html =~ "Add to Apple Wallet"
       assert html =~ "Add to Google Wallet"
+      assert html =~ ~s(href="/wallet/membership/google")
     end
   end
 end
