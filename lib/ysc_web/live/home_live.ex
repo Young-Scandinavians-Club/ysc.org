@@ -694,7 +694,7 @@ defmodule YscWeb.HomeLive do
                   preferred_type={:optimized}
                 />
                 <div class="absolute top-6 left-6 flex gap-2 z-2 flex-wrap">
-                  <%= if days_since_inserted(event.inserted_at) <= 7 do %>
+                  <%= if days_since_inserted(Map.get(event, :inserted_at)) <= 7 do %>
                     <span class="px-3 py-1 bg-zinc-700 text-white text-xs rounded-sm shadow-lg type-eyebrow">
                       Just Added
                     </span>
