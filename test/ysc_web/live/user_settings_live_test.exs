@@ -1277,6 +1277,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(view, "#member-entitlement-#{entitlement.id}")
       assert html =~ "2 free nights"
       assert html =~ "book the whole cabin"
+      assert html =~ "$200.00"
     end
 
     test "payment pagination prev on first page is a no-op", %{conn: conn} do

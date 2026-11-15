@@ -6245,7 +6245,7 @@ defmodule YscWeb.UserSettingsLive do
         end
 
       :fixed_amount_off ->
-        "#{format_member_money(ent.amount_off)} off"
+        "#{Ysc.MoneyHelper.format_money_safe(ent.amount_off)} off"
 
       _ ->
         "Member savings"
@@ -6284,24 +6284,18 @@ defmodule YscWeb.UserSettingsLive do
     case ent.benefit_kind do
       :free_nights ->
         n = ent.free_nights || 0
-        cap = format_member_money(ent.buyout_max_discount)
+        cap = Ysc.MoneyHelper.format_money_safe(ent.buyout_max_discount)
 
         "#{n} free night#{if n == 1, do: "", else: "s"} (up to #{cap} off when you book the whole cabin)"
 
       :percent_off ->
         pct = ent.percent_off || Decimal.new(0)
-        cap = format_member_money(ent.buyout_max_discount)
+        cap = Ysc.MoneyHelper.format_money_safe(ent.buyout_max_discount)
 
         "#{Decimal.round(pct, 2)}% off your stay (up to #{cap} when booking the whole cabin)"
 
       :fixed_amount_off ->
-        "#{format_member_money(ent.amount_off)} off your stay"
+        "#{Ysc.MoneyHelper.format_money_safe(ent.amount_off)} off your stay"
     end
-  end
-
-  defp format_member_money(nil), do: "—"
-
-  defp format_member_money(%Money{} = m) do
-    Ysc.MoneyHelper.format_money!(m)
   end
 end
