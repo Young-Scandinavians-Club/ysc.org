@@ -693,6 +693,30 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
                  "this membership includes one members-only ticket per event"
              } = json_response(response, 422)
     end
+
+    test "returns 422 when the selection exceeds the tier's per-member limit",
+         %{conn: conn} do
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Guest (+1)",
+          max_per_buyer: 1
+        })
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/payment_intent", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 2}
+        })
+
+      assert %{
+               "error" =>
+                 "this ticket type has a per-member limit that the selection exceeds"
+             } = json_response(response, 422)
+    end
   end
 
   describe "POST /api/v1/app/events/:event_id/tickets/offline_order" do
@@ -842,6 +866,79 @@ defmodule YscWeb.Api.AppTicketsControllerTest do
 
       assert %{"error" => "payment_method must be one of: cash, check, other"} =
                json_response(response, 422)
+    end
+
+    test "returns 422 when the selection exceeds the tier's per-member limit",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Guest (+1)",
+          max_per_buyer: 1
+        })
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 2},
+          "payment_method" => "cash"
+        })
+
+      assert %{
+               "error" =>
+                 "this ticket type has a per-member limit that the selection exceeds"
+             } = json_response(response, 422)
+
+      assert Ysc.Repo.aggregate(Ysc.Events.Ticket, :count) == 0
+    end
+
+    test "returns 422 when the member already holds the per-member limit", %{
+      conn: conn
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      member = member_with_active_membership()
+      event = event_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Guest (+1)",
+          max_per_buyer: 1
+        })
+
+      admin = user_fixture(%{role: :admin})
+
+      assert {:ok, _} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 member.id,
+                 event.id,
+                 %{tier.id => 1},
+                 skip_email: true
+               )
+
+      response =
+        post(conn, ~p"/api/v1/app/events/#{event.id}/tickets/offline_order", %{
+          "member_id" => member.id,
+          "tiers" => %{tier.id => 1},
+          "payment_method" => "cash"
+        })
+
+      assert %{
+               "error" =>
+                 "this ticket type has a per-member limit that the selection exceeds"
+             } = json_response(response, 422)
+
+      tickets =
+        Ysc.Events.Ticket
+        |> Ysc.Repo.all()
+        |> Enum.filter(&(&1.ticket_tier_id == tier.id))
+
+      assert length(tickets) == 1
     end
 
     test "rejects a sale to a member without an active membership", %{

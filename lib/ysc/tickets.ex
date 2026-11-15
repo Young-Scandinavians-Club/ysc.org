@@ -3321,16 +3321,22 @@ defmodule Ysc.Tickets do
     )
   end
 
-  # Enforces per-tier `max_per_buyer` limits for this checkout: tickets the
-  # buyer already holds (confirmed) for the tier plus the selected quantity may
-  # not exceed the limit. The owned-ticket COUNT only runs when a selected tier
-  # actually has a limit. See `Ysc.Events.TierPurchaseLimits`.
-  defp validate_tier_purchase_limits(
-         user,
-         event_id,
-         ticket_selections,
-         ticket_tiers
-       ) do
+  @doc """
+  Enforces per-tier `max_per_buyer` limits for this buyer: tickets they
+  already hold (confirmed) for the tier plus the selected quantity may not
+  exceed the limit.
+
+  The owned-ticket COUNT only runs when a selected tier actually has a limit.
+  See `Ysc.Events.TierPurchaseLimits`. Used by web/card checkout and by
+  in-person cash/check door sales; complimentary admin grants skip this on
+  purpose.
+  """
+  def validate_tier_purchase_limits(
+        user,
+        event_id,
+        ticket_selections,
+        ticket_tiers
+      ) do
     if TierPurchaseLimits.any_limited?(ticket_tiers) do
       owned_by_tier =
         user.id

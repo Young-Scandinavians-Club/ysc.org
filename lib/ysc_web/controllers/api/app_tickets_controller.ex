@@ -26,8 +26,9 @@ defmodule YscWeb.Api.AppTicketsController do
   and tier-sale-window guards, and allow exceeding tier/event capacity
   instead of rejecting the sale — this app is for selling in person *while*
   an event is happening, precisely to solve on-the-spot problems (a tier
-  capped too low, a walk-in after the posted start time). Membership and
-  member-only-tier eligibility are unaffected. A capacity overage doesn't
+  capped too low, a walk-in after the posted start time). Membership,
+  member-only-tier eligibility, and per-buyer `max_per_buyer` limits still
+  apply. A capacity overage doesn't
   fail silently: the response includes `warnings`, computed before the sale
   via `BookingLocker.capacity_warnings/2`, so the app can show the seller
   what they're about to exceed.
@@ -121,7 +122,10 @@ defmodule YscWeb.Api.AppTicketsController do
 
   Capacity and sale-window guards are bypassed here the same way as
   `create_payment_intent/2` — see this module's moduledoc. Donation tiers
-  are rejected, matching `create_payment_intent/2`.
+  are rejected, matching `create_payment_intent/2`. Per-buyer `max_per_buyer`
+  limits still apply: `grant_admin_tickets/5` is the complimentary-grant
+  primitive (web admin comps may exceed a limit), but an in-person cash/check
+  sale should follow the same rule as the card path.
 
   Finding 99: quantities are still capped (`Tickets.max_door_sale_quantity_per_tier/0`
   per tier, `Tickets.max_door_sale_tickets/0` across the order). Door sales
@@ -141,6 +145,13 @@ defmodule YscWeb.Api.AppTicketsController do
          {:ok, selections} <- parse_ticket_selections(tiers),
          {:ok, selected_tiers} <- load_selected_tiers(event.id, selections),
          :ok <- reject_donation_tiers(selected_tiers),
+         :ok <-
+           Tickets.validate_tier_purchase_limits(
+             member,
+             event.id,
+             selections,
+             selected_tiers
+           ),
          {:ok, payment_method} <- parse_offline_payment_method(params),
          warnings <-
            BookingLocker.capacity_warnings(event.id, selections,
@@ -264,8 +275,10 @@ defmodule YscWeb.Api.AppTicketsController do
   end
 
   # `grant_admin_tickets/5` itself does not gate on membership (admins grant
-  # comps to non-members). An in-person sale should follow the same rule as
-  # the card path (`Tickets.create_ticket_order/3`), so enforce it here.
+  # comps to non-members) or `max_per_buyer`. An in-person sale should follow
+  # the same rule as the card path (`Tickets.create_ticket_order/3`), so
+  # membership is checked here and per-buyer limits via
+  # `Tickets.validate_tier_purchase_limits/4`.
   defp require_active_membership(member) do
     if Accounts.has_active_membership?(member) do
       :ok
