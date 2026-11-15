@@ -511,7 +511,14 @@ defmodule Ysc.MixProject do
       # 1.28.0: TurboSMTP adapter. 1.28.1: Customer.io CC. We use AmazonSES, so
       # both are unused.
       {:swoosh, "~> 1.28.1"},
-      {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
+      # 0.5.2: httpc download uses max_header_size: 32_768 so GitHub
+      # release redirects do not fail with {:header_too_long, {:max, 10240}}
+      # on OTP 27+ (default max is 10240). Also fixes "overide" →
+      # "override" in the proxy/cert error message. Public APIs
+      # (bin_path/1, run/2, install_and_run/2, configured_version/0)
+      # are unchanged. We do not set :path; the Mix wrapper still
+      # downloads into _build. Tailwind CSS stays 4.3.3.
+      {:tailwind, "~> 0.5.2", runtime: Mix.env() == :dev},
       # 1.2.0: tags may be a 1-arity function (supersedes tag_values in docs).
       # tag_values is still supported and emits no deprecation warning. We keep
       # tag_values because PromEx/Peep, LiveDashboard, and prometheus_core still
