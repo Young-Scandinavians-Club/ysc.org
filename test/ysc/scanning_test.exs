@@ -2225,6 +2225,35 @@ defmodule Ysc.ScanningTest do
       assert Scanning.member_checked_in?(session.id, user.id) == true
     end
 
+    test "auto check-in does not reload the operator or scan session", %{
+      session: session
+    } do
+      user = make_active_member()
+      token = QrToken.sign_membership(user.id)
+
+      {_result, user_selects} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.process_scan(session, token) end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      # One SELECT for the scanned member. Operator FK comes from the session.
+      assert user_selects == 1
+
+      {_result, session_selects} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            other = make_active_member()
+            Scanning.process_scan(session, QrToken.sign_membership(other.id))
+          end,
+          pattern: ~r/FROM "scan_sessions"/i,
+          caller_pids: [self()]
+        )
+
+      assert session_selects == 0
+    end
+
     test "inactive member is scanned but not automatically checked in", %{
       session: session
     } do
@@ -2336,6 +2365,68 @@ defmodule Ysc.ScanningTest do
                       }}
 
       assert session_id == session.id
+    end
+
+    test "does not reload member, operator, or session after insert", %{
+      session: session,
+      admin: admin
+    } do
+      user =
+        make_active_member()
+        |> Ecto.Changeset.change(%{
+          board_bio: "bio check_in_member must not load"
+        })
+        |> Ysc.Repo.update!()
+
+      {{:ok, check_in}, user_selects} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.check_in_member(session, user, admin) end,
+          pattern: ~r/FROM "users"/i,
+          caller_pids: [self()]
+        )
+
+      refute Ecto.assoc_loaded?(check_in.user)
+      refute Ecto.assoc_loaded?(check_in.checked_in_by)
+      refute Ecto.assoc_loaded?(check_in.scan_session)
+      assert user_selects == 0
+    end
+
+    test "does not SELECT password hashes, bios, or scan sessions on check-in",
+         %{
+           session: session,
+           admin: admin
+         } do
+      user =
+        make_active_member()
+        |> Ecto.Changeset.change(%{
+          board_bio: "bio check_in_member must not load"
+        })
+        |> Ysc.Repo.update!()
+
+      {_result, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.check_in_member(session, user, admin) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+
+      other =
+        make_active_member()
+        |> Ecto.Changeset.change(%{
+          board_bio: "bio check_in_member must not load"
+        })
+        |> Ysc.Repo.update!()
+
+      {_result, extra_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Scanning.check_in_member(session, other, admin) end,
+          pattern: ~r/board_bio|FROM "scan_sessions"/i,
+          caller_pids: [self()]
+        )
+
+      assert extra_cols == 0
     end
   end
 

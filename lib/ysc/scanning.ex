@@ -385,9 +385,10 @@ defmodule Ysc.Scanning do
     case process_membership_scan_for_user(session, user_id) do
       {:ok, result} ->
         if result.status == :active do
-          user = result.user
-          checked_in_by = Repo.get!(Ysc.Accounts.User, session.created_by_id)
-          check_in_member(session, user, checked_in_by)
+          # Only the operator FK is stored. Loading the full User (password
+          # hash, bios) was unused: check_in_member persists `.id`, and the
+          # desk LiveView reloads the slim checked-in list from PubSub.
+          check_in_member(session, result.user, %User{id: session.created_by_id})
         end
 
         {:ok, result}
@@ -1288,9 +1289,11 @@ defmodule Ysc.Scanning do
 
     case Repo.insert(changeset) do
       {:ok, check_in} ->
-        check_in =
-          Repo.preload(check_in, [:user, :checked_in_by, :scan_session])
-
+        # Do not preload `:user`, `:checked_in_by`, or `:scan_session`.
+        # AdminMembershipCheckInLive matches only `session_id` and reloads
+        # the slim desk list (`checkin_user_query/0`). Ticket check-in
+        # still slim-preloads because EventCheckInLive applies the ticket
+        # from the PubSub payload.
         broadcast_membership_checkin(
           session.id,
           %MessagePassingEvents.MemberCheckedIn{
