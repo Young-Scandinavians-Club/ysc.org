@@ -45,49 +45,48 @@ defmodule YscWeb.MembershipQrTest do
 
       assert updated.assigns.membership_qr_details.member_since ==
                ~D[2019-06-15]
-
-      assert updated.assigns.google_wallet_membership_url == nil
     end
 
-    test "leaves the google wallet url unset when credentials are missing" do
+    test "does not query subscriptions when opening the modal" do
       user = user_fixture()
       membership = %{type: :lifetime, awarded_at: ~D[2019-06-15]}
 
-      updated =
-        MembershipQr.show(
-          socket(%{
-            current_user: user,
-            current_membership: membership,
-            is_sub_account: false,
-            primary_user: nil,
-            google_wallet_membership_enabled?: true
-          }),
-          user
+      {_updated, subscription_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            MembershipQr.show(
+              socket(%{
+                current_user: user,
+                current_membership: membership,
+                is_sub_account: false,
+                primary_user: nil,
+                google_wallet_membership_enabled?: true
+              }),
+              user
+            )
+          end,
+          pattern: ~r/FROM "subscriptions"/i,
+          caller_pids: [self()]
         )
 
-      assert updated.assigns.show_membership_qr
-      assert updated.assigns.google_wallet_membership_url == nil
+      assert subscription_queries == 0
     end
   end
 
   describe "hide/1" do
-    test "clears the modal assigns and leaves the google wallet url" do
+    test "clears the modal assigns" do
       updated =
         MembershipQr.hide(
           socket(%{
             show_membership_qr: true,
             membership_qr_token: "token",
-            membership_qr_details: %{type_label: "Family Membership"},
-            google_wallet_membership_url: "https://pay.google.com/example"
+            membership_qr_details: %{type_label: "Family Membership"}
           })
         )
 
       refute updated.assigns.show_membership_qr
       assert updated.assigns.membership_qr_token == nil
       assert updated.assigns.membership_qr_details == nil
-
-      assert updated.assigns.google_wallet_membership_url ==
-               "https://pay.google.com/example"
     end
   end
 end

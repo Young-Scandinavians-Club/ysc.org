@@ -419,6 +419,41 @@ defmodule Ysc.SubscriptionsTest do
       assert found.id == sub.id
     end
 
+    test "get_active_subscription/1 does not load subscription_items", %{
+      user: user
+    } do
+      future = DateTime.add(DateTime.utc_now(), 30, :day)
+
+      {:ok, sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_items_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: future
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: sub.id,
+          stripe_id: "si_items_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_items",
+          stripe_price_id: "price_items",
+          quantity: 1
+        })
+
+      {found, item_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Subscriptions.get_active_subscription(user) end,
+          pattern: ~r/FROM "subscription_items"/i,
+          caller_pids: [self()]
+        )
+
+      assert found.id == sub.id
+      assert item_queries == 0
+      assert %Ecto.Association.NotLoaded{} = found.subscription_items
+    end
+
     test "change_membership_plan/3 returns error for lifetime plan" do
       assert {:error, "Lifetime memberships cannot be changed"} =
                Subscriptions.change_membership_plan(

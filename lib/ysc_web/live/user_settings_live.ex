@@ -1619,7 +1619,6 @@ defmodule YscWeb.UserSettingsLive do
             timezone={@timezone}
             apple_wallet_enabled?={@apple_wallet_membership_enabled?}
             google_wallet_enabled?={@google_wallet_membership_enabled?}
-            google_wallet_url={@google_wallet_membership_url}
             wallet_platform={@wallet_platform}
           />
 
@@ -2510,7 +2509,6 @@ defmodule YscWeb.UserSettingsLive do
         :google_wallet_membership_enabled?,
         GoogleWallet.configured?(:membership)
       )
-      |> assign(:google_wallet_membership_url, nil)
       |> assign(:wallet_platform, WalletPlatform.from_socket(socket))
       |> assign(:user_avatars, [])
       |> assign(:current_avatar_url, nil)

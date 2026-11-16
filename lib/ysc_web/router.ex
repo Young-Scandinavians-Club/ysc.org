@@ -500,6 +500,7 @@ defmodule YscWeb.Router do
 
     get "/expensereport/files/:encoded_path", ExpenseReportFileController, :show
     get "/wallet/tickets/:ticket_id", AppleWalletController, :ticket
+    get "/wallet/membership/google", GoogleWalletController, :membership
     get "/wallet/membership", AppleWalletController, :membership
 
     live_session :require_authenticated_user,
