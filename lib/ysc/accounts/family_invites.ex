@@ -146,6 +146,18 @@ defmodule Ysc.Accounts.FamilyInvites do
   def child_invite?(%FamilyInvite{relationship: relationship}),
     do: child_relationship?(relationship)
 
+  @doc """
+  Returns true when two addresses are the same mailbox after
+  `Ysc.Accounts.Email` normalization (trim, case, Gmail dots / plus-tags /
+  googlemail.com). Non-binaries never match.
+  """
+  def emails_match?(user_email, invite_email)
+      when is_binary(user_email) and is_binary(invite_email) do
+    Email.equiv?(user_email, invite_email)
+  end
+
+  def emails_match?(_, _), do: false
+
   defp child_relationship?(relationship),
     do: relationship not in [:spouse, "spouse"]
 
@@ -191,7 +203,7 @@ defmodule Ysc.Accounts.FamilyInvites do
       token = FamilyInvite.build_token()
 
       attrs = %{
-        email: String.downcase(String.trim(email)),
+        email: Email.normalize(email),
         token: token,
         primary_user_id: primary_user.id,
         created_by_user_id: primary_user.id,
@@ -715,13 +727,6 @@ defmodule Ysc.Accounts.FamilyInvites do
   defp relationship_label(:spouse), do: "spouse"
   defp relationship_label("spouse"), do: "spouse"
   defp relationship_label(_), do: "child"
-
-  defp emails_match?(user_email, invite_email)
-       when is_binary(user_email) and is_binary(invite_email) do
-    Email.normalize(user_email) == Email.normalize(invite_email)
-  end
-
-  defp emails_match?(_, _), do: false
 
   defp invite_email_matches_attrs?(%FamilyInvite{} = invite, user_attrs)
        when is_map(user_attrs) do

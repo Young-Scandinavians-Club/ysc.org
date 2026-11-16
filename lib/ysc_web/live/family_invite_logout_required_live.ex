@@ -44,8 +44,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
 
       true ->
         invite_email_matches_current_user? =
-          String.downcase(String.trim(current_user.email)) ==
-            String.downcase(String.trim(invite.email))
+          FamilyInvites.emails_match?(current_user.email, invite.email)
 
         # Matching email belongs on the accept page (join, or leave-family
         # instructions if they are already a linked family member).
