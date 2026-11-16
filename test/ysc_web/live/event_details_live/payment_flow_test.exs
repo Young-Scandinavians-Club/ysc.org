@@ -126,9 +126,21 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
+      test_pid = self()
 
+      # LiveView handles :create_checkout_payment_intent as soon as
+      # handle_event returns. Block Stripe so cancel wins the race that CI
+      # otherwise loses when the mock returns immediately.
       stub(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
-        {:ok, build_payment_intent(%{amount: params.amount})}
+        send(test_pid, {:deferred_pi_create, self()})
+
+        receive do
+          :continue_deferred_pi_create ->
+            {:ok, build_payment_intent(%{amount: params.amount})}
+        after
+          5_000 ->
+            raise "timed out waiting to continue deferred PaymentIntent create"
+        end
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
@@ -140,6 +152,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert html =~ ~s(id="checkout-payment-loading")
       refute html =~ ~s(id="payment-element")
 
+      assert_receive {:deferred_pi_create, stripe_pid}, 1_000
+
       order =
         Tickets.list_user_ticket_orders(user.id)
         |> List.first()
@@ -150,6 +164,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert {:ok, _} =
                Tickets.cancel_ticket_order(order, "started a new checkout")
 
+      send(stripe_pid, :continue_deferred_pi_create)
       render(view)
 
       refute has_element?(view, "#payment-element")
