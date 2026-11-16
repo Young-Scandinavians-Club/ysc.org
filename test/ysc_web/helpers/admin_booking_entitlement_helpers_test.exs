@@ -97,6 +97,25 @@ defmodule YscWeb.AdminBookingEntitlementHelpersTest do
       assert AdminBookingEntitlementHelpers.benefit_summary(ent, :list) ==
                "$25.00 off"
     end
+
+    test "missing amounts render as an em dash" do
+      percent = %BookingEntitlement{
+        benefit_kind: :percent_off,
+        percent_off: Decimal.new("25"),
+        buyout_max_discount: nil
+      }
+
+      assert AdminBookingEntitlementHelpers.benefit_summary(percent, :list) ==
+               "25% off, buyout cap —"
+
+      fixed = %BookingEntitlement{
+        benefit_kind: :fixed_amount_off,
+        amount_off: nil
+      }
+
+      assert AdminBookingEntitlementHelpers.benefit_summary(fixed, :list) ==
+               "— off"
+    end
   end
 
   describe "grant_benefit_kind_options/0" do

@@ -95,6 +95,26 @@ defmodule Ysc.MoneyHelperTest do
     end
   end
 
+  describe "format_money_safe/1" do
+    test "formats Money for admin tables and missing-amount labels" do
+      assert MoneyHelper.format_money_safe(Money.new(:USD, "10.99")) == "$10.99"
+
+      assert MoneyHelper.format_money_safe(Money.new(:USD, "1000.00")) ==
+               "$1,000.00"
+    end
+
+    test "places negative sign before currency symbol" do
+      assert MoneyHelper.format_money_safe(Money.new(:USD, "-123.00")) ==
+               "-$123.00"
+    end
+
+    test "falls back to an em dash for nil, blank, and non-Money values" do
+      assert MoneyHelper.format_money_safe(nil) == "—"
+      assert MoneyHelper.format_money_safe("") == "—"
+      assert MoneyHelper.format_money_safe(%{amount: Decimal.new(100)}) == "—"
+    end
+  end
+
   describe "cents_to_dollars/1" do
     test "converts integer cents to a decimal dollars amount" do
       assert Decimal.equal?(

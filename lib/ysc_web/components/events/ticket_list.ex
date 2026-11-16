@@ -16,6 +16,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   alias Ysc.Events
   alias Ysc.Events.AttendeeInfo
   alias Ysc.Events.TicketDetail
+  alias Ysc.MoneyHelper
   alias Ysc.Tickets
   alias Ysc.Tickets.DonationDisplay
   alias YscWeb.Admin.DateTimeDisplay
@@ -109,7 +110,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
               {length(group.tickets)} ticket{if length(group.tickets) != 1, do: "s"}
             </span>
             <span class="text-sm font-medium text-zinc-800 shrink-0">
-              {format_money_safe(order_total(group))}
+              {MoneyHelper.format_money_safe(order_total(group))}
             </span>
             <span class="hidden sm:inline text-xs text-zinc-500 whitespace-nowrap shrink-0">
               {DateTimeDisplay.format_pacific_datetime_at(order_purchased_at(group))}
@@ -174,7 +175,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
               </div>
               <div class="w-24 shrink-0 text-right">
                 <div class="text-sm font-medium text-zinc-800">
-                  {format_money_safe(Map.get(ticket_amounts, ticket.id))}
+                  {MoneyHelper.format_money_safe(Map.get(ticket_amounts, ticket.id))}
                 </div>
                 <%= if discount = ticket_reservation_discount(ticket) do %>
                   <div
@@ -182,7 +183,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
                     title="Discount applied from a ticket reservation"
                   >
                     <.icon name="hero-tag" class="w-3 h-3 shrink-0" />
-                    -{format_money_safe(discount)}
+                    -{MoneyHelper.format_money_safe(discount)}
                   </div>
                 <% end %>
               </div>
@@ -366,7 +367,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
         >
           <p class="text-sm text-zinc-600">
             Refunding this ticket will issue a refund of
-            <strong>{format_money_safe(@refund_amount)}</strong>
+            <strong>{MoneyHelper.format_money_safe(@refund_amount)}</strong>
             back to the original payment method and cancel the ticket, releasing it back to stock.
           </p>
 
@@ -1028,9 +1029,6 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   defp blank_to_default(nil, default), do: default
   defp blank_to_default("", default), do: default
   defp blank_to_default(value, _default), do: value
-
-  defp format_money_safe(%Money{} = money), do: Money.to_string!(money)
-  defp format_money_safe(_), do: "—"
 
   @csv_base_headers Enum.sort([
                       "Ticket Reference",

@@ -2,6 +2,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   use YscWeb, :live_component
 
   alias Ysc.Events
+  alias Ysc.MoneyHelper
 
   @impl true
   def render(assigns) do
@@ -156,7 +157,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                         <% :donation -> %>
                           User sets amount
                         <% _ -> %>
-                          {format_money_safe(ticket_tier.price)}
+                          {MoneyHelper.format_money_safe(ticket_tier.price)}
                       <% end %>
                     </.labeled_value>
 
@@ -1084,19 +1085,6 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   end
 
   defp format_date(date), do: Timex.format!(date, "{Mshort} {D}, {YYYY}")
-
-  defp format_money_safe(nil), do: "—"
-  defp format_money_safe(""), do: "—"
-
-  defp format_money_safe(%Money{} = money) do
-    case Ysc.MoneyHelper.format_money(money) do
-      {:ok, formatted} when formatted != "" -> formatted
-      {:error, _} -> "Invalid amount"
-      _ -> "—"
-    end
-  end
-
-  defp format_money_safe(_), do: "—"
 
   # Check if ticket tier is currently active (on sale)
   defp tier_is_active?(ticket_tier) do

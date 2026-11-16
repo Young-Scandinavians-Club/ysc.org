@@ -4,6 +4,7 @@ defmodule YscWeb.AdminBookingEntitlementHelpers do
   """
 
   alias Ysc.Bookings.BookingEntitlement
+  alias Ysc.MoneyHelper
 
   @benefit_kind_options [
     {"percent_off", "Percent off stay",
@@ -78,7 +79,7 @@ defmodule YscWeb.AdminBookingEntitlementHelpers do
         %BookingEntitlement{benefit_kind: :free_nights} = ent,
         :user_detail
       ) do
-    "#{ent.free_nights || "?"} free night(s), buyout cap #{format_money(ent.buyout_max_discount)}"
+    "#{ent.free_nights || "?"} free night(s), buyout cap #{MoneyHelper.format_money_safe(ent.buyout_max_discount)}"
   end
 
   def benefit_summary(
@@ -87,7 +88,7 @@ defmodule YscWeb.AdminBookingEntitlementHelpers do
       ) do
     percent = Decimal.round(ent.percent_off || Decimal.new(0), 0)
 
-    "#{Decimal.to_string(percent)}% off, buyout cap #{format_money(ent.buyout_max_discount)}"
+    "#{Decimal.to_string(percent)}% off, buyout cap #{MoneyHelper.format_money_safe(ent.buyout_max_discount)}"
   end
 
   def benefit_summary(
@@ -95,16 +96,14 @@ defmodule YscWeb.AdminBookingEntitlementHelpers do
         :user_detail
       ) do
     percent = Decimal.to_string(ent.percent_off || Decimal.new(0))
-    "#{percent}% off, buyout cap #{format_money(ent.buyout_max_discount)}"
+
+    "#{percent}% off, buyout cap #{MoneyHelper.format_money_safe(ent.buyout_max_discount)}"
   end
 
   def benefit_summary(
         %BookingEntitlement{benefit_kind: :fixed_amount_off} = ent,
         _context
       ) do
-    "#{format_money(ent.amount_off)} off"
+    "#{MoneyHelper.format_money_safe(ent.amount_off)} off"
   end
-
-  defp format_money(nil), do: "—"
-  defp format_money(m), do: Ysc.MoneyHelper.format_money!(m)
 end
