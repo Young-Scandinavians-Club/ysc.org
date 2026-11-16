@@ -99,12 +99,10 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
       :free_nights ->
         n = ent.free_nights || 0
         nights_word = if n == 1, do: "night", else: "nights"
-        example_nights = if n < 1, do: 2, else: n * 2
 
         "#{n} free #{nights_word} on your next cabin stay. " <>
-          "If you book more nights than that, you still pay for the extra nights — " <>
-          "for example, #{n} free #{nights_word} on a #{example_nights}-night stay " <>
-          "is half off the cabin price."
+          "If you book more nights than that, you still pay for the extra nights. " <>
+          "Your exact savings show on the price summary when you check out."
 
       :percent_off ->
         "#{Decimal.round(ent.percent_off || Decimal.new(0), 2)}% off your next cabin stay."

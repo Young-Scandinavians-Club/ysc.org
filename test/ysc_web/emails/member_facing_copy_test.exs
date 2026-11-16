@@ -408,8 +408,12 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert data.benefit_description =~ "2 free nights on your next cabin stay"
 
       assert data.benefit_description =~
-               "4-night stay is half off the cabin price"
+               "you still pay for the extra nights"
 
+      assert data.benefit_description =~
+               "Your exact savings show on the price summary when you check out"
+
+      refute data.benefit_description =~ "half off"
       refute data.benefit_description =~ "proportionally"
       refute data.benefit_description =~ "subtotal"
       refute data.benefit_description =~ "eligible stay"
@@ -429,7 +433,27 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       html = BookingEntitlementGranted.render(data)
       text = html_text(html)
       assert text =~ "Start a new booking"
+      assert text =~ "you still pay for the extra nights"
+      assert text =~ "Your exact savings show on the price summary"
+      refute text =~ "half off"
       refute text =~ "Start a new reservation"
+    end
+
+    test "free-nights copy stays accurate for a single free night" do
+      user = oauth_user_fixture(%{first_name: "Jane"})
+
+      ent = %BookingEntitlement{
+        benefit_kind: :free_nights,
+        free_nights: 1,
+        buyout_max_discount: Money.new(:USD, 250),
+        property: :clear_lake
+      }
+
+      data = BookingEntitlementGranted.prepare_email_data(ent, user)
+
+      assert data.benefit_description =~ "1 free night on your next cabin stay"
+      refute data.benefit_description =~ "1 free nights"
+      refute data.benefit_description =~ "half off"
     end
   end
 
