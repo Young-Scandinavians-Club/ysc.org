@@ -22,9 +22,9 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
 
   describe "perform/1" do
     test "sends notifications for published event", %{event: event} do
-      # Update event to published state
+      # Update event to published state with admin opt-in
       event
-      |> Event.changeset(%{state: :published})
+      |> Event.changeset(%{state: :published, send_notification: true})
       |> Ysc.Repo.update!()
 
       job = %Oban.Job{
@@ -38,6 +38,52 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
 
       result = EventNotificationWorker.perform(job)
       assert result == :ok
+    end
+
+    test "skips notifications when send_notification is false", %{event: event} do
+      future_start =
+        DateTime.utc_now()
+        |> DateTime.add(86_400, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        Ysc.Accounts.update_notification_preferences(user_fixture(), %{
+          event_notifications: true,
+          account_notifications: true
+        })
+
+      event
+      |> Event.changeset(%{
+        state: :published,
+        send_notification: false,
+        start_date: future_start,
+        start_time: ~T[15:30:00]
+      })
+      |> Ysc.Repo.update!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_id" => event.id},
+        worker: "YscWeb.Workers.EventNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert EventNotificationWorker.perform(job) == :ok
+
+      reloaded = Ysc.Repo.get!(Event, event.id)
+      assert is_nil(reloaded.notification_sent_at)
+      assert is_nil(reloaded.notification_recipient_count)
+
+      refute Ysc.Repo.exists?(
+               from m in Ysc.Messages.MessageIdempotency,
+                 where:
+                   like(
+                     m.idempotency_key,
+                     ^"event_notification_#{event.id}_%"
+                   )
+             )
     end
 
     test "skips notifications for non-published event", %{event: event} do
@@ -97,6 +143,7 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
       event
       |> Event.changeset(%{
         state: :published,
+        send_notification: true,
         start_date: future_date,
         start_time: nil
       })
@@ -125,6 +172,11 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
                  start_time: ~T[10:00:00]
                })
 
+      event =
+        event
+        |> Event.changeset(%{send_notification: true})
+        |> Ysc.Repo.update!()
+
       job = %Oban.Job{
         id: 1,
         args: %{"event_id" => event.id},
@@ -150,12 +202,16 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
           account_notifications: true
         })
 
-      assert {:ok, _} =
+      assert {:ok, updated} =
                Events.update_event(event, %{
                  state: :published,
                  start_date: future_start,
                  start_time: ~T[15:30:00]
                })
+
+      updated
+      |> Event.changeset(%{send_notification: true})
+      |> Ysc.Repo.update!()
 
       job = %Oban.Job{
         id: 1,
@@ -179,6 +235,7 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
       event
       |> Event.changeset(%{
         state: :published,
+        send_notification: true,
         start_date: past_date,
         start_time: past_time
       })
@@ -362,7 +419,11 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
 
       event =
         event
-        |> Event.changeset(%{state: :published, start_date: future_start})
+        |> Event.changeset(%{
+          state: :published,
+          start_date: future_start,
+          send_notification: true
+        })
         |> Ysc.Repo.update!()
 
       email_data = EventNotification.prepare_email_data(event, subscriber)
@@ -422,7 +483,11 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
 
       event =
         event
-        |> Event.changeset(%{state: :published, start_time: ~T[09:00:00]})
+        |> Event.changeset(%{
+          state: :published,
+          start_time: ~T[09:00:00],
+          send_notification: true
+        })
         |> Ysc.Repo.update!()
 
       assert :ok = EventNotificationWorker.send_event_notifications(event)

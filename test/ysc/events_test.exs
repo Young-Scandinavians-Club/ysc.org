@@ -4618,6 +4618,65 @@ defmodule Ysc.EventsTest do
       end)
     end
 
+    test "unpublish cancels a pending notification; republish with false does not blast",
+         %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, published} =
+                 Events.publish_event(event, send_notification: true)
+
+        assert [_job] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert {:ok, draft} = Events.unpublish_event(published, actor: :system)
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert {:ok, republished} =
+                 Events.publish_event(draft, send_notification: false)
+
+        refute republished.send_notification
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert YscWeb.Workers.EventNotificationWorker.perform(%Oban.Job{
+                 id: 1,
+                 args: %{"event_id" => republished.id},
+                 worker: "YscWeb.Workers.EventNotificationWorker",
+                 queue: "bulk_mail",
+                 state: "available",
+                 attempt: 1
+               }) == :ok
+
+        reloaded = Repo.get!(Event, republished.id)
+        assert is_nil(reloaded.notification_sent_at)
+      end)
+    end
+
+    test "publish_event with send_notification false cancels a leftover job",
+         %{event: event} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, published} =
+                 Events.publish_event(event, send_notification: true)
+
+        assert [_job] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        # Simulate a stale pending job surviving into a false publish (e.g. if
+        # unpublish cancel were skipped): publishing with false must clear it.
+        assert {:ok, draft} =
+                 published
+                 |> Event.changeset(%{state: "draft", published_at: nil})
+                 |> Repo.update()
+
+        assert [_stale] =
+                 all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+
+        assert {:ok, republished} =
+                 Events.publish_event(draft, send_notification: false)
+
+        refute republished.send_notification
+        assert [] = all_enqueued(worker: YscWeb.Workers.EventNotificationWorker)
+      end)
+    end
+
     test "editing a published event after the notification has been sent does not re-queue",
          %{event: event} do
       Oban.Testing.with_testing_mode(:manual, fn ->
