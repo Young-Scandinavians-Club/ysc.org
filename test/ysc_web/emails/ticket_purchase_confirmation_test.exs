@@ -750,9 +750,23 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       refute data.granted
 
       html = TicketPurchaseConfirmation.render(data)
+      assert html =~ "Your donation is confirmed"
+
+      assert html =~
+               "Thank you for your donation to the Young Scandinavians Club"
+
+      assert html =~ "This email is your receipt"
+      assert html =~ "Donation Date:"
+      assert html =~ ">Donation</td>"
       assert html =~ "receipt for your donation"
+      assert html =~ "Tack så mycket"
+      refute html =~ "Your tickets are confirmed"
+      refute html =~ "Thank you for your ticket purchase"
+      refute html =~ "Purchase Date:"
+      refute html =~ ">Ticket</td>"
       refute html =~ "View all tickets"
       refute html =~ "show the tickets on your phone"
+      refute html =~ "See you soon"
     end
   end
 
@@ -768,6 +782,12 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
 
       refute TicketPurchaseConfirmation.get_subject(%{granted: true}) =~
                "confirmed"
+
+      assert TicketPurchaseConfirmation.get_subject(%{donation_only: true}) ==
+               "Your donation is confirmed"
+
+      refute TicketPurchaseConfirmation.get_subject(%{donation_only: true}) =~
+               "ticket"
 
       id = Ecto.ULID.generate()
       assert YscWeb.Emails.Helpers.event_url(id) =~ "/events/#{id}"
