@@ -230,7 +230,7 @@
       header_image_url: "http://localhost:4000/images/tahoe-cabin-feature.jpg",
       header_image_alt: "Lake Tahoe cabin",
       benefit_description:
-        "2 free nights on your next cabin stay. If you book more nights than that, you still pay for the extra nights — for example, 2 free nights on a 4-night stay is half off the cabin price.",
+        "2 free nights on your next cabin stay. If you book more nights than that, you still pay for the extra nights. Your exact savings show on the price summary when you check out.",
       property_line: "Cabin: Lake Tahoe.",
       buyout_cap_line: "",
       expiry_line: "This benefit does not expire.",
@@ -389,7 +389,8 @@
       post_title: "Midsummer Picnic Recap",
       replier_name: "Erik Hansen",
       reply_text: "Agreed, the photos turned out great!",
-      comment_url: "http://localhost:4000/posts/midsummer-recap#comments-preview"
+      comment_url:
+        "http://localhost:4000/posts/midsummer-recap#comments-preview"
     },
     "email_changed" => %{
       first_name: "Astrid",
