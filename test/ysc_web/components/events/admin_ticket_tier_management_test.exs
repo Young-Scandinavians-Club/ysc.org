@@ -22,7 +22,30 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
           current_user: user
         })
 
-      assert html =~ "No ticket tiers" or html =~ "Add"
+      assert html =~ ~s(id="ticket-tiers-empty")
+      assert html =~ "No ticket tiers created yet."
+
+      refute html =~
+               "Click &quot;Add Ticket Tier&quot; to create your first ticket tier."
+    end
+
+    test "shows how to add a tier when the actor can create tiers" do
+      event = event_fixture()
+      user = user_fixture()
+
+      html =
+        render_component(TicketTierManagement, %{
+          id: "tier-management",
+          event_id: event.id,
+          current_user: user,
+          admin_role: :admin
+        })
+
+      assert html =~ ~s(id="ticket-tiers-empty")
+      assert html =~ "No ticket tiers created yet."
+
+      assert html =~
+               "Click &quot;Add Ticket Tier&quot; to create your first ticket tier."
     end
 
     test "displays add tier button" do

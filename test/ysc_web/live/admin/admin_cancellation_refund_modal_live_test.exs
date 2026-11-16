@@ -102,6 +102,33 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
   describe "cancelling a published event" do
     setup [:create_admin]
 
+    test "shows empty copy when the cancelled event has no ticket orders", %{
+      conn: conn
+    } do
+      event = event_fixture(%{state: :published})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#cancel-event-btn")
+      |> render_click()
+
+      assert has_element?(view, "#cancellation-refund-modal")
+      assert has_element?(view, "#cancellation-refund-empty")
+
+      assert has_element?(
+               view,
+               "#cancellation-refund-empty",
+               "No ticket orders for this event."
+             )
+
+      assert has_element?(
+               view,
+               "#cancellation-refund-empty",
+               "There's nothing to refund."
+             )
+    end
+
     test "opens a refund modal listing the event's paid orders", %{
       conn: conn
     } do

@@ -68,12 +68,12 @@ defmodule YscWeb.AdminEventsLive.TicketList do
         </div>
       </div>
 
-      <div :if={@tickets == []} class="text-center py-8 text-zinc-500">
-        <p class="font-semibold">No tickets yet.</p>
-        <p class="text-sm">
-          Tickets will appear here once users start buying tickets.
-        </p>
-      </div>
+      <.admin_text_empty
+        :if={@tickets == []}
+        id="ticket-list-empty"
+        title="No tickets yet."
+        description="Tickets will appear here once users start buying tickets."
+      />
 
       <div
         :if={@tickets != []}

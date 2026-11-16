@@ -1,6 +1,8 @@
 defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   use YscWeb, :live_component
 
+  import YscWeb.AdminComponents
+
   alias Ysc.Events
 
   @impl true
@@ -84,15 +86,15 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           </div>
         <% end %>
 
-        <div
+        <.admin_text_empty
           :if={length(@ticket_tiers) == 0}
-          class="text-center py-8 text-zinc-500"
-        >
-          <p class="font-semibold">No ticket tiers created yet.</p>
-          <p :if={can?(@admin_role, :ticket_tier_create)} class="text-sm">
-            Click "Add Ticket Tier" to create your first ticket tier.
-          </p>
-        </div>
+          id="ticket-tiers-empty"
+          title="No ticket tiers created yet."
+          description={
+            if can?(@admin_role, :ticket_tier_create),
+              do: "Click \"Add Ticket Tier\" to create your first ticket tier."
+          }
+        />
 
         <div :if={length(@ticket_tiers) > 0} class="space-y-3 sm:space-y-4">
           <%= for ticket_tier <- @ticket_tiers do %>

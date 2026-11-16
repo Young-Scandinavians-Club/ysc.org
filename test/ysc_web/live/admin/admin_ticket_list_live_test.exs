@@ -122,6 +122,28 @@ defmodule YscWeb.AdminTicketListLiveTest do
     :binary.match(html, "ticket-order-#{order_id}") |> elem(0)
   end
 
+  describe "empty state" do
+    setup [:create_admin]
+
+    test "shows the ticket list empty copy when the event has no tickets", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      assert has_element?(view, "#ticket-list-empty")
+      assert has_element?(view, "#ticket-list-empty", "No tickets yet.")
+
+      assert has_element?(
+               view,
+               "#ticket-list-empty",
+               "Tickets will appear here once users start buying tickets."
+             )
+    end
+  end
+
   describe "order grouping" do
     setup [:create_admin]
 
