@@ -351,6 +351,10 @@ defmodule YscWeb.AdminDashboardLiveTest do
 
       assert has_element?(view, "#revenue-mix-merch", "$60.00")
       assert has_element?(view, "#revenue-mix-merch-bar[style='width: 100%']")
+
+      # Sales ($50) + shipping ($10) must also land in the Financials total,
+      # not only the mix row — otherwise MoM/YTD silently drop shop revenue.
+      assert has_element?(view, "#dashboard-financials", "$60.00")
     end
 
     test "splits the bar between merch and another stream", %{

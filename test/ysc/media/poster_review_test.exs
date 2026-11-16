@@ -174,6 +174,48 @@ defmodule Ysc.Media.PosterReviewTest do
       refute_received {:chat, _, _}
     end
 
+    test "UrlFetchGuard-blocked paths never hit Req or the vision model" do
+      test_pid = self()
+
+      Req.Test.stub(PosterReview, fn conn ->
+        send(test_pid, :fetched)
+        Plug.Conn.send_resp(conn, 200, @png)
+      end)
+
+      for path <- [
+            "file:///etc/passwd",
+            "http://localhost/poster.png",
+            "http://metadata.google.internal/computeMetadata/v1/"
+          ] do
+        assert {:error, :download_failed} =
+                 PosterReview.review(%MediaImage{
+                   raw_image_path: path,
+                   optimized_image_path: path
+                 })
+      end
+
+      refute_received :fetched
+      refute_received {:chat, _, _}
+    end
+
+    test "oversized downloads never reach the vision model" do
+      test_pid = self()
+      # One byte over the 25 MiB cap in PosterReview.
+      oversized = :binary.copy(<<0>>, 25 * 1024 * 1024 + 1)
+
+      Req.Test.stub(PosterReview, fn conn ->
+        send(test_pid, :fetched)
+
+        conn
+        |> Plug.Conn.put_resp_content_type("image/png")
+        |> Plug.Conn.send_resp(200, oversized)
+      end)
+
+      assert {:error, :download_failed} = PosterReview.review(image())
+      assert_received :fetched
+      refute_received {:chat, _, _}
+    end
+
     test "errors when the image has no path" do
       assert {:error, :no_image_path} =
                PosterReview.review(%MediaImage{

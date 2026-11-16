@@ -268,5 +268,45 @@ defmodule YscWeb.AdminEventsPosterQualityLiveTest do
 
       refute has_element?(view, "#cover-image-quality")
     end
+
+    test "discards a stale review when the cover changes mid-flight", ctx do
+      gate = self()
+
+      Application.put_env(
+        :ysc,
+        :open_router_client,
+        Ysc.Test.GatedPosterReviewClient
+      )
+
+      Application.put_env(:ysc, :poster_review_gate, gate)
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :poster_review_gate)
+        Application.delete_env(:ysc, :poster_review_rule)
+      end)
+
+      {_event, view} = edit_event(ctx.conn, ctx.admin)
+      first = poster(1920, 1080)
+      second = poster(1920, 1080)
+
+      Application.put_env(:ysc, :poster_review_rule, "embedded_text")
+      pick_cover(view, first)
+
+      assert_receive {:poster_review_waiting, first_task}, 1_000
+
+      Application.put_env(:ysc, :poster_review_rule, "collage_or_border")
+      pick_cover(view, second)
+
+      assert_receive {:poster_review_waiting, second_task}, 1_000
+      refute first_task == second_task
+
+      # Late completion of the cancelled first review must not win.
+      send(first_task, {:poster_review_continue, "embedded_text"})
+      send(second_task, {:poster_review_continue, "collage_or_border"})
+      render_async(view)
+
+      assert has_element?(view, "#cover-image-quality-review-collage_or_border")
+      refute has_element?(view, "#cover-image-quality-review-embedded_text")
+    end
   end
 end
