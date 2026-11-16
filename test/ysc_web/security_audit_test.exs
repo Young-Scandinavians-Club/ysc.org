@@ -95,6 +95,9 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 98 (MEDIUM)   Volunteer dashboard magic search (`Ysc.Search.global_search/2`) had no role filter, so typing on `/admin` returned cabin bookings (member name, property, stay dates, reference) and user emails. Users and Bookings are full-admin-only (`ensure_full_admin`); clicking through was blocked, but the dropdown already disclosed the data. Same class as Finding 76.
   Finding 99 (MEDIUM)   Volunteer door-sale `POST /api/v1/app/events/:id/tickets/payment_intent` accepted unbounded `tiers` quantities while `bypass_guards: true` skipped capacity. Pending tickets count as sold, so one JSON body could insert unbounded ticket rows and lock the event until the 5-minute timeout (repeatable).
   Finding 100 (MEDIUM)  Event photo direct-to-S3 presign used LiveView's 20 GB video cap for every file (including photos) and public-read ACL. A ticket holder could POST a multi-GB `.jpg` before `Limits.validate_upload/2` ran; cancel/abandon never deleted the object, so untrusted bytes stayed on the club CDN. S3 policy is now per-type, unsupported names are not presigned, cancel deletes the object, and the worker HEADs Content-Length before downloading.
+  Finding 101 (MEDIUM)  Add-to-calendar passed volunteer-controlled event `title` / `location_name` into the web component unchanged. The vendor iCal escape does not strip CR/LF, so a title containing a newline could inject extra ICS properties into the `.ics` attendees download from the public event page.
+  Finding 102 (MEDIUM)  Finding 98 removed users from volunteer magic search, but the event editor host picker still called `Accounts.search_users/2` (email match) and rendered emails in the dropdown — volunteers could enumerate member mailboxes by typing `@`.
+  Finding 103 (MEDIUM)  Public `/events/:id` rendered `update.rendered_body` via `raw/1` without re-scrubbing (unlike `event_body/1` and the Atom feed after Finding 96). `validate-event-update` also trusted client `rendered_body` into the preview/SMS form state.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -7221,5 +7224,127 @@ defmodule YscWeb.SecurityAuditTest do
       }
     }
     |> Map.merge(overrides)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 101 (MEDIUM): ICS CR/LF injection via calendar button text
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 101: add-to-calendar strips CR/LF from title and location" do
+    test "AddToCalendar.text/1 removes newlines and control characters" do
+      assert Ysc.Events.AddToCalendar.text(
+               "Party\nDESCRIPTION:http://evil.example\nSUMMARY:Fake"
+             ) == "Party DESCRIPTION:http://evil.example SUMMARY:Fake"
+
+      assert Ysc.Events.AddToCalendar.text("Hall\r\nURL:https://phish.test") ==
+               "Hall URL:https://phish.test"
+
+      assert Ysc.Events.AddToCalendar.text("  Midsummer  ") == "Midsummer"
+      assert Ysc.Events.AddToCalendar.text("\n\t") == nil
+      assert Ysc.Events.AddToCalendar.text(nil) == nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 102 (MEDIUM): Volunteer host search must not enumerate emails
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 102: volunteer host search is name-only" do
+    import Ysc.EventsFixtures
+
+    test "volunteer host picker does not match or show member emails", %{
+      conn: conn
+    } do
+      volunteer = user_fixture(%{role: :volunteer})
+
+      member =
+        user_fixture(%{
+          first_name: "Sigrid",
+          last_name: "Finding102Host",
+          email:
+            "sigrid.finding102.#{System.unique_integer([:positive])}@ysc.org"
+        })
+
+      event =
+        event_fixture(%{organizer_id: volunteer.id, state: :published})
+
+      # Typed query may appear in the input value; what matters is that email
+      # search returns no hits and result rows never include the address.
+      assert Ysc.Accounts.search_users_by_name(member.email) == []
+
+      {:ok, view, _html} =
+        live(log_in_user(conn, volunteer), ~p"/admin/events/#{event.id}/edit")
+
+      render_hook(view, "search-hosts", %{"value" => member.email})
+
+      refute has_element?(view, "#host-search-results")
+      refute has_element?(view, "#host-result-#{member.id}")
+
+      render_hook(view, "search-hosts", %{"value" => "Finding102Host"})
+
+      assert has_element?(view, "#host-result-#{member.id}")
+      assert has_element?(view, "#host-result-#{member.id}", "Finding102Host")
+      refute has_element?(view, "#host-result-#{member.id}", member.email)
+    end
+
+    test "full admin host picker still matches by email", %{conn: conn} do
+      admin = user_fixture(%{role: :admin})
+
+      member =
+        user_fixture(%{
+          first_name: "Ingrid",
+          last_name: "Finding102Admin",
+          email:
+            "ingrid.finding102.#{System.unique_integer([:positive])}@ysc.org"
+        })
+
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+
+      {:ok, view, _html} =
+        live(log_in_user(conn, admin), ~p"/admin/events/#{event.id}/edit")
+
+      render_hook(view, "search-hosts", %{"value" => member.email})
+
+      assert has_element?(view, "#host-result-#{member.id}")
+      assert render(view) =~ member.email
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 103 (MEDIUM): Public event updates re-scrub stored HTML
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 103: public event updates scrub rendered_body before raw/1" do
+    import Ysc.EventsFixtures
+
+    test "script tags in a stored update body do not reach the public page" do
+      organizer = user_fixture(%{role: :admin})
+      event = event_fixture(%{organizer_id: organizer.id, state: :published})
+
+      {:ok, update} =
+        Ysc.Events.create_event_update(event, %{
+          title: "Finding 103",
+          raw_body: "<p>ok</p>",
+          rendered_body: "<p>ok</p>",
+          show_on_event_page: true,
+          sent_by_id: organizer.id
+        })
+
+      # Simulate a leftover write that bypassed the LiveView scrubber.
+      update
+      |> Ecto.Changeset.change(%{
+        rendered_body:
+          "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+      })
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(build_conn(), ~p"/events/#{event.id}")
+      html = render_async(view)
+
+      assert html =~ "event-update-body-#{update.id}"
+      refute html =~ "<script>document.cookie</script>"
+      refute html =~ "onerror="
+      assert html =~ "Injected"
+    end
   end
 end

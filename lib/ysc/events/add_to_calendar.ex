@@ -16,6 +16,31 @@ defmodule Ysc.Events.AddToCalendar do
   def timezone, do: @timezone
 
   @doc """
+  Sanitizes free-text fields before they are passed into the add-to-calendar
+  web component (and from there into generated `.ics` / calendar URLs).
+
+  The vendor's iCal escape only backslash-escapes `,` / `;` / `\\` — it does
+  **not** strip CR/LF. A volunteer-controlled event title or location that
+  contains a newline can therefore inject extra ICS properties
+  (`DESCRIPTION:…`, `URL:…`, a second `SUMMARY:`) into the file attendees
+  download from the public event page (Finding 101).
+  """
+  def text(nil), do: nil
+
+  def text(value) when is_binary(value) do
+    value
+    |> String.replace(~r/[\x00-\x1f\x7f]/u, " ")
+    |> String.replace(~r/[ \t]+/u, " ")
+    |> String.trim()
+    |> case do
+      "" -> nil
+      cleaned -> cleaned
+    end
+  end
+
+  def text(_), do: nil
+
+  @doc """
   Formats a calendar date as `YYYY-MM-DD` for `start-date` / `end-date`.
 
   Accepts `%Date{}`, `%DateTime{}`, or `%NaiveDateTime{}`. Event start/end
