@@ -1230,50 +1230,19 @@ defmodule Ysc.Subscriptions do
          first_item,
          new_price_id
        ) do
-    current_price_id =
-      if is_binary(first_item.price),
-        do: first_item.price,
-        else: first_item.price.id
-
-    current_period_end = SubscriptionHelpers.current_period_end(stripe_sub)
-    current_period_start = SubscriptionHelpers.current_period_start(stripe_sub)
-
-    # Phase 1: current plan until period end
-    phase1_items = [
-      %{price: current_price_id, quantity: first_item.quantity || 1}
-    ]
-
-    phase1 = %{
-      items: phase1_items,
-      start_date: current_period_start,
-      end_date: current_period_end,
-      proration_behavior: "none"
-    }
-
-    # Phase 2: downgraded plan, starts at period end. Use end_date (duration
-    # param not supported in all Stripe API versions). Set to 1 year from
-    # period end for annual billing.
-    phase2_items = [%{price: new_price_id, quantity: 1}]
-
-    phase2_end_date = current_period_end + 365 * 24 * 60 * 60
-
-    phase2 = %{
-      items: phase2_items,
-      start_date: current_period_end,
-      end_date: phase2_end_date,
-      proration_behavior: "none"
-    }
+    phases = downgrade_phases(stripe_sub, first_item, new_price_id)
 
     result =
       if stripe_sub.schedule do
         Ysc.Stripe.RetryHelper.stripe_retry(fn ->
           Stripe.SubscriptionSchedule.update(stripe_sub.schedule, %{
-            phases: [phase1, phase2],
+            phases: phases,
             end_behavior: "release"
           })
         end)
       else
-        with {:ok, schedule} <-
+        with :ok <- allow_schedule_on_trial(stripe_sub),
+             {:ok, schedule} <-
                Ysc.Stripe.RetryHelper.stripe_retry(fn ->
                  Stripe.SubscriptionSchedule.create(%{
                    from_subscription: stripe_sub.id
@@ -1281,7 +1250,7 @@ defmodule Ysc.Subscriptions do
                end) do
           case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
                  Stripe.SubscriptionSchedule.update(schedule.id, %{
-                   phases: [phase1, phase2],
+                   phases: phases,
                    end_behavior: "release"
                  })
                end) do
@@ -1308,6 +1277,76 @@ defmodule Ysc.Subscriptions do
         {:error, error}
     end
   end
+
+  @doc false
+  # Phases for a downgrade at renewal: current plan until period end, then the
+  # new plan for a year.
+  #
+  # A trialing subscription (e.g. a WordPress-migrated member paid through the
+  # trial end) must keep `trial_end` on phase 1. Without it Stripe would treat
+  # the phase as non-trialing, end the trial and invoice the current plan now.
+  def downgrade_phases(stripe_sub, first_item, new_price_id) do
+    current_price_id =
+      if is_binary(first_item.price),
+        do: first_item.price,
+        else: first_item.price.id
+
+    current_period_end = SubscriptionHelpers.current_period_end(stripe_sub)
+    current_period_start = SubscriptionHelpers.current_period_start(stripe_sub)
+
+    phase1 =
+      %{
+        items: [%{price: current_price_id, quantity: first_item.quantity || 1}],
+        start_date: current_period_start,
+        end_date: current_period_end,
+        proration_behavior: "none"
+      }
+      |> maybe_keep_trial(stripe_sub, current_period_end)
+
+    # Phase 2: downgraded plan, starts at period end. Use end_date (duration
+    # param not supported in all Stripe API versions). Set to 1 year from
+    # period end for annual billing.
+    phase2 = %{
+      items: [%{price: new_price_id, quantity: 1}],
+      start_date: current_period_end,
+      end_date: current_period_end + 365 * 24 * 60 * 60,
+      proration_behavior: "none"
+    }
+
+    [phase1, phase2]
+  end
+
+  defp maybe_keep_trial(phase, %{status: "trialing"}, period_end),
+    do: Map.put(phase, :trial_end, period_end)
+
+  defp maybe_keep_trial(phase, _stripe_sub, _period_end), do: phase
+
+  # Stripe refuses to create a schedule from a subscription that pauses at trial
+  # end ("You cannot create a subscription schedule from a subscription that is
+  # configured to pause at trial end"). Migrated trialing subscriptions are
+  # created that way, so switch them to create_invoice first. They all have a
+  # default payment method on file in practice, so the missing-payment-method
+  # behavior is unaffected.
+  @dialyzer {:nowarn_function, allow_schedule_on_trial: 1}
+  defp allow_schedule_on_trial(
+         %{
+           status: "trialing",
+           trial_settings: %{end_behavior: %{missing_payment_method: "pause"}}
+         } = stripe_sub
+       ) do
+    case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+           Stripe.Subscription.update(stripe_sub.id, %{
+             trial_settings: %{
+               end_behavior: %{missing_payment_method: "create_invoice"}
+             }
+           })
+         end) do
+      {:ok, _} -> :ok
+      {:error, _} = error -> error
+    end
+  end
+
+  defp allow_schedule_on_trial(_stripe_sub), do: :ok
 
   # Stripe integration functions
 
