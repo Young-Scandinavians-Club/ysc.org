@@ -610,6 +610,33 @@ defmodule YscWeb.FamilyInviteAcceptanceLiveTest do
     end
   end
 
+  describe "mount/3 — matching Gmail alias" do
+    test "treats a Gmail alias on a legacy invite row as the invited mailbox",
+         %{
+           conn: conn
+         } do
+      n = System.unique_integer([:positive])
+      canonical = "invitee#{n}@gmail.com"
+      dotted = "in.vite.e#{n}+ysc@gmail.com"
+
+      {invite, _primary} = create_family_invite(%{email: canonical})
+
+      invite
+      |> Ecto.Changeset.change(%{email: dotted})
+      |> Repo.update!()
+
+      invited_user =
+        user_fixture(%{email: canonical, date_of_birth: child_birth_date()})
+
+      conn = log_in_user(conn, invited_user)
+
+      {:ok, view, _html} = live(conn, ~p"/family-invite/#{invite.token}/accept")
+
+      assert has_element?(view, "#link-existing-button")
+      refute has_element?(view, "#accept-invite-form")
+    end
+  end
+
   describe "handle_event link_existing" do
     test "links matching user and redirects home", %{conn: conn} do
       {invite, _primary} = create_family_invite()

@@ -1082,6 +1082,39 @@ defmodule YscWeb.SecurityAuditTest do
       assert is_nil(user.registration_form.family_invite_id)
     end
 
+    test "register_user links family_invite when emails are Gmail-equivalent",
+         %{} do
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      n = System.unique_integer([:positive])
+      canonical = "reginvitee#{n}@gmail.com"
+      dotted = "reg.in.vite.e#{n}+ysc@gmail.com"
+
+      {:ok, invite} = FamilyInvites.create_invite(primary, canonical)
+
+      invite
+      |> Ecto.Changeset.change(%{email: dotted})
+      |> Repo.update!()
+
+      attrs =
+        security_registration_attrs(%{
+          email: canonical,
+          registration_form: %{family_invite_id: invite.id}
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      user = Accounts.get_user!(user.id, [:registration_form])
+
+      assert user.email == canonical
+      assert user.registration_form.family_invite_id == invite.id
+    end
+
     test "register_user does not reassign an existing family member via forged id",
          %{} do
       victim = user_fixture()

@@ -15,6 +15,7 @@ defmodule Ysc.Accounts do
   alias Ysc.Accounts.{
     Address,
     BoardPosition,
+    Email,
     FamilyInvite,
     MembershipCache,
     User,
@@ -1014,8 +1015,7 @@ defmodule Ysc.Accounts do
     with invite_id when is_binary(invite_id) and invite_id != "" <- invite_id,
          %SignupApplication{} = application <- user.registration_form,
          %FamilyInvite{} = invite <- Repo.get(FamilyInvite, invite_id),
-         true <-
-           String.downcase(invite.email) == String.downcase(user.email) do
+         true <- Email.equiv?(invite.email, user.email) do
       case application
            |> Ecto.Changeset.change(family_invite_id: invite.id)
            |> Repo.update() do

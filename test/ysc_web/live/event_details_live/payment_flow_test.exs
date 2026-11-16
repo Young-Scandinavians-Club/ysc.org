@@ -119,6 +119,14 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       refute has_element?(view, "#checkout-payment-loading")
       assert has_element?(view, "#payment-element")
       assert has_element?(view, "#payment-modal")
+
+      assert has_element?(
+               view,
+               "#checkout-payment-leave",
+               "Leave without tickets"
+             )
+
+      refute has_element?(view, "#checkout-payment-leave", "Cancel")
     end
 
     test "does not attach a PaymentIntent after the cart is cancelled during deferred create",
@@ -126,9 +134,21 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
+      test_pid = self()
 
+      # LiveView handles :create_checkout_payment_intent as soon as
+      # handle_event returns. Block Stripe so cancel wins the race that CI
+      # otherwise loses when the mock returns immediately.
       stub(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
-        {:ok, build_payment_intent(%{amount: params.amount})}
+        send(test_pid, {:deferred_pi_create, self()})
+
+        receive do
+          :continue_deferred_pi_create ->
+            {:ok, build_payment_intent(%{amount: params.amount})}
+        after
+          5_000 ->
+            raise "timed out waiting to continue deferred PaymentIntent create"
+        end
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
@@ -140,6 +160,8 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert html =~ ~s(id="checkout-payment-loading")
       refute html =~ ~s(id="payment-element")
 
+      assert_receive {:deferred_pi_create, stripe_pid}, 1_000
+
       order =
         Tickets.list_user_ticket_orders(user.id)
         |> List.first()
@@ -150,6 +172,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert {:ok, _} =
                Tickets.cancel_ticket_order(order, "started a new checkout")
 
+      send(stripe_pid, :continue_deferred_pi_create)
       render(view)
 
       refute has_element?(view, "#payment-element")
@@ -213,6 +236,14 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
       assert has_element?(view, "#payment-modal")
       assert has_element?(view, "#submit-payment")
+
+      assert has_element?(
+               view,
+               "#checkout-payment-leave",
+               "Leave without tickets"
+             )
+
+      refute has_element?(view, "#checkout-payment-leave", "Cancel")
       assert payment_submit_disabled?(render(view))
 
       render_click(view, "stripe-payment-element-ready", %{})
@@ -683,6 +714,46 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       result = render_click(view, "close-payment-modal")
 
       assert is_binary(result)
+    end
+
+    test "leave without tickets releases the pending hold and explains it", %{
+      conn: conn,
+      user: user
+    } do
+      {event, _tier, order, payment_intent} = setup_pending_order(user)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: id,
+           client_secret: payment_intent.client_secret,
+           amount: order.total_amount.amount
+         })}
+      end)
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/events/#{event.id}?checkout=payment&order_id=#{order.id}"
+        )
+
+      view = wait_for_async(view)
+
+      assert has_element?(
+               view,
+               "#checkout-payment-leave",
+               "Leave without tickets"
+             )
+
+      refute has_element?(view, "#checkout-payment-leave", "Cancel")
+
+      html = render_click(view, "close-payment-modal")
+
+      assert html =~ "left without tickets"
+      refute has_element?(view, "#payment-modal")
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :cancelled
     end
 
     test "close-payment-modal keeps pending order when payment intent is processing",

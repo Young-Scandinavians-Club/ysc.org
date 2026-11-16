@@ -104,7 +104,6 @@ defmodule YscWeb.HomeLive do
       apple_wallet_membership_enabled?:
         Ysc.AppleWallet.configured?(:membership),
       google_wallet_membership_enabled?: GoogleWallet.configured?(:membership),
-      google_wallet_membership_url: nil,
       wallet_platform: WalletPlatform.from_socket(socket),
       show_passkey_prompt: false,
       newsletter_subscribed: false
@@ -694,7 +693,7 @@ defmodule YscWeb.HomeLive do
                   preferred_type={:optimized}
                 />
                 <div class="absolute top-6 left-6 flex gap-2 z-2 flex-wrap">
-                  <%= if days_since_inserted(event.inserted_at) <= 7 do %>
+                  <%= if days_since_inserted(Map.get(event, :inserted_at)) <= 7 do %>
                     <span class="px-3 py-1 bg-zinc-700 text-white text-xs rounded-sm shadow-lg type-eyebrow">
                       Just Added
                     </span>
@@ -1463,7 +1462,6 @@ defmodule YscWeb.HomeLive do
               timezone={@timezone}
               apple_wallet_enabled?={@apple_wallet_membership_enabled?}
               google_wallet_enabled?={@google_wallet_membership_enabled?}
-              google_wallet_url={@google_wallet_membership_url}
               wallet_platform={@wallet_platform}
             />
 

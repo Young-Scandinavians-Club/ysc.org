@@ -54,4 +54,16 @@ defmodule QueryConsoleWeb.UserAuthTest do
 
     assert redirected_to(conn) == "/auth/ysc"
   end
+
+  test "an open LiveView is bounced through SSO when the session TTL fires", %{
+    conn: conn
+  } do
+    user = user_fixture()
+    conn = log_in_user(conn, user)
+
+    {:ok, view, _html} = live(conn, "/")
+    send(view.pid, :query_console_session_expired)
+
+    assert_redirect(view, "/auth/ysc")
+  end
 end

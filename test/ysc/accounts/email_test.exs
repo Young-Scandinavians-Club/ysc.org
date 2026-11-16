@@ -112,5 +112,10 @@ defmodule Ysc.Accounts.EmailTest do
       assert Email.equiv?("john.doe+tag@googlemail.com", "johndoe@gmail.com")
       refute Email.equiv?("user@gmail.com", "other@googlemail.com")
     end
+
+    test "trims and lowercases before comparing" do
+      assert Email.equiv?("  User@Example.com  ", "user@example.com")
+      refute Email.equiv?("user@example.com", "other@example.com")
+    end
   end
 end

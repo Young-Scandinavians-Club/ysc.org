@@ -126,6 +126,7 @@ defmodule YscWeb.AdminMerchOrderNewLiveTest do
       # The address appears once there is someone to ship to.
       refute has_element?(view, "#order-address")
       assert has_element?(view, "#review-order")
+      assert has_element?(view, "#merch-order-details-actions")
     end
 
     test "choosing a member fills in their address", %{conn: conn} do
@@ -449,6 +450,7 @@ defmodule YscWeb.AdminMerchOrderNewLiveTest do
 
       render_hook(view, "select-event", %{"id" => event.id})
       review(view, custom_params(tee, %{"event_id" => event.id}))
+      assert has_element?(view, "#merch-order-review-actions")
       view |> element("#place-order") |> render_click()
 
       order = Repo.one!(Order)

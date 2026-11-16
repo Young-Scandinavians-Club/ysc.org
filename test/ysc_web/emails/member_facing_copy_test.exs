@@ -1004,20 +1004,37 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       text = html_text(html)
 
-      assert text =~ "Your tickets are confirmed"
+      assert TicketPurchaseConfirmation.get_subject(%{donation_only: true}) ==
+               "Your donation is confirmed"
+
+      assert text =~ "Your donation is confirmed"
+
+      assert text =~
+               "Thank you for your donation to the Young Scandinavians Club"
+
+      assert text =~ "This email is your receipt"
       assert text =~ "See event details"
       assert text =~ "Your Donations"
+      assert text =~ "Donation Date:"
       assert text =~ "Your donation numbers"
       assert text =~ "write to us about this donation"
       assert text =~ "receipt for your donation"
       assert text =~ "not a ticket for the door"
       assert text =~ "Thank you for supporting the Young Scandinavians Club"
+      assert text =~ "Tack så mycket"
+      assert html =~ ">Donation</td>"
+      refute html =~ ">Ticket</td>"
+      refute text =~ "Your tickets are confirmed"
+      refute text =~ "Thank you for your ticket purchase"
+      refute text =~ "Purchase Date:"
       refute text =~ "View all tickets"
       refute text =~ "show the tickets on your phone"
       refute text =~ "You'll receive a reminder email"
       refute text =~ "We look forward to seeing you at the event"
       refute text =~ "Your ticket numbers"
       refute text =~ "Your Tickets"
+      refute text =~ "See you soon"
+      refute text =~ "Vi ses snart"
     end
 
     test "guest recipient email pluralizes when someone received more than one ticket" do

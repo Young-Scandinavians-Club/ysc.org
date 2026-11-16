@@ -1,7 +1,11 @@
 defmodule YscWeb.GoogleWalletController do
   @moduledoc """
   Redirects a signed-in member to Google Wallet's "Save to wallet" page
-  for a ticket they own.
+  for a ticket they own or for their membership card.
+
+  JWT signing happens here, on click — not while the membership QR modal or
+  ticket page loads. Email-token ticket save links use
+  `YscWeb.PublicTicketController.google/2`.
   """
   use YscWeb, :controller
 
@@ -35,6 +39,36 @@ defmodule YscWeb.GoogleWalletController do
         )
 
         YscWeb.ErrorHTML.render_page(conn, :"500")
+    end
+  end
+
+  @doc """
+  Generates a Google Wallet save URL for the current member and redirects.
+
+  The user must have an active membership (same gate as Apple Wallet).
+  """
+  def membership(conn, _params) do
+    user = conn.assigns.current_user
+
+    if conn.assigns[:active_membership?] do
+      case GoogleWallet.generate_membership_save_url(user) do
+        {:ok, url} ->
+          redirect(conn, external: url)
+
+        {:error, reason} when reason in [:not_configured, :not_found] ->
+          YscWeb.ErrorHTML.render_page(conn, :"404")
+
+        {:error, reason} ->
+          Ysc.Logging.error(
+            "GoogleWalletController: failed to generate membership save URL",
+            user_id: user.id,
+            error: inspect(reason)
+          )
+
+          YscWeb.ErrorHTML.render_page(conn, :"500")
+      end
+    else
+      YscWeb.ErrorHTML.render_page(conn, :"404")
     end
   end
 end

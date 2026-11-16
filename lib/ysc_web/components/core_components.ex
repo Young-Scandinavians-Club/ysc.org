@@ -5738,6 +5738,61 @@ defmodule YscWeb.CoreComponents do
   defp quick_action_card_icon_class(:zinc), do: "text-zinc-500"
 
   @doc """
+  Right-aligned Cancel/Submit row with a top divider.
+
+  Use this at the bottom of modal forms and stacked admin editors instead of
+  repeating `flex justify-end gap-3` plus a `border-t`. The caller still owns
+  the buttons and their events.
+
+  `spacing={:default}` is the member-modal footer (`mt-8 pt-4`).
+  `spacing={:compact}` is the stacked admin-form footer (`pt-6`, no extra top
+  margin — the form already has vertical spacing).
+
+  ## Examples
+
+      <.form_actions>
+        <.button type="button" variant="outline" color="zinc" phx-click="cancel">
+          Cancel
+        </.button>
+        <.button type="submit">Save</.button>
+      </.form_actions>
+
+      <.form_actions id="ticket-grant-form-actions" spacing={:compact}>
+        <.button type="button" variant="outline" color="zinc">Cancel</.button>
+        <.button type="submit">Grant Tickets</.button>
+      </.form_actions>
+  """
+  attr :id, :string, default: nil
+
+  attr :spacing, :atom,
+    default: :default,
+    values: [:default, :compact],
+    doc:
+      ":default is mt-8 pt-4 (modal forms); :compact is pt-6 (stacked admin forms)"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the wrapper"
+
+  slot :inner_block, required: true
+
+  def form_actions(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "flex justify-end gap-3 border-t border-zinc-200",
+        @spacing == :default && "mt-8 pt-4",
+        @spacing == :compact && "pt-6",
+        @class
+      ]}
+    >
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.
 
   For `:info`, a default information icon is shown unless `:icon` is set to another
@@ -7602,7 +7657,6 @@ defmodule YscWeb.CoreComponents do
         timezone={@timezone}
         apple_wallet_enabled?={@apple_wallet_membership_enabled?}
         google_wallet_enabled?={@google_wallet_membership_enabled?}
-        google_wallet_url={@google_wallet_membership_url}
         wallet_platform={@wallet_platform}
       />
   """
@@ -7612,7 +7666,6 @@ defmodule YscWeb.CoreComponents do
   attr :timezone, :string, required: true
   attr :apple_wallet_enabled?, :boolean, default: false
   attr :google_wallet_enabled?, :boolean, default: false
-  attr :google_wallet_url, :string, default: nil
   attr :wallet_platform, :atom, required: true
 
   def membership_qr_modal(assigns) do
@@ -7637,10 +7690,9 @@ defmodule YscWeb.CoreComponents do
           </div>
         <% end %>
         <%= if @google_wallet_enabled? &&
-            @wallet_platform in [:google_only, :both] &&
-            @google_wallet_url do %>
+            @wallet_platform in [:google_only, :both] do %>
           <div class="flex justify-center mt-2">
-            <.add_to_google_wallet_button href={@google_wallet_url} />
+            <.add_to_google_wallet_button href={~p"/wallet/membership/google"} />
           </div>
         <% end %>
         <%= if @details do %>

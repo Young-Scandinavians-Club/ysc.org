@@ -341,7 +341,7 @@ defmodule YscWeb.UserSettingsLive do
             </div>
           </div>
           <%!-- Modal footer --%>
-          <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-200">
+          <.form_actions id="payment-method-modal-actions">
             <.button
               patch={~p"/users/membership"}
               variant="outline"
@@ -361,7 +361,7 @@ defmodule YscWeb.UserSettingsLive do
             >
               Save payment method
             </.button>
-          </div>
+          </.form_actions>
         </.modal>
 
         <.account_settings_nav
@@ -1619,7 +1619,6 @@ defmodule YscWeb.UserSettingsLive do
             timezone={@timezone}
             apple_wallet_enabled?={@apple_wallet_membership_enabled?}
             google_wallet_enabled?={@google_wallet_membership_enabled?}
-            google_wallet_url={@google_wallet_membership_url}
             wallet_platform={@wallet_platform}
           />
 
@@ -2510,7 +2509,6 @@ defmodule YscWeb.UserSettingsLive do
         :google_wallet_membership_enabled?,
         GoogleWallet.configured?(:membership)
       )
-      |> assign(:google_wallet_membership_url, nil)
       |> assign(:wallet_platform, WalletPlatform.from_socket(socket))
       |> assign(:user_avatars, [])
       |> assign(:current_avatar_url, nil)
@@ -5217,7 +5215,15 @@ defmodule YscWeb.UserSettingsLive do
         handle_membership_change_scheduled(socket, user, direction)
 
       {:error, reason} ->
-        handle_membership_change_error(socket, reason)
+        handle_membership_change_error(socket, reason, %{
+          user_id: user.id,
+          subscription_id: current_membership.id,
+          stripe_subscription_id: current_membership.stripe_id,
+          stripe_status: current_membership.stripe_status,
+          direction: direction,
+          new_plan: new_atom,
+          new_price_id: new_price_id
+        })
     end
   end
 
@@ -5262,12 +5268,14 @@ defmodule YscWeb.UserSettingsLive do
      |> push_patch(to: ~p"/users/membership")}
   end
 
-  defp handle_membership_change_error(socket, reason) do
+  defp handle_membership_change_error(socket, reason, context) do
     require Ysc.Logging
 
+    # Pass the context as Logger metadata: Ysc.Logging only forwards :extra/:tags
+    # to Sentry when an exception is given.
     Ysc.Logging.error(
       "Membership plan change failed",
-      reason: inspect(reason)
+      Map.to_list(context) ++ [reason: inspect(reason)]
     )
 
     {:noreply,

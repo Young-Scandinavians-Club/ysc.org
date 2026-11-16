@@ -186,11 +186,13 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
     test "returns error when pending invite exists for Gmail alias of same address" do
       primary_user = create_user_with_lifetime_membership()
 
-      assert {:ok, _invite} =
+      assert {:ok, invite} =
                FamilyInvites.create_invite(
                  primary_user,
                  "dup.pending@gmail.com"
                )
+
+      assert invite.email == "duppending@gmail.com"
 
       assert {:error, :pending_invite_exists} =
                FamilyInvites.create_invite(
@@ -1328,6 +1330,24 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       assert {:error, :max_sub_accounts_reached} =
                FamilyInvites.create_invite(user, unique_user_email())
+    end
+  end
+
+  describe "emails_match?/2" do
+    test "treats Gmail aliases as the same mailbox and ignores non-binaries" do
+      assert FamilyInvites.emails_match?(
+               "john.doe+tag@googlemail.com",
+               "johndoe@gmail.com"
+             )
+
+      assert FamilyInvites.emails_match?(
+               "  User@Example.com  ",
+               "user@example.com"
+             )
+
+      refute FamilyInvites.emails_match?("a@example.com", "b@example.com")
+      refute FamilyInvites.emails_match?(nil, "a@example.com")
+      refute FamilyInvites.emails_match?("a@example.com", nil)
     end
   end
 
