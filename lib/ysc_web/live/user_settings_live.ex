@@ -5273,11 +5273,11 @@ defmodule YscWeb.UserSettingsLive do
   defp handle_membership_change_error(socket, reason, context) do
     require Ysc.Logging
 
+    # Pass the context as Logger metadata: Ysc.Logging only forwards :extra/:tags
+    # to Sentry when an exception is given.
     Ysc.Logging.error(
       "Membership plan change failed",
-      reason: inspect(reason),
-      extra: Map.put(context, :reason, inspect(reason, limit: 50)),
-      tags: %{direction: to_string(context.direction)}
+      Map.to_list(context) ++ [reason: inspect(reason)]
     )
 
     {:noreply,

@@ -1233,39 +1233,7 @@ defmodule Ysc.Subscriptions do
     phases = downgrade_phases(stripe_sub, first_item, new_price_id)
 
     result =
-      if stripe_sub.schedule do
-        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-          Stripe.SubscriptionSchedule.update(stripe_sub.schedule, %{
-            phases: phases,
-            end_behavior: "release"
-          })
-        end)
-      else
-        with :ok <- allow_schedule_on_trial(stripe_sub),
-             {:ok, schedule} <-
-               Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                 Stripe.SubscriptionSchedule.create(%{
-                   from_subscription: stripe_sub.id
-                 })
-               end) do
-          case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                 Stripe.SubscriptionSchedule.update(schedule.id, %{
-                   phases: phases,
-                   end_behavior: "release"
-                 })
-               end) do
-            {:ok, _} ->
-              {:ok, schedule}
-
-            {:error, _} = error ->
-              Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                Stripe.SubscriptionSchedule.cancel(schedule.id)
-              end)
-
-              error
-          end
-        end
-      end
+      apply_downgrade_schedule(stripe_sub, phases, Stripe.SubscriptionSchedule)
 
     case result do
       {:ok, _} ->
@@ -1275,6 +1243,44 @@ defmodule Ysc.Subscriptions do
 
       {:error, error} ->
         {:error, error}
+    end
+  end
+
+  @doc false
+  # Creates (or updates) the schedule that carries the downgrade. `api` is the
+  # Stripe schedule module, injectable for tests.
+  #
+  # If the phase update fails after the schedule was created we must `release`
+  # it, never `cancel`: cancelling a schedule also cancels its subscription
+  # immediately, which would end a paid-through membership on a failed downgrade.
+  @dialyzer {:nowarn_function, apply_downgrade_schedule: 3}
+  def apply_downgrade_schedule(stripe_sub, phases, api) do
+    params = %{phases: phases, end_behavior: "release"}
+
+    if stripe_sub.schedule do
+      Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+        api.update(stripe_sub.schedule, params)
+      end)
+    else
+      with :ok <- allow_schedule_on_trial(stripe_sub),
+           {:ok, schedule} <-
+             Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               api.create(%{from_subscription: stripe_sub.id})
+             end) do
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               api.update(schedule.id, params)
+             end) do
+          {:ok, _} ->
+            {:ok, schedule}
+
+          {:error, _} = error ->
+            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+              api.release(schedule.id)
+            end)
+
+            error
+        end
+      end
     end
   end
 
