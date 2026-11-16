@@ -172,6 +172,39 @@ defmodule Ysc.AppleWalletTest do
       end)
     end
 
+    test "barcode carries a door-scan QrToken, not an AccessToken" do
+      {_owner, ticket} = member_with_confirmed_ticket()
+      original = Application.get_env(:ysc, :apple_wallet_passbook_generator)
+      Code.ensure_loaded!(Ysc.AppleWallet.CapturingPassbookGenerator)
+
+      try do
+        Application.put_env(
+          :ysc,
+          :apple_wallet_passbook_generator,
+          Ysc.AppleWallet.CapturingPassbookGenerator
+        )
+
+        Application.put_env(:ysc, :apple_wallet_pass_capture_pid, self())
+
+        with_fake_certs(fn ->
+          assert {:ok, _pkpass} =
+                   AppleWallet.generate_ticket_pass(ticket.id, :any)
+        end)
+
+        assert_receive {:apple_wallet_pass, pass}, 1_000
+        ticket_id = ticket.id
+
+        assert {:ok, {:ticket, ^ticket_id}} =
+                 Ysc.Scanning.QrToken.verify(pass.barcode.message)
+
+        assert {:error, :invalid} =
+                 Ysc.Tickets.AccessToken.verify(pass.barcode.message)
+      after
+        restore_passbook_generator(original)
+        Application.delete_env(:ysc, :apple_wallet_pass_capture_pid)
+      end
+    end
+
     test "`:any` still rejects pending and cancelled tickets" do
       {_user, ticket} = member_with_confirmed_ticket()
 
@@ -643,4 +676,10 @@ defmodule Ysc.AppleWalletTest do
       Application.put_env(:ysc, :apple_wallet, original_env)
     end
   end
+
+  defp restore_passbook_generator(nil),
+    do: Application.delete_env(:ysc, :apple_wallet_passbook_generator)
+
+  defp restore_passbook_generator(value),
+    do: Application.put_env(:ysc, :apple_wallet_passbook_generator, value)
 end

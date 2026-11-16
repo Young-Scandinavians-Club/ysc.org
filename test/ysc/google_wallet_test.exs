@@ -218,6 +218,16 @@ defmodule Ysc.GoogleWalletTest do
         assert ticket_object["state"] == "ACTIVE"
         assert is_map(ticket_object["barcode"])
         assert ticket_object["barcode"]["type"] == "QR_CODE"
+
+        # Door scanners verify ticket_qr_v1, not the email AccessToken.
+        barcode = ticket_object["barcode"]["value"]
+        ticket_id = ticket.id
+
+        assert {:ok, {:ticket, ^ticket_id}} =
+                 Ysc.Scanning.QrToken.verify(barcode)
+
+        assert {:error, :invalid} =
+                 Ysc.Tickets.AccessToken.verify(barcode)
       end)
     end
   end

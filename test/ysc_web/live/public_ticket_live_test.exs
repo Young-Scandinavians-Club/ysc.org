@@ -6,9 +6,11 @@ defmodule YscWeb.PublicTicketLiveTest do
   use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
+  import Ysc.AppleWalletCertsHelper
   import Ysc.GoogleWalletCredentialsHelper
   import Ysc.TicketAccessFixtures
 
+  alias Ysc.Scanning.QrToken
   alias Ysc.Tickets.AccessToken
 
   test "shows every ticket in an order to someone who isn't signed in", %{
@@ -111,6 +113,53 @@ defmodule YscWeb.PublicTicketLiveTest do
       conn = get(conn, "/t/#{AccessToken.sign_ticket(ticket.id)}/google")
 
       assert redirected_to(conn) =~ "https://pay.google.com/gp/v/save/"
+    end)
+  end
+
+  test "on-screen QR is a door-scan token, not the email AccessToken", %{
+    conn: conn
+  } do
+    %{tickets: [ticket]} = granted_tickets(1)
+
+    {:ok, view, _html} =
+      live(conn, ~p"/t/#{AccessToken.sign_ticket(ticket.id)}")
+
+    render_async(view)
+
+    [card] = :sys.get_state(view.pid).socket.assigns.tickets
+    ticket_id = ticket.id
+    assert {:ok, {:ticket, ^ticket_id}} = QrToken.verify(card.qr_token)
+    assert {:error, :invalid} = AccessToken.verify(card.qr_token)
+  end
+
+  test "Apple Wallet badge links to /t/:token/apple, not the login-gated path",
+       %{conn: conn} do
+    %{order: order, tickets: [ticket]} = granted_tickets(1)
+
+    with_fake_certs(fn ->
+      {:ok, view, _html} =
+        live(conn, ~p"/t/#{AccessToken.sign_order(order.id)}")
+
+      html = render_async(view)
+      {:ok, doc} = Floki.parse_fragment(html)
+
+      hrefs = Floki.attribute(Floki.find(doc, "a[href$='/apple']"), "href")
+      assert hrefs != []
+
+      Enum.each(hrefs, fn href ->
+        refute href =~ "/wallet/tickets/"
+        assert String.contains?(href, "/t/")
+
+        token =
+          href
+          |> URI.parse()
+          |> Map.fetch!(:path)
+          |> String.replace_prefix("/t/", "")
+          |> String.replace_suffix("/apple", "")
+
+        ticket_id = ticket.id
+        assert {:ok, ^ticket_id} = AccessToken.verify_ticket(token)
+      end)
     end)
   end
 end
