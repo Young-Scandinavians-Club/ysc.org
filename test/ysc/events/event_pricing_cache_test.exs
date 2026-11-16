@@ -93,6 +93,42 @@ defmodule Ysc.Events.EventPricingCacheTest do
     assert EventPricingCache.enrich_event(app_row).age_restriction == 21
   end
 
+  test "enrich_event preserves inserted_at and published_at from the caller on a cache primed without them" do
+    published_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    event =
+      event_fixture(%{
+        title: "Just Added Fields #{System.unique_integer()}",
+        published_at: published_at
+      })
+
+    _tier = ticket_tier_fixture(%{event_id: event.id})
+
+    # Kiosk/app paginated queries omit inserted_at / published_at, so a shared
+    # cache entry can be seeded without those keys.
+    slim_row =
+      event
+      |> Map.from_struct()
+      |> Map.drop([:inserted_at, :published_at])
+
+    refute Map.has_key?(
+             EventPricingCache.enrich_event(slim_row),
+             :inserted_at
+           )
+
+    refute Map.has_key?(
+             EventPricingCache.enrich_event(slim_row),
+             :published_at
+           )
+
+    # Public list/card/home select both and must get them back on a cache hit.
+    list_row = Map.from_struct(event)
+    enriched = EventPricingCache.enrich_event(list_row)
+
+    assert enriched.inserted_at == event.inserted_at
+    assert enriched.published_at == published_at
+  end
+
   test "enrich_event restores event body HTML when cache was primed from a body-less list row" do
     event = event_fixture(%{title: "Body HTML #{System.unique_integer()}"})
     _tier = ticket_tier_fixture(%{event_id: event.id})

@@ -13,10 +13,18 @@ defmodule Ysc.Events.EventPricingCache do
   # `:age_restriction` is here because the public list/card query omits it, so a
   # cached payload seeded from that query lacks the key, while the mobile app
   # list query selects it and `YscWeb.Api.EventsJSON` renders it.
+  #
+  # `:inserted_at` / `:published_at` are the inverse: the public list/card query
+  # selects them for "Just Added" badges (guest home dots `inserted_at`; card
+  # badges read `published_at`), while the kiosk/app paginated query omits them.
+  # A cache entry primed by API traffic must not KeyError or blank those badges
+  # when home / `/events` enrich the list row through the same key.
   @transient_list_fields [
     :selling_fast,
     :recent_tickets_count,
-    :age_restriction
+    :age_restriction,
+    :inserted_at,
+    :published_at
   ]
 
   # Event-body HTML. The public list/card queries omit these columns, so the
