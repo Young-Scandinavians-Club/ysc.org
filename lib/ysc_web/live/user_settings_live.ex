@@ -5215,7 +5215,15 @@ defmodule YscWeb.UserSettingsLive do
         handle_membership_change_scheduled(socket, user, direction)
 
       {:error, reason} ->
-        handle_membership_change_error(socket, reason)
+        handle_membership_change_error(socket, reason, %{
+          user_id: user.id,
+          subscription_id: current_membership.id,
+          stripe_subscription_id: current_membership.stripe_id,
+          stripe_status: current_membership.stripe_status,
+          direction: direction,
+          new_plan: new_atom,
+          new_price_id: new_price_id
+        })
     end
   end
 
@@ -5260,12 +5268,14 @@ defmodule YscWeb.UserSettingsLive do
      |> push_patch(to: ~p"/users/membership")}
   end
 
-  defp handle_membership_change_error(socket, reason) do
+  defp handle_membership_change_error(socket, reason, context) do
     require Ysc.Logging
 
+    # Pass the context as Logger metadata: Ysc.Logging only forwards :extra/:tags
+    # to Sentry when an exception is given.
     Ysc.Logging.error(
       "Membership plan change failed",
-      reason: inspect(reason)
+      Map.to_list(context) ++ [reason: inspect(reason)]
     )
 
     {:noreply,
