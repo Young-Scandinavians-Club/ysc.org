@@ -11,6 +11,7 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
   """
   use YscWeb, :live_component
 
+  import YscWeb.AdminComponents
   import YscWeb.Live.AsyncHelpers
 
   alias Ysc.Ledgers
@@ -33,10 +34,13 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
           </:subtitle>
         </.header>
 
-        <div :if={@orders == []} class="mt-6 text-center py-8 text-zinc-500">
-          <p class="font-semibold">No ticket orders for this event.</p>
-          <p class="text-sm">There's nothing to refund.</p>
-        </div>
+        <.admin_text_empty
+          :if={@orders == []}
+          id="cancellation-refund-empty"
+          class="mt-6"
+          title="No ticket orders for this event."
+          description="There's nothing to refund."
+        />
 
         <div :if={@orders != []} class="mt-6 space-y-3">
           <div class="flex items-center justify-between">

@@ -2933,6 +2933,50 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_text_empty
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Plain centered empty copy for admin lists that don't need a hero icon or dashed panel.
+
+  Use this for ticket lists, ticket tiers, and similar "nothing here yet" sections
+  that already share `text-center py-8` plus a semibold title. Prefer
+  `admin_empty_panel` for dashed detail-section placeholders and
+  `admin_icon_empty_state` when a hero icon belongs in the empty state.
+
+  ## Examples
+
+      <.admin_text_empty
+        id="ticket-list-empty"
+        title="No tickets yet."
+        description="Tickets will appear here once users start buying tickets."
+      />
+
+      <.admin_text_empty
+        id="cancellation-refund-empty"
+        class="mt-6"
+        title="No ticket orders for this event."
+        description="There's nothing to refund."
+      />
+  """
+  attr :id, :string, default: nil
+  attr :title, :string, required: true
+  attr :description, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the outer container"
+
+  def admin_text_empty(assigns) do
+    ~H"""
+    <div id={@id} class={["text-center py-8 text-zinc-500", @class]}>
+      <p class="font-semibold">{@title}</p>
+      <p :if={@description} class="text-sm">{@description}</p>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_icon_empty_state
   # ---------------------------------------------------------------------------
 
