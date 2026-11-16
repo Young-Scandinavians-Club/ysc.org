@@ -713,7 +713,8 @@ defmodule Ysc.Tickets do
 
   @doc """
   Returns the ticket when it can be used at the door (confirmed and not a
-  donation), else `nil`. Slim load for the sign-in-free QR and wallet endpoints.
+  donation), else `nil`. Slim load for the sign-in-free QR image endpoint.
+  Wallet downloads load the ticket themselves and already exclude donations.
   """
   def get_check_in_ticket(ticket_id) do
     tier_query = from(tt in TicketTier, select: struct(tt, [:id, :type]))

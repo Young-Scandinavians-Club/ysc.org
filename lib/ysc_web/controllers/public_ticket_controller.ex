@@ -55,32 +55,36 @@ defmodule YscWeb.PublicTicketController do
   # send_resp delivers a binary .pkpass file with a non-HTML content type and attachment disposition
   @sobelow_skip ["XSS.SendResp"]
   def apple(conn, %{"token" => token}) do
-    with {:ok, ticket_id} <- AccessToken.verify_ticket(token),
-         %{id: ^ticket_id} <- Tickets.get_check_in_ticket(ticket_id) do
-      case AppleWallet.generate_ticket_pass(ticket_id, :any) do
-        {:ok, binary} ->
-          conn
-          |> put_resp_content_type(@pkpass_content_type)
-          |> put_resp_header(
-            "content-disposition",
-            "attachment; filename=\"ticket.pkpass\""
-          )
-          |> send_resp(200, binary)
+    # Wallet generation already 404s unless the ticket is confirmed and not a
+    # donation. Do not call `Tickets.get_check_in_ticket/1` first — that was a
+    # second tickets+tiers round-trip before the wallet SELECT.
+    case AccessToken.verify_ticket(token) do
+      {:ok, ticket_id} ->
+        case AppleWallet.generate_ticket_pass(ticket_id, :any) do
+          {:ok, binary} ->
+            conn
+            |> put_resp_content_type(@pkpass_content_type)
+            |> put_resp_header(
+              "content-disposition",
+              "attachment; filename=\"ticket.pkpass\""
+            )
+            |> send_resp(200, binary)
 
-        {:error, reason} when reason in [:not_configured, :not_found] ->
-          YscWeb.ErrorHTML.render_page(conn, :"404")
+          {:error, reason} when reason in [:not_configured, :not_found] ->
+            YscWeb.ErrorHTML.render_page(conn, :"404")
 
-        {:error, reason} ->
-          Ysc.Logging.error(
-            "PublicTicketController: failed to generate Apple Wallet pass",
-            ticket_id: ticket_id,
-            error: reason
-          )
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "PublicTicketController: failed to generate Apple Wallet pass",
+              ticket_id: ticket_id,
+              error: reason
+            )
 
-          YscWeb.ErrorHTML.render_page(conn, :"500")
-      end
-    else
-      _ -> YscWeb.ErrorHTML.render_page(conn, :"404")
+            YscWeb.ErrorHTML.render_page(conn, :"500")
+        end
+
+      _ ->
+        YscWeb.ErrorHTML.render_page(conn, :"404")
     end
   end
 
@@ -88,26 +92,27 @@ defmodule YscWeb.PublicTicketController do
   Sends the visitor to Google Wallet's "Save to wallet" page for the ticket.
   """
   def google(conn, %{"token" => token}) do
-    with {:ok, ticket_id} <- AccessToken.verify_ticket(token),
-         %{id: ^ticket_id} <- Tickets.get_check_in_ticket(ticket_id) do
-      case GoogleWallet.generate_ticket_save_url(ticket_id, :any) do
-        {:ok, url} ->
-          redirect(conn, external: url)
+    case AccessToken.verify_ticket(token) do
+      {:ok, ticket_id} ->
+        case GoogleWallet.generate_ticket_save_url(ticket_id, :any) do
+          {:ok, url} ->
+            redirect(conn, external: url)
 
-        {:error, reason} when reason in [:not_configured, :not_found] ->
-          YscWeb.ErrorHTML.render_page(conn, :"404")
+          {:error, reason} when reason in [:not_configured, :not_found] ->
+            YscWeb.ErrorHTML.render_page(conn, :"404")
 
-        {:error, reason} ->
-          Ysc.Logging.error(
-            "PublicTicketController: failed to generate Google Wallet URL",
-            ticket_id: ticket_id,
-            error: inspect(reason)
-          )
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "PublicTicketController: failed to generate Google Wallet URL",
+              ticket_id: ticket_id,
+              error: inspect(reason)
+            )
 
-          YscWeb.ErrorHTML.render_page(conn, :"500")
-      end
-    else
-      _ -> YscWeb.ErrorHTML.render_page(conn, :"404")
+            YscWeb.ErrorHTML.render_page(conn, :"500")
+        end
+
+      _ ->
+        YscWeb.ErrorHTML.render_page(conn, :"404")
     end
   end
 end

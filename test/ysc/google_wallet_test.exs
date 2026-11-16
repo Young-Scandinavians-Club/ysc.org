@@ -40,6 +40,22 @@ defmodule Ysc.GoogleWalletTest do
     {user, ticket}
   end
 
+  defp confirmed_donation_ticket(user, event_id) do
+    tier = ticket_tier_fixture(%{event_id: event_id, type: :donation})
+
+    %Ysc.Events.Ticket{
+      id: Ecto.ULID.generate(),
+      event_id: event_id,
+      user_id: user.id,
+      ticket_tier_id: tier.id,
+      status: :confirmed,
+      expires_at:
+        DateTime.add(DateTime.utc_now(), 1, :day)
+        |> DateTime.truncate(:second)
+    }
+    |> Ysc.Repo.insert!()
+  end
+
   # ---------------------------------------------------------------------------
   # configured?/0
   # ---------------------------------------------------------------------------
@@ -169,6 +185,19 @@ defmodule Ysc.GoogleWalletTest do
       with_fake_credentials(fn ->
         assert {:error, :not_found} =
                  GoogleWallet.generate_ticket_save_url(pending.id, :any)
+      end)
+    end
+
+    test "rejects a confirmed donation ticket" do
+      {user, ticket} = member_with_confirmed_ticket()
+      donation = confirmed_donation_ticket(user, ticket.event_id)
+
+      with_fake_credentials(fn ->
+        assert {:error, :not_found} =
+                 GoogleWallet.generate_ticket_save_url(donation.id, user.id)
+
+        assert {:error, :not_found} =
+                 GoogleWallet.generate_ticket_save_url(donation.id, :any)
       end)
     end
 
