@@ -805,7 +805,7 @@ defmodule YscWeb.EventDetailsLive do
                         phx-hook="GLightboxHook"
                         phx-update="ignore"
                       >
-                        {raw(update.rendered_body)}
+                        {raw(event_update_body(update))}
                       </div>
                     </article>
                     <p :if={update.sent_by} class="mt-4 text-sm text-zinc-500">
@@ -6486,6 +6486,15 @@ defmodule YscWeb.EventDetailsLive do
       Map.get(event, :rendered_details) || Map.get(event, :raw_details) || ""
 
     html
+    |> Ysc.Html.Trix.scrub()
+    |> Ysc.Html.Links.open_in_new_tab()
+  end
+
+  # Same defense-in-depth as `event_body/1` / Atom feed (Finding 96): updates
+  # are scrubbed on the editor send path, but re-scrub before `raw/1` so a
+  # leftover write that persisted client HTML cannot XSS the public page.
+  defp event_update_body(update) do
+    (Map.get(update, :rendered_body) || "")
     |> Ysc.Html.Trix.scrub()
     |> Ysc.Html.Links.open_in_new_tab()
   end
