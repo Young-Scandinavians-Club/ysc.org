@@ -2310,6 +2310,9 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       |> element("#schedule_form-#{event.id}")
       |> render_submit(%{"event" => %{"publish_at" => "2030-07-01T09:00"}})
 
+      # ScheduleEventForm save only sends {:schedule_requested, ...}; flush it.
+      render(view)
+
       reloaded = Repo.get!(Event, event.id)
       assert reloaded.state == :scheduled
       refute reloaded.send_notification
@@ -2327,6 +2330,9 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       view
       |> element("#schedule_form-#{event.id}")
       |> render_submit(%{"event" => %{"publish_at" => "2030-07-01T09:00"}})
+
+      # ScheduleEventForm save only sends {:schedule_requested, ...}; flush it.
+      render(view)
 
       reloaded = Repo.get!(Event, event.id)
       assert reloaded.state == :scheduled
