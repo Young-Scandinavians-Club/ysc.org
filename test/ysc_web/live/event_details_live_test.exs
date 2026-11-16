@@ -1197,6 +1197,14 @@ defmodule YscWeb.EventDetailsLiveTest do
                "#free-ticket-whos-going",
                "ticket that requires registration"
              )
+
+      assert has_element?(
+               view,
+               "#free-ticket-leave",
+               "Leave without tickets"
+             )
+
+      refute has_element?(view, "#free-ticket-leave", "Cancel")
     end
   end
 

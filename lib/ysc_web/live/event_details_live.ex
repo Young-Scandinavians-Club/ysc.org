@@ -31,6 +31,7 @@ defmodule YscWeb.EventDetailsLive do
   alias YscWeb.Components.Events.AttendeeInfoCards
   alias YscWeb.DateDisplay
   alias YscWeb.SEO
+  alias YscWeb.TicketUserMessages
 
   attr :class, :string, default: "h-4 w-auto"
 
@@ -89,6 +90,25 @@ defmodule YscWeb.EventDetailsLive do
       <.icon name="hero-ticket" class={@icon_class} />
       <span>Get Tickets</span>
       <.icon name="hero-arrow-top-right-on-square" class={@icon_class} />
+    </.button>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :click, :string, required: true
+  attr :class, :string, default: "w-full sm:w-auto"
+
+  defp leave_checkout_button(assigns) do
+    ~H"""
+    <.button
+      id={@id}
+      variant="outline"
+      class={@class}
+      phx-click={@click}
+      phx-disable-with={TicketUserMessages.leave_unpaid_checkout_busy()}
+      phx-confirm={TicketUserMessages.leave_unpaid_checkout_confirm()}
+    >
+      {TicketUserMessages.leave_unpaid_checkout_button()}
     </.button>
     """
   end
@@ -2451,13 +2471,11 @@ defmodule YscWeb.EventDetailsLive do
                     </span>
                   </div>
                   <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-                    <.button
-                      variant="outline"
+                    <.leave_checkout_button
+                      id="checkout-payment-leave"
+                      click="close-payment-modal"
                       class="w-full sm:w-auto py-4"
-                      phx-click="close-payment-modal"
-                    >
-                      Cancel
-                    </.button>
+                    />
                     <.button
                       class="w-full sm:w-auto py-4"
                       id="submit-payment"
@@ -2674,12 +2692,10 @@ defmodule YscWeb.EventDetailsLive do
         <% end %>
         <!-- Action Buttons -->
         <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
-          <.button
-            class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
-            phx-click="close-free-ticket-confirmation"
-          >
-            Cancel
-          </.button>
+          <.leave_checkout_button
+            id="free-ticket-leave"
+            click="close-free-ticket-confirmation"
+          />
           <.button
             phx-click="confirm-free-tickets"
             phx-disable-with="Confirming..."
@@ -5476,6 +5492,14 @@ defmodule YscWeb.EventDetailsLive do
                 title: "Payment"
               )
 
+            other == :cancelled ->
+              YscWeb.Flash.put_toast(
+                socket,
+                :info,
+                TicketUserMessages.leave_unpaid_checkout_toast(),
+                title: "Tickets"
+              )
+
             true ->
               socket
           end
@@ -5499,13 +5523,27 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("close-free-ticket-confirmation", _params, socket) do
+    ticket_order = socket.assigns.ticket_order
+
     # Cancel the ticket order to release reserved tickets
-    if socket.assigns.ticket_order do
+    if ticket_order do
       Ysc.Tickets.cancel_ticket_order(
-        socket.assigns.ticket_order,
+        ticket_order,
         "User cancelled free ticket confirmation"
       )
     end
+
+    socket =
+      if ticket_order do
+        YscWeb.Flash.put_toast(
+          socket,
+          :info,
+          TicketUserMessages.leave_unpaid_checkout_toast(),
+          title: "Tickets"
+        )
+      else
+        socket
+      end
 
     {:noreply,
      socket
