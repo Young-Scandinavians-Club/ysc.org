@@ -1687,8 +1687,13 @@ defmodule Ysc.Events do
               event: updated_event
             })
 
-            if send_notification?,
-              do: schedule_event_notifications(updated_event, now)
+            if send_notification? do
+              schedule_event_notifications(updated_event, now)
+            else
+              # Drop any job left from an earlier publish+notify → unpublish
+              # cycle so a leftover cannot fire against the stored false.
+              cancel_event_notifications(updated_event.id)
+            end
 
             schedule_event_photo_reminders(updated_event)
 
@@ -1717,6 +1722,20 @@ defmodule Ysc.Events do
       error ->
         Ysc.Logging.error("Failed to schedule event notification emails",
           event_id: event.id,
+          error: Exception.message(error)
+        )
+    end
+  end
+
+  defp cancel_event_notifications(event_id) do
+    require Ysc.Logging
+
+    try do
+      YscWeb.Workers.EventNotificationWorker.cancel_notifications(event_id)
+    rescue
+      error ->
+        Ysc.Logging.error("Failed to cancel event notification emails",
+          event_id: event_id,
           error: Exception.message(error)
         )
     end
@@ -1784,7 +1803,16 @@ defmodule Ysc.Events do
       event
       |> Event.changeset(%{state: "draft", published_at: nil})
       |> Repo.update()
-      |> finalize_lifecycle_broadcast()
+      |> case do
+        {:ok, unpublished} = ok ->
+          # Pending +1h member blasts must not survive unpublish; otherwise a
+          # later republish with send_notification false still emails everyone.
+          cancel_event_notifications(unpublished.id)
+          finalize_lifecycle_broadcast(ok)
+
+        error ->
+          finalize_lifecycle_broadcast(error)
+      end
     end
   end
 

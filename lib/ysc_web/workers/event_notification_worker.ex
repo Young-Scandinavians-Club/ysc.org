@@ -81,6 +81,19 @@ defmodule YscWeb.Workers.EventNotificationWorker do
 
         :ok
 
+      # Admin opt-in can flip off after a job was scheduled (e.g. publish+notify
+      # → unpublish → republish with the checkbox off). Never blast against a
+      # stored false — cancel leftovers and refuse at send time.
+      event.send_notification != true ->
+        Ysc.Logging.info(
+          "Event notification opt-in is off, skipping notifications",
+          event_id: event.id,
+          send_notification: event.send_notification
+        )
+
+        cancel_pending_jobs(event.id)
+        :ok
+
       not EventDateTime.in_future?(event) ->
         Ysc.Logging.info(
           "Event is retroactive (past date), skipping notifications",
@@ -213,6 +226,17 @@ defmodule YscWeb.Workers.EventNotificationWorker do
 
         {:error, reason}
     end
+  end
+
+  @doc """
+  Cancels any incomplete notification jobs for `event_id`.
+
+  Call when an admin unpublishes or republishes with notifications opted out so
+  a previously scheduled blast cannot fire against a stored `false`.
+  """
+  def cancel_notifications(event_id) when is_binary(event_id) do
+    cancel_pending_jobs(event_id)
+    :ok
   end
 
   defp cancel_pending_jobs(event_id) do
