@@ -2301,8 +2301,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       host = user_with_membership(:lifetime)
       other_user = user_with_membership(:lifetime)
 
-      checkin = clear_lake_test_date(135)
-      checkout = Date.add(checkin, 2)
+      # LiveView clamps past check-in to today, which would miss the held nights
+      # if we used the July-2026 anchor (offset 135 is 2026-11-13).
+      {checkin, checkout} = clear_lake_upcoming_stay_dates(135, 2)
 
       assert {:ok, _} =
                BookingLocker.create_per_guest_booking(
@@ -3440,8 +3441,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       host = user_with_membership(:lifetime)
       other_user = user_with_membership(:lifetime)
 
-      checkin = clear_lake_test_date(150)
-      checkout = Date.add(checkin, 2)
+      # Same clamp as the insufficient-capacity test: keep the hold on future nights.
+      {checkin, checkout} = clear_lake_upcoming_stay_dates(150, 2)
 
       assert {:ok, _} =
                BookingLocker.create_per_guest_booking(
