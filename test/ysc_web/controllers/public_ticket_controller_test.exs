@@ -1,6 +1,7 @@
 defmodule YscWeb.PublicTicketControllerTest do
   use YscWeb.ConnCase, async: true
 
+  import Ysc.EventsFixtures
   import Ysc.TicketAccessFixtures
 
   alias Ysc.Tickets.AccessToken
@@ -15,6 +16,10 @@ defmodule YscWeb.PublicTicketControllerTest do
 
       assert response(conn, 200) =~ "PNG"
       assert get_resp_header(conn, "content-type") |> hd() =~ "image/png"
+
+      assert get_resp_header(conn, "cache-control") == [
+               "private, max-age=86400"
+             ]
     end
 
     test "works for image proxies that only accept images", %{conn: conn} do
@@ -107,6 +112,32 @@ defmodule YscWeb.PublicTicketControllerTest do
 
       token = AccessToken.sign_ticket(ticket.id)
 
+      assert conn |> get("/t/#{token}/apple") |> response(404)
+      assert conn |> get("/t/#{token}/google") |> response(404)
+    end
+
+    test "404 on a donation ticket, which cannot be scanned at the door", %{
+      conn: conn
+    } do
+      %{user: user, event: event} = granted_tickets()
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      donation =
+        %Ysc.Events.Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Ysc.Repo.insert!()
+
+      token = AccessToken.sign_ticket(donation.id)
+
+      assert conn |> get("/t/#{token}/qr.png") |> response(404)
       assert conn |> get("/t/#{token}/apple") |> response(404)
       assert conn |> get("/t/#{token}/google") |> response(404)
     end

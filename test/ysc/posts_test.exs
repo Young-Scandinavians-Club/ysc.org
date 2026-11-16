@@ -769,7 +769,35 @@ defmodule Ysc.PostsTest do
         assert email.subject =~ "Midsummer Recap"
         assert email.html_body =~ link
         assert email.html_body =~ "Loved the photos"
+        assert email.html_body =~ user.email
+        assert email.reply_to == {"", user.email}
       end)
+    end
+
+    test "queues board mail with a stable idempotency key and reply_to", %{
+      post: post,
+      regular_user: user
+    } do
+      {:ok, comment} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Posts.add_comment_to_post(
+            %{"post_id" => post.id, "text" => "Idempotent board ping"},
+            user
+          )
+        end)
+
+      jobs = all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+
+      board_job =
+        Enum.find(jobs, fn job ->
+          job.args["idempotency_key"] ==
+            "post_comment_board_notification_#{comment.id}"
+        end)
+
+      assert board_job
+      assert board_job.args["recipient"] == Ysc.EmailConfig.board_email()
+      assert board_job.args["reply_to"] == user.email
+      assert board_job.args["template"] == "post_comment_board_notification"
     end
 
     test "does not email the board when the comment is rejected", %{

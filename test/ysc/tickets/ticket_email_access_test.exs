@@ -89,6 +89,25 @@ defmodule Ysc.Tickets.TicketEmailAccessTest do
                Ysc.Scanning.QrToken.verify(AccessToken.sign_ticket("t1"))
     end
 
+    test "expires after 400 days" do
+      now = System.system_time(:second)
+
+      expired =
+        Phoenix.Token.sign(YscWeb.Endpoint, "ticket_access_v1", {:ticket, "t1"},
+          signed_at: now - 401 * 24 * 60 * 60
+        )
+
+      still_valid =
+        Phoenix.Token.sign(YscWeb.Endpoint, "ticket_access_v1", {:ticket, "t1"},
+          signed_at: now - 399 * 24 * 60 * 60
+        )
+
+      # verify/1 maps Phoenix.Token's :expired into :invalid so callers
+      # have one failure atom.
+      assert {:error, :invalid} = AccessToken.verify(expired)
+      assert {:ok, {:ticket, "t1"}} = AccessToken.verify(still_valid)
+    end
+
     test "verify_ticket/1 only accepts single-ticket tokens" do
       assert {:ok, "t1"} =
                AccessToken.verify_ticket(AccessToken.sign_ticket("t1"))
