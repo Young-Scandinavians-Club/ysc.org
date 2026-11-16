@@ -890,7 +890,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
         </ul>
       </div>
 
-      <div class="flex justify-end gap-3 border-t border-zinc-200 pt-6">
+      <.form_actions id="merch-order-details-actions" spacing={:compact}>
         <.button
           id="cancel-order"
           navigate={~p"/admin/merch/orders"}
@@ -902,7 +902,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
         <.button type="submit" id="review-order" phx-disable-with="Checking…">
           Review order
         </.button>
-      </div>
+      </.form_actions>
     </.form>
     """
   end
@@ -1024,7 +1024,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
         </p>
       </section>
 
-      <div class="flex justify-end gap-3 border-t border-zinc-200 pt-6">
+      <.form_actions id="merch-order-review-actions" spacing={:compact}>
         <.button
           type="button"
           id="back-to-details"
@@ -1043,7 +1043,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
         >
           Place order
         </.button>
-      </div>
+      </.form_actions>
     </div>
     """
   end
