@@ -1132,6 +1132,32 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "search_users_by_name/2" do
+    test "matches names but never emails" do
+      user =
+        user_fixture(%{
+          first_name: "Sigrid",
+          last_name: "NameOnlySearch",
+          email: "sigrid.nameonly.#{System.unique_integer([:positive])}@ysc.org"
+        })
+
+      assert Enum.any?(
+               Accounts.search_users_by_name("NameOnlySearch"),
+               &(&1.id == user.id)
+             )
+
+      # Finding 102: email fragments must not hit this query.
+      assert Accounts.search_users_by_name(user.email) == []
+
+      result =
+        Accounts.search_users_by_name("NameOnlySearch")
+        |> Enum.find(&(&1.id == user.id))
+
+      # Slim select omits email so it never reaches volunteer LiveView assigns.
+      assert is_nil(result.email)
+    end
+  end
+
   describe "list_event_notification_recipients/0" do
     test "returns opted-in active users without loading hashed_password" do
       opted_in =

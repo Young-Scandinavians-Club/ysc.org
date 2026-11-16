@@ -712,7 +712,10 @@ defmodule YscWeb.AdminEventsNewLive do
                   <div class="relative">
                     <div class="relative">
                       <label for="host-search-input" class="sr-only">
-                        Search hosts by name or email
+                        Search hosts by name{if(@admin_role == :admin,
+                          do: " or email",
+                          else: ""
+                        )}
                       </label>
                       <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                         <.icon
@@ -724,7 +727,12 @@ defmodule YscWeb.AdminEventsNewLive do
                         id="host-search-input"
                         type="text"
                         value={@host_search_query}
-                        placeholder="Search members by name or email..."
+                        placeholder={
+                          if(@admin_role == :admin,
+                            do: "Search members by name or email...",
+                            else: "Search members by name..."
+                          )
+                        }
                         phx-keyup="search-hosts"
                         phx-debounce="250"
                         name="host_search"
@@ -749,7 +757,7 @@ defmodule YscWeb.AdminEventsNewLive do
                             class="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 transition w-full text-left"
                             phx-click="add-host"
                             phx-value-user-id={user.id}
-                            aria-label={"Add #{user.first_name} #{user.last_name} (#{user.email}) as host"}
+                            aria-label={"Add #{user.first_name} #{user.last_name} as host"}
                           >
                             <.user_avatar_image
                               user={user}
@@ -759,7 +767,13 @@ defmodule YscWeb.AdminEventsNewLive do
                               <p class="text-sm font-medium text-zinc-900 truncate">
                                 {user.first_name} {user.last_name}
                               </p>
-                              <p class="text-xs text-zinc-500 truncate">
+                              <%!-- Finding 102: volunteers must not see member
+                                   emails here (Finding 98 leftover). Full
+                                   admins still get email for disambiguation. --%>
+                              <p
+                                :if={@admin_role == :admin}
+                                class="text-xs text-zinc-500 truncate"
+                              >
                                 {user.email}
                               </p>
                             </div>
@@ -2642,6 +2656,10 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def handle_event("validate-event-update", %{"update" => params}, socket) do
+    # Never trust client `rendered_body` (same class as Finding 40/96). Scrub
+    # from `raw_body` when present; otherwise drop a forged rendered field.
+    params = scrub_update_params(params)
+
     socket =
       socket
       |> assign(:update_form, to_form(params, as: "update"))
@@ -2917,10 +2935,19 @@ defmodule YscWeb.AdminEventsNewLive do
     query = String.trim(query)
 
     results =
-      if query == "" do
-        []
-      else
-        Ysc.Accounts.search_users(query, limit: 8)
+      cond do
+        query == "" ->
+          []
+
+        # Finding 102: volunteers already lost global user search (Finding 98).
+        # Host picker still called `Accounts.search_users/2`, which matches on
+        # email and returned full rows — so typing "@" enumerated member
+        # mailboxes. Name-only search for non-admins; full admin keeps email.
+        socket.assigns[:admin_role] == :admin ->
+          Ysc.Accounts.search_users(query, limit: 8)
+
+        true ->
+          Ysc.Accounts.search_users_by_name(query, limit: 8)
       end
 
     {:noreply,
@@ -3644,7 +3671,7 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   defp build_update_preview(socket) do
-    params = socket.assigns.update_form.params || %{}
+    params = scrub_update_params(socket.assigns.update_form.params || %{})
     raw_body = params["raw_body"] || ""
 
     if String.trim(raw_body) == "" do
@@ -3654,9 +3681,7 @@ defmodule YscWeb.AdminEventsNewLive do
        )}
     else
       event = socket.assigns.event
-
-      rendered_body =
-        params["rendered_body"] || Ysc.Html.Trix.scrub(raw_body)
+      rendered_body = params["rendered_body"] || Ysc.Html.Trix.scrub(raw_body)
 
       preview_update = %EventUpdate{
         title: params["title"],
@@ -3758,9 +3783,8 @@ defmodule YscWeb.AdminEventsNewLive do
     event = socket.assigns[:event]
 
     if sms_checked?(form) and event do
-      params = form_params(form)
-      raw_body = params["raw_body"] || ""
-      rendered_body = params["rendered_body"] || raw_body
+      params = scrub_update_params(form_params(form))
+      rendered_body = params["rendered_body"] || ""
 
       preview =
         Segment.build_event_update_sms(
@@ -3774,6 +3798,20 @@ defmodule YscWeb.AdminEventsNewLive do
       assign(socket, :sms_preview, nil)
     end
   end
+
+  # Client forms can include a forged `rendered_body`. Always derive HTML from
+  # `raw_body` through TrixScrubber (or clear it when raw is absent).
+  defp scrub_update_params(params) when is_map(params) do
+    case Map.get(params, "raw_body") do
+      raw when is_binary(raw) ->
+        Map.put(params, "rendered_body", Ysc.Html.Trix.scrub(raw))
+
+      _ ->
+        Map.delete(params, "rendered_body")
+    end
+  end
+
+  defp scrub_update_params(_), do: %{}
 
   defp sms_checked?(nil), do: false
 

@@ -551,6 +551,43 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Name-only member search for volunteer host pickers.
+
+  Unlike `search_users/2`, this never matches on email, so a volunteer cannot
+  enumerate member mailboxes by typing `@` / domain fragments (Finding 102 /
+  Finding 98 leftover on the event host picker).
+  """
+  def search_users_by_name(query, opts \\ []) when is_binary(query) do
+    query
+    |> search_users_by_name_query(opts)
+    |> Repo.all()
+  end
+
+  @doc false
+  def search_users_by_name_query(query, opts \\ []) when is_binary(query) do
+    limit = Keyword.get(opts, :limit, 10)
+    state = Keyword.get(opts, :state, :active)
+    search_term = "%" <> Ysc.Text.escape_like(query) <> "%"
+
+    from(u in User,
+      where: u.state == ^state,
+      where:
+        ilike(u.first_name, ^search_term) or
+          ilike(u.last_name, ^search_term) or
+          ilike(
+            fragment("? || ' ' || ?", u.first_name, u.last_name),
+            ^search_term
+          ),
+      order_by: [asc: u.last_name, asc: u.first_name],
+      limit: ^limit,
+      # Host chips only need identity + avatar — omit email so it never sits
+      # in the volunteer LiveView assign either.
+      select: [:id, :first_name, :last_name, :current_avatar_id],
+      preload: [:current_avatar]
+    )
+  end
+
+  @doc """
   Active members who opted in to event notification emails.
 
   Selects only the columns needed to address and greet the recipient so
@@ -5763,6 +5800,11 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_search_users_query do
     search_users_query("ci")
+  end
+
+  @doc false
+  def ci_query_explain_search_users_by_name_query do
+    search_users_by_name_query("ci")
   end
 
   @doc false
