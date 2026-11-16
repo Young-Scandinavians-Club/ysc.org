@@ -446,7 +446,18 @@ defmodule Ysc.MixProject do
       # 1.2.12: hook disconnected() runs once; JS.push no longer mutates
       # opts; assign_async falsy keys; caret restore for search/url/tel.
       {:phoenix_live_view, "~> 1.2.13"},
-      {:phoenix_test, "~> 0.12", only: :test, runtime: false},
+      # 0.13.0: regex assert_path/refute_path; LiveView phx-change sends
+      # `_unused_*` for untouched fields; only the activated submitter's
+      # data is sent (implicit submit uses the first). 0.13.1: Elixir 1.18
+      # floor (we are 1.20). 0.14.0: LiveView assertion retry interval is
+      # configurable (`:timeout_interval_wait_time`, default 100 ms);
+      # unsupported assertion options raise; fill_in refuses readonly
+      # fields; trigger-action submits keep typed values; phx-change
+      # honors phx-no-unused-field. We only set `:endpoint` in
+      # config/test.exs and do not import PhoenixTest in ConnCase yet.
+      # Registration and security LiveViews use phx-trigger-action; we
+      # still drive those with LiveViewTest, not PhoenixTest.
+      {:phoenix_test, "~> 0.14.0", only: :test, runtime: false},
       # 0.1.14: from_document/2 and from_fragment/2 accept optional
       # :max_depth, :max_memory, :max_attributes, :timeout (default
       # unlimited). extras: fine 0.1.6 → 0.2.0 (lazy_html 0.1.14 requires
