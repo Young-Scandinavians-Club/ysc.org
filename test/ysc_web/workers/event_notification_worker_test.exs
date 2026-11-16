@@ -74,6 +74,16 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
 
       reloaded = Ysc.Repo.get!(Event, event.id)
       assert is_nil(reloaded.notification_sent_at)
+      assert is_nil(reloaded.notification_recipient_count)
+
+      refute Ysc.Repo.exists?(
+               from m in Ysc.Messages.MessageIdempotency,
+                 where:
+                   like(
+                     m.idempotency_key,
+                     ^"event_notification_#{event.id}_%"
+                   )
+             )
     end
 
     test "skips notifications for non-published event", %{event: event} do
@@ -133,6 +143,7 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
       event
       |> Event.changeset(%{
         state: :published,
+        send_notification: true,
         start_date: future_date,
         start_time: nil
       })
@@ -160,6 +171,11 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
                  start_date: nil,
                  start_time: ~T[10:00:00]
                })
+
+      event =
+        event
+        |> Event.changeset(%{send_notification: true})
+        |> Ysc.Repo.update!()
 
       job = %Oban.Job{
         id: 1,
@@ -219,6 +235,7 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
       event
       |> Event.changeset(%{
         state: :published,
+        send_notification: true,
         start_date: past_date,
         start_time: past_time
       })
