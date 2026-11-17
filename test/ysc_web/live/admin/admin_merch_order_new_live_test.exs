@@ -253,6 +253,9 @@ defmodule YscWeb.AdminMerchOrderNewLiveTest do
         }
       })
 
+      assert has_element?(view, "#order-problems", "Fix these to continue:")
+      assert has_element?(view, "#order-problems.bg-red-50")
+      assert has_element?(view, "#order-problems.border-red-200")
       assert has_element?(view, "#order-problems li", "Name can't be blank")
 
       assert has_element?(
@@ -575,6 +578,8 @@ defmodule YscWeb.AdminMerchOrderNewLiveTest do
       review(view, custom_params(tee))
 
       assert has_element?(view, "#review-error", "couldn't quote shipping")
+      assert has_element?(view, "#review-error.bg-red-50")
+      assert has_element?(view, "#review-error.border-red-200")
       assert has_element?(view, "#place-order[disabled]")
 
       stub_quote()

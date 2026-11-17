@@ -342,7 +342,15 @@ defmodule YscWeb.AdminMerchOrdersLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/merch/orders/#{order.id}")
 
+      assert has_element?(
+               view,
+               "#order-failure",
+               "This order did not reach Printful."
+             )
+
       assert has_element?(view, "#order-failure", "Bad address")
+      assert has_element?(view, "#order-failure.bg-red-50")
+      assert has_element?(view, "#order-failure.border-red-200")
       assert has_element?(view, "#retry-order")
 
       view |> element("#retry-order") |> render_click()

@@ -3621,18 +3621,14 @@ defmodule YscWeb.AdminMoneyLive do
                 </p>
               <% end %>
 
-              <div
+              <.callout
                 :if={report.status == "rejected" && report.rejection_note}
                 id="expense-report-rejection-note"
-                class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm"
+                type="error"
               >
-                <p class="font-medium text-red-800">
-                  Rejection note sent to the member
-                </p>
-                <p class="mt-1 whitespace-pre-wrap text-red-700">
-                  {report.rejection_note}
-                </p>
-              </div>
+                <:title>Rejection note sent to the member</:title>
+                <p class="mt-1 whitespace-pre-wrap">{report.rejection_note}</p>
+              </.callout>
 
               <p
                 :if={report.quickbooks_bill_id && report.status != "paid"}

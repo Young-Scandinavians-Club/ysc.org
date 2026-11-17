@@ -878,17 +878,17 @@ defmodule YscWeb.AdminMerchOrderNewLive do
         </p>
       </section>
 
-      <div
+      <.callout
         :if={@summary != []}
         id="order-problems"
-        class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+        type="error"
         role="alert"
       >
-        <p class="font-semibold">Fix these to continue:</p>
+        <:title>Fix these to continue:</:title>
         <ul class="mt-2 list-disc space-y-1 pl-5">
           <li :for={problem <- @summary}>{problem}</li>
         </ul>
-      </div>
+      </.callout>
 
       <.form_actions id="merch-order-details-actions" spacing={:compact}>
         <.button
@@ -965,10 +965,10 @@ defmodule YscWeb.AdminMerchOrderNewLive do
           Asking Printful for shipping options and a price…
         </p>
 
-        <div
+        <.callout
           :if={@review_error}
           id="review-error"
-          class="rounded-lg bg-red-50 p-4 text-sm text-red-700"
+          type="error"
           role="alert"
         >
           {@review_error}
@@ -980,7 +980,7 @@ defmodule YscWeb.AdminMerchOrderNewLive do
           >
             Try again
           </button>
-        </div>
+        </.callout>
 
         <div :if={is_map(@review)} class="space-y-4">
           <form id="shipping-form" phx-change="select_option">
