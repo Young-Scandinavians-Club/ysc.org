@@ -1345,8 +1345,6 @@ defmodule Ysc.Subscriptions do
          } = stripe_sub
        ) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           # Use the injectable module so tests hit Stripe.SubscriptionMock
-           # (same as other subscription mutations), not the live Stripe API.
            stripe_subscription_module().update(stripe_sub.id, %{
              trial_settings: %{
                end_behavior: %{missing_payment_method: "create_invoice"}

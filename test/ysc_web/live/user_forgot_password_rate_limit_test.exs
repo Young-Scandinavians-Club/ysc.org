@@ -100,6 +100,9 @@ defmodule YscWeb.UserForgotPasswordRateLimitTest do
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
                "Too many password reset attempts"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, "error_toast_title") ==
+               "Password reset"
     end
   end
 end

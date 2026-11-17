@@ -2,7 +2,8 @@ defmodule YscWeb.EventDetailsLive.TierPurchaseLimitsTest do
   @moduledoc """
   LiveView tests for per-buyer ticket limits (`max_per_buyer`) on the public
   event page. Server-side enforcement is covered in `Ysc.TicketsTest`; these
-  tests pin the limit note and the + button lock.
+  tests pin the limit note, the + button lock, and the checkout toast when
+  `create_ticket_order` still returns `:tier_purchase_limit_exceeded`.
   """
   use YscWeb.ConnCase, async: false
 
@@ -189,6 +190,7 @@ defmodule YscWeb.EventDetailsLive.TierPurchaseLimitsTest do
 
       assert error =~ "per-member limit"
       assert error =~ "reduce your selection"
+      assert Phoenix.Flash.get(flash, "error_toast_title") == "Ticket limit"
       refute has_element?(view, "#payment-element")
     end
   end
