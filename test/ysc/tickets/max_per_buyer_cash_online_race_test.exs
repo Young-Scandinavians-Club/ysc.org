@@ -259,4 +259,32 @@ defmodule Ysc.Tickets.MaxPerBuyerCashOnlineRaceTest do
 
     assert confirmed == 2
   end
+
+  test "enforce_max_per_buyer without payment_channel still serializes under the lock",
+       %{
+         user: user,
+         admin: admin,
+         event: event,
+         tier: tier
+       } do
+    assert {:ok, _} =
+             Tickets.grant_admin_tickets(
+               admin.id,
+               user.id,
+               event.id,
+               %{tier.id => 1},
+               skip_email: true,
+               enforce_max_per_buyer: true
+             )
+
+    assert {:error, :tier_purchase_limit_exceeded} =
+             Tickets.grant_admin_tickets(
+               admin.id,
+               user.id,
+               event.id,
+               %{tier.id => 1},
+               skip_email: true,
+               enforce_max_per_buyer: true
+             )
+  end
 end

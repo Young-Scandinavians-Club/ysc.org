@@ -56,6 +56,7 @@ defmodule Ysc.Tickets.AdminGrants do
     admin_grant_notes = Keyword.get(opts, :admin_grant_notes)
     payment_channel = Keyword.get(opts, :payment_channel)
     offline_amount_collected = Keyword.get(opts, :offline_amount_collected)
+    enforce_max_per_buyer? = Keyword.get(opts, :enforce_max_per_buyer, false)
 
     Ysc.Logging.info("Admin ticket grant started",
       granted_by_id: granted_by_id,
@@ -84,7 +85,8 @@ defmodule Ysc.Tickets.AdminGrants do
           skip_capacity: skip_capacity?,
           skip_sale_guards: skip_sale_guards?,
           payment_channel: payment_channel,
-          offline_amount_collected: offline_amount_collected
+          offline_amount_collected: offline_amount_collected,
+          enforce_max_per_buyer: enforce_max_per_buyer?
         )
       end
 
