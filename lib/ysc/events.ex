@@ -21,6 +21,7 @@ defmodule Ysc.Events do
   alias Ysc.Events.PricingDisplay
   alias Ysc.Accounts.User
   alias Ysc.Avatars.Avatar
+  alias Ysc.Media.Image
   alias YscWeb.Authorization
   alias Ysc.Tickets.TicketOrder
 
@@ -1279,7 +1280,7 @@ defmodule Ysc.Events do
     limit
     |> upcoming_events_with_preload_query()
     |> Repo.all()
-    |> Repo.preload(preloads)
+    |> Repo.preload(slim_event_preloads(preloads))
   end
 
   @doc """
@@ -1507,16 +1508,48 @@ defmodule Ysc.Events do
     end)
   end
 
+  # Home /events / event-page enrich, signed-in ticket cards, and admin
+  # pickers only need display paths. Skipping `upload_data` (uploader JSON)
+  # and `content_hash` keeps those off EventPricingCache entries.
+  @cover_image_fields [
+    :id,
+    :title,
+    :alt_text,
+    :optimized_image_path,
+    :raw_image_path,
+    :thumbnail_path,
+    :blur_hash,
+    :width,
+    :height
+  ]
+
+  defp cover_image_query do
+    from(i in Image, select: struct(i, ^@cover_image_fields))
+  end
+
+  defp cover_images_query(image_ids) do
+    from(i in Image,
+      where: i.id in ^image_ids,
+      select: struct(i, ^@cover_image_fields)
+    )
+  end
+
+  defp slim_event_preloads(preloads) when is_list(preloads) do
+    Enum.map(preloads, fn
+      :cover_image -> {:cover_image, cover_image_query()}
+      other -> other
+    end)
+  end
+
   # Batch load images for multiple image IDs
   defp batch_load_images(image_ids) when is_list(image_ids) do
     if image_ids == [] do
       %{}
     else
-      alias Ysc.Media.Image
-
-      from(i in Image, where: i.id in ^image_ids)
+      image_ids
+      |> cover_images_query()
       |> Repo.all()
-      |> Enum.into(%{}, fn image -> {image.id, image} end)
+      |> Map.new(&{&1.id, &1})
     end
   end
 
@@ -3145,7 +3178,7 @@ defmodule Ysc.Events do
     from(e in Event,
       where: e.id in ^ids,
       select: struct(e, ^Event.summary_fields()),
-      preload: ^preloads
+      preload: ^slim_event_preloads(preloads)
     )
   end
 
@@ -3156,7 +3189,7 @@ defmodule Ysc.Events do
     event_query =
       from(e in Event,
         select: struct(e, ^Event.summary_fields()),
-        preload: [:cover_image]
+        preload: [cover_image: ^cover_image_query()]
       )
 
     Ticket
@@ -4626,6 +4659,11 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_events_by_ids_query do
     events_by_ids_query([Ysc.Ci.QueryExplain.Fixtures.ulid()], [])
+  end
+
+  @doc false
+  def ci_query_explain_cover_images_query do
+    cover_images_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
   end
 
   @doc false

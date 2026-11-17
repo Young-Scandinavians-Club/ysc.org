@@ -2265,6 +2265,31 @@ defmodule Ysc.EventsTest do
       assert body_cols == 0
     end
 
+    test "list_events_by_ids/2 omits cover image upload_data" do
+      image = fat_cover_image_fixture()
+      event = event_fixture(%{image_id: image.id})
+
+      {events, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Events.list_events_by_ids([event.id], preloads: [:cover_image])
+          end,
+          pattern: ~r/upload_data|content_hash/i,
+          caller_pids: [self()]
+        )
+
+      [loaded] = events
+      assert loaded.cover_image.id == image.id
+
+      assert loaded.cover_image.optimized_image_path ==
+               image.optimized_image_path
+
+      assert loaded.cover_image.alt_text == image.alt_text
+      assert is_nil(loaded.cover_image.upload_data)
+      assert is_nil(loaded.cover_image.content_hash)
+      assert fat_cols == 0
+    end
+
     test "count_tickets_sold_excluding_donations/1 counts non-donation tickets" do
       {:ok, event} = create_event_fixture()
       user = user_fixture()
@@ -2346,6 +2371,61 @@ defmodule Ysc.EventsTest do
       assert enriched.ticket_tiers == []
       assert enriched.ticket_count == 0
       assert enriched.pricing_info.display_text == "External Tickets"
+    end
+
+    test "enrich_single_event_with_pricing_from_db omits image upload_data" do
+      image = fat_cover_image_fixture()
+      {:ok, event} = create_event_fixture(%{image_id: image.id})
+
+      {enriched, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.enrich_single_event_with_pricing_from_db(event) end,
+          pattern: ~r/upload_data|content_hash/i,
+          caller_pids: [self()]
+        )
+
+      assert enriched.image.id == image.id
+      assert enriched.cover_image.id == image.id
+      assert enriched.image.optimized_image_path == image.optimized_image_path
+      assert enriched.image.blur_hash == image.blur_hash
+      assert enriched.image.width == image.width
+      assert is_nil(enriched.image.upload_data)
+      assert is_nil(enriched.image.content_hash)
+      assert fat_cols == 0
+    end
+
+    test "enrich_events_with_pricing_from_db skips images query when none have covers" do
+      {:ok, event} = create_event_fixture()
+
+      {_enriched, image_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.enrich_events_with_pricing_from_db([event]) end,
+          pattern: ~r/FROM "images"/i,
+          caller_pids: [self()]
+        )
+
+      assert image_queries == 0
+    end
+
+    test "list_upcoming_events_for_user/1 omits cover image upload_data" do
+      image = fat_cover_image_fixture()
+      {:ok, event} = create_event_fixture(%{image_id: image.id})
+      user = user_fixture()
+      create_ticket_fixture(%{event_id: event.id, user_id: user.id})
+
+      {tickets, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_upcoming_events_for_user(user.id) end,
+          pattern: ~r/upload_data|content_hash/i,
+          caller_pids: [self()]
+        )
+
+      loaded = Enum.find(tickets, &(&1.event_id == event.id))
+      assert loaded
+      assert loaded.event.cover_image.id == image.id
+      assert loaded.event.cover_image.thumbnail_path == image.thumbnail_path
+      assert is_nil(loaded.event.cover_image.upload_data)
+      assert fat_cols == 0
     end
 
     test "list_unique_attendees_for_event/1 returns unique attendees" do
@@ -4857,6 +4937,25 @@ defmodule Ysc.EventsTest do
       assert is_list(events)
     end
 
+    test "list_upcoming_events_with_preload omits cover image upload_data" do
+      image = fat_cover_image_fixture()
+      {:ok, event} = create_event_fixture(%{image_id: image.id})
+
+      {events, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_upcoming_events_with_preload(50) end,
+          pattern: ~r/upload_data|content_hash/i,
+          caller_pids: [self()]
+        )
+
+      loaded = Enum.find(events, &(&1.id == event.id))
+      assert loaded
+      assert loaded.cover_image.id == image.id
+      assert loaded.cover_image.raw_image_path == image.raw_image_path
+      assert is_nil(loaded.cover_image.upload_data)
+      assert fat_cols == 0
+    end
+
     test "list_upcoming_events_with_preload keeps in-progress events until they end",
          %{user: user} do
       now = DateTime.utc_now()
@@ -6610,6 +6709,20 @@ defmodule Ysc.EventsTest do
       assert %Ecto.Query{} =
                Events.ci_query_explain_list_tickets_for_export_query()
     end
+
+    test "ci_query_explain_cover_images_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} = Events.ci_query_explain_cover_images_query()
+    end
+  end
+
+  defp fat_cover_image_fixture do
+    Ysc.TestDataFactory.create_test_image(%{
+      upload_data: %{"original" => "fat-json"},
+      content_hash: "event-cover-#{System.unique_integer([:positive])}",
+      alt_text: "Midsummer crowd",
+      width: 1920,
+      height: 1080
+    })
   end
 
   defp insert_ticket!(event, tier, user, status) do
