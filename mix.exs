@@ -391,11 +391,16 @@ defmodule Ysc.MixProject do
       # or export encrypted PKCS#8. joken lists ~> 1.11.12 and goth ~> 1.11,
       # so pin the patched floor.
       {:jose, "~> 1.11.13", override: true},
-      # 2.7.0: Elixir 1.16 / OTP 26 floor (we are 1.20 / OTP 27). Signer.create
-      # accepts a JOSE.JWK; peek returns {:error, :token_malformed} for invalid
-      # tokens. We sign Google Wallet JWTs with Signer.create("RS256", %{"pem"
-      # => ...}) and generate_and_sign/3; we do not use peek or JWK signers.
-      {:joken, "~> 2.7"},
+      # 2.8.0: default exp/nbf reject non-numeric values (RFC 7519 NumericDate;
+      # Erlang term order used to treat a string/null exp as never-expire).
+      # Before hooks that halt with a non-`{:error, reason}` tuple now return
+      # {:error, :wrong_hook_return} instead of succeeding. We still sign
+      # Google Wallet JWTs with Signer.create("RS256", %{"pem" => ...}) and
+      # generate_and_sign/3 on an empty token config — no default claims,
+      # peek, hooks, or JWK signers. 2.7.0 Elixir 1.16 / OTP 26 floor and
+      # JOSE.JWK Signer.create remain. jose stays on the 1.11.13 override
+      # (joken still lists ~> 1.11.12).
+      {:joken, "~> 2.8.0"},
       # 3.0.3: require spek ~> 0.5.0 (associativity flattening in Spek.optimize/1).
       # 3.0.4: literal allow/deny true|false eval via Spek so Elixir 1.20 does not
       # warn about dead authorize?/4 branches; missing-rule warnings put policy
