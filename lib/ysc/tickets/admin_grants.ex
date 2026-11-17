@@ -18,6 +18,7 @@ defmodule Ysc.Tickets.AdminGrants do
   alias Ysc.Events.TicketTier
   alias Ysc.Events.TicketTierHelpers
   alias Ysc.Repo
+  alias Ysc.Tickets
   alias Ysc.Tickets.BookingLocker
   alias Ysc.Tickets.CheckoutCancel
   alias Ysc.Tickets.TicketOrder
@@ -32,6 +33,9 @@ defmodule Ysc.Tickets.AdminGrants do
     * `event_id` - event id
     * `ticket_selections` - map of `ticket_tier_id => quantity`
     * `opts` - `:skip_capacity`, `:skip_sale_guards`, `:skip_email`, `:admin_grant_notes`,
+      `:payment_channel`, `:offline_amount_collected`,
+      `:enforce_max_per_buyer` (or set when `:payment_channel` is present — re-checks
+      `max_per_buyer` under the shared checkout advisory lock),
       `:user`, `:event`, `:tiers` (preloaded structs skip matching Repo lookups)
 
   ## Returns
@@ -337,6 +341,11 @@ defmodule Ysc.Tickets.AdminGrants do
     tiers_by_id = Map.new(tiers, &{&1.id, &1})
 
     Repo.transaction(fn ->
+      # Same lock as create_ticket_order/4 so a cash door sale and an online
+      # checkout for the same member/event cannot both pass a stale
+      # max_per_buyer check (#1856 leftover).
+      Tickets.lock_user_event_ticket_checkout!(user.id, event.id)
+
       order_attrs =
         %{
           user_id: user.id,
@@ -355,6 +364,14 @@ defmodule Ysc.Tickets.AdminGrants do
         |> Map.new()
 
       with :ok <-
+             maybe_enforce_max_per_buyer(
+               user,
+               event.id,
+               ticket_selections,
+               tiers,
+               grant_opts
+             ),
+           :ok <-
              maybe_validate_fulfillment_in_transaction(
                user.id,
                event.id,
@@ -399,6 +416,31 @@ defmodule Ysc.Tickets.AdminGrants do
     |> case do
       {:ok, ticket_order} -> {:ok, ticket_order}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Complimentary admin comps may exceed max_per_buyer on purpose. In-person
+  # cash/check/other sales (`payment_channel` or explicit opt) must not.
+  defp maybe_enforce_max_per_buyer(
+         user,
+         event_id,
+         ticket_selections,
+         tiers,
+         grant_opts
+       ) do
+    enforce? =
+      Keyword.get(grant_opts, :enforce_max_per_buyer, false) or
+        Keyword.get(grant_opts, :payment_channel) in ["cash", "check", "other"]
+
+    if enforce? do
+      Tickets.validate_tier_purchase_limits(
+        user,
+        event_id,
+        ticket_selections,
+        tiers
+      )
+    else
+      :ok
     end
   end
 
