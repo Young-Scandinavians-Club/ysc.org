@@ -22,6 +22,12 @@ defmodule YscWeb.AccountSetupLiveTest do
   # Shared helpers
   # ---------------------------------------------------------------------------
 
+  defp redirect_info_flash(flash) when is_binary(flash) do
+    flash
+    |> then(&Phoenix.LiveView.Utils.verify_flash(YscWeb.Endpoint, &1))
+    |> Phoenix.Flash.get(:info)
+  end
+
   defp pending_user_with_default_payment(attrs \\ %{}) do
     user = verified_pending_user(Map.merge(%{password_set_at: nil}, attrs))
 
@@ -1547,9 +1553,11 @@ defmodule YscWeb.AccountSetupLiveTest do
       set_swoosh_global()
       {conn, user} = unpaid_active_user_ready_to_activate(conn)
 
-      assert {:error, {:redirect, %{to: "/"}}} =
+      assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                live(conn, account_setup_path(user))
 
+      assert redirect_info_flash(flash) == "Your membership is active. Welcome!"
+      refute redirect_info_flash(flash) =~ "renewed"
       assert approved_payment_success_email(drain_emails(), user)
     end
 
@@ -1569,9 +1577,11 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       assert Subscriptions.returning_member?(user)
 
-      assert {:error, {:redirect, %{to: "/"}}} =
+      assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                live(conn, account_setup_path(user))
 
+      assert redirect_info_flash(flash) == "Your membership is renewed."
+      refute redirect_info_flash(flash) =~ "Welcome"
       refute approved_payment_success_email(drain_emails(), user)
     end
 
@@ -1590,9 +1600,11 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       refute Subscriptions.returning_member?(user)
 
-      assert {:error, {:redirect, %{to: "/"}}} =
+      assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                live(conn, account_setup_path(user))
 
+      assert redirect_info_flash(flash) == "Your membership is active. Welcome!"
+      refute redirect_info_flash(flash) =~ "renewed"
       assert approved_payment_success_email(drain_emails(), user)
     end
 
@@ -1603,11 +1615,13 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       stub_successful_membership_subscription(user)
 
-      assert {:error, {:redirect, %{to: "/"}}} =
+      assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                view
                |> element("#retry-membership-activation")
                |> render_click()
 
+      assert redirect_info_flash(flash) == "Your membership is active. Welcome!"
+      refute redirect_info_flash(flash) =~ "renewed"
       assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
       assert approved_payment_success_email(drain_emails(), user)
     end
@@ -1621,11 +1635,13 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       stub_successful_membership_subscription(user)
 
-      assert {:error, {:redirect, %{to: "/"}}} =
+      assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                view
                |> element("#retry-membership-activation")
                |> render_click()
 
+      assert redirect_info_flash(flash) == "Your membership is renewed."
+      refute redirect_info_flash(flash) =~ "Welcome"
       assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
       refute approved_payment_success_email(drain_emails(), user)
     end
@@ -1659,11 +1675,13 @@ defmodule YscWeb.AccountSetupLiveTest do
       stub_stripe_card_retrieve(user, pm_id)
       stub_successful_membership_subscription(user)
 
-      assert {:error, {:redirect, %{to: "/"}}} =
+      assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                render_click(view, "payment-method-set", %{
                  "payment_method_id" => pm_id
                })
 
+      assert redirect_info_flash(flash) == "Your membership is active. Welcome!"
+      refute redirect_info_flash(flash) =~ "renewed"
       assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
       assert approved_payment_success_email(drain_emails(), user)
     end
@@ -1684,11 +1702,13 @@ defmodule YscWeb.AccountSetupLiveTest do
       stub_stripe_card_retrieve(user, pm_id)
       stub_successful_membership_subscription(user)
 
-      assert {:error, {:redirect, %{to: "/"}}} =
+      assert {:error, {:redirect, %{to: "/", flash: flash}}} =
                render_click(view, "payment-method-set", %{
                  "payment_method_id" => pm_id
                })
 
+      assert redirect_info_flash(flash) == "Your membership is renewed."
+      refute redirect_info_flash(flash) =~ "Welcome"
       assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
       refute approved_payment_success_email(drain_emails(), user)
     end

@@ -8,6 +8,7 @@ defmodule YscWeb.AccountSetupLive do
   alias Ysc.Accounts.VerificationCodes
   alias Ysc.Customers
   alias YscWeb.AccountSetupAccess
+  alias YscWeb.MembershipUserMessages
   alias Ysc.Payments
   alias Ysc.Subscriptions
 
@@ -767,6 +768,7 @@ defmodule YscWeb.AccountSetupLive do
     |> assign(:stripe_billing_details, "{}")
     |> assign(:signup_plan, nil)
     |> assign(:activation_attempted?, false)
+    |> assign(:returning_member?, false)
     |> assign(:public_key, Application.get_env(:stripity_stripe, :public_key))
   end
 
@@ -774,6 +776,9 @@ defmodule YscWeb.AccountSetupLive do
     user = Accounts.get_user!(user_id, [:registration_form])
     current_user = socket.assigns.current_user
     is_owner = !!(current_user && current_user.id == user.id)
+
+    # Compute before activation: a new paid row would make everyone look returning.
+    returning_member? = is_owner and Subscriptions.returning_member?(user)
 
     {user, user_needs, activation_result} =
       maybe_activate_membership_on_load(user, is_owner)
@@ -789,7 +794,9 @@ defmodule YscWeb.AccountSetupLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Your membership is active. Welcome!",
+           MembershipUserMessages.membership_activated_welcome(
+             returning_member?
+           ),
            title: "Membership"
          )
          |> redirect(to: ~p"/")}
@@ -856,6 +863,7 @@ defmodule YscWeb.AccountSetupLive do
           |> assign(:signup_plan, signup_plan)
           |> assign(:public_key, public_key)
           |> assign(:activation_attempted?, activation_attempted?)
+          |> assign(:returning_member?, returning_member?)
           |> refine_setup_needs_assigns(user)
           |> then(fn s ->
             if s.assigns.user_needs.email_verification and
@@ -965,7 +973,8 @@ defmodule YscWeb.AccountSetupLive do
     |> refine_setup_needs_assigns(user)
   end
 
-  defp maybe_redirect_after_activation(socket) do
+  defp maybe_redirect_after_activation(socket, returning_member?)
+       when is_boolean(returning_member?) do
     user_needs = socket.assigns.user_needs
 
     cond do
@@ -977,7 +986,9 @@ defmodule YscWeb.AccountSetupLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Your membership is active. Welcome!",
+           MembershipUserMessages.membership_activated_welcome(
+             returning_member?
+           ),
            title: "Membership"
          )
          |> redirect(to: ~p"/")}
@@ -1017,11 +1028,12 @@ defmodule YscWeb.AccountSetupLive do
 
       fresh_user = socket.assigns.user
       user_needs = socket.assigns.user_needs
+      returning_member? = socket.assigns[:returning_member?] == true
 
       socket =
         maybe_activate_membership_on_params(socket, fresh_user, user_needs)
 
-      case maybe_redirect_after_activation(socket) do
+      case maybe_redirect_after_activation(socket, returning_member?) do
         {:halt, redirected} ->
           {:noreply, redirected}
 
@@ -1647,7 +1659,7 @@ defmodule YscWeb.AccountSetupLive do
 
           socket = refresh_setup_user_and_needs(socket)
 
-          case maybe_redirect_after_activation(socket) do
+          case maybe_redirect_after_activation(socket, returning_member?) do
             {:halt, redirected} ->
               {:noreply, redirected}
 
@@ -1656,7 +1668,9 @@ defmodule YscWeb.AccountSetupLive do
 
               YscWeb.Flash.send_toast(
                 :info,
-                "Your membership is active!",
+                MembershipUserMessages.membership_activated_short(
+                  returning_member?
+                ),
                 title: "Membership"
               )
 
@@ -1723,7 +1737,7 @@ defmodule YscWeb.AccountSetupLive do
   defp advance_after_payment_method_saved(socket, user) do
     user = Accounts.get_user!(user.id, [:registration_form])
 
-    {socket, toast_message, activated?} =
+    {socket, toast_message, activated?, returning_member?} =
       if user.state == :active and unpaid_active_primary?(user) do
         returning_member? = Subscriptions.returning_member?(user)
 
@@ -1739,15 +1753,19 @@ defmodule YscWeb.AccountSetupLive do
 
             socket = refresh_setup_user_and_needs(socket)
 
-            {socket, "Payment method saved and your membership is now active!",
-             true}
+            toast =
+              MembershipUserMessages.payment_method_saved_membership_activated(
+                returning_member?
+              )
+
+            {socket, toast, true, returning_member?}
 
           {:error, _reason} ->
             socket = refresh_setup_user_and_needs(socket)
 
             {socket,
              "Payment method saved, but we couldn't charge your dues yet. Use Pay your membership dues, or pay on the Membership page.",
-             false}
+             false, returning_member?}
         end
       else
         socket =
@@ -1757,12 +1775,12 @@ defmodule YscWeb.AccountSetupLive do
 
         {socket,
          "Payment method saved! We'll charge it automatically if your application is approved.",
-         false}
+         false, false}
       end
 
     YscWeb.Flash.send_toast(:info, toast_message, title: "Account setup")
 
-    case maybe_redirect_after_activation(socket) do
+    case maybe_redirect_after_activation(socket, returning_member?) do
       {:halt, redirected} ->
         {:noreply, redirected}
 
