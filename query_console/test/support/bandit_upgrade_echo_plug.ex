@@ -23,6 +23,18 @@ defmodule QueryConsole.BanditUpgradeEchoPlug do
     end
   end
 
+  def call(%Plug.Conn{path_info: ["large"]} = conn, _opts) do
+    conn
+    |> put_resp_content_type("text/plain")
+    |> send_resp(200, String.duplicate("a", 400))
+  end
+
+  def call(%Plug.Conn{path_info: ["png"]} = conn, _opts) do
+    conn
+    |> put_resp_content_type("image/png")
+    |> send_resp(200, String.duplicate("a", 400))
+  end
+
   def call(conn, _opts) do
     conn
     |> put_resp_content_type("text/plain")
