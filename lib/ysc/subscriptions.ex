@@ -829,9 +829,17 @@ defmodule Ysc.Subscriptions do
            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
              Stripe.Subscription.retrieve(subscription.stripe_id)
            end),
-         :ok <- cancel_existing_schedules(stripe_sub.id),
+         :ok <-
+           release_existing_schedules(
+             stripe_sub.id,
+             Stripe.SubscriptionSchedule
+           ),
          {:ok, _schedule} <-
-           create_subscription_schedule(stripe_sub, end_timestamp) do
+           create_period_end_schedule(
+             stripe_sub,
+             end_timestamp,
+             Stripe.SubscriptionSchedule
+           ) do
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
              Stripe.Subscription.retrieve(subscription.stripe_id)
            end) do
@@ -861,18 +869,22 @@ defmodule Ysc.Subscriptions do
     end
   end
 
-  # Helper function to cancel any existing schedules
-  @dialyzer {:nowarn_function, cancel_existing_schedules: 1}
-  defp cancel_existing_schedules(subscription_id) do
+  @doc false
+  # Detach any active schedule before attaching a period-end override.
+  # Must `release`, never `cancel`: cancelling an active schedule also
+  # cancels its subscription immediately (#1866 leftover on the admin
+  # period-end path). `api` is the Stripe schedule module, injectable for tests.
+  @dialyzer {:nowarn_function, release_existing_schedules: 2}
+  def release_existing_schedules(subscription_id, api) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.SubscriptionSchedule.list(%{subscription: subscription_id})
+           api.list(%{subscription: subscription_id})
          end) do
       {:ok, %{data: schedules}} when schedules != [] ->
         schedules
-        |> Enum.filter(&(&1.status != "canceled"))
+        |> Enum.filter(&(&1.status == "active"))
         |> Enum.reduce_while(:ok, fn schedule, :ok ->
           case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                 Stripe.SubscriptionSchedule.cancel(schedule.id)
+                 api.release(schedule.id)
                end) do
             {:ok, _} -> {:cont, :ok}
             {:error, reason} -> {:halt, {:error, reason}}
@@ -887,13 +899,18 @@ defmodule Ysc.Subscriptions do
     end
   end
 
-  # Helper function to create subscription schedule
-  # Uses a two-step approach: first create schedule from subscription, then update with phases
-  @dialyzer {:nowarn_function, create_subscription_schedule: 2}
-  defp create_subscription_schedule(stripe_sub, end_timestamp) do
-    # Step 1: Create schedule from subscription (without phases)
+  @doc false
+  # Two-step period-end override: create the schedule from the subscription,
+  # then set a single phase that ends on `end_timestamp`.
+  #
+  # If the phase update fails after the schedule was created we must `release`
+  # it, never `cancel`: cancelling a schedule also cancels its subscription
+  # immediately, which would end a paid-through membership on a failed admin
+  # period-end edit (#1866 leftover). `api` is injectable for tests.
+  @dialyzer {:nowarn_function, create_period_end_schedule: 3}
+  def create_period_end_schedule(stripe_sub, end_timestamp, api) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.SubscriptionSchedule.create(%{
+           api.create(%{
              from_subscription: stripe_sub.id
            })
          end) do
@@ -915,7 +932,7 @@ defmodule Ysc.Subscriptions do
         }
 
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.SubscriptionSchedule.update(schedule.id, %{
+               api.update(schedule.id, %{
                  phases: [phase],
                  end_behavior: "release"
                })
@@ -925,7 +942,7 @@ defmodule Ysc.Subscriptions do
 
           {:error, _} = error ->
             Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-              Stripe.SubscriptionSchedule.cancel(schedule.id)
+              api.release(schedule.id)
             end)
 
             error

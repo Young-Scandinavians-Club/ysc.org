@@ -12,6 +12,11 @@ defmodule Ysc.FakeSubscriptionScheduleApi do
   def cancel(id), do: record(:cancel, [id])
   def release(id), do: record(:release, [id])
 
+  def list(params) do
+    send(self(), {:list, [params]})
+    Process.get({__MODULE__, :list}, {:ok, %{data: []}})
+  end
+
   defp record(fun, args) do
     send(self(), {fun, args})
     Process.get({__MODULE__, fun}, {:ok, %{id: "sub_sched_fake"}})
