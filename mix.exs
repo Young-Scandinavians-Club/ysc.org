@@ -500,8 +500,13 @@ defmodule Ysc.MixProject do
       # Connection class. phx.gen.cert Chromium cert and phx.new Tailwind
       # 4.3.3 are unused (we already ship 4.3.3).
       {:phoenix, "~> 1.8.16"},
-      # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
-      {:plug, "~> 1.20.2", override: true},
+      # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break).
+      # 1.20.4: EEF-CVE-2026-120287 (MEDIUM / GHSA-qj4r-jh2r-rw3f) charges
+      # multipart part framing and empty headers against `:length`. 1.20.3
+      # only counted header name/value and body bytes, so headerless parts
+      # and `:`-only header lines could accumulate unbounded parser memory.
+      # Both endpoints use Plug.Parsers with `:multipart`. Pin the patched floor.
+      {:plug, "~> 1.20.4", override: true},
       # 2.2.1: ArgumentError on wrong-typed Plug.Crypto args no longer puts
       # the secret key base in the stacktrace (EEF-CVE-2026-105963 /
       # GHSA-ffw9-w85g-f2vh). Public sign/verify/encrypt/decrypt and

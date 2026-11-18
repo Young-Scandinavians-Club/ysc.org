@@ -1,8 +1,12 @@
 defmodule Ysc.SubscriptionsDowngradePhasesTest do
-  use ExUnit.Case, async: true
+  use Ysc.DataCase, async: false
+
+  import Mox
 
   alias Ysc.FakeSubscriptionScheduleApi, as: Api
   alias Ysc.Subscriptions
+
+  setup :verify_on_exit!
 
   @period_start 1_784_999_477
   @period_end 1_794_873_600
@@ -63,6 +67,15 @@ defmodule Ysc.SubscriptionsDowngradePhasesTest do
       }
     end
 
+    defp trialing_pause_sub do
+      %{
+        id: "sub_trial_pause",
+        status: "trialing",
+        schedule: nil,
+        trial_settings: %{end_behavior: %{missing_payment_method: "pause"}}
+      }
+    end
+
     test "releases, and never cancels, the schedule when the phase update fails" do
       error =
         {:error,
@@ -97,6 +110,64 @@ defmodule Ysc.SubscriptionsDowngradePhasesTest do
 
       refute_received {:release, _}
       refute_received {:cancel, _}
+    end
+
+    test "switches trialing+pause to create_invoice before creating the schedule" do
+      expect(Stripe.SubscriptionMock, :update, fn "sub_trial_pause", params ->
+        assert get_in(params, [
+                 :trial_settings,
+                 :end_behavior,
+                 :missing_payment_method
+               ]) ==
+                 "create_invoice"
+
+        {:ok, %{id: "sub_trial_pause", status: "trialing"}}
+      end)
+
+      assert {:ok, %{id: "sub_sched_fake"}} =
+               Subscriptions.apply_downgrade_schedule(
+                 trialing_pause_sub(),
+                 [%{}, %{}],
+                 Api
+               )
+
+      assert_received {:create, [%{from_subscription: "sub_trial_pause"}]}
+    end
+
+    test "does not create a schedule when the pause→create_invoice update fails" do
+      error =
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message: "cannot update trial settings"
+         }}
+
+      expect(Stripe.SubscriptionMock, :update, fn "sub_trial_pause", _params ->
+        error
+      end)
+
+      assert ^error =
+               Subscriptions.apply_downgrade_schedule(
+                 trialing_pause_sub(),
+                 [%{}, %{}],
+                 Api
+               )
+
+      refute_received {:create, _}
+    end
+
+    test "does not touch trial_settings for an active subscription" do
+      expect(Stripe.SubscriptionMock, :update, 0, fn _id, _params ->
+        flunk("active subscriptions must not update trial_settings")
+      end)
+
+      assert {:ok, _} =
+               Subscriptions.apply_downgrade_schedule(
+                 sub_without_schedule(),
+                 [%{}, %{}],
+                 Api
+               )
     end
   end
 end
