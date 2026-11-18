@@ -1,24 +1,27 @@
 defmodule QueryConsole.BanditUpgradeTest do
   @moduledoc """
-  Guards the bandit 1.14.0 → 1.14.1 upgrade.
+  Guards the bandit 1.14.1 → 1.15.0 upgrade.
 
-  1.14.1 is a patch with no Breaking heading. It collects HTTP/2 request
-  bodies into one binary so a body sent as many 1-byte DATA frames cannot
-  amplify stream-process memory (EEF-CVE-2026-116078 HIGH /
-  GHSA-pxjf-g536-7r93). It also strips connection-specific HTTP/2
-  response headers, rejects `host` vs `:authority` mismatch, closes
-  HTTP/1 after a 2xx CONNECT, trims HTTP/1 header trailing whitespace,
-  parses Accept-Encoding q-values with the RFC 9110 grammar, and rejects
-  IPv6 authorities missing the colon before the port.
+  1.15.0 is a minor with no Breaking heading. It hibernates idle
+  connections after 15s, skips compression under 300 bytes and for
+  already-compressed content types, resolves common Accept-Encoding
+  values without parsing, flattens HTTP/2 response iolists, and accepts
+  `validate_utf8` as an alias of `validate_text_frames`. HTTP/2 CONNECT
+  with only `:method`/`:authority` is passed to the plug; `:scheme` or
+  `:path` is rejected (RFC 9113 §8.5). Out-of-order stream ids close
+  with PROTOCOL_ERROR. Invalid `:method`/`:path` is a stream
+  PROTOCOL_ERROR. Bandit's own error responses include Date. HTTP/2
+  trailer logs are a count, not contents (GHSA-j9wq-h5xx-5qx5).
 
-  1.14.0 remains the HTTP/2 receive-window / HPACK / HTTP/1 request-line
-  floor. Defaults stay `max_concurrent_streams` 500 and
-  `max_header_list_size` 262144. HTTP/2 `read_body` may still return more
-  than `:length`.
+  1.14.1 remains the HTTP/2 body-collection / hop-by-hop / CONNECT-close
+  floor. 1.14.0 remains the receive-window / HPACK / request-line floor.
+  Defaults stay `max_concurrent_streams` 500 and `max_header_list_size`
+  262144.
 
   We serve Phoenix through `Bandit.PhoenixAdapter` and use `bandit_pid/1`
   plus `ThousandIsland.connection_pids/1` for idle shutdown. We do not
-  set `http_2_options` or call `Plug.Conn.read_body` in app code.
+  set `http_options`, `http_2_options`, `websocket_options`, or
+  `thousand_island_options`, or call `Plug.Conn.read_body` in app code.
   Public adapter APIs are unchanged.
   """
   use ExUnit.Case, async: false
@@ -58,6 +61,18 @@ defmodule QueryConsole.BanditUpgradeTest do
                      "../../deps/bandit/lib/bandit/compression.ex",
                      __DIR__
                    )
+  @stream_collection_src Path.expand(
+                           "../../deps/bandit/lib/bandit/http2/stream_collection.ex",
+                           __DIR__
+                         )
+  @websocket_src Path.expand(
+                   "../../deps/bandit/lib/bandit/websocket/connection.ex",
+                   __DIR__
+                 )
+  @websocket_handler_src Path.expand(
+                           "../../deps/bandit/lib/bandit/websocket/handler.ex",
+                           __DIR__
+                         )
   @changelog Path.expand("../../deps/bandit/CHANGELOG.md", __DIR__)
   @ti_changelog Path.expand("../../deps/thousand_island/CHANGELOG.md", __DIR__)
 
@@ -81,26 +96,29 @@ defmodule QueryConsole.BanditUpgradeTest do
     :ok
   end
 
-  describe "1.14.1 Hex lock and public APIs" do
-    test "locks the Hex package to 1.14.1" do
-      assert to_string(Application.spec(:bandit, :vsn)) == "1.14.1"
+  describe "1.15.0 Hex lock and public APIs" do
+    test "locks the Hex package to 1.15.0" do
+      assert to_string(Application.spec(:bandit, :vsn)) == "1.15.0"
     end
 
-    test "mix.exs pins the 1.14.1 floor" do
+    test "mix.exs pins the 1.15.0 floor" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s({:bandit, "~> 1.14.1"})
-      refute mix_exs =~ ~s({:bandit, "~> 1.14.0"})
+      assert mix_exs =~ ~s({:bandit, "~> 1.15.0"})
+      refute mix_exs =~ ~s({:bandit, "~> 1.14.1"})
     end
 
     test "companion locks stay thousand_island 1.6.0 and hpax 1.1.0" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"bandit": {:hex, :bandit, "1.14.1"|
-      refute lock =~ ~s|"bandit": {:hex, :bandit, "1.14.0"|
+      assert lock =~ ~s|"bandit": {:hex, :bandit, "1.15.0"|
+      refute lock =~ ~s|"bandit": {:hex, :bandit, "1.14.1"|
       assert lock =~ ~s|"thousand_island": {:hex, :thousand_island, "1.6.0"|
       refute lock =~ ~s|"thousand_island": {:hex, :thousand_island, "1.5.0"|
       assert lock =~ ~s|"hpax": {:hex, :hpax, "1.1.0"|
       assert lock =~ ~s|"finch": {:hex, :finch, "0.24.0"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
+      # Restored extras: plug 1.20.4 is #1874; telemetry 1.4.3 was lock-only.
+      assert lock =~ ~s|"plug": {:hex, :plug, "1.20.3"|
+      assert lock =~ ~s|"telemetry": {:hex, :telemetry, "1.4.2"|
     end
 
     test "PhoenixAdapter APIs used for idle shutdown still exist" do
@@ -667,6 +685,225 @@ defmodule QueryConsole.BanditUpgradeTest do
       assert match?({:ok, _}, second_get)
       {:ok, second_body} = second_get
       assert second_body =~ ~r/^HTTP\/1\.[01] 200/
+    end
+  end
+
+  describe "1.15.0 changelog" do
+    test "documents hibernation, compression, CONNECT, and trailer GHSA with no Breaking heading" do
+      v1150 = changelog_section("1.15.0")
+      assert v1150
+      refute v1150 =~ "Breaking"
+      assert v1150 =~ "hibernate_after"
+      assert v1150 =~ "compress_threshold"
+      assert v1150 =~ "incompressible_content_types"
+      assert v1150 =~ "validate_utf8"
+      assert v1150 =~ "RFC 9113 §8.5"
+      assert v1150 =~ "PROTOCOL_ERROR"
+      assert v1150 =~ "GHSA-j9wq-h5xx-5qx5"
+      assert v1150 =~ "max_fragmented_message_size"
+      assert v1150 =~ "HTTP/1.1"
+      assert v1150 =~ "bad_return_value"
+    end
+  end
+
+  describe "1.15.0 hibernation and public adapter options" do
+    test "idle connections hibernate after 15s by default" do
+      bandit = File.read!(@bandit_src)
+      assert bandit =~ "@hibernate_after 15_000"
+      assert bandit =~ "[hibernate_after: @hibernate_after]"
+      assert bandit =~ "Keyword.put_new(genserver_options, :hibernate_after, @hibernate_after)"
+      assert bandit =~ "compress_threshold"
+      assert bandit =~ "incompressible_content_types"
+      assert bandit =~ "validate_utf8"
+    end
+
+    test "endpoint still does not set Bandit option trees" do
+      config = File.read!(Path.expand("../../config/config.exs", __DIR__))
+      runtime = File.read!(Path.expand("../../config/runtime.exs", __DIR__))
+      refute config =~ "http_options"
+      refute config =~ "http_2_options"
+      refute config =~ "websocket_options"
+      refute config =~ "thousand_island_options"
+      refute runtime =~ "http_options"
+      refute runtime =~ "hibernate_after"
+    end
+  end
+
+  describe "1.15.0 compression threshold and content types" do
+    test "default threshold is 300 bytes and common Accept-Encoding values skip the parser" do
+      compression = File.read!(@compression_src)
+      assert compression =~ "@default_compress_threshold 300"
+      assert compression =~ "@common_accept_encodings"
+      assert compression =~ "defp body_worth_compressing?(body_length, http_opts)"
+
+      assert compression =~
+               "body_length >= Keyword.get(http_opts, :compress_threshold, @default_compress_threshold)"
+
+      assert compression =~ "image/png"
+
+      assert compression =~
+               "defp common_negotiation(_accept_encoding, _response_encodings), do: nil"
+
+      encodings =
+        Bandit.Compression.negotiate_content_encodings("gzip, deflate, br", [])
+
+      assert "gzip" in encodings
+    end
+
+    test "a small GET body is not gzipped" do
+      port = start_echo_listener()
+
+      response =
+        raw_http(
+          port,
+          "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept-Encoding: gzip\r\n\r\n"
+        )
+
+      assert response =~ ~r/^HTTP\/1\.1 200/
+      assert response =~ "bandit-upgrade-ok"
+      refute response =~ ~r/\r\ncontent-encoding: gzip\r\n/i
+    end
+
+    test "a 400-byte text body is gzipped" do
+      port = start_echo_listener()
+
+      response =
+        raw_http(
+          port,
+          "GET /large HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept-Encoding: gzip\r\n\r\n"
+        )
+
+      assert response =~ ~r/^HTTP\/1\.1 200/
+      assert response =~ ~r/\r\ncontent-encoding: gzip\r\n/i
+      refute response =~ String.duplicate("a", 400)
+    end
+
+    test "an image/png body is not gzipped even when larger than the threshold" do
+      port = start_echo_listener()
+
+      response =
+        raw_http(
+          port,
+          "GET /png HTTP/1.1\r\nHost: 127.0.0.1\r\nAccept-Encoding: gzip\r\n\r\n"
+        )
+
+      assert response =~ ~r/^HTTP\/1\.1 200/
+      refute response =~ ~r/\r\ncontent-encoding: gzip\r\n/i
+      assert response =~ String.duplicate("a", 400)
+    end
+  end
+
+  describe "1.15.0 HTTP/2 CONNECT, stream ids, and method/path tokens" do
+    test "CONNECT without :scheme or :path is accepted; those extras are stream errors" do
+      stream = File.read!(@stream_src)
+      assert stream =~ ~S[defp build_request_target!("CONNECT", headers, stream)]
+      assert stream =~ "Received CONNECT with :scheme or :path (RFC9113§8.5)"
+      assert stream =~ "Received CONNECT without a host and port (RFC9113§8.5)"
+      assert stream =~ "{nil, host, port, nil}"
+    end
+
+    test "out-of-order HTTP/2 stream identifiers close the connection" do
+      connection = File.read!(@connection_src)
+      collection = File.read!(@stream_collection_src)
+
+      assert connection =~ "Received unexpected stream identifier (RFC9113§5.1.1)"
+      assert collection =~ "def skipped?(collection, stream_id)"
+      assert collection =~ "highest_stream_id"
+    end
+
+    test "HTTP/2 :method must be a token and :path must not contain SP or HTAB" do
+      stream = File.read!(@stream_src)
+      headers = File.read!(@headers_src)
+
+      assert stream =~ "Received invalid :method (RFC9113§8.3.1)"
+      assert stream =~ "Received invalid :path (RFC9113§8.3.1)"
+      assert stream =~ "Bandit.Headers.token?(method)"
+      assert stream =~ "Bandit.Headers.request_line_component_valid?(path)"
+      assert headers =~ "def token?(<<char>>) when is_tchar(char), do: true"
+      assert headers =~ "def request_line_component_valid?(<<>>), do: true"
+
+      assert Bandit.Headers.token?("GET")
+      assert Bandit.Headers.token?("CONNECT")
+      refute Bandit.Headers.token?("")
+      refute Bandit.Headers.token?("GET /")
+      assert Bandit.Headers.request_line_component_valid?("/workbooks/1")
+      refute Bandit.Headers.request_line_component_valid?("/foo bar")
+      refute Bandit.Headers.request_line_component_valid?("/foo\tbar")
+    end
+
+    test "HTTP/2 response bodies are flattened before the connection process" do
+      stream = File.read!(@stream_src)
+      assert stream =~ "def send_data(%@for{} = stream, data, end_stream),"
+      assert stream =~ "do: do_send_data(stream, IO.iodata_to_binary(data), end_stream, nil)"
+    end
+  end
+
+  describe "1.15.0 Date headers, HTTP/1.1 error version, and trailers" do
+    test "Bandit's own HTTP/1 error responses include Date and use HTTP/1.1 before the request line is parsed" do
+      socket = File.read!(@http1_socket_src)
+      assert socket =~ "version: :\"HTTP/1.1\""
+      assert socket =~ "the highest version that we support (RFC9110§6.2)"
+      assert socket =~ "headers = [Bandit.Clock.date_header() | headers]"
+
+      port = start_echo_listener()
+
+      response = raw_http(port, "GET\r\n\r\n")
+      assert response =~ ~r/^HTTP\/1\.1 400/
+      refute response =~ ~r/^HTTP\/1\.0 400/
+      assert response =~ ~r/\r\n[Dd]ate: /
+    end
+
+    test "an HTTP/1.1 request that fails before the plug still answers HTTP/1.1 with Date" do
+      port = start_echo_listener()
+
+      response =
+        raw_http(
+          port,
+          "GET / HTTP/1.1 extra\r\nHost: 127.0.0.1\r\n\r\n"
+        )
+
+      assert response =~ ~r/^HTTP\/1\.1 400/
+      refute response =~ ~r/^HTTP\/1\.0 400/
+      assert response =~ ~r/\r\n[Dd]ate: /
+    end
+
+    test "HTTP/2 trailer logs are a count, not the trailer contents" do
+      stream = File.read!(@stream_src)
+      assert stream =~ ~S[Ignoring #{length(trailers)} trailer field(s)]
+      refute stream =~ "inspect(trailers)"
+    end
+
+    test "HTTP/1 chunked trailers use the body read_timeout and configured header limits" do
+      socket = File.read!(@http1_socket_src)
+
+      assert socket =~
+               "socket = %{socket | read_timeout: Keyword.get(opts, :read_timeout, 15_000)}"
+
+      assert socket =~ "the max_header_length and max_header_count configured for the server"
+    end
+  end
+
+  describe "1.15.0 WebSocket first-fragment limit, utf8 alias, and handler stop" do
+    test "max_fragmented_message_size applies to the first fragment" do
+      websocket = File.read!(@websocket_src)
+      assert websocket =~ "defp start_fragmented_message(frame, socket, connection) do"
+
+      assert websocket =~
+               "The first fragment of a message counts towards max_fragmented_message_size"
+
+      assert websocket =~ "do_protocol_error(1009, \"Received oversize fragmented message\""
+    end
+
+    test "validate_utf8 is accepted as an alias of validate_text_frames" do
+      handler = File.read!(@websocket_handler_src)
+      assert handler =~ "Keyword.pop(connection_opts, :validate_utf8)"
+      assert handler =~ "Keyword.put(connection_opts, :validate_text_frames, validate)"
+    end
+
+    test "HTTP/2 handler stops with a valid GenServer stop tuple after a rescued error" do
+      handler = File.read!(@handler_src)
+      assert handler =~ "{:stop, {:shutdown, :local_closed}, {socket, state}}"
+      refute handler =~ "{:stop, :local_closed}"
     end
   end
 

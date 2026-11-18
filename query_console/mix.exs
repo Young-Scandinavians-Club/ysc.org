@@ -163,11 +163,23 @@ defmodule QueryConsole.MixProject do
       # connection-specific HTTP/2 response headers, reject host vs
       # :authority mismatch, close HTTP/1 after 2xx CONNECT, trim HTTP/1
       # header trailing whitespace, and parse Accept-Encoding q-values
-      # with the RFC 9110 grammar. We use Bandit.PhoenixAdapter
-      # (bandit_pid/1 for idle shutdown) and do not set http_2_options
-      # or call Plug.Conn.read_body ourselves. Public adapter APIs are
-      # unchanged.
-      {:bandit, "~> 1.14.1"},
+      # with the RFC 9110 grammar.
+      # 1.15.0: hibernate idle connections after 15s (override via
+      # thousand_island_options genserver_options hibernate_after);
+      # skip compression under 300 bytes or for already-compressed
+      # content types (compress_threshold / incompressible_content_types);
+      # resolve common Accept-Encoding values without parsing; flatten
+      # HTTP/2 response iolists; validate_utf8 aliases validate_text_frames.
+      # HTTP/2 CONNECT with only :method/:authority is passed to the plug
+      # (reject :scheme/:path, RFC 9113 §8.5); out-of-order stream ids
+      # close with PROTOCOL_ERROR; invalid :method/:path is a stream
+      # PROTOCOL_ERROR. Bandit error responses include Date. HTTP/2
+      # trailer logs are a count, not contents (GHSA-j9wq-h5xx-5qx5).
+      # We use Bandit.PhoenixAdapter (bandit_pid/1 for idle shutdown)
+      # and do not set http_options, http_2_options, websocket_options,
+      # or thousand_island_options, or call Plug.Conn.read_body ourselves.
+      # Public adapter APIs are unchanged.
+      {:bandit, "~> 1.15.0"},
       # 1.11.0: EEF-CVE-2026-91043 (HPACK-indexed cookies bypass decoded
       # max_header_list_size), EEF-CVE-2026-92103 (HTTP/2 frames buffered up to
       # 16 MiB before max_frame_size), EEF-CVE-2026-94194 (chunked framing when
