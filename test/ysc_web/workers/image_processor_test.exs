@@ -157,6 +157,21 @@ defmodule YscWeb.Workers.ImageProcessorTest do
   end
 
   describe "perform/1" do
+    test "fails closed when the raw URL is blocked by UrlFetchGuard without fetching" do
+      image =
+        create_test_image(%{
+          raw_image_path: "file:///etc/passwd",
+          upload_data: nil,
+          processing_state: "unprocessed"
+        })
+
+      assert {:error, {:url_not_allowed, :unsupported_scheme}} =
+               ImageProcessor.perform(make_job(image.id))
+
+      updated = Media.fetch_image(image.id)
+      assert updated.processing_state == :failed
+    end
+
     test "returns error when image is not found" do
       missing_id = Ecto.ULID.generate()
 
