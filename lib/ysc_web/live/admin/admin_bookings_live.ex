@@ -12,6 +12,7 @@ defmodule YscWeb.AdminBookingsLive do
   alias Ysc.Bookings
   alias Ysc.Bookings.BookingLocker
   alias Ysc.Bookings.PropertyDisplay
+  alias Ysc.Bookings.SeasonHelpers
   alias Ysc.MoneyHelper
   alias Ysc.Ledgers.{Payment, Refund}
   alias Ysc.Repo
@@ -1974,6 +1975,28 @@ defmodule YscWeb.AdminBookingsLive do
                   "{Mshort} {D}"
                 )}
               </p>
+              <div
+                :if={@booking_window != %{}}
+                id="booking-window-legend"
+                class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500"
+              >
+                <span class="inline-flex items-center gap-1.5">
+                  <span class="h-0.5 w-4 bg-emerald-400/70"></span>
+                  Open to members{if @booking_window_edge,
+                    do:
+                      " through #{Calendar.strftime(@booking_window_edge, "%a %b %-d")}"}
+                </span>
+                <span class="inline-flex items-center gap-1.5">
+                  <span class="h-3 w-4 rounded-sm border border-zinc-200 bg-zinc-100/60"></span>
+                  Not yet open
+                </span>
+                <span :if={@next_weekend_opening} id="next-weekend-opening">
+                  Next weekend to open: {format_weekend_range(
+                    @next_weekend_opening.checkin,
+                    @next_weekend_opening.checkout
+                  )}, opens {format_weekend_opens_on(@next_weekend_opening.opens_on)}
+                </span>
+              </div>
             </div>
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-4">
               <!-- Date Range Inputs -->
@@ -2096,13 +2119,21 @@ defmodule YscWeb.AdminBookingsLive do
                 >
                   <%= for date <- @calendar_dates do %>
                     <div class="col-span-2 flex items-center justify-center border-r border-zinc-200 border-b">
-                      <div class={"flex flex-col items-center justify-center h-10 w-full relative #{if Date.compare(date, @today) == :eq, do: "bg-blue-100/20", else: ""}"}>
+                      <div
+                        class={"flex flex-col items-center justify-center h-10 w-full relative #{if Date.compare(date, @today) == :eq, do: "bg-blue-100/20", else: ""}"}
+                        title={booking_window_title(Map.get(@booking_window, date))}
+                      >
                         <span class="font-medium text-center">
                           {Calendar.strftime(date, "%a")}
                         </span>
                         <span class="text-zinc-500 text-center">
                           {Calendar.strftime(date, "%m/%d")}
                         </span>
+                        <div
+                          :if={Map.get(@booking_window, date) == :open}
+                          class="absolute inset-x-0 bottom-0 h-0.5 bg-emerald-400/70"
+                        >
+                        </div>
                       </div>
                     </div>
                   <% end %>
@@ -2132,17 +2163,33 @@ defmodule YscWeb.AdminBookingsLive do
                         ) %>
                     <% base_bg =
                       cond do
-                        is_selected_start -> "bg-purple-200"
-                        is_in_range -> "bg-purple-100/60"
-                        today_col?(i, @calendar_dates, @today) -> "bg-blue-100/20"
-                        true -> "bg-white"
+                        is_selected_start ->
+                          "bg-purple-200"
+
+                        is_in_range ->
+                          "bg-purple-100/60"
+
+                        today_col?(i, @calendar_dates, @today) ->
+                          "bg-blue-100/20"
+
+                        Map.get(@booking_window, date) == :closed ->
+                          "bg-zinc-100/60"
+
+                        Map.get(@booking_window, date) == :closed ->
+                          "bg-zinc-100/60"
+
+                        true ->
+                          "bg-white"
                       end %>
                     <div
                       class={"h-14 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""}"}
                       style={"grid-column: #{i + 1}; grid-row: 1;"}
                     >
                       <%= if rem(i + 1, 2) == 0 do %>
-                        <div class={"absolute right-0 top-0 bottom-0 w-px bg-zinc-200 #{if today_col?(i, @calendar_dates, @today), do: "bg-blue-200", else: ""}"}>
+                        <div class={[
+                          "absolute right-0 top-0 bottom-0",
+                          col_divider_class(date, @today, @booking_window_edge)
+                        ]}>
                         </div>
                       <% end %>
                     </div>
@@ -2249,6 +2296,7 @@ defmodule YscWeb.AdminBookingsLive do
                       is_selected_start -> "bg-red-200"
                       is_in_range -> "bg-red-100/60"
                       today_col?(i, @calendar_dates, @today) -> "bg-blue-100/20"
+                      Map.get(@booking_window, date) == :closed -> "bg-zinc-100/60"
                       true -> "bg-white"
                     end %>
                   <div
@@ -2268,7 +2316,10 @@ defmodule YscWeb.AdminBookingsLive do
                     }
                   >
                     <%= if rem(i + 1, 2) == 0 do %>
-                      <div class={"absolute right-0 top-0 bottom-0 w-px bg-zinc-200 #{if today_col?(i, @calendar_dates, @today), do: "bg-blue-200", else: ""}"}>
+                      <div class={[
+                        "absolute right-0 top-0 bottom-0",
+                        col_divider_class(date, @today, @booking_window_edge)
+                      ]}>
                       </div>
                     <% end %>
                   </div>
@@ -2305,6 +2356,7 @@ defmodule YscWeb.AdminBookingsLive do
                       is_selected_start -> "bg-green-200"
                       is_in_range -> "bg-green-100/60"
                       today_col?(i, @calendar_dates, @today) -> "bg-blue-100/20"
+                      Map.get(@booking_window, date) == :closed -> "bg-zinc-100/60"
                       true -> "bg-white"
                     end %>
                   <div
@@ -2324,7 +2376,10 @@ defmodule YscWeb.AdminBookingsLive do
                     }
                   >
                     <%= if rem(i + 1, 2) == 0 do %>
-                      <div class={"absolute right-0 top-0 bottom-0 w-px bg-zinc-200 #{if today_col?(i, @calendar_dates, @today), do: "bg-blue-200", else: ""}"}>
+                      <div class={[
+                        "absolute right-0 top-0 bottom-0",
+                        col_divider_class(date, @today, @booking_window_edge)
+                      ]}>
                       </div>
                     <% end %>
                   </div>
@@ -2361,10 +2416,23 @@ defmodule YscWeb.AdminBookingsLive do
                         ) %>
                     <% base_bg =
                       cond do
-                        is_selected_start -> "bg-blue-200"
-                        is_in_range -> "bg-blue-100/60"
-                        today_col?(i, @calendar_dates, @today) -> "bg-blue-100/20"
-                        true -> "bg-white"
+                        is_selected_start ->
+                          "bg-blue-200"
+
+                        is_in_range ->
+                          "bg-blue-100/60"
+
+                        today_col?(i, @calendar_dates, @today) ->
+                          "bg-blue-100/20"
+
+                        Map.get(@booking_window, date) == :closed ->
+                          "bg-zinc-100/60"
+
+                        Map.get(@booking_window, date) == :closed ->
+                          "bg-zinc-100/60"
+
+                        true ->
+                          "bg-white"
                       end %>
                     <div
                       class={"h-14 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""} cursor-pointer hover:bg-blue-50 transition-colors"}
@@ -2388,7 +2456,10 @@ defmodule YscWeb.AdminBookingsLive do
                       }
                     >
                       <%= if rem(i + 1, 2) == 0 do %>
-                        <div class={"absolute right-0 top-0 bottom-0 w-px bg-zinc-200 #{if today_col?(i, @calendar_dates, @today), do: "bg-blue-200", else: ""}"}>
+                        <div class={[
+                          "absolute right-0 top-0 bottom-0",
+                          col_divider_class(date, @today, @booking_window_edge)
+                        ]}>
                         </div>
                       <% end %>
                     </div>
@@ -3468,6 +3539,9 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:calendar_start_date, calendar_start)
       |> assign(:calendar_end_date, calendar_end)
       |> assign(:calendar_dates, calendar_dates)
+      |> assign(:booking_window, %{})
+      |> assign(:booking_window_edge, nil)
+      |> assign(:next_weekend_opening, nil)
       |> assign(:filtered_rooms, [])
       |> assign(:filtered_blackouts, [])
       |> assign(:room_bookings, [])
@@ -7185,7 +7259,8 @@ defmodule YscWeb.AdminBookingsLive do
   defp section_needs_reference_data?(_section), do: false
 
   defp maybe_load_property_reference_data(socket, property) do
-    if socket.assigns[:reference_data_loaded?] do
+    if socket.assigns[:reference_data_loaded?] &&
+         socket.assigns[:reference_data_property] == property do
       socket
     else
       socket
@@ -7229,6 +7304,7 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:door_codes, door_codes)
     |> assign(:active_door_code, active_door_code)
     |> assign(:reference_data_loaded?, true)
+    |> assign(:reference_data_property, property)
     |> assign_filtered_data(property, seasons, pricing_rules, refund_policies)
   end
 
@@ -7682,6 +7758,90 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:filtered_blackouts, filtered_blackouts)
     |> assign(:calendar_start_date, start_date)
     |> assign(:daily_availability, daily_availability)
+    |> assign_booking_window(property, calendar_dates)
+  end
+
+  # What members can book right now under the season advance-booking limits
+  # (e.g. Tahoe winter's 45 days), so the calendar can show it at a glance.
+  defp assign_booking_window(socket, property, calendar_dates) do
+    seasons = socket.assigns[:seasons] || []
+    today = SeasonHelpers.cabin_today()
+
+    # Include the day after the range so the edge marker can show on the
+    # last displayed day without the admin having to display the next one.
+    dates_with_next =
+      case List.last(calendar_dates) do
+        nil -> calendar_dates
+        last -> calendar_dates ++ [Date.add(last, 1)]
+      end
+
+    statuses =
+      SeasonHelpers.member_booking_statuses(
+        property,
+        dates_with_next,
+        today,
+        seasons
+      )
+
+    next_weekend =
+      if statuses == %{},
+        do: nil,
+        else: SeasonHelpers.next_weekend_opening(property, today, seasons)
+
+    socket
+    |> assign(:booking_window, statuses)
+    |> assign(
+      :booking_window_edge,
+      booking_window_edge(dates_with_next, statuses)
+    )
+    |> assign(:next_weekend_opening, next_weekend)
+  end
+
+  # Last open day directly followed by a closed one: where the window ends.
+  defp booking_window_edge(dates, statuses) do
+    dates
+    |> Enum.zip(Enum.drop(dates, 1))
+    |> Enum.find_value(fn {date, next_date} ->
+      if Map.get(statuses, date) == :open &&
+           Map.get(statuses, next_date) == :closed,
+         do: date
+    end)
+  end
+
+  defp booking_window_title(:open), do: "Members can book this date now"
+  defp booking_window_title(:closed), do: "Not yet open to members"
+  defp booking_window_title(_), do: nil
+
+  defp col_divider_class(date, today, window_edge) do
+    cond do
+      date && window_edge && Date.compare(date, window_edge) == :eq ->
+        "w-0.5 bg-emerald-400/70"
+
+      date && Date.compare(date, today) == :eq ->
+        "w-px bg-blue-200"
+
+      true ->
+        "w-px bg-zinc-200"
+    end
+  end
+
+  defp format_weekend_range(checkin, checkout) do
+    checkout_format =
+      if checkin.month == checkout.month, do: "%-d", else: "%b %-d"
+
+    Calendar.strftime(checkin, "%b %-d") <>
+      "–" <> Calendar.strftime(checkout, checkout_format)
+  end
+
+  defp format_weekend_opens_on(opens_on) do
+    days = Date.diff(opens_on, SeasonHelpers.cabin_today())
+    label = Calendar.strftime(opens_on, "%a %b %-d")
+
+    case days do
+      1 -> "#{label} (tomorrow)"
+      n when n > 1 -> "#{label} (in #{n} days)"
+      _ -> label
+    end
   end
 
   defp build_room_bookings_by_room_id(room_bookings)
