@@ -428,7 +428,10 @@ defmodule YscWeb.AdminComponentsTest do
     test "renders loading skeleton before picker data is ready" do
       html = render_ordered_thumbnail_picker(loaded?: false)
 
+      assert html =~ ~s(id="newsletter-posts-picker")
       assert html =~ ~s(id="newsletter-posts-picker-loading")
+      assert html =~ "rounded-lg border border-zinc-200 bg-white"
+      assert html =~ "p-4"
       assert html =~ "Loading posts…"
       assert html =~ "Latest news (posts)"
       refute html =~ ~s(id="newsletter-posts-picker-item-p1")
@@ -737,6 +740,25 @@ defmodule YscWeb.AdminComponentsTest do
       refute html =~ "Grant new benefit"
       refute html =~ "<h2"
       refute html =~ "<h3"
+    end
+
+    test "renders compact untitled card for editor panels" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_form_card id="newsletter-cover-card" class="space-y-3">
+          <h2 id="cover-heading">Cover photo</h2>
+        </.admin_form_card>
+        """)
+
+      assert html =~ ~s(id="newsletter-cover-card")
+      assert html =~ ~s(id="cover-heading")
+      assert html =~ "rounded-lg border border-zinc-200 bg-white"
+      assert html =~ "p-4"
+      assert html =~ "space-y-3"
+      refute html =~ "p-6"
+      refute html =~ ~s(<h2 class="text-sm text-zinc-800 mb-3 type-subhead")
     end
   end
 

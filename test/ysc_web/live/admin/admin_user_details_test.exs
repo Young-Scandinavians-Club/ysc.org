@@ -505,6 +505,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       assert html =~ "Create membership (paid elsewhere)"
       assert html =~ "create-paid-membership-form"
+      assert has_element?(view, "#create-paid-membership-card")
       assert has_element?(view, "#create-paid-membership-form")
       assert html =~ "Create membership (paid elsewhere)"
     end

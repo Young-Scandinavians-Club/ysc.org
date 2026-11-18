@@ -233,12 +233,12 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 pb-16">
         <%!-- Left: editor (cover, fields, pickers) --%>
         <div id="ghost-newsletter-editor-panel" class="space-y-4">
-          <div class="border border-zinc-200 rounded-lg p-4 bg-white">
+          <.admin_form_card id="ghost-newsletter-cover-card">
             <h2 class="text-base text-zinc-800 mb-3 type-subhead">Cover photo</h2>
             <.admin_ghost_image ratio="aspect-video" class="rounded-lg" />
-          </div>
+          </.admin_form_card>
 
-          <div class="border border-zinc-200 rounded-lg p-4 bg-white space-y-3">
+          <.admin_form_card id="ghost-newsletter-headline-card" class="space-y-3">
             <h2 class="text-base text-zinc-800 type-subhead">
               Headline & subject
             </h2>
@@ -250,7 +250,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
               <p class="text-sm text-zinc-600">Email subject line</p>
               <.admin_ghost_bar width="w-full" height="h-10" rounded="rounded-lg" />
             </div>
-          </div>
+          </.admin_form_card>
 
           <div class="border border-zinc-200 rounded-lg overflow-hidden bg-white">
             <div class="px-4 pt-4 pb-2">
@@ -270,10 +270,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
             <.admin_ghost_editor_body class="min-h-[100px]" />
           </div>
 
-          <div
-            id="ghost-newsletter-post-picker"
-            class="border border-zinc-200 rounded-lg p-4 bg-white"
-          >
+          <.admin_form_card id="ghost-newsletter-post-picker">
             <h2 class="text-base text-zinc-800 mb-1 type-subhead">
               Latest news (posts)
             </h2>
@@ -287,12 +284,9 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
               <.admin_ghost_newsletter_picker_tile />
               <.admin_ghost_newsletter_picker_tile />
             </div>
-          </div>
+          </.admin_form_card>
 
-          <div
-            id="ghost-newsletter-event-picker"
-            class="border border-zinc-200 rounded-lg p-4 bg-white"
-          >
+          <.admin_form_card id="ghost-newsletter-event-picker">
             <h2 class="text-base text-zinc-800 mb-1 type-subhead">
               Upcoming events
             </h2>
@@ -304,7 +298,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
               <.admin_ghost_newsletter_picker_tile />
               <.admin_ghost_newsletter_picker_tile />
             </div>
-          </div>
+          </.admin_form_card>
         </div>
 
         <%!-- Right: live email preview --%>
