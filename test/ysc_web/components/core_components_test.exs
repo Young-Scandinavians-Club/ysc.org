@@ -855,11 +855,16 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "Plan change scheduled"
       assert html =~ "Your membership will change to"
       assert html =~ "Single"
+      assert html =~ "on <strong>"
       assert html =~ "December 15, 2026"
+      assert html =~ "until then"
       assert html =~ ~s(id="cancel-scheduled-downgrade-btn")
       assert html =~ ~s(phx-click="cancel-scheduled-downgrade")
       assert html =~ "Keep my current plan"
+      assert html =~ "will not switch on the date shown above"
       refute html =~ "family membership"
+      refute html =~ "after <strong>"
+      refute html =~ "until that date"
     end
 
     test "renders family copy with primary member name" do
@@ -885,8 +890,12 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "Ada"
       assert html =~ "Lovelace"
       assert html =~ "will change to"
+      assert html =~ "on <strong>"
       assert html =~ "December 20, 2026"
+      assert html =~ "until then"
       refute html =~ "Your membership will change to"
+      refute html =~ "after <strong>"
+      refute html =~ "until that date"
     end
 
     test "renders family copy without a primary user" do
@@ -908,7 +917,11 @@ defmodule YscWeb.CoreComponentsTest do
 
       assert html =~ "Your family membership will change to"
       assert html =~ "Family"
+      assert html =~ "on <strong>"
       assert html =~ "January 05, 2027"
+      assert html =~ "until then"
+      refute html =~ "after <strong>"
+      refute html =~ "until that date"
     end
   end
 

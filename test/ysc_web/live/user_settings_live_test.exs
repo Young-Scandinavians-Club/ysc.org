@@ -213,6 +213,17 @@ defmodule YscWeb.UserSettingsLiveTest do
                  "#scheduled-downgrade-notice",
                  "Plan change scheduled"
                )
+
+        notice =
+          view
+          |> element("#scheduled-downgrade-notice")
+          |> render()
+
+        assert notice =~ "will change to"
+        assert notice =~ "on <strong>"
+        assert notice =~ "until then"
+        refute notice =~ "after <strong>"
+        refute notice =~ "until that date"
       after
         Application.delete_env(:ysc, :get_scheduled_downgrade_info_callback)
       end

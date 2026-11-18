@@ -6738,7 +6738,7 @@ defmodule YscWeb.CoreComponents do
             Your membership will change to
         <% end %>
         <strong>{@plan_label}</strong>
-        after <strong>{@date_label}</strong>. You will keep your current benefits until that date.
+        on <strong>{@date_label}</strong>. You will keep your current benefits until then.
       </p>
       <:actions>
         <.button
