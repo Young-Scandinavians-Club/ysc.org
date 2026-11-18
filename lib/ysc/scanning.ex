@@ -39,6 +39,18 @@ defmodule Ysc.Scanning do
     :checked_in_at
   ]
   @checkin_user_fields [:id, :email, :first_name, :last_name]
+  # Desk typeahead: name/email plus the columns MembershipCache needs to
+  # decide lifetime vs inherited family membership. Omits hashed_password,
+  # bios, Stripe ids, and the current_avatar preload `search_users/2` uses
+  # for pickers that render photos.
+  @membership_search_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :lifetime_membership_awarded_at,
+    :primary_user_id
+  ]
   @checkin_registration_fields [
     :id,
     :ticket_id,
@@ -1458,7 +1470,12 @@ defmodule Ysc.Scanning do
     if trimmed == "" do
       []
     else
-      users = Accounts.search_users(trimmed, limit: 20)
+      users =
+        Accounts.search_users(trimmed,
+          limit: 20,
+          select: @membership_search_user_fields
+        )
+
       user_ids = Enum.map(users, & &1.id)
       checked_in_ids = checked_in_user_ids(session_id, user_ids)
       membership_data = MembershipCache.batch_membership_data_for_users(users)
@@ -1621,5 +1638,13 @@ defmodule Ysc.Scanning do
   @doc false
   def ci_query_explain_ticket_for_scan_query do
     ticket_for_scan_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_search_users_for_checkin_query do
+    Accounts.search_users_query("ci",
+      limit: 20,
+      select: @membership_search_user_fields
+    )
   end
 end

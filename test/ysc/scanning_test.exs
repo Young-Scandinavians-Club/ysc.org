@@ -2729,6 +2729,74 @@ defmodule Ysc.ScanningTest do
 
       assert found.id == user.id
     end
+
+    test "does not SELECT password hashes, bios, or avatars", %{
+      session: session
+    } do
+      unique = System.unique_integer([:positive])
+
+      user =
+        user_fixture(%{
+          first_name: "DeskSearch#{unique}",
+          last_name: "Member",
+          board_bio: "bio the desk typeahead must not load"
+        })
+
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      {results, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Scanning.search_users_for_checkin(
+              session.id,
+              "DeskSearch#{unique}"
+            )
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert [%{user: found, membership_status: :active}] = results
+      assert found.id == user.id
+      assert found.first_name == user.first_name
+      assert is_nil(found.hashed_password)
+      assert is_nil(found.board_bio)
+      assert password_cols == 0
+
+      {_results, bio_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Scanning.search_users_for_checkin(
+              session.id,
+              "DeskSearch#{unique}"
+            )
+          end,
+          pattern: ~r/board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert bio_cols == 0
+
+      {_results, avatar_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Scanning.search_users_for_checkin(
+              session.id,
+              "DeskSearch#{unique}"
+            )
+          end,
+          pattern: ~r/FROM "avatars"/i,
+          caller_pids: [self()]
+        )
+
+      assert avatar_cols == 0
+    end
   end
 
   # ──────────────────────────────────────────────────────────────────────────
