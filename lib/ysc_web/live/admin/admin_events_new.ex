@@ -186,6 +186,24 @@ defmodule YscWeb.AdminEventsNewLive do
                         </span>
                       </label>
 
+                      <div
+                        :if={@send_notification}
+                        id="publish-send-notification-note"
+                        class="flex items-start gap-2 bg-amber-50 px-4 py-3 text-xs text-amber-900"
+                      >
+                        <.icon
+                          name="hero-exclamation-triangle"
+                          class="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+                        />
+                        <p>
+                          One hour after publishing, every active member with event
+                          notifications enabled gets an email about this event, sent
+                          once. Please be mindful not to spam members: save this for
+                          events that are worth the interruption, and skip it for
+                          small, minor, or recurring events.
+                        </p>
+                      </div>
+
                       <div class="px-2 py-2">
                         <button
                           type="button"
