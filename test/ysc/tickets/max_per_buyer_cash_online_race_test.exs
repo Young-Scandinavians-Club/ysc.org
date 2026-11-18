@@ -287,4 +287,64 @@ defmodule Ysc.Tickets.MaxPerBuyerCashOnlineRaceTest do
                enforce_max_per_buyer: true
              )
   end
+
+  # AppTicketsController now also passes `enforce_max_per_buyer: true`, but
+  # the domain contract is that cash/check/other alone implies the re-check.
+  # Without this, dropping the implied-channel clause still passes the
+  # explicit-flag tests above.
+  for channel <- ["cash", "check", "other"] do
+    test "payment_channel #{channel} implies max_per_buyer without enforce_max_per_buyer",
+         %{
+           user: user,
+           admin: admin,
+           event: event,
+           tier: tier
+         } do
+      channel = unquote(channel)
+
+      assert {:ok, _} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier.id => 1},
+                 skip_email: true,
+                 payment_channel: channel
+               )
+
+      assert {:error, :tier_purchase_limit_exceeded} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier.id => 1},
+                 skip_email: true,
+                 payment_channel: channel
+               )
+    end
+  end
+
+  test "online checkout is rejected after a cash door grant at the limit", %{
+    user: user,
+    admin: admin,
+    event: event,
+    tier: tier
+  } do
+    assert {:ok, _} =
+             Tickets.grant_admin_tickets(
+               admin.id,
+               user.id,
+               event.id,
+               %{tier.id => 1},
+               skip_email: true,
+               payment_channel: "cash"
+             )
+
+    assert {:error, :tier_purchase_limit_exceeded} =
+             Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1},
+               user: user,
+               event: event,
+               tiers: [tier]
+             )
+  end
 end
