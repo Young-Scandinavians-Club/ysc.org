@@ -274,6 +274,71 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
       assert Scanning.member_checked_in?(session.id, member.id)
     end
 
+    test "checking in from search does not re-fetch the full user row", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{session: session} = setup_session(admin)
+      member = make_active_member()
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/membership-check-in/#{session.id}?q=#{URI.encode(member.email)}"
+        )
+
+      {_html, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+
+            view
+            |> element(
+              "#search-result-#{member.id} button[phx-click='check-in-member']"
+            )
+            |> render_click()
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self(), view.pid]
+        )
+
+      assert password_cols == 0
+      assert Scanning.member_checked_in?(session.id, member.id)
+    end
+
+    test "falls back to loading a member who is not in search results", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{session: session} = setup_session(admin)
+      member = make_active_member()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/membership-check-in/#{session.id}")
+
+      render_click(view, "check-in-member", %{"user-id" => member.id})
+
+      assert Scanning.member_checked_in?(session.id, member.id)
+      assert has_element?(view, "#checked-in-members", member.first_name)
+    end
+
+    test "shows an error when the check-in user id does not exist", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{session: session} = setup_session(admin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/membership-check-in/#{session.id}")
+
+      html =
+        render_click(view, "check-in-member", %{
+          "user-id" => Ecto.ULID.generate()
+        })
+
+      assert html =~ "Member not found."
+    end
+
     test "checking in an inactive user shows an error flash", %{
       conn: conn,
       admin: admin

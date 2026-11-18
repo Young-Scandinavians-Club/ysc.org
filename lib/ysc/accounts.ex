@@ -513,6 +513,10 @@ defmodule Ysc.Accounts do
   ## Options
     - `:limit` - Maximum number of results (default: 10)
     - `:state` - User state to filter by (default: :active)
+    - `:select` - User columns to load as `select: struct`. When set, skips
+      the `current_avatar` preload so callers that only need name/email
+      (membership check-in) do not SELECT `hashed_password` / bios or hit
+      `avatars`. Omit it for pickers that render avatars.
 
   ## Examples
 
@@ -533,22 +537,31 @@ defmodule Ysc.Accounts do
   def search_users_query(query, opts \\ []) when is_binary(query) do
     limit = Keyword.get(opts, :limit, 10)
     state = Keyword.get(opts, :state, :active)
+    fields = Keyword.get(opts, :select)
     search_term = "%" <> Ysc.Text.escape_like(query) <> "%"
 
-    from(u in User,
-      where: u.state == ^state,
-      where:
-        ilike(u.first_name, ^search_term) or
-          ilike(u.last_name, ^search_term) or
-          ilike(fragment("(?::text)", u.email), ^search_term) or
-          ilike(
-            fragment("? || ' ' || ?", u.first_name, u.last_name),
-            ^search_term
-          ),
-      order_by: [asc: u.last_name, asc: u.first_name],
-      limit: ^limit,
-      preload: [:current_avatar]
-    )
+    base =
+      from(u in User,
+        where: u.state == ^state,
+        where:
+          ilike(u.first_name, ^search_term) or
+            ilike(u.last_name, ^search_term) or
+            ilike(fragment("(?::text)", u.email), ^search_term) or
+            ilike(
+              fragment("? || ' ' || ?", u.first_name, u.last_name),
+              ^search_term
+            ),
+        order_by: [asc: u.last_name, asc: u.first_name],
+        limit: ^limit
+      )
+
+    case fields do
+      nil ->
+        from(u in base, preload: [:current_avatar])
+
+      fields when is_list(fields) ->
+        from(u in base, select: struct(u, ^fields))
+    end
   end
 
   @doc """

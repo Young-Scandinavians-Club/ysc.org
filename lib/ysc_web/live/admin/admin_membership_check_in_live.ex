@@ -437,7 +437,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   def handle_event("check-in-member", %{"user-id" => user_id}, socket) do
     %{session: session, current_user: current_user} = socket.assigns
 
-    case Ysc.Accounts.get_user(user_id) do
+    case resolve_check_in_user(socket, user_id) do
       nil ->
         {:noreply, put_flash(socket, :error, "Member not found.")}
 
@@ -526,6 +526,18 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  # Search already loaded the member (name/email/lifetime/primary). A second
+  # `Accounts.get_user/1` would SELECT hashed_password / bios. Crafted
+  # `phx-value` ids still go through get_user.
+  defp resolve_check_in_user(socket, user_id) do
+    case Enum.find(socket.assigns.search_results, fn result ->
+           result.user.id == user_id
+         end) do
+      %{user: user} -> user
+      nil -> Ysc.Accounts.get_user(user_id)
+    end
+  end
 
   defp do_check_in_member(socket, session, user, current_user) do
     case Scanning.check_in_member(session, user, current_user) do

@@ -1130,6 +1130,46 @@ defmodule Ysc.AccountsTest do
       refute Enum.any?(Accounts.search_users("%d"), &(&1.id == user.id))
       assert Enum.any?(Accounts.search_users("Wild"), &(&1.id == user.id))
     end
+
+    test "select: option omits hashed_password and skips the avatar preload" do
+      unique = System.unique_integer([:positive])
+
+      user =
+        user_fixture(%{
+          first_name: "SlimSearch#{unique}",
+          last_name: "Member",
+          phone_number: "+14159098268"
+        })
+
+      {results, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Accounts.search_users("SlimSearch#{unique}",
+              select: [:id, :email, :first_name, :last_name]
+            )
+          end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert [%{id: id, first_name: "SlimSearch" <> _}] = results
+      assert id == user.id
+      assert is_nil(hd(results).hashed_password)
+      assert password_cols == 0
+
+      {_results, avatar_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Accounts.search_users("SlimSearch#{unique}",
+              select: [:id, :email, :first_name, :last_name]
+            )
+          end,
+          pattern: ~r/FROM "avatars"/i,
+          caller_pids: [self()]
+        )
+
+      assert avatar_cols == 0
+    end
   end
 
   describe "list_event_notification_recipients/0" do
