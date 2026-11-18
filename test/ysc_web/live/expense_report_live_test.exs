@@ -230,6 +230,15 @@ defmodule YscWeb.ExpenseReportLiveTest do
       assert has_element?(
                view,
                "#expense-report-rejection-note",
+               "What needs to change"
+             )
+
+      assert has_element?(view, "#expense-report-rejection-note.bg-red-50")
+      assert has_element?(view, "#expense-report-rejection-note.border-red-200")
+
+      assert has_element?(
+               view,
+               "#expense-report-rejection-note",
                "The hotel receipt is missing."
              )
 

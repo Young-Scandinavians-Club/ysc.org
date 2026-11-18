@@ -4208,25 +4208,22 @@ defmodule YscWeb.ExpenseReportLive do
             description="Your expense report was not approved. Review the note below, then submit a new expense report with the fixes."
           />
         </div>
-        <div
+        <.callout
           :if={present?(@expense_report.rejection_note)}
           id="expense-report-rejection-note"
-          class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4"
+          type="error"
+          class="mt-4"
         >
-          <p class="text-sm font-semibold text-red-800">
-            What needs to change
-          </p>
-          <p class="mt-1 whitespace-pre-wrap text-sm text-red-700">
-            {@expense_report.rejection_note}
-          </p>
+          <:title>What needs to change</:title>
+          <p class="mt-1 whitespace-pre-wrap">{@expense_report.rejection_note}</p>
           <.link
             navigate={~p"/expensereport"}
-            class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-red-800 hover:underline"
+            class="mt-3 inline-flex items-center gap-1 font-semibold hover:underline"
           >
             Start a corrected expense report
             <.icon name="hero-arrow-right" class="w-4 h-4" />
           </.link>
-        </div>
+        </.callout>
       <% else %>
         <!-- Normal flow: submitted -> approved -> paid -->
         <div class="space-y-4">

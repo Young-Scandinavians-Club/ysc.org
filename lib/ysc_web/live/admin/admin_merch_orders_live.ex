@@ -346,13 +346,13 @@ defmodule YscWeb.AdminMerchOrdersLive do
       </div>
 
       <div id="order-detail" class="w-full max-w-4xl space-y-10 pb-16 pt-4">
-        <div
+        <.callout
           :if={@order.status == :failed}
           id="order-failure"
-          class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          type="error"
           role="alert"
         >
-          <p class="font-semibold">This order did not reach Printful.</p>
+          <:title>This order did not reach Printful.</:title>
           <p :if={@order.failure_reason} class="mt-1">{@order.failure_reason}</p>
           <p class="mt-2">
             <%= if @order.kind == :purchase do %>
@@ -361,7 +361,7 @@ defmodule YscWeb.AdminMerchOrdersLive do
               Fix the problem and send it again, or place a new order.
             <% end %>
           </p>
-        </div>
+        </.callout>
 
         <div class="grid grid-cols-1 gap-10 md:grid-cols-2">
           <section id="order-recipient" class="space-y-3">

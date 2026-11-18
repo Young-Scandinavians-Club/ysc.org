@@ -808,6 +808,28 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "border-zinc-200"
       assert html =~ "Neutral notice."
     end
+
+    test "error callout with title can hold a problem list" do
+      assigns = %{problems: ["Name can't be blank", "Add at least one item"]}
+
+      html =
+        rendered_to_string(~H"""
+        <.callout id="order-problems" type="error" role="alert">
+          <:title>Fix these to continue:</:title>
+          <ul>
+            <li :for={problem <- @problems}>{problem}</li>
+          </ul>
+        </.callout>
+        """)
+
+      assert html =~ ~s(id="order-problems")
+      assert html =~ ~s(role="alert")
+      assert html =~ "border-red-200"
+      assert html =~ "bg-red-50"
+      assert html =~ "Fix these to continue:"
+      assert html =~ "Name can&#39;t be blank"
+      assert html =~ "Add at least one item"
+    end
   end
 
   describe "scheduled_plan_change_notice/1" do
