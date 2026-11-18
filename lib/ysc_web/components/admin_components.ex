@@ -2163,9 +2163,10 @@ defmodule YscWeb.AdminComponents do
   @doc """
   Card with an ordered thumbnail grid for picking featured items.
 
-  Used by the newsletter editor for posts and events. Clicking a tile toggles
-  selection; order is shown as numbered badges on tiles and as a list below
-  the grid. Pass thumbnail contents via the `:image` slot.
+  Used by the newsletter editor for posts and events. The outer chrome is
+  `admin_form_card`. Clicking a tile toggles selection; order is shown as
+  numbered badges on tiles and as a list below the grid. Pass thumbnail
+  contents via the `:image` slot.
 
   ## Examples
 
@@ -2233,7 +2234,7 @@ defmodule YscWeb.AdminComponents do
       )
 
     ~H"""
-    <div id={@id} class="border border-zinc-200 rounded-lg p-4 bg-white">
+    <.admin_form_card id={@id}>
       <h2 class="text-lg text-zinc-800 mb-2 type-subhead">
         {@title}
       </h2>
@@ -2313,7 +2314,7 @@ defmodule YscWeb.AdminComponents do
           <span class="truncate">{item.title}</span>
         </div>
       </div>
-    </div>
+    </.admin_form_card>
     """
   end
 
@@ -2536,10 +2537,15 @@ defmodule YscWeb.AdminComponents do
 
   Unlike `admin_table_card`, padding is on the card itself — there is no
   header bar or overflow wrapper. Use this for grant forms, editor loading
-  skeletons, and similar short panels.
+  skeletons, newsletter compose panels, and similar short panels.
 
-  - `padding={:compact}` — `p-4` (grant forms)
-  - `padding={:comfortable}` — `p-6` (loading skeletons)
+  - `padding={:compact}` — `p-4` (grant forms, newsletter editor, scanner
+    loading skeletons)
+  - `padding={:comfortable}` — `p-6` (full-page loading skeletons)
+
+  Omit `title` when the panel already has its own heading (newsletter cover
+  photo, ordered thumbnail picker). Do not convert overflow-hidden Trix
+  editors, hover list rows, or zinc-filled empty notices onto this card.
 
   ## Examples
 
@@ -2547,6 +2553,11 @@ defmodule YscWeb.AdminComponents do
         <.form for={@form} id="grant-entitlement-form" phx-submit="grant">
           ...
         </.form>
+      </.admin_form_card>
+
+      <.admin_form_card id="newsletter-cover-card">
+        <h2 class="text-lg text-zinc-800 mb-4 type-subhead">Cover photo</h2>
+        ...
       </.admin_form_card>
 
       <.admin_form_card padding={:comfortable} class="space-y-4">

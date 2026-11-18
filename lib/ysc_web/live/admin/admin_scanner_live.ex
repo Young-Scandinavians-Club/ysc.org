@@ -41,16 +41,13 @@ defmodule YscWeb.AdminScannerLive do
           aria-live="polite"
         >
           <span class="sr-only">Loading sessions…</span>
-          <div
-            :for={_ <- 1..4}
-            class="bg-white border border-zinc-200 rounded-lg p-4 space-y-2"
-          >
+          <.admin_form_card :for={_ <- 1..4} class="space-y-2">
             <div class="flex items-center justify-between">
               <.skeleton_block class="h-4 w-40 rounded-sm" />
               <.skeleton_block class="h-5 w-16 rounded-full" />
             </div>
             <.skeleton_block class="h-3 w-24 rounded-sm" />
-          </div>
+          </.admin_form_card>
         </div>
 
         <.admin_icon_empty_state

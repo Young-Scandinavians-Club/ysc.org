@@ -518,20 +518,6 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
             </:actions>
           </.simple_form>
         </div>
-
-        <%!-- When existing user but logged in with different account --%>
-        <div
-          :if={
-            @existing_user && @current_user && !@can_link_existing &&
-              !@already_on_family?
-          }
-          class="mt-8"
-        >
-          <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-4">
-            You're signed in as a different account. To accept this invitation for <strong>{@invite.email}</strong>, please sign out and either sign in with that email or
-            create a new account with that email.
-          </p>
-        </div>
       </div>
     </div>
     """

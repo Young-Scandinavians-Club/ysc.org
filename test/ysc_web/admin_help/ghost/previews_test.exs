@@ -56,6 +56,10 @@ defmodule YscWeb.AdminHelp.Ghost.PreviewsTest do
       html = render_slug("newsletter-compose")
       assert has_id?(html, "ghost-newsletter-editor-panel")
       assert has_id?(html, "ghost-newsletter-preview-panel")
+      assert has_id?(html, "ghost-newsletter-cover-card")
+      assert has_id?(html, "ghost-newsletter-headline-card")
+      assert has_id?(html, "ghost-newsletter-post-picker")
+      assert has_id?(html, "ghost-newsletter-event-picker")
     end
 
     test "renders the events-edit preview sections" do

@@ -1032,7 +1032,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   Create a subscription paid elsewhere (e.g. cash) or award lifetime membership below.
                 </p>
               </div>
-              <div class="border border-zinc-200 rounded-lg p-4 bg-white">
+              <.admin_form_card id="create-paid-membership-card">
                 <h3 class="text-lg text-zinc-800 mb-2 type-subhead">
                   Create membership (paid elsewhere)
                 </h3>
@@ -1059,7 +1059,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     </.button>
                   </div>
                 </.simple_form>
-              </div>
+              </.admin_form_card>
             </div>
 
             <div :if={@active_subscription != nil} class="space-y-6">

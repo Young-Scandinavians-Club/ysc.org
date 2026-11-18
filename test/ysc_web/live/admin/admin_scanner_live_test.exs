@@ -708,8 +708,9 @@ defmodule YscWeb.AdminScannerLiveTest do
     setup [:create_admin]
 
     test "renders session list page", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/scanner/sessions")
+      {:ok, view, html} = live(conn, ~p"/admin/scanner/sessions")
       assert html =~ "Check-in Sessions"
+      refute has_element?(view, "#scanner-sessions-loading")
     end
 
     test "lists created sessions", %{conn: conn, admin: admin} do

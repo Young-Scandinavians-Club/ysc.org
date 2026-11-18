@@ -655,18 +655,18 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             aria-live="polite"
           >
             <span class="sr-only">Loading newsletter…</span>
-            <div class="border border-zinc-200 rounded-lg p-4 bg-white space-y-3">
+            <.admin_form_card class="space-y-3">
               <.skeleton_block class="h-5 w-32 rounded-sm" />
               <.skeleton_block class="h-40 w-full rounded-lg" />
-            </div>
-            <div class="border border-zinc-200 rounded-lg p-4 bg-white space-y-3">
+            </.admin_form_card>
+            <.admin_form_card class="space-y-3">
               <.skeleton_block class="h-5 w-24 rounded-sm" />
               <.skeleton_block class="h-11 w-full rounded-lg" />
               <.skeleton_block class="h-24 w-full rounded-lg" />
-            </div>
+            </.admin_form_card>
           </div>
           <div :if={!@loading_edition?} class="space-y-6">
-            <div class="border border-zinc-200 rounded-lg p-4 bg-white">
+            <.admin_form_card id="newsletter-cover-card">
               <h2 class="text-lg text-zinc-800 mb-4 type-subhead">Cover photo</h2>
               <div :if={@readonly?}>
                 <%= if has_cover_image?(@preview_cover_image_id) do %>
@@ -688,7 +688,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                   image_id={@preview_cover_image_id}
                 />
               </div>
-            </div>
+            </.admin_form_card>
 
             <.form
               for={@form}
@@ -699,7 +699,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             >
               <%!-- Hidden field keeps cover_image_id in phx-change params so auto-save never clobbers it --%>
               <.input type="hidden" field={@form[:cover_image_id]} />
-              <div class="border border-zinc-200 rounded-lg p-4 bg-white">
+              <.admin_form_card id="newsletter-headline-card">
                 <h2 class="text-lg text-zinc-800 mb-4 type-subhead">
                   Headline & subject
                 </h2>
@@ -736,7 +736,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                     </p>
                   </div>
                 </div>
-              </div>
+              </.admin_form_card>
 
               <div class="border border-zinc-200 rounded-lg overflow-hidden bg-white">
                 <div class="px-4 pt-4 pb-3">
