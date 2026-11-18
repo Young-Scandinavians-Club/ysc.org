@@ -784,6 +784,17 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
              }
     end
 
+    test "next_weekend_opening/3 re-evaluates the window when the current season changes" do
+      # Winter ends Apr 30; from May 1 the unlimited Summer reach applies, so
+      # the Jun 18–20 weekend opens May 1, not 45 days before it.
+      assert %{checkin: ~D[2027-06-18], opens_on: ~D[2027-05-01]} =
+               SeasonHelpers.next_weekend_opening(
+                 :tahoe,
+                 ~D[2027-04-30],
+                 [@winter, @summer]
+               )
+    end
+
     test "next_weekend_opening/3 is nil when no season limits advance booking" do
       unlimited = %{@winter | advance_booking_days: nil}
 

@@ -1991,12 +1991,9 @@ defmodule YscWeb.AdminBookingsLive do
                   Not yet open
                 </span>
                 <span :if={@next_weekend_opening} id="next-weekend-opening">
-                  Next weekend to open: {Calendar.strftime(
+                  Next weekend to open: {format_weekend_range(
                     @next_weekend_opening.checkin,
-                    "%b %-d"
-                  )}–{Calendar.strftime(
-                    @next_weekend_opening.checkout,
-                    "%-d"
+                    @next_weekend_opening.checkout
                   )}, opens {format_weekend_opens_on(@next_weekend_opening.opens_on)}
                 </span>
               </div>
@@ -7262,7 +7259,8 @@ defmodule YscWeb.AdminBookingsLive do
   defp section_needs_reference_data?(_section), do: false
 
   defp maybe_load_property_reference_data(socket, property) do
-    if socket.assigns[:reference_data_loaded?] do
+    if socket.assigns[:reference_data_loaded?] &&
+         socket.assigns[:reference_data_property] == property do
       socket
     else
       socket
@@ -7306,6 +7304,7 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:door_codes, door_codes)
     |> assign(:active_door_code, active_door_code)
     |> assign(:reference_data_loaded?, true)
+    |> assign(:reference_data_property, property)
     |> assign_filtered_data(property, seasons, pricing_rules, refund_policies)
   end
 
@@ -7768,10 +7767,18 @@ defmodule YscWeb.AdminBookingsLive do
     seasons = socket.assigns[:seasons] || []
     today = SeasonHelpers.cabin_today()
 
+    # Include the day after the range so the edge marker can show on the
+    # last displayed day without the admin having to display the next one.
+    dates_with_next =
+      case List.last(calendar_dates) do
+        nil -> calendar_dates
+        last -> calendar_dates ++ [Date.add(last, 1)]
+      end
+
     statuses =
       SeasonHelpers.member_booking_statuses(
         property,
-        calendar_dates,
+        dates_with_next,
         today,
         seasons
       )
@@ -7785,15 +7792,15 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:booking_window, statuses)
     |> assign(
       :booking_window_edge,
-      booking_window_edge(calendar_dates, statuses)
+      booking_window_edge(dates_with_next, statuses)
     )
     |> assign(:next_weekend_opening, next_weekend)
   end
 
   # Last open day directly followed by a closed one: where the window ends.
-  defp booking_window_edge(calendar_dates, statuses) do
-    calendar_dates
-    |> Enum.zip(Enum.drop(calendar_dates, 1))
+  defp booking_window_edge(dates, statuses) do
+    dates
+    |> Enum.zip(Enum.drop(dates, 1))
     |> Enum.find_value(fn {date, next_date} ->
       if Map.get(statuses, date) == :open &&
            Map.get(statuses, next_date) == :closed,
@@ -7816,6 +7823,14 @@ defmodule YscWeb.AdminBookingsLive do
       true ->
         "w-px bg-zinc-200"
     end
+  end
+
+  defp format_weekend_range(checkin, checkout) do
+    checkout_format =
+      if checkin.month == checkout.month, do: "%-d", else: "%b %-d"
+
+    Calendar.strftime(checkin, "%b %-d") <>
+      "–" <> Calendar.strftime(checkout, checkout_format)
   end
 
   defp format_weekend_opens_on(opens_on) do

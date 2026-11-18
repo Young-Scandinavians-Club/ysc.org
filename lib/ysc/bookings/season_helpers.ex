@@ -434,17 +434,17 @@ defmodule Ysc.Bookings.SeasonHelpers do
   The next whole weekend (Friday check-in, Sunday check-out) that members
   can't book yet, and the date it opens to them.
 
-  A weekend opens once both its check-in and check-out fall inside the
-  advance-booking window, so it opens on the later of the two dates'
-  individual opening days. Returns `nil` when no season restricts advance
-  booking or no such weekend is found within the next year.
+  A weekend opens on the first day both its check-in and check-out are
+  bookable, re-evaluating the booking window each day (it moves with the
+  calendar and can jump when the current season changes). Returns `nil` when
+  no season restricts advance booking or no such weekend is found within the
+  next year.
 
   Returns `%{checkin: Date, checkout: Date, opens_on: Date}`.
   """
   def next_weekend_opening(property, today, seasons) when is_list(seasons) do
     if advance_booking_limited?(seasons) do
       max_booking_date = calculate_max_booking_date(property, today, seasons)
-      window_days = Date.diff(max_booking_date, today)
 
       today
       |> next_friday_on_or_after()
@@ -453,8 +453,8 @@ defmodule Ysc.Bookings.SeasonHelpers do
       |> Enum.find_value(fn checkin ->
         checkout = Date.add(checkin, 2)
 
-        closed_dates =
-          Enum.filter([checkin, checkout], fn date ->
+        weekend_closed? =
+          Enum.any?([checkin, checkout], fn date ->
             member_booking_status(
               property,
               date,
@@ -464,30 +464,31 @@ defmodule Ysc.Bookings.SeasonHelpers do
             ) == :closed
           end)
 
-        if closed_dates != [] do
-          opens_on =
-            closed_dates
-            |> Enum.map(&opening_date(&1, seasons, window_days))
-            |> Enum.max(Date)
-
+        with true <- weekend_closed?,
+             %Date{} = opens_on <-
+               weekend_opens_on(property, checkin, checkout, today, seasons) do
           %{checkin: checkin, checkout: checkout, opens_on: opens_on}
+        else
+          _ -> nil
         end
       end)
     end
   end
 
-  # The day `date` becomes bookable: its season's own limit when it has one,
-  # otherwise the calendar's overall reach.
-  defp opening_date(date, seasons, window_days) do
-    season = Season.find_season_for_date(seasons, date)
+  # First day after `today` on which both weekend endpoints are bookable,
+  # recalculating the window for each candidate day.
+  defp weekend_opens_on(property, checkin, checkout, today, seasons) do
+    today
+    |> Date.add(1)
+    |> Date.range(checkin)
+    |> Enum.find(fn day ->
+      max_booking_date = calculate_max_booking_date(property, day, seasons)
 
-    days =
-      if season && season.advance_booking_days &&
-           season.advance_booking_days > 0,
-         do: season.advance_booking_days,
-         else: window_days
-
-    Date.add(date, -days)
+      Enum.all?([checkin, checkout], fn date ->
+        member_booking_status(property, date, day, seasons, max_booking_date) ==
+          :open
+      end)
+    end)
   end
 
   @doc """

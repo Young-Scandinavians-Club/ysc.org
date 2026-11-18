@@ -543,6 +543,24 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert has_element?(view, "#next-weekend-opening")
     end
 
+    test "marks the window edge even when the range ends on the last open day",
+         %{conn: conn} do
+      insert_year_round_season!(30)
+
+      today = Ysc.Bookings.SeasonHelpers.cabin_today()
+      from = Date.to_string(today)
+      to = Date.to_string(Date.add(today, 30))
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings?property=tahoe&from_date=#{from}&to_date=#{to}"
+        )
+
+      assert view |> element("#booking-window-legend") |> render() =~
+               "Open to members through"
+    end
+
     test "omits the legend when no season limits advance booking", %{conn: conn} do
       insert_year_round_season!(nil)
 
