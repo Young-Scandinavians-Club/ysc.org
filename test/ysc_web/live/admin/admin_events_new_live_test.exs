@@ -2253,6 +2253,27 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       refute Repo.get!(Event, event.id).send_notification
     end
 
+    test "shows the spam-awareness note only while the box is checked", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        cabin_event(admin, %{
+          location_name: "Swedish American Hall",
+          address: "2174 Market St, San Francisco, CA 94114"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      refute has_element?(view, "#publish-send-notification-note")
+
+      view |> element("#publish-send-notification") |> render_click()
+      assert has_element?(view, "#publish-send-notification-note")
+
+      view |> element("#publish-send-notification") |> render_click()
+      refute has_element?(view, "#publish-send-notification-note")
+    end
+
     test "checking the box publishes with notification", %{
       conn: conn,
       admin: admin
