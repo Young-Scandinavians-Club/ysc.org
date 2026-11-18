@@ -375,6 +375,122 @@ defmodule Ysc.Bookings.SeasonHelpers do
   end
 
   @doc """
+  Classifies each of `dates` against the member advance-booking window, for
+  admin views that want to show what members can (and can't yet) book.
+
+  Returns a map of `date => status` where status is:
+  - `:past` — before `today`, nothing to book
+  - `:open` — a member could book this date right now
+  - `:closed` — not yet open (beyond the calendar's reach or its season's
+    advance-booking limit)
+
+  Uses the same rules the member booking calendar applies
+  (`calculate_max_booking_date/3` and `date_selectable?/4`). Returns an empty
+  map when no season restricts advance booking, since then there's no window
+  to show.
+  """
+  def member_booking_statuses(property, dates, today, seasons)
+      when is_list(dates) and is_list(seasons) do
+    if advance_booking_limited?(seasons) do
+      max_booking_date = calculate_max_booking_date(property, today, seasons)
+
+      Map.new(dates, fn date ->
+        {date,
+         member_booking_status(
+           property,
+           date,
+           today,
+           seasons,
+           max_booking_date
+         )}
+      end)
+    else
+      %{}
+    end
+  end
+
+  defp member_booking_status(property, date, today, seasons, max_booking_date) do
+    cond do
+      Date.compare(date, today) == :lt ->
+        :past
+
+      Date.compare(date, max_booking_date) != :gt and
+          date_selectable?(property, date, today, seasons) ->
+        :open
+
+      true ->
+        :closed
+    end
+  end
+
+  defp advance_booking_limited?(seasons) do
+    Enum.any?(
+      seasons,
+      &(&1.advance_booking_days && &1.advance_booking_days > 0)
+    )
+  end
+
+  @doc """
+  The next whole weekend (Friday check-in, Sunday check-out) that members
+  can't book yet, and the date it opens to them.
+
+  A weekend opens once both its check-in and check-out fall inside the
+  advance-booking window, so it opens on the later of the two dates'
+  individual opening days. Returns `nil` when no season restricts advance
+  booking or no such weekend is found within the next year.
+
+  Returns `%{checkin: Date, checkout: Date, opens_on: Date}`.
+  """
+  def next_weekend_opening(property, today, seasons) when is_list(seasons) do
+    if advance_booking_limited?(seasons) do
+      max_booking_date = calculate_max_booking_date(property, today, seasons)
+      window_days = Date.diff(max_booking_date, today)
+
+      today
+      |> next_friday_on_or_after()
+      |> Stream.iterate(&Date.add(&1, 7))
+      |> Enum.take(53)
+      |> Enum.find_value(fn checkin ->
+        checkout = Date.add(checkin, 2)
+
+        closed_dates =
+          Enum.filter([checkin, checkout], fn date ->
+            member_booking_status(
+              property,
+              date,
+              today,
+              seasons,
+              max_booking_date
+            ) == :closed
+          end)
+
+        if closed_dates != [] do
+          opens_on =
+            closed_dates
+            |> Enum.map(&opening_date(&1, seasons, window_days))
+            |> Enum.max(Date)
+
+          %{checkin: checkin, checkout: checkout, opens_on: opens_on}
+        end
+      end)
+    end
+  end
+
+  # The day `date` becomes bookable: its season's own limit when it has one,
+  # otherwise the calendar's overall reach.
+  defp opening_date(date, seasons, window_days) do
+    season = Season.find_season_for_date(seasons, date)
+
+    days =
+      if season && season.advance_booking_days &&
+           season.advance_booking_days > 0,
+         do: season.advance_booking_days,
+         else: window_days
+
+    Date.add(date, -days)
+  end
+
+  @doc """
   Validates that check-in and check-out dates are within the current season.
 
   Returns a map of errors (empty if valid).

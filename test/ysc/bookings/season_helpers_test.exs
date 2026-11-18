@@ -721,4 +721,77 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
       assert summer_result.cycle_year == 2027
     end
   end
+
+  describe "member booking window (admin calendar indicator)" do
+    @winter %Season{
+      id: "window-winter",
+      name: "Winter",
+      property: :tahoe,
+      start_date: ~D[2024-11-01],
+      end_date: ~D[2025-04-30],
+      advance_booking_days: 45
+    }
+
+    @summer %Season{
+      id: "window-summer",
+      name: "Summer",
+      property: :tahoe,
+      start_date: ~D[2024-05-01],
+      end_date: ~D[2024-10-31],
+      advance_booking_days: nil
+    }
+
+    test "member_booking_statuses/4 marks past, open and not-yet-open dates" do
+      today = ~D[2026-11-18]
+
+      dates =
+        Date.range(Date.add(today, -1), Date.add(today, 47)) |> Enum.to_list()
+
+      statuses =
+        SeasonHelpers.member_booking_statuses(
+          :tahoe,
+          dates,
+          today,
+          [@winter, @summer]
+        )
+
+      assert statuses[~D[2026-11-17]] == :past
+      assert statuses[today] == :open
+      assert statuses[Date.add(today, 45)] == :open
+      assert statuses[Date.add(today, 46)] == :closed
+    end
+
+    test "member_booking_statuses/4 is empty when no season limits advance booking" do
+      unlimited = %{@winter | advance_booking_days: nil}
+
+      assert SeasonHelpers.member_booking_statuses(
+               :tahoe,
+               [~D[2026-11-18]],
+               ~D[2026-11-18],
+               [unlimited, @summer]
+             ) == %{}
+    end
+
+    test "next_weekend_opening/3 finds the first weekend members can't book yet" do
+      assert SeasonHelpers.next_weekend_opening(
+               :tahoe,
+               ~D[2026-11-18],
+               [@winter, @summer]
+             ) == %{
+               checkin: ~D[2027-01-01],
+               checkout: ~D[2027-01-03],
+               opens_on: ~D[2026-11-19]
+             }
+    end
+
+    test "next_weekend_opening/3 is nil when no season limits advance booking" do
+      unlimited = %{@winter | advance_booking_days: nil}
+
+      assert SeasonHelpers.next_weekend_opening(
+               :tahoe,
+               ~D[2026-11-18],
+               [unlimited, @summer]
+             ) == nil
+    end
+  end
 end

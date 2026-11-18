@@ -505,6 +505,62 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     end
   end
 
+  describe "calendar member booking window indicator" do
+    setup [:create_admin]
+
+    defp insert_year_round_season!(advance_booking_days) do
+      clear_seasons!()
+
+      {:ok, _} =
+        %Ysc.Bookings.Season{}
+        |> Ysc.Bookings.Season.changeset(%{
+          name: "Winter",
+          property: :tahoe,
+          start_date: ~D[2024-01-01],
+          end_date: ~D[2024-12-31],
+          advance_booking_days: advance_booking_days
+        })
+        |> Repo.insert()
+
+      Ysc.Bookings.SeasonCache.invalidate()
+    end
+
+    test "shows the legend and next weekend to open when a season limits advance booking",
+         %{conn: conn} do
+      insert_year_round_season!(30)
+
+      today = Ysc.Bookings.SeasonHelpers.cabin_today()
+      from = Date.to_string(today)
+      to = Date.to_string(Date.add(today, 60))
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings?property=tahoe&from_date=#{from}&to_date=#{to}"
+        )
+
+      assert has_element?(view, "#booking-window-legend")
+      assert has_element?(view, "#next-weekend-opening")
+    end
+
+    test "omits the legend when no season limits advance booking", %{conn: conn} do
+      insert_year_round_season!(nil)
+
+      today = Ysc.Bookings.SeasonHelpers.cabin_today()
+      from = Date.to_string(today)
+      to = Date.to_string(Date.add(today, 60))
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings?property=tahoe&from_date=#{from}&to_date=#{to}"
+        )
+
+      assert has_element?(view, "#calendar-container")
+      refute has_element?(view, "#booking-window-legend")
+    end
+  end
+
   describe "calendar date selection" do
     setup [:create_admin]
 
