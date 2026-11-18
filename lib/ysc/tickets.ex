@@ -205,22 +205,39 @@ defmodule Ysc.Tickets do
     case Repo.transaction(fn ->
            lock_user_event_ticket_checkout!(user_id, event_id)
 
-           case prepare_new_checkout_session(user_id, event_id) do
+           # Re-check max_per_buyer under the lock. The pre-lock validate in
+           # create_ticket_order/4 can race a cash door grant that confirms
+           # tickets without sharing this lock (#1856 leftover).
+           user = Keyword.fetch!(booking_opts, :user)
+           ticket_tiers = selection_tier_attrs(ticket_selections, booking_opts)
+
+           case validate_tier_purchase_limits(
+                  user,
+                  event_id,
+                  ticket_selections,
+                  ticket_tiers
+                ) do
              :ok ->
-               case BookingLocker.atomic_booking(
-                      user_id,
-                      event_id,
-                      ticket_selections,
-                      booking_opts
-                    ) do
-                 {:ok, ticket_order} -> {:created, ticket_order}
-                 {:error, reason} -> Repo.rollback(reason)
+               case prepare_new_checkout_session(user_id, event_id) do
+                 :ok ->
+                   case BookingLocker.atomic_booking(
+                          user_id,
+                          event_id,
+                          ticket_selections,
+                          booking_opts
+                        ) do
+                     {:ok, ticket_order} -> {:created, ticket_order}
+                     {:error, reason} -> Repo.rollback(reason)
+                   end
+
+                 # Fulfill-during-cleanup must commit: rollback would un-complete
+                 # the tickets and leave a captured charge on a pending cart.
+                 {:error, :checkout_payment_in_progress} ->
+                   {:blocked, :checkout_payment_in_progress}
                end
 
-             # Fulfill-during-cleanup must commit: rollback would un-complete
-             # the tickets and leave a captured charge on a pending cart.
-             {:error, :checkout_payment_in_progress} ->
-               {:blocked, :checkout_payment_in_progress}
+             {:error, reason} ->
+               Repo.rollback(reason)
            end
          end) do
       {:ok, {:created, ticket_order}} -> {:ok, ticket_order}
@@ -229,7 +246,15 @@ defmodule Ysc.Tickets do
     end
   end
 
-  defp lock_user_event_ticket_checkout!(user_id, event_id) do
+  @doc """
+  Serializes ticket checkout and offline cash/check door grants for one
+  `(user_id, event_id)` pair via a transaction-scoped advisory lock.
+
+  Must be called inside an open `Repo.transaction/1`. Used by
+  `create_ticket_order/4` and by `Ysc.Tickets.AdminGrants` when recording an
+  in-person sale so max_per_buyer cannot be exceeded across cash+online tabs.
+  """
+  def lock_user_event_ticket_checkout!(user_id, event_id) do
     Repo.query!("SELECT pg_advisory_xact_lock($1, $2)", [
       @checkout_advisory_lock_namespace,
       :erlang.phash2({user_id, event_id}, 2_147_483_647)
@@ -249,6 +274,9 @@ defmodule Ysc.Tickets do
     * `:admin_grant_notes` - optional audit note (e.g. legacy order reference)
     * `:payment_channel` - optional `"cash"` | `"check"` | `"other"` for an in-person sale recorded outside Stripe
     * `:offline_amount_collected` - optional `Money` the seller physically collected (order total stays $0)
+    * `:enforce_max_per_buyer` - when true (also implied by `:payment_channel`),
+      re-check `max_per_buyer` under the shared checkout advisory lock so a
+      cash door sale cannot race an online checkout past the limit
     * `:user` / `:event` / `:tiers` - preloaded structs matching the ids; skips
       the corresponding Repo lookups in `AdminGrants`
 

@@ -167,6 +167,7 @@ defmodule YscWeb.Api.AppTicketsController do
              [
                {:skip_capacity, true},
                {:skip_sale_guards, true},
+               {:enforce_max_per_buyer, true},
                {:payment_channel, payment_method},
                {:user, member},
                {:event, event},
