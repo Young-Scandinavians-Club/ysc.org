@@ -3595,6 +3595,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         })
 
       assert html =~ "Payment method saved and your membership is now active"
+      refute html =~ "Your membership is renewed"
       assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
       assert approved_payment_success_email(drain_emails(), user)
     end
@@ -3614,7 +3615,9 @@ defmodule YscWeb.UserSettingsLiveTest do
           "payment_method_id" => pm_id
         })
 
-      assert html =~ "Payment method saved and your membership is now active"
+      assert html =~ "Payment method saved. Your membership is renewed."
+      refute html =~ "membership is now active"
+      refute html =~ "Welcome"
       assert MembershipCache.get_active_membership(Accounts.get_user!(user.id))
       refute approved_payment_success_email(drain_emails(), user)
     end

@@ -27,7 +27,7 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Payments.PaymentDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.BookingDisplay
-  alias YscWeb.{MembershipQr, WalletPlatform}
+  alias YscWeb.{MembershipQr, MembershipUserMessages, WalletPlatform}
 
   @impl true
   def render(assigns) do
@@ -4780,7 +4780,9 @@ defmodule YscWeb.UserSettingsLive do
            |> assign(:user, refreshed)
            |> assign(:current_membership, membership)
            |> assign(:active_plan_type, plan_type),
-           "Payment method saved and your membership is now active!"}
+           MembershipUserMessages.payment_method_saved_membership_activated(
+             returning_member?
+           )}
 
         {:error, _reason} ->
           {socket,
