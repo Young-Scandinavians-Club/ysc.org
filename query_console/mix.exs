@@ -47,6 +47,11 @@ defmodule QueryConsole.MixProject do
       # freeze/resume. 1.8.10: longpoll POST timeout close-and-retry.
       # phx.gen.auth / phx.gen.cert / phx.new unused (Tailwind stays 4.1.7).
       {:phoenix, "~> 1.8.16"},
+      # plug 1.20.0/1.20.1 retired on Hex. 1.20.4: EEF-CVE-2026-120287
+      # (MEDIUM / GHSA-qj4r-jh2r-rw3f) charges multipart part framing and
+      # empty headers against `:length`. Phoenix lists plug ~> 1.14, so
+      # pin the patched floor. We use Plug.Parsers with `:multipart`.
+      {:plug, "~> 1.20.4", override: true},
       # 2.2.1: ArgumentError on wrong-typed Plug.Crypto args no longer puts
       # the secret key base in the stacktrace (EEF-CVE-2026-105963 /
       # GHSA-ffw9-w85g-f2vh). Public sign/verify/encrypt/decrypt and
