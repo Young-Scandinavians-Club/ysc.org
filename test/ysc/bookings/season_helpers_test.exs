@@ -772,6 +772,17 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
              ) == %{}
     end
 
+    test "member_booking_statuses/4 treats advance_booking_days 0 as unlimited" do
+      zero = %{@winter | advance_booking_days: 0}
+
+      assert SeasonHelpers.member_booking_statuses(
+               :tahoe,
+               [~D[2026-11-18]],
+               ~D[2026-11-18],
+               [zero, @summer]
+             ) == %{}
+    end
+
     test "next_weekend_opening/3 finds the first weekend members can't book yet" do
       assert SeasonHelpers.next_weekend_opening(
                :tahoe,
@@ -803,6 +814,20 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
                ~D[2026-11-18],
                [unlimited, @summer]
              ) == nil
+    end
+
+    test "next_weekend_opening/3 skips a Friday that members can already book" do
+      # 2026-11-20 is Friday and sits inside the 45-day window, so this weekend
+      # is already open. The next closed Fri–Sun is 2027-01-08–10.
+      assert SeasonHelpers.next_weekend_opening(
+               :tahoe,
+               ~D[2026-11-20],
+               [@winter, @summer]
+             ) == %{
+               checkin: ~D[2027-01-08],
+               checkout: ~D[2027-01-10],
+               opens_on: ~D[2026-11-26]
+             }
     end
   end
 end
