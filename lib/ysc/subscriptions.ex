@@ -811,15 +811,22 @@ defmodule Ysc.Subscriptions do
   Updates the subscription period end date using subscription schedules.
   This creates a schedule that overrides when the current subscription period ends.
 
+  `schedule_api` is the Stripe schedule module, injectable for tests. Retrieve
+  goes through `stripe_subscription_module/0` so tests can mock Stripe without
+  hitting the live API.
+
   ## Examples
 
       iex> update_period_end(subscription, ~U[2024-12-31 23:59:59Z])
       {:ok, %Subscription{}}
 
   """
+  @dialyzer {:nowarn_function, update_period_end: 2}
+  @dialyzer {:nowarn_function, update_period_end: 3}
   def update_period_end(
         %Subscription{} = subscription,
-        %DateTime{} = new_end_date
+        %DateTime{} = new_end_date,
+        schedule_api \\ Stripe.SubscriptionSchedule
       ) do
     # Convert DateTime to Unix timestamp for Stripe
     end_timestamp = DateTime.to_unix(new_end_date)
@@ -827,21 +834,21 @@ defmodule Ysc.Subscriptions do
     # First, retrieve the current subscription to get its items and current period
     with {:ok, stripe_sub} <-
            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.Subscription.retrieve(subscription.stripe_id)
+             stripe_subscription_module().retrieve(subscription.stripe_id)
            end),
          :ok <-
            release_existing_schedules(
              stripe_sub.id,
-             Stripe.SubscriptionSchedule
+             schedule_api
            ),
          {:ok, _schedule} <-
            create_period_end_schedule(
              stripe_sub,
              end_timestamp,
-             Stripe.SubscriptionSchedule
+             schedule_api
            ) do
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.Subscription.retrieve(subscription.stripe_id)
+             stripe_subscription_module().retrieve(subscription.stripe_id)
            end) do
         {:ok, updated_stripe_subscription} ->
           # Update local subscription with new period dates
