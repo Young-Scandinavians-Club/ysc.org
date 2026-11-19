@@ -16,8 +16,9 @@ defmodule YscWeb.PhoenixTestUpgradeTest do
   Registration and security LiveViews use `phx-trigger-action`; we
   still drive those with LiveViewTest. We do not use
   `phx-no-unused-field`. `mix deps.update` also pulled ranch 2.4.0,
-  phoenix_template 1.1.0, and websock_adapter 0.7.2; those extras stay
-  at 2.3.0 / 1.0.4 / 0.6.0.
+  phoenix_template 1.1.0, and websock_adapter 0.7.2; phoenix_template
+  and websock_adapter stay 1.0.4 / 0.6.0. Ranch is independently
+  pinned at 2.4.0.
   """
   use YscWeb.ConnCase, async: true
 
@@ -88,12 +89,12 @@ defmodule YscWeb.PhoenixTestUpgradeTest do
                ~s({:phoenix_test, "~> 0.14.0", only: :test, runtime: false})
     end
 
-    test "companion extras stay on ranch 2.3.0, phoenix_template 1.0.4, websock_adapter 0.6.0" do
+    test "companion extras stay on ranch 2.4.0, phoenix_template 1.0.4, websock_adapter 0.6.0" do
       lock = File.read!(@mix_lock)
       assert lock =~ ~s|"phoenix_test": {:hex, :phoenix_test, "0.14.0"|
       refute lock =~ ~s|"phoenix_test": {:hex, :phoenix_test, "0.12.1"|
-      assert lock =~ ~s|"ranch": {:hex, :ranch, "2.3.0"|
-      refute lock =~ ~s|"ranch": {:hex, :ranch, "2.4.0"|
+      assert lock =~ ~s|"ranch": {:hex, :ranch, "2.4.0"|
+      refute lock =~ ~s|"ranch": {:hex, :ranch, "2.3.0"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
       refute lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
       assert lock =~ ~s|"websock_adapter": {:hex, :websock_adapter, "0.6.0"|

@@ -20,10 +20,15 @@ defmodule Ysc.MixProject do
       # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
       # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
+      # idna 8.0.0 fixes EEF-CVE-2026-117678 (punycode labels decoded before the
+      # 63-octet check). swoosh 1.28.1/1.29.3 list idna < 8.0.0; hackney 4.10.2
+      # lists ~> 7.1.0. Do not override idna 8 until swoosh allows it. App HTTP
+      # uses Req, not hackney; we do not call idna APIs.
       hex: [
         ignore_advisories: [
           "EEF-CVE-2026-95105",
-          "EEF-CVE-2026-94206"
+          "EEF-CVE-2026-94206",
+          "EEF-CVE-2026-117678"
         ]
       ],
       test_coverage: [
@@ -284,9 +289,18 @@ defmodule Ysc.MixProject do
       # longer reads code archives. We serve HTTP via
       # Phoenix.Endpoint.Cowboy2Adapter and Plug.Static; we do not call
       # Cowboy/Cowlib APIs, cowboy_static, Unix sockets, or structured
-      # field encoders. Ranch stays 2.3.0 (cowboy still allows >= 1.8).
+      # field encoders. cowboy still allows ranch >= 1.8; we pin 2.4.0.
       {:cowboy, "~> 2.21", override: true},
       {:cowlib, "~> 2.22", override: true},
+      # 2.4.0: trusted_proxies transport option (opt-in; absent means any
+      # peer may send a PROXY header). PROXY v1 lines > 107 bytes are
+      # rejected before decode; {local, Path} cleanup only deletes
+      # sockets/FIFOs; child_spec/5 raises on invalid transport options;
+      # set_transport_options/2 updates stored max_connections. We do not
+      # enable PROXY protocol (Fly client IP is HTTP headers via
+      # YscWeb.ClientIP). Sandbox idle shutdown uses :ranch.procs/2
+      # (unchanged). extras: none.
+      {:ranch, "~> 2.4.0", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},

@@ -10,7 +10,7 @@ defmodule Ysc.CowboyUpgradeTest do
   longer reads code archives. We serve HTTP via
   `Phoenix.Endpoint.Cowboy2Adapter` and `Plug.Cowboy` in tests; we do not
   call Cowboy or Cowlib APIs, `cowboy_static`, Unix sockets, or structured
-  field encoders. Ranch stays 2.3.0.
+  field encoders. Ranch is independently pinned at 2.4.0.
   """
   use ExUnit.Case, async: false
 
@@ -53,21 +53,22 @@ defmodule Ysc.CowboyUpgradeTest do
       assert to_string(Application.spec(:cowlib, :vsn)) == "2.22.0"
     end
 
-    test "companion lock is 2.21.0 / 2.22.0 and ranch stays 2.3.0" do
+    test "companion lock is 2.21.0 / 2.22.0 and ranch is 2.4.0" do
       lock = File.read!(@mix_lock)
       assert lock =~ ~s|"cowboy": {:hex, :cowboy, "2.21.0"|
       refute lock =~ ~s|"cowboy": {:hex, :cowboy, "2.20.0"|
       assert lock =~ ~s|"cowlib": {:hex, :cowlib, "2.22.0"|
       refute lock =~ ~s|"cowlib": {:hex, :cowlib, "2.21.0"|
-      assert lock =~ ~s|"ranch": {:hex, :ranch, "2.3.0"|
-      refute lock =~ ~s|"ranch": {:hex, :ranch, "2.4.0"|
+      assert lock =~ ~s|"ranch": {:hex, :ranch, "2.4.0"|
+      refute lock =~ ~s|"ranch": {:hex, :ranch, "2.3.0"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
     end
 
-    test "mix.exs pins cowboy 2.21 and cowlib 2.22 floors" do
+    test "mix.exs pins cowboy 2.21, cowlib 2.22, and ranch 2.4.0 floors" do
       mix_exs = File.read!(@mix_exs)
       assert mix_exs =~ ~s|{:cowboy, "~> 2.21", override: true}|
       assert mix_exs =~ ~s|{:cowlib, "~> 2.22", override: true}|
+      assert mix_exs =~ ~s|{:ranch, "~> 2.4.0", override: true}|
     end
 
     test "OTP 27 floor is satisfied" do
