@@ -577,6 +577,37 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert has_element?(view, "#calendar-container")
       refute has_element?(view, "#booking-window-legend")
     end
+
+    test "reloads the window after changing property off the calendar", %{
+      conn: conn
+    } do
+      insert_year_round_season!(30)
+
+      today = Ysc.Bookings.SeasonHelpers.cabin_today()
+      from = Date.to_string(today)
+      to = Date.to_string(Date.add(today, 60))
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings?property=tahoe&from_date=#{from}&to_date=#{to}"
+        )
+
+      assert has_element?(view, "#booking-window-legend")
+
+      view
+      |> element("button[phx-value-section=reservations]", "Reservations")
+      |> render_click()
+
+      render_click(view, "select-property", %{"property" => "clear_lake"})
+
+      view
+      |> element("button[phx-value-section=calendar]", "Calendar")
+      |> render_click()
+
+      assert has_element?(view, "#calendar-container")
+      refute has_element?(view, "#booking-window-legend")
+    end
   end
 
   describe "calendar date selection" do

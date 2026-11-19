@@ -192,6 +192,7 @@ defmodule Ysc.CowboyUpgradeTest do
       refute mix_exs =~ ~s|"EEF-CVE-2026-43969"|
       assert mix_exs =~ ~s|"EEF-CVE-2026-95105"|
       assert mix_exs =~ ~s|"EEF-CVE-2026-94206"|
+      assert mix_exs =~ ~s|"EEF-CVE-2026-117678"|
     end
   end
 
