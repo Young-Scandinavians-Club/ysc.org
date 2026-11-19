@@ -1896,7 +1896,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
     defp start_free_checkout(conn, event, tier) do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      render_async(view)
+      wait_for_async(view, 5_000)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
