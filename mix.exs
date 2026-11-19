@@ -20,10 +20,15 @@ defmodule Ysc.MixProject do
       # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       # cloak/cloak_ecto: no patched release on Hex. We only use Cloak.Ciphers.AES.GCM
       # (see lib/ysc/vault.ex), not the affected AES-CTR cipher or PBKDF2 field.
+      # idna 8.0.0 fixes EEF-CVE-2026-117678 (punycode labels decoded before the
+      # 63-octet check). swoosh 1.28.1/1.29.3 list idna < 8.0.0; hackney 4.10.2
+      # lists ~> 7.1.0. Do not override idna 8 until swoosh allows it. App HTTP
+      # uses Req, not hackney; we do not call idna APIs.
       hex: [
         ignore_advisories: [
           "EEF-CVE-2026-95105",
-          "EEF-CVE-2026-94206"
+          "EEF-CVE-2026-94206",
+          "EEF-CVE-2026-117678"
         ]
       ],
       test_coverage: [
