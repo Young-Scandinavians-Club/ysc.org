@@ -513,6 +513,15 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.checkout_cancel_failed() =~ "info@ysc.org"
 
     assert BookingUserMessages.checkout_cancel_failed() =~
+             "couldn't leave checkout"
+
+    assert BookingUserMessages.checkout_cancel_failed() =~
+             "dates are still held"
+
+    assert BookingUserMessages.checkout_cancel_failed() =~
+             "Leave without booking"
+
+    refute BookingUserMessages.checkout_cancel_failed() =~
              "couldn't go back from this page"
 
     refute BookingUserMessages.checkout_cancel_failed() =~
@@ -522,6 +531,9 @@ defmodule YscWeb.BookingUserMessagesTest do
              "still processing"
 
     assert BookingUserMessages.checkout_cancel_payment_in_progress() =~
+             "can't leave checkout yet"
+
+    refute BookingUserMessages.checkout_cancel_payment_in_progress() =~
              "can't go back yet"
 
     refute BookingUserMessages.checkout_cancel_payment_in_progress() =~

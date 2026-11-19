@@ -1340,6 +1340,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         |> render_click()
 
       assert html =~ "still processing"
+      assert html =~ "leave checkout yet"
       assert Repo.get!(Booking, booking.id).status == :hold
     end
 
@@ -1377,7 +1378,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         |> element("button[phx-click=\"cancel-booking\"]")
         |> render_click()
 
-      assert html =~ "go back from this page"
+      assert html =~ "leave checkout"
+      assert html =~ "dates are still held"
       assert Repo.get!(Booking, booking.id).status == :hold
     end
   end
