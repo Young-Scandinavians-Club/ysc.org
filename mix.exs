@@ -289,9 +289,18 @@ defmodule Ysc.MixProject do
       # longer reads code archives. We serve HTTP via
       # Phoenix.Endpoint.Cowboy2Adapter and Plug.Static; we do not call
       # Cowboy/Cowlib APIs, cowboy_static, Unix sockets, or structured
-      # field encoders. Ranch stays 2.3.0 (cowboy still allows >= 1.8).
+      # field encoders. cowboy still allows ranch >= 1.8; we pin 2.4.0.
       {:cowboy, "~> 2.21", override: true},
       {:cowlib, "~> 2.22", override: true},
+      # 2.4.0: trusted_proxies transport option (opt-in; absent means any
+      # peer may send a PROXY header). PROXY v1 lines > 107 bytes are
+      # rejected before decode; {local, Path} cleanup only deletes
+      # sockets/FIFOs; child_spec/5 raises on invalid transport options;
+      # set_transport_options/2 updates stored max_connections. We do not
+      # enable PROXY protocol (Fly client IP is HTTP headers via
+      # YscWeb.ClientIP). Sandbox idle shutdown uses :ranch.procs/2
+      # (unchanged). extras: none.
+      {:ranch, "~> 2.4.0", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},

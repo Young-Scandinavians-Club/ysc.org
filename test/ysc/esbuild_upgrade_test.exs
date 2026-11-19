@@ -49,8 +49,8 @@ defmodule Ysc.EsbuildUpgradeTest do
       lock = File.read!(@mix_lock)
       assert lock =~ ~s|"esbuild": {:hex, :esbuild, "0.10.1"|
       refute lock =~ ~s|"esbuild": {:hex, :esbuild, "0.10.0"|
-      assert lock =~ ~s|"ranch": {:hex, :ranch, "2.3.0"|
-      refute lock =~ ~s|"ranch": {:hex, :ranch, "2.4.0"|
+      assert lock =~ ~s|"ranch": {:hex, :ranch, "2.4.0"|
+      refute lock =~ ~s|"ranch": {:hex, :ranch, "2.3.0"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
     end
 
