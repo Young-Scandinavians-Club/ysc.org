@@ -57,8 +57,8 @@ defmodule Ysc.TailwindUpgradeTest do
       lock = File.read!(@mix_lock)
       assert lock =~ ~s|"tailwind": {:hex, :tailwind, "0.5.2"|
       refute lock =~ ~s|"tailwind": {:hex, :tailwind, "0.5.1"|
-      assert lock =~ ~s|"ranch": {:hex, :ranch, "2.3.0"|
-      refute lock =~ ~s|"ranch": {:hex, :ranch, "2.4.0"|
+      assert lock =~ ~s|"ranch": {:hex, :ranch, "2.4.0"|
+      refute lock =~ ~s|"ranch": {:hex, :ranch, "2.3.0"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.0.4"|
     end
 
