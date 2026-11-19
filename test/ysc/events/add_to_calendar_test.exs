@@ -9,6 +9,15 @@ defmodule Ysc.Events.AddToCalendarTest do
     end
   end
 
+  describe "text/1" do
+    test "strips CR/LF and collapses whitespace for ICS-safe attributes" do
+      assert AddToCalendar.text("YSC\nHall") == "YSC Hall"
+      assert AddToCalendar.text("A\r\nB\tC") == "A B C"
+      assert AddToCalendar.text(nil) == nil
+      assert AddToCalendar.text("") == nil
+    end
+  end
+
   describe "date/1" do
     test "formats Date, DateTime, and NaiveDateTime as ISO calendar days" do
       assert AddToCalendar.date(~D[2026-10-16]) == "2026-10-16"

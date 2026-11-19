@@ -60,5 +60,28 @@ defmodule YscWeb.Components.AddToCalendarButtonTest do
       assert html =~ ~s(end-time="01:30:00")
       assert html =~ ~s(light-mode="dark")
     end
+
+    test "strips CR/LF from name and location before rendering attributes" do
+      assigns = %{
+        event: %{
+          title: "Party\nDESCRIPTION:evil",
+          location_name: "Hall\r\nURL:https://phish.test",
+          start_date: ~D[2026-10-16],
+          end_date: ~D[2026-10-16],
+          start_time: ~T[19:00:00],
+          end_time: ~T[22:00:00]
+        }
+      }
+
+      html =
+        rendered_to_string(~H"""
+        <.add_to_calendar_button event={@event} />
+        """)
+
+      refute html =~ "Party\nDESCRIPTION"
+      refute html =~ "Hall\r\nURL"
+      assert html =~ ~s(name="Party DESCRIPTION:evil")
+      assert html =~ ~s(location="Hall URL:https://phish.test")
+    end
   end
 end
