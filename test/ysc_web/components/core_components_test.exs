@@ -809,6 +809,80 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "Neutral notice."
     end
 
+    test "warning callout with title can hold a resume link" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.callout
+          type="warning"
+          icon="hero-exclamation-triangle"
+          id="pending-email-notice"
+        >
+          <:title>Email verification pending</:title>
+          <p>
+            You have a pending email change to <strong>new@example.com</strong>.
+          </p>
+          <a href="/users/settings/email-verification">Resume verification</a>
+        </.callout>
+        """)
+
+      assert html =~ ~s(id="pending-email-notice")
+      assert html =~ "hero-exclamation-triangle"
+      assert html =~ "border-amber-200"
+      assert html =~ "bg-amber-50"
+      assert html =~ "Email verification pending"
+      assert html =~ "new@example.com"
+      assert html =~ "Resume verification"
+    end
+
+    test "compact error callout tightens padding" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.callout
+          id="modification-preview-error"
+          type="error"
+          role="alert"
+          size="compact"
+        >
+          Total room capacity is 4.
+        </.callout>
+        """)
+
+      assert html =~ ~s(id="modification-preview-error")
+      assert html =~ ~s(role="alert")
+      assert html =~ "p-3"
+      assert html =~ "text-xs"
+      assert html =~ "border-red-200"
+      assert html =~ "bg-red-50"
+      assert html =~ "Total room capacity is 4."
+    end
+
+    test "success callout with icon and title" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.callout
+          id="modification-payment-success"
+          type="success"
+          icon="hero-check-circle"
+        >
+          <:title>Payment successful</:title>
+          We're saving your booking changes.
+        </.callout>
+        """)
+
+      assert html =~ ~s(id="modification-payment-success")
+      assert html =~ "hero-check-circle"
+      assert html =~ "border-green-200"
+      assert html =~ "bg-green-50"
+      assert html =~ "Payment successful"
+      assert html =~ "We're saving your booking changes."
+    end
+
     test "error callout with title can hold a problem list" do
       assigns = %{problems: ["Name can't be blank", "Add at least one item"]}
 

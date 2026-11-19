@@ -776,6 +776,16 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       html = render(view)
       assert html =~ ~r/name="user\[newsletter_notifications\]"[^>]*checked/s
+
+      assert has_element?(view, "#sms-consent-notice", "SMS Consent")
+      assert has_element?(view, "#sms-consent-notice.bg-blue-50")
+      assert has_element?(view, "#sms-consent-notice.border-blue-200")
+
+      assert has_element?(
+               view,
+               "#sms-consent-notice a[href='/privacy-policy']",
+               "Privacy Policy"
+             )
     end
 
     test "update_notifications is ignored while notification preferences are loading",
@@ -3284,6 +3294,41 @@ defmodule YscWeb.UserSettingsLiveTest do
       })
 
       assert render(view) =~ "Invalid verification code"
+    end
+
+    test "closing email verification shows pending-email callout on settings",
+         %{
+           conn: conn
+         } do
+      new_email =
+        "pendingnotice#{System.unique_integer([:positive])}@example.com"
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      render_submit(view, "request_email_change", %{
+        "user" => %{"email" => new_email}
+      })
+
+      submit_reauth_password(view, valid_user_password())
+      render_click(view, "cancel_email_verification_confirmed")
+      assert_patched(view, ~p"/users/settings")
+
+      assert has_element?(
+               view,
+               "#pending-email-notice",
+               "Email verification pending"
+             )
+
+      assert has_element?(view, "#pending-email-notice.bg-amber-50")
+      assert has_element?(view, "#pending-email-notice.border-amber-200")
+      assert has_element?(view, "#pending-email-notice", new_email)
+
+      assert has_element?(
+               view,
+               "#pending-email-notice a",
+               "Resume verification"
+             )
     end
 
     test "validate_email_code is a no-op when there is no pending email change",

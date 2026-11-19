@@ -462,6 +462,14 @@ defmodule YscWeb.BookingChangeLiveTest do
       })
       |> render_change()
 
+    assert has_element?(
+             view,
+             "#modification-preview-error",
+             "Total room capacity is 4"
+           )
+
+    assert has_element?(view, "#modification-preview-error.bg-red-50")
+    assert has_element?(view, "#modification-preview-error.border-red-200")
     assert html =~ "modification-preview-error"
     assert html =~ "Total room capacity is 4"
   end

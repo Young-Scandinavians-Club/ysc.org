@@ -724,38 +724,31 @@ defmodule YscWeb.UserSettingsLive do
               </.simple_form>
             </.settings_section>
             <.settings_section title="Email">
-              <%= if @pending_email do %>
-                <div class="p-4 bg-amber-50 border border-amber-200 rounded-md">
-                  <div class="flex items-start">
-                    <.icon
-                      name="hero-exclamation-triangle"
-                      class="w-5 h-5 text-amber-600 mt-0.5 me-2"
-                    />
-                    <div class="flex-1">
-                      <p class="text-sm text-amber-800 font-semibold">
-                        Email verification pending
-                      </p>
-                      <p class="text-sm text-amber-700 mt-1">
-                        You have a pending email change to <strong><%= @pending_email %></strong>.
-                        Please verify your new email address to complete the change.
-                      </p>
-                      <.link
-                        patch={
-                          if @pending_email_token do
-                            ~p"/users/settings/email-verification" <>
-                              "?etok=#{@pending_email_token}"
-                          else
-                            ~p"/users/settings/email-verification"
-                          end
-                        }
-                        class="inline-block mt-2 text-sm font-medium text-amber-800 hover:text-amber-900 underline"
-                      >
-                        Resume verification
-                      </.link>
-                    </div>
-                  </div>
-                </div>
-              <% end %>
+              <.callout
+                :if={@pending_email}
+                type="warning"
+                icon="hero-exclamation-triangle"
+                id="pending-email-notice"
+              >
+                <:title>Email verification pending</:title>
+                <p>
+                  You have a pending email change to <strong>{@pending_email}</strong>.
+                  Please verify your new email address to complete the change.
+                </p>
+                <.link
+                  patch={
+                    if @pending_email_token do
+                      ~p"/users/settings/email-verification" <>
+                        "?etok=#{@pending_email_token}"
+                    else
+                      ~p"/users/settings/email-verification"
+                    end
+                  }
+                  class="inline-block mt-2 text-sm font-medium text-amber-800 hover:text-amber-900 underline"
+                >
+                  Resume verification
+                </.link>
+              </.callout>
 
               <.simple_form
                 for={@email_form}
@@ -1630,8 +1623,8 @@ defmodule YscWeb.UserSettingsLive do
               <p class="text-sm text-zinc-600">
                 Manage how you receive notifications from the YSC. You can control which types of notifications you receive by email or text message.
               </p>
-              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p class="text-sm text-blue-900">
+              <.callout type="info" id="sms-consent-notice">
+                <p>
                   <strong>SMS Consent:</strong>
                   By voluntarily providing your phone number and explicitly opting in to text messaging, you consent to receive text messages from Young Scandinavians Club (YSC). Message and data rates may apply. You can opt out at any time by unchecking the Text options below or sending a STOP message to the number you receive messages from. See our
                   <.link
@@ -1642,7 +1635,7 @@ defmodule YscWeb.UserSettingsLive do
                   </.link>
                   for more information about how we use your phone number.
                 </p>
-              </div>
+              </.callout>
 
               <div
                 :if={@loading_notification_preferences}

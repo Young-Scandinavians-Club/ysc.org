@@ -191,6 +191,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
                YscWeb.BookingUserMessages.checkout_payment_setup_failed()
              )
 
+      assert has_element?(view, "#checkout-payment-error.bg-red-50")
+      assert has_element?(view, "#checkout-payment-error.border-red-200")
       refute has_element?(view, "#stripe-payment-container")
       Mox.verify!(StripeMock)
     end
@@ -890,6 +892,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
                YscWeb.BookingUserMessages.checkout_payment_setup_failed()
              )
 
+      assert has_element?(view, "#checkout-payment-error.bg-red-50")
+      assert has_element?(view, "#checkout-payment-error.border-red-200")
       Mox.verify!(StripeMock)
     end
 
