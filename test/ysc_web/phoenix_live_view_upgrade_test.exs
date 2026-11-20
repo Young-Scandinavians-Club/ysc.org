@@ -1,20 +1,25 @@
 defmodule YscWeb.PhoenixLiveViewUpgradeTest do
   @moduledoc """
-  Guards the phoenix_live_view 1.2.12 → 1.2.13 upgrade.
+  Guards the phoenix_live_view 1.2.13 → 1.2.14 upgrade.
 
-  1.2.13 is a patch (2026-10-20). Upload FileReader errors and chunk
-  timeouts fail the entry; auto_upload waits for every ancestor lock
-  (changelog says "looks"); live-link clicks on nested children honor
-  target/download; form recovery calls the mount callback once every
-  form finishes; reload-status cookies are dropped on the next
-  navigation; JS.focus retries only if focus did not move. Socket
-  options such as `:max_channels_per_transport` now forward through
-  `use Phoenix.LiveView.Socket`. No Elixir API breaks.
+  1.2.14 patches EEF-CVE-2026-126334 (MEDIUM / GHSA-v4p7-3pm2-wq6c):
+  a router-mounted LiveView joined without `"url"` or `"redirect"`
+  used to skip its `live_session` `on_mount` hooks. Auth, onboarding,
+  and admin checks live in those hooks (`YscWeb.UserAuth`), so a
+  crafted `phx_join` could mount the LiveView after the HTTP render
+  had already passed. Nested LiveViews still join without a URL.
+  Do not add this CVE to `ignore_advisories`.
 
-  We auto_upload receipts, avatars, and media, nest children inside
-  `<.link navigate>`, and pass `disconnectedTimeout: 1000`. We do not
-  set `formtarget`, ColocatedCSS, `onDocumentPatch`, or
-  `:max_channels_per_transport`. `phoenix_template` stays 1.0.4.
+  1.2.13 still applies: upload FileReader errors and chunk timeouts
+  fail the entry; auto_upload waits for every ancestor lock; live-link
+  clicks on nested children honor target/download; form recovery
+  completion order; reload-status cookies; JS.focus retry. Socket
+  options such as `:max_channels_per_transport` forward through
+  `use Phoenix.LiveView.Socket`. We auto_upload receipts, avatars,
+  and media, nest children inside `<.link navigate>`, and pass
+  `disconnectedTimeout: 1000`. We do not set `formtarget`,
+  ColocatedCSS, `onDocumentPatch`, or `:max_channels_per_transport`.
+  `phoenix_template` stays 1.0.4.
   """
   use ExUnit.Case, async: true
 
@@ -53,6 +58,19 @@ defmodule YscWeb.PhoenixLiveViewUpgradeTest do
                __DIR__
              )
   @changelog Path.expand("../../deps/phoenix_live_view/CHANGELOG.md", __DIR__)
+  @channel_ex Path.expand(
+                "../../deps/phoenix_live_view/lib/phoenix_live_view/channel.ex",
+                __DIR__
+              )
+  @session_ex Path.expand(
+                "../../deps/phoenix_live_view/lib/phoenix_live_view/session.ex",
+                __DIR__
+              )
+  @static_ex Path.expand(
+               "../../deps/phoenix_live_view/lib/phoenix_live_view/static.ex",
+               __DIR__
+             )
+  @router_ex Path.expand("../../lib/ysc_web/router.ex", __DIR__)
   @async_ex Path.expand(
               "../../deps/phoenix_live_view/lib/phoenix_live_view/async.ex",
               __DIR__
@@ -89,13 +107,32 @@ defmodule YscWeb.PhoenixLiveViewUpgradeTest do
     "lib/ysc_web/live/user_settings_live.ex"
   ]
 
-  describe "1.2.13 Hex lock and public APIs" do
-    test "locks the Hex package to 1.2.13" do
-      assert to_string(Application.spec(:phoenix_live_view, :vsn)) == "1.2.13"
-      assert File.read!(@mix_exs) =~ ~s({:phoenix_live_view, "~> 1.2.13"})
+  describe "1.2.14 Hex lock and public APIs" do
+    test "locks the Hex package to 1.2.14" do
+      assert to_string(Application.spec(:phoenix_live_view, :vsn)) == "1.2.14"
+      assert File.read!(@mix_exs) =~ ~s({:phoenix_live_view, "~> 1.2.14"})
+      refute File.read!(@mix_exs) =~ ~s({:phoenix_live_view, "~> 1.2.13"})
 
-      assert File.read!(@mix_lock) =~
+      lock = File.read!(@mix_lock)
+
+      assert lock =~
+               ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.14"|
+
+      refute lock =~
                ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.13"|
+    end
+
+    test "does not ignore the patched advisory" do
+      mix_exs = File.read!(@mix_exs)
+
+      ignore =
+        mix_exs
+        |> String.split("ignore_advisories: [", parts: 2)
+        |> Enum.at(1)
+        |> String.split("]", parts: 2)
+        |> hd()
+
+      refute ignore =~ "EEF-CVE-2026-126334"
     end
 
     test "companion phoenix_template lock stays 1.0.4" do
@@ -105,7 +142,15 @@ defmodule YscWeb.PhoenixLiveViewUpgradeTest do
       refute lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
     end
 
-    test "changelog records the 1.2.13 patch heading" do
+    test "changelog records the 1.2.14 security heading" do
+      changelog = File.read!(@changelog)
+      assert changelog =~ "## v1.2.14 (2026-11-20)"
+      assert changelog =~ "CVE-2026-126334"
+      assert changelog =~ "live_session"
+      assert changelog =~ "on_mount"
+    end
+
+    test "changelog still records the 1.2.13 patch heading" do
       changelog = File.read!(@changelog)
       assert changelog =~ "## v1.2.13 (2026-10-20)"
       assert changelog =~ "Handle file reader upload error"
@@ -128,6 +173,51 @@ defmodule YscWeb.PhoenixLiveViewUpgradeTest do
       assert function_exported?(JS, :push, 1)
       assert function_exported?(JS, :push, 2)
       assert function_exported?(JS, :push, 3)
+    end
+  end
+
+  describe "EEF-CVE-2026-126334 live_session on_mount skip" do
+    test "router-mounted joins without url or redirect are unauthorized" do
+      source = File.read!(@channel_ex)
+
+      assert source =~
+               "defp authorize_session(%Session{route_required?: true}, _endpoint, %{}) do"
+
+      assert source =~
+               "Router-mounted LiveViews need a route to load the live_session hooks"
+
+      assert source =~ "{:error, :unauthorized}"
+    end
+
+    test "nested LiveViews can still join without a URL" do
+      source = File.read!(@channel_ex)
+
+      assert source =~
+               "defp authorize_session(%Session{} = session, _endpoint, %{}) do"
+
+      assert source =~ "{:ok, session, _route = nil, _url = nil}"
+    end
+
+    test "root session tokens mark route_required; nested tokens do not" do
+      static = File.read!(@static_ex)
+      session = File.read!(@session_ex)
+
+      assert static =~ "route_required?: not is_nil(router),"
+      assert static =~ "route_required?: false,"
+      assert session =~ "route_required?: route_required?(session),"
+
+      assert session =~
+               "defp route_required?(%{route_required?: required?}), do: required?"
+    end
+
+    test "auth live_sessions still declare UserAuth on_mount in the router" do
+      source = File.read!(@router_ex)
+
+      assert source =~ "live_session :require_authenticated_user,"
+      assert source =~ "{YscWeb.UserAuth, :ensure_authenticated}"
+      assert source =~ "{YscWeb.UserAuth, :ensure_onboarding_complete}"
+      assert source =~ "live_session :require_admin,"
+      assert source =~ "{YscWeb.UserAuth, :ensure_admin}"
     end
   end
 
