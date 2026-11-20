@@ -45,6 +45,16 @@ defmodule YscWeb.AdminUserSearch do
   @default_selected :selected_user
   @default_min_chars 2
   @default_limit 10
+  # Autocomplete only renders name/email. Merch order prefill also needs
+  # phone. Omits hashed_password, bios, Stripe ids, and the current_avatar
+  # preload default `search_users/2` uses for pickers that render photos.
+  @autocomplete_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :phone_number
+  ]
 
   @doc """
   Clears the picker: no selected user, empty query, empty results.
@@ -77,6 +87,10 @@ defmodule YscWeb.AdminUserSearch do
   @doc """
   Runs `Accounts.search_users/2` when the query is at least `min_chars`
   (default 2) and assigns the query plus results.
+
+  Passes `:select` so typeahead keystrokes do not SELECT `hashed_password` /
+  bios or preload avatars. App members JSON and event-host pickers still use
+  the default (full row + avatar).
   """
   def search(socket, query, opts \\ []) when is_binary(query) do
     keys = keys(opts)
@@ -85,7 +99,10 @@ defmodule YscWeb.AdminUserSearch do
 
     results =
       if String.length(query) >= min_chars do
-        Accounts.search_users(query, limit: limit)
+        Accounts.search_users(query,
+          limit: limit,
+          select: @autocomplete_user_fields
+        )
       else
         []
       end
@@ -96,11 +113,29 @@ defmodule YscWeb.AdminUserSearch do
   end
 
   @doc """
-  Loads the user with `Accounts.get_user!/1` and selects them.
+  Selects the user from the current search results.
+
+  Search already loaded name/email/phone. A second `Accounts.get_user!/1`
+  would SELECT `hashed_password` / bios. Crafted `phx-value` ids still go
+  through `get_user!/1`.
   """
   def select(socket, id, opts \\ []) do
-    assign_selected(socket, Accounts.get_user!(id), opts)
+    keys = keys(opts)
+    results = Map.get(socket.assigns, keys.results, [])
+
+    assign_selected(socket, resolve_selected_user(results, id), opts)
   end
+
+  defp resolve_selected_user(results, id) when is_list(results) do
+    match_id = to_string(id)
+
+    case Enum.find(results, fn user -> to_string(user.id) == match_id end) do
+      %Accounts.User{} = user -> user
+      nil -> Accounts.get_user!(id)
+    end
+  end
+
+  defp resolve_selected_user(_results, id), do: Accounts.get_user!(id)
 
   defp keys(opts) do
     %{

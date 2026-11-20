@@ -105,15 +105,83 @@ defmodule YscWeb.AdminUserSearchTest do
                &(&1.id == member.id)
              )
     end
+
+    test "omits hashed_password and skips the avatar preload" do
+      unique = System.unique_integer([:positive])
+
+      member =
+        user_fixture(%{
+          first_name: "AdminPicker#{unique}",
+          last_name: "Member",
+          board_bio: "bio the admin typeahead must not load"
+        })
+
+      {updated, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> AdminUserSearch.search(socket(), "AdminPicker#{unique}") end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      found =
+        Enum.find(
+          updated.assigns.user_search_results,
+          &(&1.id == member.id)
+        )
+
+      assert found
+      assert found.first_name == member.first_name
+      assert found.email == member.email
+      assert found.phone_number == member.phone_number
+      assert is_nil(found.hashed_password)
+      assert is_nil(found.board_bio)
+      assert password_cols == 0
+
+      {_updated, avatar_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> AdminUserSearch.search(socket(), "AdminPicker#{unique}") end,
+          pattern: ~r/FROM "avatars"/i,
+          caller_pids: [self()]
+        )
+
+      assert avatar_cols == 0
+    end
   end
 
   describe "select/3" do
-    test "loads the user and selects them" do
+    test "reuses the search-result user without re-fetching" do
+      unique = System.unique_integer([:positive])
+
+      member =
+        user_fixture(%{
+          first_name: "AdminSelect#{unique}",
+          last_name: "Member"
+        })
+
+      searched = AdminUserSearch.search(socket(), "AdminSelect#{unique}")
+
+      {updated, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> AdminUserSearch.select(searched, member.id) end,
+          pattern: ~r/hashed_password/i,
+          caller_pids: [self()]
+        )
+
+      assert updated.assigns.selected_user.id == member.id
+      assert updated.assigns.selected_user.first_name == member.first_name
+      assert updated.assigns.selected_user.email == member.email
+      assert is_nil(updated.assigns.selected_user.hashed_password)
+      assert updated.assigns.user_search == ""
+      assert updated.assigns.user_search_results == []
+      assert password_cols == 0
+    end
+
+    test "loads the user when they are not in the current results" do
       member = user_fixture()
 
       updated =
         AdminUserSearch.select(
-          socket(%{user_search: "Jo", user_search_results: [member]}),
+          socket(%{user_search: "Jo", user_search_results: []}),
           member.id
         )
 
