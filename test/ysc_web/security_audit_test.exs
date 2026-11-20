@@ -95,6 +95,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 98 (MEDIUM)   Volunteer dashboard magic search (`Ysc.Search.global_search/2`) had no role filter, so typing on `/admin` returned cabin bookings (member name, property, stay dates, reference) and user emails. Users and Bookings are full-admin-only (`ensure_full_admin`); clicking through was blocked, but the dropdown already disclosed the data. Same class as Finding 76.
   Finding 99 (MEDIUM)   Volunteer door-sale `POST /api/v1/app/events/:id/tickets/payment_intent` accepted unbounded `tiers` quantities while `bypass_guards: true` skipped capacity. Pending tickets count as sold, so one JSON body could insert unbounded ticket rows and lock the event until the 5-minute timeout (repeatable).
   Finding 100 (MEDIUM)  Event photo direct-to-S3 presign used LiveView's 20 GB video cap for every file (including photos) and public-read ACL. A ticket holder could POST a multi-GB `.jpg` before `Limits.validate_upload/2` ran; cancel/abandon never deleted the object, so untrusted bytes stayed on the club CDN. S3 policy is now per-type, unsupported names are not presigned, cancel deletes the object, and the worker HEADs Content-Length before downloading.
+  Finding 101 (MEDIUM)  Add-to-calendar passed volunteer-controlled event `title` / `location_name` into the web component unchanged. The vendor iCal escape does not strip CR/LF, so a title containing a newline could inject extra ICS properties into the `.ics` attendees download from the public event page.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -7254,5 +7255,24 @@ defmodule YscWeb.SecurityAuditTest do
       }
     }
     |> Map.merge(overrides)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 101 (MEDIUM): ICS CR/LF injection via calendar button text
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 101: add-to-calendar strips CR/LF from title and location" do
+    test "AddToCalendar.text/1 removes newlines and control characters" do
+      assert Ysc.Events.AddToCalendar.text(
+               "Party\nDESCRIPTION:http://evil.example\nSUMMARY:Fake"
+             ) == "Party DESCRIPTION:http://evil.example SUMMARY:Fake"
+
+      assert Ysc.Events.AddToCalendar.text("Hall\r\nURL:https://phish.test") ==
+               "Hall URL:https://phish.test"
+
+      assert Ysc.Events.AddToCalendar.text("  Midsummer  ") == "Midsummer"
+      assert Ysc.Events.AddToCalendar.text("\n\t") == nil
+      assert Ysc.Events.AddToCalendar.text(nil) == nil
+    end
   end
 end

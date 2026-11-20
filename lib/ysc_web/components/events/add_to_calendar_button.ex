@@ -34,19 +34,23 @@ defmodule YscWeb.Components.Events.AddToCalendarButton do
       |> assign(:end_time, AddToCalendar.end_time(event))
       |> assign(:time_zone, AddToCalendar.timezone())
       |> assign(:options, @calendar_options)
+      # Strip CR/LF before the web component embeds these in ICS. The vendor
+      # iCal escape does not treat raw newlines as `\n`.
+      |> assign(:name, AddToCalendar.text(Map.get(event, :title)))
+      |> assign(:location, AddToCalendar.text(Map.get(event, :location_name)))
 
     ~H"""
     <add-to-calendar-button
       id={@id}
       class={@class}
-      name={@event.title}
+      name={@name}
       start-date={@start_date}
       end-date={@end_date}
       options={@options}
       start-time={@event.start_time}
       end-time={@end_time}
       time-zone={@time_zone}
-      location={@event.location_name}
+      location={@location}
       size="4"
       light-mode={@light_mode}
     ></add-to-calendar-button>
