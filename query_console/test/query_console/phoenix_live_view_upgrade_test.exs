@@ -1,20 +1,20 @@
 defmodule QueryConsole.PhoenixLiveViewUpgradeTest do
   @moduledoc """
-  Guards the phoenix_live_view 1.1.33 → 1.2.13 upgrade.
+  Guards the phoenix_live_view 1.2.13 → 1.2.14 upgrade.
 
-  lotus_web 1.4 allows LiveView `>= 1.1.0 and < 1.3.0`, so Query Console
-  moves to 1.2.x. The floor keeps the fix for EEF-CVE-2026-64941 (LOW /
-  GHSA-36m4-rm57-3prf, 1.1.33 / 1.2.9): `validate_local_url!/2` rejects
-  ASCII tab, LF, CR, and encoded tab (`/%09`) in `redirect/2`,
-  `push_navigate/2`, and `push_patch/2` `:to` paths. Browsers strip those
-  characters before URL parsing, so `/\\t/evil.com` used to pass as a local
-  path and then resolve as a scheme-relative open redirect. Only
-  `redirect/2` is the sink; live navigation expands against the current
-  origin.
+  1.2.14 patches EEF-CVE-2026-126334 (MEDIUM / GHSA-v4p7-3pm2-wq6c):
+  a router-mounted LiveView joined without `"url"` or `"redirect"`
+  used to skip its `live_session` `on_mount` hooks. Lotus dashboard
+  mounts through `live_session` in `QueryConsoleWeb.LotusMount`.
+  Nested LiveViews still join without a URL.
 
-  We only pass compile-time `~p` paths (`/auth/ysc`, `/`, `/workbooks/:id`)
-  and do not forward user input to `Phoenix.LiveView.redirect/2`.
-  `phoenix_template` moves to 1.1.0 with it.
+  lotus_web 1.4 allows LiveView `>= 1.1.0 and < 1.3.0`. The floor
+  keeps the fix for EEF-CVE-2026-64941 (LOW / GHSA-36m4-rm57-3prf,
+  1.1.33 / 1.2.9): `validate_local_url!/2` rejects ASCII tab, LF, CR,
+  and encoded tab (`/%09`) in `redirect/2`, `push_navigate/2`, and
+  `push_patch/2` `:to` paths. We only pass compile-time `~p` paths
+  (`/auth/ysc`, `/`, `/workbooks/:id`) and do not forward user input
+  to `Phoenix.LiveView.redirect/2`. `phoenix_template` stays 1.1.0.
   """
   use ExUnit.Case, async: true
 
@@ -25,7 +25,19 @@ defmodule QueryConsole.PhoenixLiveViewUpgradeTest do
                   "../../deps/phoenix_live_view/lib/phoenix_live_view.ex",
                   __DIR__
                 )
+  @channel_ex Path.expand(
+                "../../deps/phoenix_live_view/lib/phoenix_live_view/channel.ex",
+                __DIR__
+              )
+  @static_ex Path.expand(
+               "../../deps/phoenix_live_view/lib/phoenix_live_view/static.ex",
+               __DIR__
+             )
   @lotus_web_mix Path.expand("../../deps/lotus_web/mix.exs", __DIR__)
+  @lotus_mount_ex Path.expand(
+                    "../../lib/query_console_web/lotus_mount.ex",
+                    __DIR__
+                  )
   @user_auth_ex Path.expand("../../lib/query_console_web/user_auth.ex", __DIR__)
   @console_live_ex Path.expand(
                      "../../lib/query_console_web/live/console_live.ex",
@@ -47,20 +59,22 @@ defmodule QueryConsole.PhoenixLiveViewUpgradeTest do
     :ok
   end
 
-  describe "1.2.13 Hex lock and public APIs" do
-    test "locks the Hex package to 1.2.13" do
-      assert to_string(Application.spec(:phoenix_live_view, :vsn)) == "1.2.13"
+  describe "1.2.14 Hex lock and public APIs" do
+    test "locks the Hex package to 1.2.14" do
+      assert to_string(Application.spec(:phoenix_live_view, :vsn)) == "1.2.14"
     end
 
     test "mix.exs pins the patched 1.2.x floor" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s({:phoenix_live_view, "~> 1.2.13"})
+      assert mix_exs =~ ~s({:phoenix_live_view, "~> 1.2.14"})
+      refute mix_exs =~ ~s({:phoenix_live_view, "~> 1.2.13"})
       refute mix_exs =~ ~s({:phoenix_live_view, "~> 1.1.33"})
     end
 
-    test "companion lock is 1.2.13 with phoenix_template 1.1.0" do
+    test "companion lock is 1.2.14 with phoenix_template 1.1.0" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.13"|
+      assert lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.14"|
+      refute lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.13"|
       refute lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.1.33"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
 
@@ -82,6 +96,17 @@ defmodule QueryConsole.PhoenixLiveViewUpgradeTest do
   end
 
   describe "1.2.x changelog" do
+    test "documents CVE-2026-126334 under the v1.2.14 heading" do
+      changelog = File.read!(@changelog)
+      heading = changelog_section(changelog, "v1.2.14")
+
+      assert heading
+      assert heading =~ "CVE-2026-126334"
+      assert heading =~ "live_session"
+      assert heading =~ "on_mount"
+      refute heading =~ "v1.2.13"
+    end
+
     test "documents CVE-2026-64941 under the v1.2.9 heading" do
       changelog = File.read!(@changelog)
       heading = changelog_section(changelog, "v1.2.9")
@@ -91,6 +116,32 @@ defmodule QueryConsole.PhoenixLiveViewUpgradeTest do
       assert heading =~ "open redirect"
       assert heading =~ "ASCII tab, LF and CR"
       refute heading =~ "v1.2.8"
+    end
+  end
+
+  describe "EEF-CVE-2026-126334 live_session on_mount skip" do
+    test "router-mounted joins without url or redirect are unauthorized" do
+      source = File.read!(@channel_ex)
+
+      assert source =~
+               "defp authorize_session(%Session{route_required?: true}, _endpoint, %{}) do"
+
+      assert source =~
+               "Router-mounted LiveViews need a route to load the live_session hooks"
+
+      assert source =~ "{:error, :unauthorized}"
+    end
+
+    test "root session tokens mark route_required; nested tokens do not" do
+      static = File.read!(@static_ex)
+      assert static =~ "route_required?: not is_nil(router),"
+      assert static =~ "route_required?: false,"
+    end
+
+    test "Lotus dashboard still mounts through live_session" do
+      source = File.read!(@lotus_mount_ex)
+      assert source =~ ~S|live_session :"#{session_name}_public", public_session_opts do|
+      assert source =~ "live_session session_name, session_opts do"
     end
   end
 
