@@ -468,17 +468,24 @@ defmodule Ysc.MixProject do
       # have named Ysc.Repo + ecto_psql_extras; pin the patched floor.
       {:phoenix_live_dashboard, "~> 0.9.1"},
       {:phoenix_live_reload, "~> 1.7", only: :dev},
-      # 1.2.13: upload file-reader/chunk-timeout/errored-entry handling;
-      # wait for ancestor locks before auto_upload; hooked <svg> inner
-      # updates; live-link target/download on child clicks; form recovery
-      # completion order; reload-cookie clear; focus retry only if focus
-      # did not move. Socket opts (e.g. max_channels_per_transport) now
-      # forward to Phoenix.Socket. We auto_upload receipts/avatars/media
-      # and nest children in <.link>; we do not set formtarget,
-      # ColocatedCSS, onDocumentPatch, or max_channels_per_transport.
-      # 1.2.12: hook disconnected() runs once; JS.push no longer mutates
-      # opts; assign_async falsy keys; caret restore for search/url/tel.
-      {:phoenix_live_view, "~> 1.2.13"},
+      # 1.2.14: EEF-CVE-2026-126334 (MEDIUM / GHSA-v4p7-3pm2-wq6c). A
+      # router-mounted LiveView joined without `"url"`/`"redirect"` used
+      # to skip its live_session on_mount hooks. Auth/onboarding/admin
+      # checks live in live_session hooks, so pin the patched floor.
+      # Also: refuse joins whose url has no host; only call
+      # handle_params/3 on patch when defined. 1.2.13: upload
+      # file-reader/chunk-timeout/errored-entry handling; wait for
+      # ancestor locks before auto_upload; hooked <svg> inner updates;
+      # live-link target/download on child clicks; form recovery
+      # completion order; reload-cookie clear; focus retry only if
+      # focus did not move. Socket opts (e.g.
+      # max_channels_per_transport) now forward to Phoenix.Socket. We
+      # auto_upload receipts/avatars/media and nest children in <.link>;
+      # we do not set formtarget, ColocatedCSS, onDocumentPatch, or
+      # max_channels_per_transport. 1.2.12: hook disconnected() runs
+      # once; JS.push no longer mutates opts; assign_async falsy keys;
+      # caret restore for search/url/tel.
+      {:phoenix_live_view, "~> 1.2.14"},
       # 0.13.0: regex assert_path/refute_path; LiveView phx-change sends
       # `_unused_*` for untouched fields; only the activated submitter's
       # data is sent (implicit submit uses the first). 0.13.1: Elixir 1.18
