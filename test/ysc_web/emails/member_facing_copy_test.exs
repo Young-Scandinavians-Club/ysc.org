@@ -503,6 +503,17 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       assert amount.headline == "A $50.00 discount on your next cabin stay"
       assert BookingEntitlementGranted.get_subject(amount) == amount.headline
     end
+
+    test "subject falls back when headline is missing or blank" do
+      assert BookingEntitlementGranted.get_subject(%{}) ==
+               "A discount for your next cabin stay"
+
+      assert BookingEntitlementGranted.get_subject(%{headline: ""}) ==
+               "A discount for your next cabin stay"
+
+      assert BookingEntitlementGranted.get_subject(%{headline: nil}) ==
+               "A discount for your next cabin stay"
+    end
   end
 
   describe "booking stay emails" do
