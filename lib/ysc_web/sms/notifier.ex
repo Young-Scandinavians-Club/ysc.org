@@ -357,9 +357,13 @@ defmodule YscWeb.Sms.Notifier do
   defp valid_phone_number?(phone_number) when is_binary(phone_number) do
     # Normalize phone number (remove + prefix if present) and validate
     normalized = normalize_phone_number(phone_number)
-    # Validate 11-digit North American format (e.g., 12065551234)
-    # Also ensure normalized string is not empty
-    is_valid = normalized != "" && Regex.match?(~r/^1\d{10}$/, normalized)
+    # Valid when it's an 11-digit North American number (e.g., 12065551234) or
+    # a valid number in a region served by another provider (e.g., Nordic via
+    # Twilio, 46701234567).
+    is_valid =
+      normalized != "" &&
+        (Regex.match?(~r/^1\d{10}$/, normalized) ||
+           Ysc.Extensions.PhoneNumber.sms_provider(normalized) != nil)
 
     Ysc.Logging.debug("valid_phone_number? check",
       original: phone_number,

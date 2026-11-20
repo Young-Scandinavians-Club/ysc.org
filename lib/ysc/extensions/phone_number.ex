@@ -75,26 +75,63 @@ defmodule Ysc.Extensions.PhoneNumber do
     end
   end
 
-  @sms_supported_regions ~w(US CA)
+  @flowroute_regions ~w(US CA)
+  @twilio_regions ~w(SE NO DK FI IS)
 
   @doc """
   Returns whether SMS delivery is supported for a given phone number.
 
-  FlowRoute (our SMS provider) can only reliably deliver to US and Canadian
-  numbers, so anything outside those regions should skip SMS verification
-  and notifications rather than attempt (and silently fail) delivery.
+  See `sms_provider/1`. Numbers outside the supported regions skip SMS
+  verification and notifications rather than attempt (and silently fail)
+  delivery.
   """
   @spec sms_supported?(String.t() | nil) :: boolean()
-  def sms_supported?(nil), do: false
-  def sms_supported?(""), do: false
+  def sms_supported?(phone_number), do: sms_provider(phone_number) != nil
 
-  def sms_supported?(phone_number) when is_binary(phone_number) do
-    case ExPhoneNumber.parse(phone_number, "") do
+  @doc """
+  Returns which provider should deliver SMS to a phone number.
+
+  - `:flowroute` - US and Canada (cheaper, but cannot reach international numbers)
+  - `:twilio` - Sweden, Norway, Denmark, Finland and Iceland. These must also be
+    valid numbers (not just plausible), since each send is billed.
+  - `nil` - unsupported or unparseable
+
+  Accepts E.164 (`+46701234567`) or the digits-only form the SMS notifier
+  normalizes to (`46701234567`).
+  """
+  @spec sms_provider(String.t() | nil) :: :flowroute | :twilio | nil
+  def sms_provider(nil), do: nil
+  def sms_provider(""), do: nil
+
+  def sms_provider(phone_number) when is_binary(phone_number) do
+    case ExPhoneNumber.parse(with_plus(phone_number), "") do
       {:ok, parsed} ->
-        ExPhoneNumber.Metadata.get_region_code_for_number(parsed) in @sms_supported_regions
+        provider_for_region(
+          ExPhoneNumber.Metadata.get_region_code_for_number(parsed),
+          parsed
+        )
 
       {:error, _} ->
-        false
+        nil
     end
+  end
+
+  defp provider_for_region(region, _parsed) when region in @flowroute_regions,
+    do: :flowroute
+
+  defp provider_for_region(region, parsed) when region in @twilio_regions do
+    if ExPhoneNumber.is_valid_number?(parsed), do: :twilio
+  end
+
+  defp provider_for_region(_region, _parsed), do: nil
+
+  defp with_plus("+" <> _ = phone_number), do: phone_number
+
+  defp with_plus(phone_number) do
+    # Only a bare run of digits is the notifier's digits-only form; leave
+    # anything else alone so garbage input still fails to parse.
+    if Regex.match?(~r/^\d+$/, phone_number),
+      do: "+" <> phone_number,
+      else: phone_number
   end
 end

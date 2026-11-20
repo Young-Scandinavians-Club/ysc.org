@@ -1,6 +1,6 @@
 import EctoEnum
 
-defenum(SmsProvider, ["flowroute"])
+defenum(SmsProvider, ["flowroute", "twilio"])
 
 # Status for outbound SMS messages
 defenum(SmsMessageStatus, ["sent", "buffered", "delivered", "failed"])
