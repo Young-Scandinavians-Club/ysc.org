@@ -61,7 +61,9 @@ defmodule QueryConsole.LazyHtmlUpgradeTest do
       refute lock =~ ~s|"fine": {:hex, :fine, "0.1.6"|
       assert lock =~ ~s|"elixir_make": {:hex, :elixir_make, "0.10.1"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
-      assert lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.13"|
+
+      assert lock =~
+               ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.14"|
     end
 
     test "LiveViewTest APIs still exist" do
