@@ -92,14 +92,19 @@ defmodule QueryConsole.MixProject do
       # attribute names to attributes_escape/1. Pin the patched floor.
       {:phoenix_html, "~> 4.4.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      # 1.2.13: lotus_web 1.4 allows LiveView >= 1.1 and < 1.3. Includes the
-      # 1.1.33 fix for EEF-CVE-2026-64941 (LOW / GHSA-36m4-rm57-3prf), which
-      # rejects ASCII tab, LF, CR, and encoded tab (`/%09`) in LiveView redirect /
-      # push_navigate / push_patch `:to` paths so `/\t/evil.com` cannot become a
-      # scheme-relative open redirect. We only pass compile-time `~p` paths
-      # (`/auth/ysc`, `/workbooks/:id`); we do not forward user input to
-      # `redirect/2`.
-      {:phoenix_live_view, "~> 1.2.13"},
+      # 1.2.14: EEF-CVE-2026-126334 (MEDIUM / GHSA-v4p7-3pm2-wq6c). A
+      # router-mounted LiveView joined without `"url"`/`"redirect"` used
+      # to skip its live_session on_mount hooks. Lotus dashboard mounts
+      # via live_session (QueryConsoleWeb.LotusMount). Includes the
+      # 1.2.9 / 1.1.33 fix for EEF-CVE-2026-64941 (LOW /
+      # GHSA-36m4-rm57-3prf), which rejects ASCII tab, LF, CR, and
+      # encoded tab (`/%09`) in LiveView redirect / push_navigate /
+      # push_patch `:to` paths so `/\t/evil.com` cannot become a
+      # scheme-relative open redirect. lotus_web 1.4 allows LiveView
+      # >= 1.1 and < 1.3. We only pass compile-time `~p` paths
+      # (`/auth/ysc`, `/workbooks/:id`); we do not forward user input
+      # to `redirect/2`.
+      {:phoenix_live_view, "~> 1.2.14"},
       # 0.1.14: from_document/2 and from_fragment/2 accept optional
       # :max_depth, :max_memory, :max_attributes, :timeout (default
       # unlimited). extras: fine 0.1.6 → 0.2.0 (lazy_html 0.1.14 requires
