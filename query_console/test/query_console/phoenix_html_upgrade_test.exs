@@ -53,7 +53,7 @@ defmodule QueryConsole.PhoenixHtmlUpgradeTest do
       assert lock =~ ~s|"phoenix_html": {:hex, :phoenix_html, "4.4.0"|
       refute lock =~ ~s|"phoenix_html": {:hex, :phoenix_html, "4.3.0"|
       assert lock =~ ~s|"phoenix_template": {:hex, :phoenix_template, "1.1.0"|
-      assert lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.13"|
+      assert lock =~ ~s|"phoenix_live_view": {:hex, :phoenix_live_view, "1.2.14"|
       assert lock =~ ~s|"lotus_web": {:hex, :lotus_web, "1.4.0"|
     end
 
