@@ -577,14 +577,15 @@ defmodule YscWeb.BookingChangeLive do
               </div>
             <% end %>
 
-            <%= if @preview_error do %>
-              <div
-                id="modification-preview-error"
-                class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm"
-              >
-                {@preview_error}
-              </div>
-            <% end %>
+            <.callout
+              :if={@preview_error}
+              id="modification-preview-error"
+              type="error"
+              role="alert"
+              size="compact"
+            >
+              {@preview_error}
+            </.callout>
 
             <%= if @preview do %>
               <.modification_price_preview preview={@preview} />
@@ -1793,30 +1794,28 @@ defmodule YscWeb.BookingChangeLive do
       </div>
 
       <%= if @payment_processing do %>
-        <div
+        <.callout
           id="modification-payment-success"
-          class="p-4 rounded-lg bg-green-50 border border-green-200 text-green-900"
+          type="success"
+          icon="hero-check-circle"
         >
-          <p class="font-semibold flex items-center gap-2">
-            <.icon name="hero-check-circle" class="w-5 h-5" /> Payment successful
-          </p>
-          <p class="text-sm mt-2 text-green-800">
-            We're saving your booking changes. You'll be redirected to your confirmation shortly.
-          </p>
-        </div>
+          <:title>Payment successful</:title>
+          We're saving your booking changes. You'll be redirected to your confirmation shortly.
+        </.callout>
       <% else %>
         <%= if @preview do %>
           <.modification_price_preview preview={@preview} />
         <% end %>
 
-        <%= if @payment_error do %>
-          <div
-            id="modification-payment-error"
-            class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm"
-          >
-            {@payment_error}
-          </div>
-        <% end %>
+        <.callout
+          :if={@payment_error}
+          id="modification-payment-error"
+          type="error"
+          role="alert"
+          size="compact"
+        >
+          {@payment_error}
+        </.callout>
 
         <div
           id="stripe-payment-container"

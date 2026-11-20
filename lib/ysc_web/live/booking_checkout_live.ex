@@ -446,14 +446,15 @@ defmodule YscWeb.BookingCheckoutLive do
                 Secure Payment
               <% end %>
             </h2>
-            <!-- Payment Error -->
-            <div
+            <.callout
               :if={@payment_error}
               id="checkout-payment-error"
-              class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
+              type="error"
+              role="alert"
+              class="mb-6"
             >
-              <p class="text-sm text-red-800">{@payment_error}</p>
-            </div>
+              {@payment_error}
+            </.callout>
             <div
               :if={
                 !@complimentary_checkout && !@payment_intent && !@payment_error &&
