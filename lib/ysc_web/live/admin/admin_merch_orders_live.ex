@@ -256,21 +256,14 @@ defmodule YscWeb.AdminMerchOrdersLive do
         />
 
         <div id="orders-filters" class="flex flex-wrap gap-2 py-6">
-          <.link
+          <.filter_chip
             :for={filter <- AdminOrders.filters()}
             id={"orders-filter-#{filter}"}
+            active={@filter == filter}
             patch={~p"/admin/merch/orders?#{list_params(filter, @search)}"}
-            aria-current={@filter == filter && "true"}
-            class={[
-              "rounded-full px-4 py-2 text-sm font-semibold transition",
-              if(@filter == filter,
-                do: "bg-blue-600 text-white shadow-md",
-                else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-              )
-            ]}
           >
             {filter_label(filter)}
-          </.link>
+          </.filter_chip>
         </div>
 
         <.admin_table_skeleton
