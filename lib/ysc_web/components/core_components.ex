@@ -5737,6 +5737,138 @@ defmodule YscWeb.CoreComponents do
   defp quick_action_card_icon_class(:yellow), do: "text-yellow-600"
   defp quick_action_card_icon_class(:zinc), do: "text-zinc-500"
 
+  @filter_chip_active_classes %{
+    blue: "bg-blue-600 text-white shadow-md",
+    emerald: "bg-emerald-600 text-white shadow-md",
+    purple: "bg-purple-600 text-white shadow-md",
+    yellow: "bg-yellow-600 text-white shadow-md",
+    teal: "bg-teal-600 text-white shadow-md",
+    rose: "bg-rose-600 text-white shadow-md"
+  }
+
+  @filter_chip_icon_idle_classes %{
+    blue: "text-blue-600",
+    emerald: "text-emerald-600",
+    purple: "text-purple-600",
+    yellow: "text-yellow-600",
+    teal: "text-teal-600",
+    rose: "text-rose-600"
+  }
+
+  @doc """
+  Rounded pill for mutually exclusive filters.
+
+  Use this for payment-history chips and admin list filters instead of
+  repeating `rounded-full px-4 py-2 text-sm font-semibold` plus the
+  selected/unselected color pair. The caller still owns the filter event
+  or patch URL.
+
+  `color` is the filled background when the chip is selected (`:blue`
+  by default). Idle chips always use zinc. Pass `patch` or `navigate` to
+  render a `<.link>`; otherwise a `<button type="button">`. Optional `icon`
+  is white when selected and `text-{color}-600` when idle.
+
+  Do not convert shop color filters (`rounded-full px-3 py-1.5 text-base`)
+  or `admin_tab` underline tabs onto this chip.
+
+  ## Examples
+
+      <.filter_chip
+        id="orders-filter-all"
+        active={@filter == :all}
+        patch={~p"/admin/merch/orders"}
+      >
+        All
+      </.filter_chip>
+
+      <.filter_chip
+        id="payment-filter-merch"
+        active={@payment_filter == :merch}
+        color={:rose}
+        icon="hero-shopping-bag"
+        phx-click="filter-payments"
+        phx-value-filter="merch"
+      >
+        Club Gear
+      </.filter_chip>
+  """
+  attr :id, :string, default: nil
+  attr :active, :boolean, default: false
+
+  attr :color, :atom,
+    default: :blue,
+    values: [:blue, :emerald, :purple, :yellow, :teal, :rose]
+
+  attr :icon, :string, default: nil
+  attr :patch, :any, default: nil
+  attr :navigate, :any, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the control"
+
+  attr :rest, :global, include: ~w(phx-click phx-value-filter type)
+
+  slot :inner_block, required: true
+
+  def filter_chip(assigns) do
+    ~H"""
+    <%= if @patch || @navigate do %>
+      <.link
+        id={@id}
+        patch={@patch}
+        navigate={@navigate}
+        aria-current={@active && "true"}
+        class={filter_chip_class(assigns)}
+      >
+        <.filter_chip_body icon={@icon} active={@active} color={@color}>
+          {render_slot(@inner_block)}
+        </.filter_chip_body>
+      </.link>
+    <% else %>
+      <button id={@id} type="button" class={filter_chip_class(assigns)} {@rest}>
+        <.filter_chip_body icon={@icon} active={@active} color={@color}>
+          {render_slot(@inner_block)}
+        </.filter_chip_body>
+      </button>
+    <% end %>
+    """
+  end
+
+  attr :icon, :string, default: nil
+  attr :active, :boolean, required: true
+  attr :color, :atom, required: true
+  slot :inner_block, required: true
+
+  defp filter_chip_body(assigns) do
+    ~H"""
+    <.icon
+      :if={@icon}
+      name={@icon}
+      class={[
+        "w-4 h-4",
+        if(@active, do: "text-white", else: filter_chip_icon_idle_class(@color))
+      ]}
+    />
+    {render_slot(@inner_block)}
+    """
+  end
+
+  defp filter_chip_class(assigns) do
+    [
+      "rounded-full px-4 py-2 text-sm font-semibold transition",
+      assigns.icon && "flex items-center gap-2",
+      if(assigns.active,
+        do: Map.fetch!(@filter_chip_active_classes, assigns.color),
+        else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+      ),
+      assigns.class
+    ]
+  end
+
+  defp filter_chip_icon_idle_class(color),
+    do: Map.fetch!(@filter_chip_icon_idle_classes, color)
+
   @doc """
   Right-aligned Cancel/Submit row with a top divider.
 
