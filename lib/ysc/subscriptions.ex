@@ -580,6 +580,10 @@ defmodule Ysc.Subscriptions do
   Cancels a scheduled downgrade by releasing the subscription schedule in Stripe.
   The user keeps their current plan (e.g. Family) with no change at renewal.
 
+  `schedule_api` is the Stripe schedule module, injectable for tests. The
+  schedule must be `release`d, never `cancel`ed: cancelling it would also
+  cancel the live subscription.
+
   Returns `{:ok, subscription}` on success, `{:error, reason}` on failure.
 
   ## Examples
@@ -590,19 +594,28 @@ defmodule Ysc.Subscriptions do
       iex> cancel_scheduled_downgrade(subscription_without_schedule)
       {:error, :no_scheduled_downgrade}
   """
-  def cancel_scheduled_downgrade(nil), do: {:error, "No subscription to update"}
+  def cancel_scheduled_downgrade(
+        subscription,
+        schedule_api \\ Stripe.SubscriptionSchedule
+      )
 
-  def cancel_scheduled_downgrade(%Subscription{} = subscription) do
+  def cancel_scheduled_downgrade(nil, _schedule_api),
+    do: {:error, "No subscription to update"}
+
+  def cancel_scheduled_downgrade(%Subscription{} = subscription, schedule_api) do
     case Application.get_env(:ysc, :cancel_scheduled_downgrade_callback) do
       callback when is_function(callback, 1) ->
         callback.(subscription)
 
       _ ->
-        do_cancel_scheduled_downgrade(subscription)
+        do_cancel_scheduled_downgrade(subscription, schedule_api)
     end
   end
 
-  defp do_cancel_scheduled_downgrade(%Subscription{} = subscription) do
+  defp do_cancel_scheduled_downgrade(
+         %Subscription{} = subscription,
+         schedule_api
+       ) do
     with {:ok, stripe_sub} <-
            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
              stripe_subscription_retriever().retrieve(subscription.stripe_id)
@@ -610,7 +623,7 @@ defmodule Ysc.Subscriptions do
          schedule_id when is_binary(schedule_id) <- stripe_sub.schedule,
          {:ok, _} <-
            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.SubscriptionSchedule.release(schedule_id)
+             schedule_api.release(schedule_id)
            end) do
       if subscription.user_id do
         invalidate_membership_caches(subscription.user_id)
@@ -1030,17 +1043,34 @@ defmodule Ysc.Subscriptions do
   - Downgrades: take effect at next renewal (no immediate credit/refund).
 
   Prevents downgrades if user has sub-accounts.
-  """
-  def change_membership_plan(%{type: :lifetime}, _new_price_id, _direction),
-    do: {:error, "Lifetime memberships cannot be changed"}
 
-  def change_membership_plan(nil, _new_price_id, _direction),
+  `schedule_api` is the Stripe schedule module, injectable for tests. Existing
+  schedules must be `release`d, never `cancel`ed: cancelling a schedule also
+  cancels its subscription and would end a paid-through membership.
+  """
+  def change_membership_plan(
+        subscription,
+        new_price_id,
+        direction,
+        schedule_api \\ Stripe.SubscriptionSchedule
+      )
+
+  def change_membership_plan(
+        %{type: :lifetime},
+        _new_price_id,
+        _direction,
+        _schedule_api
+      ),
+      do: {:error, "Lifetime memberships cannot be changed"}
+
+  def change_membership_plan(nil, _new_price_id, _direction, _schedule_api),
     do: {:error, "No active subscription found"}
 
   def change_membership_plan(
         %Subscription{} = subscription,
         new_price_id,
-        direction
+        direction,
+        schedule_api
       ) do
     # Prevent downgrade if user has sub-accounts
     if direction == :downgrade do
@@ -1051,17 +1081,28 @@ defmodule Ysc.Subscriptions do
         {:error,
          "Cannot switch to a single-person membership while family members are still linked to your account. On the Family page, remove each linked family member, then try again."}
       else
-        do_change_membership_plan(subscription, new_price_id, direction)
+        do_change_membership_plan(
+          subscription,
+          new_price_id,
+          direction,
+          schedule_api
+        )
       end
     else
-      do_change_membership_plan(subscription, new_price_id, direction)
+      do_change_membership_plan(
+        subscription,
+        new_price_id,
+        direction,
+        schedule_api
+      )
     end
   end
 
   defp do_change_membership_plan(
          %Subscription{} = subscription,
          new_price_id,
-         direction
+         direction,
+         schedule_api
        ) do
     result =
       case Application.get_env(:ysc, :change_membership_plan_stripe_callback) do
@@ -1072,18 +1113,20 @@ defmodule Ysc.Subscriptions do
           do_change_membership_plan_stripe(
             subscription,
             new_price_id,
-            direction
+            direction,
+            schedule_api
           )
       end
 
     sync_board_pause_after(result)
   end
 
-  @dialyzer {:nowarn_function, do_change_membership_plan_stripe: 3}
+  @dialyzer {:nowarn_function, do_change_membership_plan_stripe: 4}
   defp do_change_membership_plan_stripe(
          %Subscription{} = subscription,
          new_price_id,
-         direction
+         direction,
+         schedule_api
        ) do
     # Callback allows tests to stub the initial retrieve (avoid hitting Stripe).
     initial_retrieve_fn =
@@ -1114,7 +1157,7 @@ defmodule Ysc.Subscriptions do
         # If subscription has a scheduled downgrade, release it to cancel
         if stripe_sub.schedule do
           case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-                 Stripe.SubscriptionSchedule.release(stripe_sub.schedule)
+                 schedule_api.release(stripe_sub.schedule)
                end) do
             {:ok, _} -> {:ok, subscription}
             {:error, error} -> {:error, error}
@@ -1126,7 +1169,8 @@ defmodule Ysc.Subscriptions do
         case direction do
           :upgrade ->
             # Release any existing schedule first (e.g. scheduled downgrade user is canceling)
-            with {:ok, _stripe_sub} <- maybe_release_schedule(stripe_sub) do
+            with {:ok, _stripe_sub} <-
+                   maybe_release_schedule(stripe_sub, schedule_api) do
               # For upgrades: charge proration delta immediately and update subscription.
               # Note: Manual (paid elsewhere) memberships have no default payment method in
               # Stripe; the user settings flow requires a payment method before allowing
@@ -1229,7 +1273,8 @@ defmodule Ysc.Subscriptions do
               subscription,
               stripe_sub,
               first_item,
-              new_price_id
+              new_price_id,
+              schedule_api
             )
         end
       end
@@ -1239,29 +1284,32 @@ defmodule Ysc.Subscriptions do
     end
   end
 
-  defp maybe_release_schedule(%{schedule: nil} = stripe_sub),
+  defp maybe_release_schedule(%{schedule: nil} = stripe_sub, _schedule_api),
     do: {:ok, stripe_sub}
 
-  defp maybe_release_schedule(%{schedule: schedule_id} = stripe_sub) do
+  defp maybe_release_schedule(
+         %{schedule: schedule_id} = stripe_sub,
+         schedule_api
+       ) do
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           Stripe.SubscriptionSchedule.release(schedule_id)
+           schedule_api.release(schedule_id)
          end) do
       {:ok, _} -> {:ok, stripe_sub}
       {:error, _} = error -> error
     end
   end
 
-  @dialyzer {:nowarn_function, schedule_downgrade_at_renewal: 4}
+  @dialyzer {:nowarn_function, schedule_downgrade_at_renewal: 5}
   defp schedule_downgrade_at_renewal(
          subscription,
          stripe_sub,
          first_item,
-         new_price_id
+         new_price_id,
+         schedule_api
        ) do
     phases = downgrade_phases(stripe_sub, first_item, new_price_id)
 
-    result =
-      apply_downgrade_schedule(stripe_sub, phases, Stripe.SubscriptionSchedule)
+    result = apply_downgrade_schedule(stripe_sub, phases, schedule_api)
 
     case result do
       {:ok, _} ->
