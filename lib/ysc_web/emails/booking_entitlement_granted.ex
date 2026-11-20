@@ -1,6 +1,6 @@
 defmodule YscWeb.Emails.BookingEntitlementGranted do
   @moduledoc """
-  Notifies a member that a cabin booking benefit was added to their account.
+  Notifies a member that free nights or a cabin discount was added to their account.
   """
   use MjmlEEx,
     mjml_template: "templates/booking_entitlement_granted.mjml.eex",
@@ -17,10 +17,15 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
 
   def get_template_name, do: "booking_entitlement_granted"
 
-  def get_subject, do: "A cabin benefit for your next booking"
+  def get_subject(%{headline: headline})
+      when is_binary(headline) and headline != "",
+      do: headline
+
+  def get_subject(_email_data), do: "A discount for your next cabin stay"
 
   def prepare_email_data(ent, user) do
     first_name = attendee_greeting_name(user)
+    headline = headline(ent)
 
     {show_tahoe, show_clear, tahoe_url, clear_url} =
       case ent.property do
@@ -41,7 +46,8 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
       first_name: first_name,
       header_image_url: header_image_url,
       header_image_alt: header_image_alt,
-      benefit_description: benefit_description(ent),
+      headline: headline,
+      benefit_description: benefit_description(ent, headline),
       property_line: property_line(ent),
       buyout_cap_line: buyout_cap_line(ent),
       expiry_line: expiry_line(ent),
@@ -51,7 +57,7 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
       tahoe_book_url: tahoe_url,
       clear_lake_book_url: clear_url,
       manage_bookings_hint:
-        "Start a new booking to use this benefit — it appears on your price summary automatically before you confirm."
+        "Start a new booking to use this — it appears on your price summary automatically before you confirm."
     }
   end
 
@@ -90,27 +96,31 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
   end
 
   defp next_booking_notice do
-    "This benefit is for your next eligible cabin booking. When you pick new dates and go through checkout, " <>
-      "the discount is applied automatically to the total. It does not change past trips, completed stays, or bookings you've already made."
+    "This is for your next new cabin booking. When you pick dates and go through checkout, " <>
+      "the discount is applied automatically. It does not change past trips, completed stays, or bookings you've already made."
   end
 
-  defp benefit_description(ent) do
-    case ent.benefit_kind do
-      :free_nights ->
-        n = ent.free_nights || 0
-        nights_word = if n == 1, do: "night", else: "nights"
-
-        "#{n} free #{nights_word} on your next cabin stay. " <>
-          "If you book more nights than that, you still pay for the extra nights. " <>
-          "Your exact savings show on the price summary when you check out."
-
-      :percent_off ->
-        "#{Decimal.round(ent.percent_off || Decimal.new(0), 2)}% off your next cabin stay."
-
-      :fixed_amount_off ->
-        "A #{format_money(ent.amount_off)} discount on your next cabin stay."
-    end
+  defp headline(%{benefit_kind: :free_nights} = ent) do
+    n = ent.free_nights || 0
+    nights_word = if n == 1, do: "night", else: "nights"
+    "#{n} free #{nights_word} on your next cabin stay"
   end
+
+  defp headline(%{benefit_kind: :percent_off} = ent) do
+    "#{Decimal.round(ent.percent_off || Decimal.new(0), 2)}% off your next cabin stay"
+  end
+
+  defp headline(%{benefit_kind: :fixed_amount_off} = ent) do
+    "A #{format_money(ent.amount_off)} discount on your next cabin stay"
+  end
+
+  defp benefit_description(%{benefit_kind: :free_nights}, headline) do
+    "#{headline}. " <>
+      "If you book more nights than that, you still pay for the extra nights. " <>
+      "Your exact savings show on the price summary when you check out."
+  end
+
+  defp benefit_description(_ent, headline), do: "#{headline}."
 
   defp property_line(ent) do
     case ent.property do

@@ -702,7 +702,7 @@ defmodule Ysc.Bookings.Entitlements do
       Notifier.schedule_email(
         user.email,
         "booking_entitlement_granted:#{ent.id}",
-        BookingEntitlementGranted.get_subject(),
+        BookingEntitlementGranted.get_subject(variables),
         BookingEntitlementGranted.get_template_name(),
         variables,
         BookingEntitlementGranted.plain_text_summary(variables),
