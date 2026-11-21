@@ -494,6 +494,9 @@ defmodule Ysc.Subscriptions do
   When a user schedules a downgrade (e.g. Family → Single at renewal), the
   subscription has a Stripe schedule with two phases. This fetches that info.
 
+  `schedule_api` is the Stripe schedule module, injectable for tests. The live
+  subscription is retrieved via `stripe_subscription_retriever/0`.
+
   ## Returns
 
   - `nil` - No scheduled downgrade
@@ -510,17 +513,22 @@ defmodule Ysc.Subscriptions do
       nil
 
   """
-  def get_scheduled_downgrade_info(nil), do: nil
+  def get_scheduled_downgrade_info(
+        subscription,
+        schedule_api \\ Stripe.SubscriptionSchedule
+      )
 
-  def get_scheduled_downgrade_info(%{type: :lifetime}), do: nil
+  def get_scheduled_downgrade_info(nil, _schedule_api), do: nil
 
-  def get_scheduled_downgrade_info(%Subscription{} = subscription) do
+  def get_scheduled_downgrade_info(%{type: :lifetime}, _schedule_api), do: nil
+
+  def get_scheduled_downgrade_info(%Subscription{} = subscription, schedule_api) do
     case Application.get_env(:ysc, :get_scheduled_downgrade_info_callback) do
       callback when is_function(callback, 1) ->
         callback.(subscription)
 
       _ ->
-        do_get_scheduled_downgrade_info(subscription)
+        do_get_scheduled_downgrade_info(subscription, schedule_api)
     end
   end
 
@@ -536,7 +544,10 @@ defmodule Ysc.Subscriptions do
     Application.get_env(:ysc, :stripe_subscription_module, Stripe.Subscription)
   end
 
-  defp do_get_scheduled_downgrade_info(%Subscription{} = subscription) do
+  defp do_get_scheduled_downgrade_info(
+         %Subscription{} = subscription,
+         schedule_api
+       ) do
     with {:ok, stripe_sub} <-
            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
              stripe_subscription_retriever().retrieve(subscription.stripe_id)
@@ -544,7 +555,7 @@ defmodule Ysc.Subscriptions do
          schedule_id when is_binary(schedule_id) <- stripe_sub.schedule,
          {:ok, schedule} <-
            Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             Stripe.SubscriptionSchedule.retrieve(schedule_id)
+             schedule_api.retrieve(schedule_id)
            end),
          phases when is_list(phases) and length(phases) >= 2 <- schedule.phases,
          next_phase <- Enum.at(phases, 1),
