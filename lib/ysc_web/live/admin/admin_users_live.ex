@@ -12,7 +12,7 @@ defmodule YscWeb.AdminUsersLive do
   alias Ysc.Accounts.{User, UserDisplay}
   alias Ysc.Payments
   alias Ysc.Subscriptions
-  alias YscWeb.{Admin.DateTimeDisplay, AdminBadgeHelpers, AdminExportFiles}
+  alias YscWeb.{Admin.DateTimeDisplay, AdminExportFiles}
   alias YscWeb.Emails.ApplicationApproved
   alias YscWeb.Workers.UserExporter
 
@@ -125,43 +125,14 @@ defmodule YscWeb.AdminUsersLive do
         </div>
 
         <div :if={!@loading_user_modal?} class="max-w-2xl mx-auto">
-          <div class="flex items-center justify-between border-b border-zinc-200 pb-4 mb-6 gap-4">
-            <div class="min-w-0">
-              <.admin_page_title level={2} variant={:emphasis}>
-                Review Application
-              </.admin_page_title>
-              <p class="text-sm text-zinc-500 mt-0.5">
-                {if @selected_user.state != :pending_approval &&
-                      @selected_user_application.reviewed_at do
-                  "Reviewed " <>
-                    DateTimeDisplay.format_utc_date(
-                      @selected_user_application.reviewed_at
-                    )
-                else
-                  "Submitted " <>
-                    Timex.from_now(@selected_user_application.completed)
-                end}
-              </p>
-            </div>
-            <span :if={@selected_user.state == :pending_approval} class="shrink-0">
-              <.badge type="default">Pending Review</.badge>
-            </span>
-            <span
-              :if={
-                @selected_user.state != :pending_approval &&
-                  @selected_user_application.review_outcome != nil
-              }
-              class="shrink-0"
-            >
-              <.badge type={
-                AdminBadgeHelpers.review_outcome_badge_type(
-                  @selected_user_application.review_outcome
-                )
-              }>
-                {String.capitalize("#{@selected_user_application.review_outcome}")}
-              </.badge>
-            </span>
-          </div>
+          <.admin_application_header
+            id="review-application-header"
+            user={@selected_user}
+            application={@selected_user_application}
+            class="mb-6"
+          >
+            Review Application
+          </.admin_application_header>
 
           <div class="space-y-6">
             <.admin_application_reviewer

@@ -1409,6 +1409,159 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_application_header/1" do
+    defp sample_application_header_assigns(overrides) do
+      user = %{state: :pending_approval}
+
+      application = %{
+        completed: ~U[2020-01-15 18:00:00Z],
+        reviewed_at: nil,
+        review_outcome: nil
+      }
+
+      %{
+        user: Map.merge(user, Map.get(overrides, :user, %{})),
+        application:
+          Map.merge(application, Map.get(overrides, :application, %{}))
+      }
+    end
+
+    test "renders pending title, submitted subtitle, and pending badge" do
+      assigns = sample_application_header_assigns(%{})
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_application_header
+          id="review-application-header"
+          user={@user}
+          application={@application}
+        >
+          Review Application
+        </.admin_application_header>
+        """)
+
+      assert html =~ ~s(id="review-application-header")
+      assert html =~ "Review Application"
+      assert html =~ "Submitted"
+      refute html =~ "Submitted N/A"
+      refute html =~ "Reviewed"
+      assert html =~ "Pending Review"
+      refute html =~ "Approved"
+    end
+
+    test "renders reviewed subtitle and approved badge" do
+      reviewed_at = ~U[2024-06-15 19:00:00Z]
+
+      assigns =
+        sample_application_header_assigns(%{
+          user: %{state: :active},
+          application: %{
+            reviewed_at: reviewed_at,
+            review_outcome: :approved
+          }
+        })
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_application_header
+          id="admin-application-header"
+          user={@user}
+          application={@application}
+        >
+          Application
+        </.admin_application_header>
+        """)
+
+      expected_date =
+        YscWeb.Admin.DateTimeDisplay.format_utc_date(reviewed_at)
+
+      assert html =~ ~s(id="admin-application-header")
+      assert html =~ "Application"
+      assert html =~ "Reviewed #{expected_date}"
+      refute html =~ "Pending Review"
+      assert html =~ "Approved"
+      assert html =~ "bg-green-100"
+    end
+
+    test "renders rejected badge" do
+      assigns =
+        sample_application_header_assigns(%{
+          user: %{state: :rejected},
+          application: %{
+            reviewed_at: ~U[2024-06-15 19:00:00Z],
+            review_outcome: :rejected
+          }
+        })
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_application_header user={@user} application={@application}>
+          Application
+        </.admin_application_header>
+        """)
+
+      assert html =~ "Rejected"
+      assert html =~ "bg-red-100"
+      refute html =~ "Pending Review"
+    end
+
+    test "shows Submitted N/A when completed is missing" do
+      assigns =
+        sample_application_header_assigns(%{
+          application: %{completed: nil}
+        })
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_application_header user={@user} application={@application}>
+          Application
+        </.admin_application_header>
+        """)
+
+      assert html =~ "Submitted N/A"
+    end
+
+    test "keeps Submitted copy for pending applications that already have reviewed_at" do
+      assigns =
+        sample_application_header_assigns(%{
+          application: %{
+            reviewed_at: ~U[2024-06-15 19:00:00Z],
+            review_outcome: :approved
+          }
+        })
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_application_header user={@user} application={@application}>
+          Application
+        </.admin_application_header>
+        """)
+
+      assert html =~ "Submitted"
+      refute html =~ "Reviewed"
+      assert html =~ "Pending Review"
+      refute html =~ "Approved"
+    end
+
+    test "merges extra class onto the wrapper" do
+      assigns = sample_application_header_assigns(%{})
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_application_header
+          user={@user}
+          application={@application}
+          class="mb-6"
+        >
+          Review Application
+        </.admin_application_header>
+        """)
+
+      assert html =~ "mb-6"
+      assert html =~ "border-b"
+    end
+  end
+
   describe "admin_signup_application/1" do
     defp sample_application_assigns(overrides) do
       user = %{
