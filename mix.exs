@@ -509,22 +509,30 @@ defmodule Ysc.MixProject do
       # phoenix_live_view lists it optional ~> 0.1.0; pin the patched floor.
       {:lazy_html, "~> 0.1.14", only: :test},
       {:phoenix_turnstile, "~> 1.2"},
-      # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+.
-      # 1.8.12: clear return_to after login; drop channel messages without a join_ref.
-      # 1.8.13: phoenix.js reconnects after Chrome freeze/resume when visibilitychange is skipped.
-      # 1.8.14: LongPoll fetch timer leak (we use websocket only); VerifiedRoutes
-      # :router must be a compile-time module; local path validation is shared
-      # across redirect, static_path, and ~p (also rejects CR/LF in paths).
-      # 1.8.16: phoenix.js connection-handling races (#6867) and WebSocket
-      # close code 1000 is no longer special-cased (#6880). Endpoint.socket/3
-      # accepts max_channels_per_transport (default 100). We mount LiveView
-      # websocket only, broadcast "disconnect" on logout, and keep the
-      # default channel cap. Requires phoenix_pubsub ~> 2.4 (lock 2.4.1);
-      # we only call subscribe/2, unsubscribe/2, broadcast/3. 1.8.15
-      # replaceTransport detach-before-close is superseded by the
-      # Connection class. phx.gen.cert Chromium cert and phx.new Tailwind
-      # 4.3.3 are unused (we already ship 4.3.3).
-      {:phoenix, "~> 1.8.16"},
+      # 1.8.17: EEF-CVE-2026-129344 (HIGH / GHSA-5vmc-qgf8-rw36) an
+      # unencodable channel broadcast used to DoS every client on the
+      # topic; fastlane now stops only channels using the failing
+      # serializer. EEF-CVE-2026-128361 (HIGH / GHSA-pvfx-rx4x-phrr)
+      # Presence stringifies keys so a non-binary key cannot crash the
+      # tracker. Do not ignore these advisories. We track editor
+      # presence with string socket ids (`YscWeb.Presence`) and mount
+      # LiveView websocket only (vsn 2.0.0). 1.8.16: phoenix.js
+      # connection-handling races (#6867) and WebSocket close code 1000
+      # is no longer special-cased (#6880). Endpoint.socket/3 accepts
+      # max_channels_per_transport (default 100). We broadcast
+      # "disconnect" on logout and keep the default channel cap.
+      # Requires phoenix_pubsub ~> 2.4 (lock 2.4.1); we only call
+      # subscribe/2, unsubscribe/2, broadcast/3. 1.8.15 replaceTransport
+      # detach-before-close is superseded by the Connection class.
+      # 1.8.14: LongPoll fetch timer leak (we use websocket only);
+      # VerifiedRoutes :router must be a compile-time module; local path
+      # validation is shared across redirect, static_path, and ~p.
+      # 1.8.13: phoenix.js reconnects after Chrome freeze/resume.
+      # 1.8.12: clear return_to after login; drop channel messages
+      # without a join_ref. EEF-CVE-2026-56811/56812: channel join DoS +
+      # Presence JS prototype collision; fixed in 1.8.9+. phx.gen.cert
+      # Chromium cert and phx.new Tailwind 4.3.3 are unused.
+      {:phoenix, "~> 1.8.17"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break).
       # 1.20.4: EEF-CVE-2026-120287 (MEDIUM / GHSA-qj4r-jh2r-rw3f) charges
       # multipart part framing and empty headers against `:length`. 1.20.3
