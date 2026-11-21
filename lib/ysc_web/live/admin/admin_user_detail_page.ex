@@ -2102,6 +2102,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     >
                       <%= for user <- @add_family_user_results do %>
                         <button
+                          id={"add-family-user-#{user.id}"}
                           type="button"
                           phx-click="admin_link_family_user"
                           phx-value-user_id={user.id}
@@ -3808,7 +3809,7 @@ defmodule YscWeb.AdminUserDetailsLive do
           primary_user.id | Enum.map(socket.assigns.sub_accounts, & &1.id)
         ]
 
-        Accounts.search_users(query, limit: 8)
+        Accounts.search_users_for_family_link(query)
         |> Enum.reject(fn u -> u.id in sub_ids end)
       else
         []
@@ -3846,11 +3847,10 @@ defmodule YscWeb.AdminUserDetailsLive do
     rel = if relationship == "spouse", do: :spouse, else: :child
 
     user_to_link =
-      try do
-        Accounts.get_user!(user_id)
-      rescue
-        Ecto.NoResultsError -> nil
-      end
+      family_link_user_from_results(
+        socket.assigns.add_family_user_results,
+        user_id
+      )
 
     if is_nil(user_to_link) do
       {:noreply,
@@ -4467,6 +4467,27 @@ defmodule YscWeb.AdminUserDetailsLive do
       members when is_list(members) -> members
       _ -> []
     end
+  end
+
+  # Search already loaded name/email/`primary_user_id`/`board_position`.
+  # A second `Accounts.get_user!/1` would SELECT `hashed_password` / bios.
+  # Crafted `phx-value` ids still go through `get_user!/1`.
+  defp family_link_user_from_results(results, id) when is_list(results) do
+    match_id = to_string(id)
+
+    case Enum.find(results, fn user -> to_string(user.id) == match_id end) do
+      %Accounts.User{} = user -> user
+      nil -> family_link_user_from_id(id)
+    end
+  end
+
+  defp family_link_user_from_results(_results, id),
+    do: family_link_user_from_id(id)
+
+  defp family_link_user_from_id(id) do
+    Accounts.get_user!(id)
+  rescue
+    Ecto.NoResultsError -> nil
   end
 
   defp load_family_data_for_membership(socket, user_id) do
