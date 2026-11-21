@@ -361,7 +361,16 @@ defmodule Ysc.MixProject do
       # EEF-CVE-2026-82672. Finch still lists mint ~> 1.8, so pin the patched
       # floor.
       {:mint, "~> 1.11.0", override: true},
-      {:floki, "~> 0.38"},
+      # 0.38.5: quadratic-time parsing of unbalanced tags in the built-in
+      # mochiweb parser is linear again (open-element names are tracked so
+      # a non-matching end tag is rejected without scanning the stack;
+      # parse tree unchanged). Functional :nth-child / :nth-of-type match
+      # with O(1) remainder arithmetic instead of scanning an+b values.
+      # We parse with Floki.parse_fragment/1 then find/text/raw_html
+      # (newsletter HTML, SES no-track, open-in-new-tab, SMS strip). We
+      # do not pass attributes_as_maps, html_parser, or parser_args, or
+      # call find/2 on an unparsed string. Public APIs unchanged.
+      {:floki, "~> 0.38.5"},
       # 0.29.0: Flop.Schema is a behaviour (`use Flop.Schema` + `@flop_options`)
       # instead of a protocol (`@derive`). field_info/2, get_field/3, and
       # primary_key/1 take the schema module. Schema option accessors are gone
