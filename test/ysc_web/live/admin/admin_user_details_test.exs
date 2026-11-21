@@ -1593,6 +1593,135 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       assert is_nil(Accounts.get_user!(holder.id).primary_user_id)
     end
+
+    test "family-link search omits hashed_password and avatars", %{conn: conn} do
+      unique = System.unique_integer([:positive])
+      primary = lifetime_member()
+
+      member =
+        user_fixture(%{
+          first_name: "FamSearch#{unique}",
+          last_name: "Member",
+          board_bio: "family-link typeahead must not load this bio"
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{primary.id}/details/family")
+
+      render_async(view)
+
+      {_html, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+
+            view
+            |> form("#add-family-user-search-form", %{
+              query: "FamSearch#{unique}"
+            })
+            |> render_change()
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self(), view.pid]
+        )
+
+      assert has_element?(view, "#add-family-user-#{member.id}")
+
+      assert password_cols == 0
+
+      {_html, avatar_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+
+            view
+            |> form("#add-family-user-search-form", %{
+              query: "FamSearch#{unique}"
+            })
+            |> render_change()
+          end,
+          pattern: ~r/FROM "avatars"/i,
+          caller_pids: [self(), view.pid]
+        )
+
+      assert avatar_cols == 0
+    end
+
+    test "links a member selected from family-link search results", %{
+      conn: conn
+    } do
+      unique = System.unique_integer([:positive])
+      primary = lifetime_member()
+
+      member =
+        user_fixture(%{
+          first_name: "FamLink#{unique}",
+          last_name: "Member"
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{primary.id}/details/family")
+
+      render_async(view)
+
+      view
+      |> form("#add-family-user-search-form", %{query: "FamLink#{unique}"})
+      |> render_change()
+
+      html =
+        view
+        |> element("#add-family-user-#{member.id}")
+        |> render_click()
+
+      assert html =~
+               "#{member.first_name} #{member.last_name} has been added to the family membership."
+
+      assert Accounts.get_user!(member.id).primary_user_id == primary.id
+    end
+
+    test "falls back to loading a user who is not in search results", %{
+      conn: conn
+    } do
+      unique = System.unique_integer([:positive])
+      primary = lifetime_member()
+
+      member =
+        user_fixture(%{
+          first_name: "FamFallback#{unique}",
+          last_name: "Member"
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{primary.id}/details/family")
+
+      render_async(view)
+
+      html =
+        render_click(view, "admin_link_family_user", %{"user_id" => member.id})
+
+      assert html =~
+               "#{member.first_name} #{member.last_name} has been added to the family membership."
+
+      assert Accounts.get_user!(member.id).primary_user_id == primary.id
+    end
+
+    test "shows an error when the family-link user id does not exist", %{
+      conn: conn
+    } do
+      primary = lifetime_member()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{primary.id}/details/family")
+
+      render_async(view)
+
+      html =
+        render_click(view, "admin_link_family_user", %{
+          "user_id" => Ecto.ULID.generate()
+        })
+
+      assert html =~ "User not found."
+    end
   end
 
   defp register_and_log_in_admin(%{conn: conn}) do
