@@ -1475,20 +1475,19 @@ defmodule YscWeb.UserSettingsLive do
                           )
                         ]}>
                           <%= if @membership_change_info.direction == :upgrade do %>
-                            <p>
-                              To upgrade today, you'll pay the price difference for the rest of your
-                              membership year when you switch from {String.capitalize(
-                                "#{@membership_change_info.current_plan.id}"
-                              )} to {String.capitalize(
-                                "#{@membership_change_info.new_plan.id}"
-                              )} membership. Today's charge won't exceed <strong>
-                                {Ysc.MoneyHelper.format_money!(
-                                  Money.new(
-                                    :USD,
-                                    @membership_change_info.price_difference
-                                  )
-                                )}
-                              </strong>.
+                            <p id="plan-change-upgrade-body">
+                              {MembershipUserMessages.upgrade_banner_before_amount(
+                                MembershipUserMessages.plan_name(
+                                  @membership_change_info.new_plan.id
+                                )
+                              )}
+                              <strong>{membership_change_max_label(
+                                @membership_change_info
+                              )}</strong>. {MembershipUserMessages.upgrade_banner_after_amount(
+                                MembershipUserMessages.plan_name(
+                                  @membership_change_info.new_plan.id
+                                )
+                              )}
                             </p>
                           <% else %>
                             <p>
@@ -1568,9 +1567,11 @@ defmodule YscWeb.UserSettingsLive do
                     :if={@change_membership_button}
                     class="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-zinc-100"
                   >
-                    <p class="text-sm text-zinc-500">
+                    <p class="text-sm text-zinc-500" id="plan-change-confirm-helper">
                       <%= if @membership_change_info && @membership_change_info.direction == :upgrade do %>
-                        You'll pay the difference for the rest of your membership year today.
+                        {MembershipUserMessages.upgrade_confirm_helper(
+                          membership_change_max_label(@membership_change_info)
+                        )}
                       <% else %>
                         The change will take effect at your next renewal date.
                       <% end %>
@@ -5292,6 +5293,10 @@ defmodule YscWeb.UserSettingsLive do
     Enum.each(sub_accounts, fn sub_account ->
       MembershipCache.invalidate_user(sub_account.id)
     end)
+  end
+
+  defp membership_change_max_label(%{price_difference: price_difference}) do
+    Ysc.MoneyHelper.format_money!(Money.new(:USD, price_difference))
   end
 
   defp get_success_message(:upgrade) do
