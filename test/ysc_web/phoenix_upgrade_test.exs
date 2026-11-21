@@ -1,23 +1,21 @@
 defmodule YscWeb.PhoenixUpgradeTest do
   @moduledoc """
-  Guards the Phoenix 1.8.15 → 1.8.16 upgrade.
+  Guards the Phoenix 1.8.16 → 1.8.17 upgrade.
 
-  1.8.16 is a patch. phoenix.js rewrites connection lifecycle around a
-  per-transport `Connection` object so late close/error events, overlapping
-  disconnect/connect, heartbeat timeouts, and LongPoll fallback cannot tear
-  down a healthy replacement (#6867). Close code 1000 is no longer treated
-  as a permanent disconnect (#6880); any close that we did not initiate
-  reconnects, because proxies also use 1000. `Phoenix.Endpoint.socket/3`
-  accepts `:max_channels_per_transport` (default 100).
+  1.8.17 patches EEF-CVE-2026-129344 (HIGH / GHSA-5vmc-qgf8-rw36): an
+  unencodable channel broadcast used to take down every client on the
+  shared topic. Fastlane now catches serializer failures, logs once per
+  serializer, and stops only those channels (`phx_error` so they rejoin).
+  It also patches EEF-CVE-2026-128361 (HIGH / GHSA-pvfx-rx4x-phrr):
+  Presence stringifies keys before the tracker, so a non-binary key
+  cannot crash it. Do not add these CVEs to `ignore_advisories`.
 
-  Phoenix 1.8.16 requires `phoenix_pubsub ~> 2.4` (lock 2.4.1). That adds
-  `Phoenix.PubSub.Sender` and `unsubscribe_sender/3`. We only call
-  `subscribe/2`, `unsubscribe/2`, and `broadcast/3` with the default
-  dispatcher. `phoenix_template` stays 1.0.4.
-
-  We import `phoenix` via esbuild `NODE_PATH=deps` and mount only the
-  LiveView websocket. Logout still broadcasts `"disconnect"`. We do not
-  set `:max_channels_per_transport` on the LiveView socket.
+  We track editor presence with string socket ids (`YscWeb.Presence`)
+  and mount LiveView websocket only (vsn 2.0.0). 1.8.16 still applies:
+  phoenix.js connection races (#6867), close code 1000 reconnects
+  (#6880), `Endpoint.socket/3` `:max_channels_per_transport`. We import
+  `phoenix` via esbuild `NODE_PATH=deps`. Logout still broadcasts
+  `"disconnect"`. `phoenix_template` stays 1.0.4.
   """
   use ExUnit.Case, async: true
 
@@ -47,6 +45,18 @@ defmodule YscWeb.PhoenixUpgradeTest do
                        "../../deps/phoenix/lib/phoenix/socket.ex",
                        __DIR__
                      )
+  @phoenix_presence_ex Path.expand(
+                         "../../deps/phoenix/lib/phoenix/presence.ex",
+                         __DIR__
+                       )
+  @phoenix_channel_server_ex Path.expand(
+                               "../../deps/phoenix/lib/phoenix/channel/server.ex",
+                               __DIR__
+                             )
+  @phoenix_v1_serializer_ex Path.expand(
+                              "../../deps/phoenix/lib/phoenix/socket/serializers/v1_json_serializer.ex",
+                              __DIR__
+                            )
   @app_js Path.expand("../../assets/js/app.js", __DIR__)
   @endpoint_ex Path.expand("../../lib/ysc_web/endpoint.ex", __DIR__)
   @ysc_web_ex Path.expand("../../lib/ysc_web.ex", __DIR__)
@@ -56,10 +66,26 @@ defmodule YscWeb.PhoenixUpgradeTest do
   @mix_lock Path.expand("../../mix.lock", __DIR__)
   @config_exs Path.expand("../../config/config.exs", __DIR__)
 
-  describe "1.8.16 lock and JS client" do
-    test "locks the Hex package to 1.8.16" do
-      assert to_string(Application.spec(:phoenix, :vsn)) == "1.8.16"
-      assert File.read!(@mix_exs) =~ ~s({:phoenix, "~> 1.8.16"})
+  describe "1.8.17 lock and JS client" do
+    test "locks the Hex package to 1.8.17" do
+      assert to_string(Application.spec(:phoenix, :vsn)) == "1.8.17"
+      mix_exs = File.read!(@mix_exs)
+      assert mix_exs =~ ~s({:phoenix, "~> 1.8.17"})
+      refute mix_exs =~ ~s({:phoenix, "~> 1.8.16"})
+    end
+
+    test "does not ignore the patched phoenix advisories" do
+      mix_exs = File.read!(@mix_exs)
+
+      ignore =
+        mix_exs
+        |> String.split("ignore_advisories: [", parts: 2)
+        |> Enum.at(1)
+        |> String.split("]", parts: 2)
+        |> hd()
+
+      refute ignore =~ "EEF-CVE-2026-129344"
+      refute ignore =~ "EEF-CVE-2026-128361"
     end
 
     test "companion phoenix_pubsub lock is 2.4.1 with the APIs we use" do
@@ -119,6 +145,140 @@ defmodule YscWeb.PhoenixUpgradeTest do
 
       assert {:module, Phoenix.LiveView.Socket} =
                Code.ensure_loaded(Phoenix.LiveView.Socket)
+    end
+  end
+
+  describe "1.8.17 unencodable fastlane broadcasts (EEF-CVE-2026-129344)" do
+    test "changelog documents both HIGH channel and Presence CVEs" do
+      changelog = File.read!(@phoenix_changelog)
+
+      assert changelog =~ "## v1.8.17 (2026-11-20)"
+      assert changelog =~ "CVE-2026-129344"
+      assert changelog =~ "CVE-2026-128361"
+      assert changelog =~ "cannot be serialized"
+      assert changelog =~ "Unsanitized presence key"
+    end
+
+    test "fastlane catches serializer failures and stops only those channels" do
+      source = File.read!(@phoenix_channel_server_ex)
+
+      assert source =~ "%{^serializer => :fastlane_error}"
+      assert source =~ "send(pid, {__MODULE__, :fastlane_error})"
+      assert source =~ "defp fastlane(serializer, msg) do"
+      assert source =~ "catch"
+      assert source =~ "Stopping channels on topic"
+      assert source =~ "{:stop, {:shutdown, :fastlane_error}, socket}"
+    end
+
+    test "V1 serializer refuses binary payloads instead of crashing the topic" do
+      source = File.read!(@phoenix_v1_serializer_ex)
+      assert source =~ "unable to send a binary payload"
+
+      msg = %Phoenix.Socket.Broadcast{
+        topic: "t",
+        event: "e",
+        payload: {:binary, <<1, 2, 3>>}
+      }
+
+      assert_raise ArgumentError,
+                   ~r/unable to send a binary payload on topic "t"/,
+                   fn ->
+                     Phoenix.Socket.V1.JSONSerializer.fastlane!(msg)
+                   end
+    end
+
+    test "unencodable broadcasts stop V1 subscribers and leave V2 on the topic" do
+      topic = "fastlane:#{System.unique_integer([:positive])}"
+      pubsub = Ysc.PubSub
+      test_pid = self()
+
+      v1_transport =
+        spawn_link(fn -> forward_upgrade_messages(test_pid, :v1_transport) end)
+
+      _v1_channel =
+        spawn_link(fn ->
+          :ok =
+            Phoenix.PubSub.subscribe(pubsub, topic,
+              sender:
+                {Phoenix.Channel.Server,
+                 {v1_transport, Phoenix.Socket.V1.JSONSerializer, []}}
+            )
+
+          send(test_pid, {:ready, :v1})
+          forward_upgrade_messages(test_pid, :v1_channel)
+        end)
+
+      v2_transport =
+        spawn_link(fn -> forward_upgrade_messages(test_pid, :v2_transport) end)
+
+      _v2_channel =
+        spawn_link(fn ->
+          :ok =
+            Phoenix.PubSub.subscribe(pubsub, topic,
+              sender:
+                {Phoenix.Channel.Server,
+                 {v2_transport, Phoenix.Socket.V2.JSONSerializer, []}}
+            )
+
+          send(test_pid, {:ready, :v2})
+          forward_upgrade_messages(test_pid, :v2_channel)
+        end)
+
+      assert_receive {:ready, :v1}
+      assert_receive {:ready, :v2}
+
+      msg = %Phoenix.Socket.Broadcast{
+        topic: topic,
+        event: "evt",
+        payload: {:binary, <<1, 2, 3>>}
+      }
+
+      assert :ok = Phoenix.PubSub.broadcast(pubsub, topic, msg)
+
+      assert_receive {:v2_transport, {:socket_push, :binary, <<2, _::binary>>}}
+      assert_receive {:v1_channel, {Phoenix.Channel.Server, :fastlane_error}}
+      refute_received {:v1_transport, _}
+    end
+  end
+
+  describe "1.8.17 Presence key stringify (EEF-CVE-2026-128361)" do
+    test "track, untrack, update, and get_by_key stringify the key" do
+      source = File.read!(@phoenix_presence_ex)
+
+      assert source =~
+               "Phoenix.Tracker.track(__MODULE__, pid, topic, to_string(key), meta)"
+
+      assert source =~
+               "Phoenix.Tracker.untrack(__MODULE__, pid, topic, to_string(key))"
+
+      assert source =~
+               "Phoenix.Tracker.update(__MODULE__, pid, topic, to_string(key), meta)"
+
+      assert source =~ "string_key = to_string(key)"
+      assert source =~ "Phoenix.Tracker.get_by_key(module, topic, string_key)"
+    end
+
+    test "a non-binary presence key is stored as a string and does not crash the tracker" do
+      topic = "presence:upgrade-#{System.unique_integer([:positive])}"
+
+      {:ok, _ref} = YscWeb.Presence.track(self(), topic, :atom_key, %{n: 1})
+
+      listed = YscWeb.Presence.list(topic)
+      assert Map.has_key?(listed, "atom_key")
+      refute Map.has_key?(listed, :atom_key)
+      assert %{metas: [meta]} = listed["atom_key"]
+      assert meta.n == 1
+
+      assert %{metas: [by_atom]} = YscWeb.Presence.get_by_key(topic, :atom_key)
+
+      assert %{metas: [by_string]} =
+               YscWeb.Presence.get_by_key(topic, "atom_key")
+
+      assert by_atom.n == 1
+      assert by_string.n == 1
+
+      :ok = YscWeb.Presence.untrack(self(), topic, :atom_key)
+      assert YscWeb.Presence.list(topic) == %{}
     end
   end
 
@@ -435,6 +595,14 @@ defmodule YscWeb.PhoenixUpgradeTest do
                        metadata: [:reserved_sender]
                      )
                    end
+    end
+  end
+
+  defp forward_upgrade_messages(test_pid, tag) do
+    receive do
+      msg ->
+        send(test_pid, {tag, msg})
+        forward_upgrade_messages(test_pid, tag)
     end
   end
 end
