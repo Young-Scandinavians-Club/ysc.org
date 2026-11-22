@@ -1467,6 +1467,34 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert has_element?(view, "#add-family-user-search-form")
     end
 
+    test "lists linked household members without re-fetching the primary row",
+         %{conn: conn} do
+      unique = System.unique_integer([:positive])
+      primary = lifetime_member()
+
+      member =
+        user_fixture(%{
+          first_name: "FamListed#{unique}",
+          last_name: "Member",
+          board_bio: "family tab household list must not load this bio"
+        })
+
+      assert {:ok, member} =
+               Accounts.admin_link_user_to_family(primary, member,
+                 relationship: :child
+               )
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{primary.id}/details/family")
+
+      render_async(view)
+
+      html = render(view)
+      assert html =~ member.first_name
+      assert html =~ member.email
+      assert has_element?(view, "#add-family-user-search-form")
+    end
+
     test "sends a family invite after the deferred family tab load", %{
       conn: conn
     } do
@@ -1676,7 +1704,51 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert html =~
                "#{member.first_name} #{member.last_name} has been added to the family membership."
 
+      assert html =~ member.email
       assert Accounts.get_user!(member.id).primary_user_id == primary.id
+    end
+
+    test "family-link does not re-SELECT hashed_password of the primary", %{
+      conn: conn
+    } do
+      unique = System.unique_integer([:positive])
+
+      primary =
+        lifetime_member(%{
+          board_bio: "family tab reload must not load this bio"
+        })
+
+      member =
+        user_fixture(%{
+          first_name: "FamReload#{unique}",
+          last_name: "Member"
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{primary.id}/details/family")
+
+      render_async(view)
+
+      view
+      |> form("#add-family-user-search-form", %{query: "FamReload#{unique}"})
+      |> render_change()
+
+      {_html, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+
+            view
+            |> element("#add-family-user-#{member.id}")
+            |> render_click()
+          end,
+          pattern: ~r/SELECT.*hashed_password|SELECT.*board_bio/is,
+          caller_pids: [self(), view.pid]
+        )
+
+      assert has_element?(view, "#add-family-user-search-form")
+      assert render(view) =~ member.email
+      assert password_cols == 0
     end
 
     test "falls back to loading a user who is not in search results", %{

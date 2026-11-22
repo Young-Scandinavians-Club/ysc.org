@@ -13,6 +13,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.Accounts.{
     FamilyDisplay,
     FamilyInvites,
+    FamilyMembers,
     MembershipCache,
     UserDisplay
   }
@@ -2699,16 +2700,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   end
 
   def handle_async(:load_family, {:ok, assigns}, socket) do
-    {:noreply,
-     socket
-     |> assign(:primary_user, assigns.primary_user)
-     |> assign(:sub_accounts, assigns.sub_accounts)
-     |> assign(:family_members, assigns.family_members)
-     |> assign(:pending_invites, assigns.pending_invites)
-     |> assign(:can_manage_family, assigns.can_manage_family)
-     |> assign(:add_family_user_search, "")
-     |> assign(:add_family_user_results, [])
-     |> assign(:add_family_user_relationship, "child")}
+    {:noreply, assign_family_tab(socket, assigns)}
   end
 
   def handle_async(:load_family, {:exit, _}, socket) do
@@ -3863,9 +3855,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         {:ok, _user} ->
           {:noreply,
            socket
-           |> then(&load_family_data_for_membership(&1, primary_user.id))
-           |> assign(:add_family_user_search, "")
-           |> assign(:add_family_user_results, [])
+           |> reload_family_tab()
            |> YscWeb.Flash.put_toast(
              :info,
              "#{user_to_link.first_name} #{user_to_link.last_name} has been added to the family membership.",
@@ -4049,7 +4039,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       {:ok, _} ->
         {:noreply,
          socket
-         |> then(&load_family_data_for_membership(&1, primary_user.id))
+         |> reload_family_tab()
          |> YscWeb.Flash.put_toast(
            :info,
            "Invite cancelled. Invitee will be notified by email.",
@@ -4075,7 +4065,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       {:error, :already_accepted} ->
         {:noreply,
          socket
-         |> then(&load_family_data_for_membership(&1, primary_user.id))
+         |> reload_family_tab()
          |> YscWeb.Flash.put_toast(:error, "Invite was already accepted.",
            title: "Cancel Invite"
          )}
@@ -4084,23 +4074,33 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   def handle_event("admin_remove_family_user", %{"user_id" => user_id}, socket) do
     primary_user = socket.assigns.primary_user || socket.assigns.selected_user
-    sub_account = Accounts.get_user!(user_id)
 
-    case Accounts.remove_sub_account(sub_account, primary_user) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> then(&load_family_data_for_membership(&1, primary_user.id))
-         |> YscWeb.Flash.put_toast(:info, "User removed from membership.",
-           title: "Remove User"
-         )}
+    sub_account =
+      family_tab_user_from_sub_accounts(socket.assigns.sub_accounts, user_id)
 
-      {:error, _} ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:error, "Failed to remove user.",
-           title: "Remove User"
-         )}
+    if is_nil(sub_account) do
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(:error, "User not found.",
+         title: "Remove User"
+       )}
+    else
+      case Accounts.remove_sub_account(sub_account, primary_user) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> reload_family_tab()
+           |> YscWeb.Flash.put_toast(:info, "User removed from membership.",
+             title: "Remove User"
+           )}
+
+        {:error, _} ->
+          {:noreply,
+           socket
+           |> YscWeb.Flash.put_toast(:error, "Failed to remove user.",
+             title: "Remove User"
+           )}
+      end
     end
   end
 
@@ -4362,111 +4362,81 @@ defmodule YscWeb.AdminUserDetailsLive do
     end
   end
 
-  @family_tab_user_preloads [
-    :family_members,
-    {:primary_user, [:current_avatar, :family_members, :sub_accounts]},
-    {:sub_accounts, :current_avatar},
-    :current_avatar
-  ]
-
   defp fetch_family_assigns(selected_user) do
-    user = family_tab_user(selected_user)
-
-    if Accounts.primary_user?(user) and
-         (Accounts.has_lifetime_membership?(user) or
-            has_family_subscription?(user)) do
-      primary_user = Accounts.get_primary_user(user)
-
-      sub_accounts =
-        if primary_user, do: [], else: Accounts.get_sub_accounts(user)
-
-      family_members = family_members_for_user(user, primary_user)
-      primary_for_invites = primary_user || user
-
-      pending_invites =
-        FamilyInvites.list_invites(primary_for_invites)
-        |> Enum.filter(&is_nil(&1.accepted_at))
-
-      %{
-        primary_user: primary_user,
-        sub_accounts: sub_accounts,
-        family_members: family_members,
-        pending_invites: pending_invites,
-        can_manage_family: true
-      }
+    if Accounts.primary_user?(selected_user) and
+         not Accounts.family_membership_host?(selected_user) do
+      empty_family_assigns()
     else
-      primary_user = Accounts.get_primary_user(user)
+      load_family_household_assigns(selected_user)
+    end
+  end
 
-      if primary_user do
-        all_sub_accounts = Accounts.get_sub_accounts(primary_user)
-        siblings = Enum.reject(all_sub_accounts, &(&1.id == user.id))
+  defp empty_family_assigns do
+    %{
+      primary_user: nil,
+      sub_accounts: [],
+      family_members: [],
+      pending_invites: [],
+      can_manage_family: false
+    }
+  end
 
-        pending_invites =
-          FamilyInvites.list_invites(primary_user)
-          |> Enum.filter(&is_nil(&1.accepted_at))
+  defp load_family_household_assigns(selected_user) do
+    household_id = selected_user.primary_user_id || selected_user.id
+    viewing_primary? = Accounts.primary_user?(selected_user)
+    household = Accounts.list_family_tab_household_users(selected_user)
 
-        can_manage =
-          Accounts.has_lifetime_membership?(primary_user) or
-            has_family_subscription?(primary_user)
+    {primaries, members} =
+      Enum.split_with(household, &is_nil(&1.primary_user_id))
 
-        %{
-          primary_user: primary_user,
-          sub_accounts: siblings,
-          family_members: family_members_for_user(nil, primary_user),
-          pending_invites: pending_invites,
-          can_manage_family: can_manage
-        }
-      else
-        %{
-          primary_user: nil,
-          sub_accounts: [],
-          family_members: [],
-          pending_invites: [],
-          can_manage_family: false
-        }
+    primary_user = List.first(primaries)
+
+    can_manage_family =
+      case {viewing_primary?, primary_user} do
+        {true, _} ->
+          true
+
+        {false, %Accounts.User{} = host} ->
+          Accounts.family_membership_host?(host)
+
+        {false, _} ->
+          false
       end
-    end
+
+    %{
+      primary_user: if(viewing_primary?, do: nil, else: primary_user),
+      sub_accounts:
+        if viewing_primary? do
+          members
+        else
+          Enum.reject(members, &(&1.id == selected_user.id))
+        end,
+      family_members:
+        FamilyMembers.list_for_user(%Accounts.User{id: household_id}),
+      pending_invites:
+        FamilyInvites.list_invites(%Accounts.User{id: household_id})
+        |> Enum.filter(&is_nil(&1.accepted_at)),
+      can_manage_family: can_manage_family
+    }
   end
 
-  defp family_tab_user(user) do
-    if family_tab_preloads_loaded?(user) do
-      user
-    else
-      Accounts.get_user!(user.id, @family_tab_user_preloads)
-    end
+  defp reload_family_tab(socket) do
+    assign_family_tab(
+      socket,
+      fetch_family_assigns(socket.assigns.selected_user)
+    )
   end
 
-  defp family_tab_preloads_loaded?(user) do
-    Ecto.assoc_loaded?(user.family_members) and
-      Ecto.assoc_loaded?(user.sub_accounts) and
-      Ecto.assoc_loaded?(user.current_avatar) and
-      primary_household_preloads_loaded?(user)
-  end
-
-  defp primary_household_preloads_loaded?(%{primary_user_id: nil}), do: true
-
-  defp primary_household_preloads_loaded?(user) do
-    case user.primary_user do
-      %Ecto.Association.NotLoaded{} ->
-        false
-
-      nil ->
-        true
-
-      primary_user ->
-        Ecto.assoc_loaded?(primary_user.family_members) and
-          Ecto.assoc_loaded?(primary_user.sub_accounts)
-    end
-  end
-
-  defp family_members_for_user(user, primary_user) do
-    source = if primary_user, do: primary_user, else: user
-
-    case source.family_members do
-      %Ecto.Association.NotLoaded{} -> []
-      members when is_list(members) -> members
-      _ -> []
-    end
+  defp assign_family_tab(socket, assigns) do
+    socket
+    |> assign(:primary_user, assigns.primary_user)
+    |> assign(:sub_accounts, assigns.sub_accounts)
+    |> assign(:family_members, assigns.family_members)
+    |> assign(:pending_invites, assigns.pending_invites)
+    |> assign(:can_manage_family, assigns.can_manage_family)
+    |> assign(:add_family_user_search, "")
+    |> assign(:add_family_user_results, [])
+    |> assign(:add_family_user_relationship, "child")
   end
 
   # Search already loaded name/email/`primary_user_id`/`board_position`.
@@ -4484,120 +4454,25 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp family_link_user_from_results(_results, id),
     do: family_link_user_from_id(id)
 
+  # Linked household rows already have the columns `remove_sub_account/2`
+  # needs. Crafted `phx-value` ids still go through `get_user!/1`.
+  defp family_tab_user_from_sub_accounts(sub_accounts, id)
+       when is_list(sub_accounts) do
+    match_id = to_string(id)
+
+    case Enum.find(sub_accounts, fn user -> to_string(user.id) == match_id end) do
+      %Accounts.User{} = user -> user
+      nil -> family_link_user_from_id(id)
+    end
+  end
+
+  defp family_tab_user_from_sub_accounts(_sub_accounts, id),
+    do: family_link_user_from_id(id)
+
   defp family_link_user_from_id(id) do
     Accounts.get_user!(id)
   rescue
     Ecto.NoResultsError -> nil
-  end
-
-  defp load_family_data_for_membership(socket, user_id) do
-    selected_user = socket.assigns.selected_user
-
-    # Only load family group if this user is a primary with family/lifetime
-    if Accounts.primary_user?(selected_user) and
-         (Accounts.has_lifetime_membership?(selected_user) or
-            has_family_subscription?(selected_user)) do
-      socket
-      |> load_family_data(user_id)
-      |> assign(:can_manage_family, true)
-      |> assign(:add_family_user_search, "")
-      |> assign(:add_family_user_results, [])
-      |> assign(:add_family_user_relationship, "child")
-    else
-      primary_user = Accounts.get_primary_user(selected_user)
-
-      socket
-      |> assign(:primary_user, primary_user)
-      |> assign(:can_manage_family, false)
-      |> assign(:add_family_user_search, "")
-      |> assign(:add_family_user_results, [])
-      |> assign(:add_family_user_relationship, "child")
-    end
-  end
-
-  defp has_family_subscription?(user) do
-    subs =
-      case user.subscriptions do
-        %Ecto.Association.NotLoaded{} ->
-          Ysc.Subscriptions.list_subscriptions(user)
-
-        s when is_list(s) ->
-          s
-
-        _ ->
-          []
-      end
-
-    subs
-    |> Enum.filter(&Ysc.Subscriptions.valid?/1)
-    |> Repo.preload(:subscription_items)
-    |> Enum.any?(fn s ->
-      case s.subscription_items do
-        [item | _] ->
-          plans = Application.get_env(:ysc, :membership_plans, [])
-
-          Enum.any?(plans, fn p ->
-            p.stripe_price_id == item.stripe_price_id and p.id == :family
-          end)
-
-        _ ->
-          false
-      end
-    end)
-  end
-
-  defp load_family_data(socket, user_id) do
-    selected_user =
-      Accounts.get_user!(user_id, [
-        :family_members,
-        {:primary_user, [:current_avatar, :family_members]},
-        {:sub_accounts, :current_avatar},
-        :current_avatar
-      ])
-
-    # Get primary user if this is a sub-account
-    primary_user = Accounts.get_primary_user(selected_user)
-
-    # Get sub accounts if this is a primary user (not a sub-account)
-    sub_accounts =
-      if primary_user do
-        # If user is a sub-account, don't show sub_accounts
-        []
-      else
-        # If user is a primary account, get their sub_accounts
-        Accounts.get_sub_accounts(selected_user)
-      end
-
-    # Get family members (non-user entities)
-    # If user is a sub-account, show family_members from the primary user
-    # Otherwise, show family_members from the selected user
-    family_members =
-      if primary_user do
-        case primary_user.family_members do
-          %Ecto.Association.NotLoaded{} -> []
-          members when is_list(members) -> members
-          _ -> []
-        end
-      else
-        # Get family_members from the selected user
-        case selected_user.family_members do
-          %Ecto.Association.NotLoaded{} -> []
-          members when is_list(members) -> members
-          _ -> []
-        end
-      end
-
-    primary_for_invites = primary_user || selected_user
-
-    pending_invites =
-      FamilyInvites.list_invites(primary_for_invites)
-      |> Enum.filter(&is_nil(&1.accepted_at))
-
-    socket
-    |> assign(:primary_user, primary_user)
-    |> assign(:sub_accounts, sub_accounts)
-    |> assign(:family_members, family_members)
-    |> assign(:pending_invites, pending_invites)
   end
 
   defp lifetime_membership_changeset(params) do
