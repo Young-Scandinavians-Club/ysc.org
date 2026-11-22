@@ -515,8 +515,8 @@ defmodule Ysc.Accounts do
     - `:state` - User state to filter by (default: :active)
     - `:select` - User columns to load as `select: struct`. When set, skips
       the `current_avatar` preload so callers that only need name/email
-      (membership check-in) do not SELECT `hashed_password` / bios or hit
-      `avatars`. Omit it for pickers that render avatars.
+      (membership check-in, admin family-link) do not SELECT `hashed_password`
+      / bios or hit `avatars`. Omit it for pickers that render avatars.
 
   ## Examples
 
@@ -562,6 +562,34 @@ defmodule Ysc.Accounts do
       fields when is_list(fields) ->
         from(u in base, select: struct(u, ^fields))
     end
+  end
+
+  # Admin family-link typeahead: name/email plus the columns
+  # `admin_link_user_to_family/3` needs (`primary_user_id` for
+  # `sub_account?/1`, `board_position` for volunteer billing sync after
+  # the UPDATE). Omits hashed_password, bios, Stripe ids, and the
+  # current_avatar preload default `search_users/2` uses for photo pickers.
+  @family_link_search_user_fields [
+    :id,
+    :email,
+    :first_name,
+    :last_name,
+    :primary_user_id,
+    :board_position
+  ]
+
+  @doc """
+  Active users matching `query` for the admin family-link typeahead.
+
+  Selects identity plus `primary_user_id` / `board_position` so the LiveView
+  can call `admin_link_user_to_family/3` with the search-result struct
+  instead of re-fetching the full user row.
+  """
+  def search_users_for_family_link(query) when is_binary(query) do
+    search_users(query,
+      limit: 8,
+      select: @family_link_search_user_fields
+    )
   end
 
   @doc """
@@ -5776,6 +5804,14 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_search_users_query do
     search_users_query("ci")
+  end
+
+  @doc false
+  def ci_query_explain_search_users_for_family_link_query do
+    search_users_query("ci",
+      limit: 8,
+      select: @family_link_search_user_fields
+    )
   end
 
   @doc false

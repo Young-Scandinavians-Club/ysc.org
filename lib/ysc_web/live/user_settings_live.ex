@@ -1475,20 +1475,19 @@ defmodule YscWeb.UserSettingsLive do
                           )
                         ]}>
                           <%= if @membership_change_info.direction == :upgrade do %>
-                            <p>
-                              To upgrade today, you'll pay the price difference for the rest of your
-                              membership year when you switch from {String.capitalize(
-                                "#{@membership_change_info.current_plan.id}"
-                              )} to {String.capitalize(
-                                "#{@membership_change_info.new_plan.id}"
-                              )} membership. Today's charge won't exceed <strong>
-                                {Ysc.MoneyHelper.format_money!(
-                                  Money.new(
-                                    :USD,
-                                    @membership_change_info.price_difference
-                                  )
-                                )}
-                              </strong>.
+                            <p id="plan-change-upgrade-body">
+                              {MembershipUserMessages.upgrade_banner_before_amount(
+                                MembershipUserMessages.plan_name(
+                                  @membership_change_info.new_plan.id
+                                )
+                              )}
+                              <strong>{membership_change_max_label(
+                                @membership_change_info
+                              )}</strong>. {MembershipUserMessages.upgrade_banner_after_amount(
+                                MembershipUserMessages.plan_name(
+                                  @membership_change_info.new_plan.id
+                                )
+                              )}
                             </p>
                           <% else %>
                             <p>
@@ -1568,9 +1567,11 @@ defmodule YscWeb.UserSettingsLive do
                     :if={@change_membership_button}
                     class="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-zinc-100"
                   >
-                    <p class="text-sm text-zinc-500">
+                    <p class="text-sm text-zinc-500" id="plan-change-confirm-helper">
                       <%= if @membership_change_info && @membership_change_info.direction == :upgrade do %>
-                        You'll pay the difference for the rest of your membership year today.
+                        {MembershipUserMessages.upgrade_confirm_helper(
+                          membership_change_max_label(@membership_change_info)
+                        )}
                       <% else %>
                         The change will take effect at your next renewal date.
                       <% end %>
@@ -2015,152 +2016,17 @@ defmodule YscWeb.UserSettingsLive do
               <!-- Filter Chips (hidden while loading) -->
               <div :if={!assigns[:loading_payments]}>
                 <div class="flex flex-wrap gap-2 pb-4 border-b border-zinc-200">
-                  <button
+                  <.filter_chip
+                    :for={chip <- payment_filter_chips()}
+                    id={chip.id}
+                    active={@payment_filter == chip.filter}
+                    color={chip.color}
+                    icon={chip.icon}
                     phx-click="filter-payments"
-                    phx-value-filter="all"
-                    class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition",
-                      if(@payment_filter == :all,
-                        do: "bg-blue-600 text-white shadow-md",
-                        else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                      )
-                    ]}
+                    phx-value-filter={to_string(chip.filter)}
                   >
-                    All
-                  </button>
-                  <button
-                    phx-click="filter-payments"
-                    phx-value-filter="tahoe"
-                    class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
-                      if(@payment_filter == :tahoe,
-                        do: "bg-blue-600 text-white shadow-md",
-                        else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                      )
-                    ]}
-                  >
-                    <.icon
-                      name="hero-home"
-                      class={[
-                        "w-4 h-4",
-                        if(@payment_filter == :tahoe,
-                          do: "text-white",
-                          else: "text-blue-600"
-                        )
-                      ]}
-                    />Tahoe
-                  </button>
-                  <button
-                    phx-click="filter-payments"
-                    phx-value-filter="clear_lake"
-                    class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
-                      if(@payment_filter == :clear_lake,
-                        do: "bg-emerald-600 text-white shadow-md",
-                        else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                      )
-                    ]}
-                  >
-                    <.icon
-                      name="hero-home"
-                      class={[
-                        "w-4 h-4",
-                        if(@payment_filter == :clear_lake,
-                          do: "text-white",
-                          else: "text-emerald-600"
-                        )
-                      ]}
-                    />Clear Lake
-                  </button>
-                  <button
-                    phx-click="filter-payments"
-                    phx-value-filter="events"
-                    class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
-                      if(@payment_filter == :events,
-                        do: "bg-purple-600 text-white shadow-md",
-                        else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                      )
-                    ]}
-                  >
-                    <.icon
-                      name="hero-ticket"
-                      class={[
-                        "w-4 h-4",
-                        if(@payment_filter == :events,
-                          do: "text-white",
-                          else: "text-purple-600"
-                        )
-                      ]}
-                    />Events
-                  </button>
-                  <button
-                    phx-click="filter-payments"
-                    phx-value-filter="donations"
-                    class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
-                      if(@payment_filter == :donations,
-                        do: "bg-yellow-600 text-white shadow-md",
-                        else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                      )
-                    ]}
-                  >
-                    <.icon
-                      name="hero-gift"
-                      class={[
-                        "w-4 h-4",
-                        if(@payment_filter == :donations,
-                          do: "text-white",
-                          else: "text-yellow-600"
-                        )
-                      ]}
-                    />Donations
-                  </button>
-                  <button
-                    phx-click="filter-payments"
-                    phx-value-filter="membership"
-                    class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
-                      if(@payment_filter == :membership,
-                        do: "bg-teal-600 text-white shadow-md",
-                        else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                      )
-                    ]}
-                  >
-                    <.icon
-                      name="hero-heart"
-                      class={[
-                        "w-4 h-4",
-                        if(@payment_filter == :membership,
-                          do: "text-white",
-                          else: "text-teal-600"
-                        )
-                      ]}
-                    />Membership
-                  </button>
-                  <button
-                    id="payment-filter-merch"
-                    phx-click="filter-payments"
-                    phx-value-filter="merch"
-                    class={[
-                      "px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2",
-                      if(@payment_filter == :merch,
-                        do: "bg-rose-600 text-white shadow-md",
-                        else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                      )
-                    ]}
-                  >
-                    <.icon
-                      name="hero-shopping-bag"
-                      class={[
-                        "w-4 h-4",
-                        if(@payment_filter == :merch,
-                          do: "text-white",
-                          else: "text-rose-600"
-                        )
-                      ]}
-                    />Club Gear
-                  </button>
+                    {chip.label}
+                  </.filter_chip>
                 </div>
                 <!-- Desktop Table View -->
                 <div class="hidden md:block overflow-x-auto">
@@ -5294,6 +5160,10 @@ defmodule YscWeb.UserSettingsLive do
     end)
   end
 
+  defp membership_change_max_label(%{price_difference: price_difference}) do
+    Ysc.MoneyHelper.format_money!(Money.new(:USD, price_difference))
+  end
+
   defp get_success_message(:upgrade) do
     "Your membership plan has been upgraded. You've been charged the difference for the rest of your membership year."
   end
@@ -5307,6 +5177,54 @@ defmodule YscWeb.UserSettingsLive do
 
   defp normalize_verification_code(code),
     do: VerificationCodes.normalize_otp_input(code)
+
+  defp payment_filter_chips do
+    [
+      %{filter: :all, label: "All", color: :blue, icon: nil, id: nil},
+      %{
+        filter: :tahoe,
+        label: "Tahoe",
+        color: :blue,
+        icon: "hero-home",
+        id: nil
+      },
+      %{
+        filter: :clear_lake,
+        label: "Clear Lake",
+        color: :emerald,
+        icon: "hero-home",
+        id: nil
+      },
+      %{
+        filter: :events,
+        label: "Events",
+        color: :purple,
+        icon: "hero-ticket",
+        id: nil
+      },
+      %{
+        filter: :donations,
+        label: "Donations",
+        color: :yellow,
+        icon: "hero-gift",
+        id: nil
+      },
+      %{
+        filter: :membership,
+        label: "Membership",
+        color: :teal,
+        icon: "hero-heart",
+        id: nil
+      },
+      %{
+        filter: :merch,
+        label: "Club Gear",
+        color: :rose,
+        icon: "hero-shopping-bag",
+        id: "payment-filter-merch"
+      }
+    ]
+  end
 
   defp paginate_payments(socket, new_page) when new_page >= 1 do
     %{payments_per_page: per_page, user: user} = socket.assigns

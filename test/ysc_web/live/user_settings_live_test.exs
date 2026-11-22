@@ -2139,6 +2139,102 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert banner =~ "Your membership will switch at your next renewal date"
       assert banner =~ "No immediate charges or credits will apply"
     end
+
+    test "selecting Family names today's charge as a ceiling, not a won't-exceed hedge",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active})
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          stripe_id: "cus_upgradecopy_#{System.unique_integer()}"
+        })
+        |> Repo.update()
+
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(plans, &(&1.id == :single))
+      family_plan = Enum.find(plans, &(&1.id == :family))
+      assert single_plan && family_plan
+
+      max_label =
+        Ysc.MoneyHelper.format_money!(
+          Money.new(:USD, abs(family_plan.amount - single_plan.amount))
+        )
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_upgradecopy_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_upgradecopy_#{System.unique_integer()}",
+          stripe_product_id: "prod_single",
+          stripe_price_id: single_plan.stripe_price_id,
+          quantity: 1
+        })
+
+      {:ok, _} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_upgradecopy_default",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      MembershipCache.invalidate_user(user.id)
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_change(view, "validate_membership", %{
+        "membership_type" => "family"
+      })
+
+      assert has_element?(view, "#plan-change-info-banner")
+      assert has_element?(view, "#plan-change-upgrade-body")
+      assert has_element?(view, "#plan-change-confirm-helper")
+
+      heading =
+        view
+        |> element("#plan-change-banner-heading")
+        |> render()
+
+      assert heading =~ "Upgrade to Family Membership"
+
+      banner =
+        view
+        |> element("#plan-change-upgrade-body")
+        |> render()
+
+      assert banner =~ "You&#39;ll switch to Family today"
+      assert banner =~ "at most"
+      assert banner =~ max_label
+      assert banner =~ "partway through the year"
+      assert banner =~ "you&#39;ll pay less than that"
+      assert banner =~ "Family price"
+      refute banner =~ "won&#39;t exceed"
+      refute banner =~ "won't exceed"
+      refute banner =~ "price difference"
+
+      helper =
+        view
+        |> element("#plan-change-confirm-helper")
+        |> render()
+
+      assert helper =~ "You&#39;ll be charged today — at most #{max_label}."
+      refute helper =~ "the difference for the rest"
+    end
   end
 
   describe "settings page — email validation and payment method UI" do

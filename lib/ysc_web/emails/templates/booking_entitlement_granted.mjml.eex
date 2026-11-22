@@ -3,7 +3,7 @@
     <mj-image src="<%= @header_image_url %>" alt="<%= @header_image_alt %>" border-radius="8px" padding="0px" fluid-on-mobile="true"></mj-image>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Cabin booking benefit</strong>
+      <strong><%= @headline %></strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -12,7 +12,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hello <%= @first_name %>!</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We've added a booking benefit to your Young Scandinavians Club account <strong>for your next eligible cabin booking</strong>.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We've added this to your Young Scandinavians Club account. Use it the next time you book a cabin stay.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-wrapper background-color="#f0f9ff" border-radius="8px" padding="8px">
       <mj-section background-color="#f0f9ff" border-radius="8px" padding="20px 24px">

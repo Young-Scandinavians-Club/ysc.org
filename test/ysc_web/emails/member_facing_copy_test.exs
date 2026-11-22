@@ -405,6 +405,11 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       data = BookingEntitlementGranted.prepare_email_data(ent, user)
 
+      assert data.headline == "2 free nights on your next cabin stay"
+
+      assert BookingEntitlementGranted.get_subject(data) ==
+               "2 free nights on your next cabin stay"
+
       assert data.benefit_description =~ "2 free nights on your next cabin stay"
 
       assert data.benefit_description =~
@@ -417,6 +422,9 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
       refute data.benefit_description =~ "proportionally"
       refute data.benefit_description =~ "subtotal"
       refute data.benefit_description =~ "eligible stay"
+
+      assert data.next_booking_notice =~ "next new cabin booking"
+      refute data.next_booking_notice =~ "eligible"
 
       assert data.property_line == "Cabin: Lake Tahoe."
 
@@ -432,11 +440,18 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       html = BookingEntitlementGranted.render(data)
       text = html_text(html)
+      assert text =~ "2 free nights on your next cabin stay"
+      assert text =~ "Use it the next time you book a cabin stay"
+      assert text =~ "next new cabin booking"
       assert text =~ "Start a new booking"
       assert text =~ "you still pay for the extra nights"
       assert text =~ "Your exact savings show on the price summary"
       refute text =~ "half off"
       refute text =~ "Start a new reservation"
+      refute text =~ "eligible"
+      refute text =~ "Cabin booking benefit"
+      refute text =~ "A cabin benefit"
+      refute text =~ "booking benefit"
     end
 
     test "free-nights copy stays accurate for a single free night" do
@@ -451,9 +466,53 @@ defmodule YscWeb.Emails.MemberFacingCopyTest do
 
       data = BookingEntitlementGranted.prepare_email_data(ent, user)
 
+      assert data.headline == "1 free night on your next cabin stay"
       assert data.benefit_description =~ "1 free night on your next cabin stay"
       refute data.benefit_description =~ "1 free nights"
       refute data.benefit_description =~ "half off"
+    end
+
+    test "subject and heading name the discount for percent and dollar grants" do
+      user = oauth_user_fixture(%{first_name: "Jane"})
+
+      percent =
+        BookingEntitlementGranted.prepare_email_data(
+          %BookingEntitlement{
+            benefit_kind: :percent_off,
+            percent_off: Decimal.new("15"),
+            property: :tahoe
+          },
+          user
+        )
+
+      assert percent.headline ==
+               "#{Decimal.round(Decimal.new("15"), 2)}% off your next cabin stay"
+
+      assert BookingEntitlementGranted.get_subject(percent) == percent.headline
+
+      amount =
+        BookingEntitlementGranted.prepare_email_data(
+          %BookingEntitlement{
+            benefit_kind: :fixed_amount_off,
+            amount_off: Money.new(:USD, 50),
+            property: :clear_lake
+          },
+          user
+        )
+
+      assert amount.headline == "A $50.00 discount on your next cabin stay"
+      assert BookingEntitlementGranted.get_subject(amount) == amount.headline
+    end
+
+    test "subject falls back when headline is missing or blank" do
+      assert BookingEntitlementGranted.get_subject(%{}) ==
+               "A discount for your next cabin stay"
+
+      assert BookingEntitlementGranted.get_subject(%{headline: ""}) ==
+               "A discount for your next cabin stay"
+
+      assert BookingEntitlementGranted.get_subject(%{headline: nil}) ==
+               "A discount for your next cabin stay"
     end
   end
 

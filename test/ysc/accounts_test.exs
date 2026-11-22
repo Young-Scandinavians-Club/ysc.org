@@ -1172,6 +1172,134 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "search_users_for_family_link/1" do
+    test "omits hashed_password and skips the avatar preload" do
+      unique = System.unique_integer([:positive])
+
+      user =
+        user_fixture(%{
+          first_name: "FamilyLink#{unique}",
+          last_name: "Member",
+          phone_number: "+14159098268",
+          board_bio: "family-link typeahead must not load this bio"
+        })
+        |> Ecto.Changeset.change(%{board_position: :treasurer})
+        |> Repo.update!()
+
+      {results, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Accounts.search_users_for_family_link("FamilyLink#{unique}")
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      found = Enum.find(results, &(&1.id == user.id))
+      assert found
+      assert found.first_name == user.first_name
+      assert found.email == user.email
+      assert found.board_position == :treasurer
+      assert is_nil(found.primary_user_id)
+      assert is_nil(found.hashed_password)
+      assert is_nil(found.board_bio)
+      assert password_cols == 0
+
+      {_results, avatar_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Accounts.search_users_for_family_link("FamilyLink#{unique}")
+          end,
+          pattern: ~r/FROM "avatars"/i,
+          caller_pids: [self()]
+        )
+
+      assert avatar_cols == 0
+    end
+
+    test "admin_link_user_to_family accepts a slim search result" do
+      unique = System.unique_integer([:positive])
+
+      primary =
+        user_fixture(%{
+          first_name: "FamilyHost#{unique}",
+          phone_number: "+14159098269"
+        })
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      member =
+        user_fixture(%{
+          first_name: "FamilyGuest#{unique}",
+          last_name: "Member",
+          phone_number: "+14159098270"
+        })
+
+      [found] = Accounts.search_users_for_family_link("FamilyGuest#{unique}")
+      assert found.id == member.id
+      assert is_nil(found.hashed_password)
+
+      assert {:ok, linked} =
+               Accounts.admin_link_user_to_family(primary, found,
+                 relationship: :child
+               )
+
+      assert linked.primary_user_id == primary.id
+      assert Accounts.get_user!(member.id).primary_user_id == primary.id
+    end
+
+    test "slim search result still rejects an already-linked user" do
+      unique = System.unique_integer([:positive])
+
+      primary =
+        user_fixture(%{
+          first_name: "FamilyRejectHost#{unique}",
+          phone_number: "+14159098271"
+        })
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      other_primary =
+        user_fixture(%{
+          first_name: "FamilyOtherHost#{unique}",
+          phone_number: "+14159098272"
+        })
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      member =
+        user_fixture(%{
+          first_name: "FamilyAlready#{unique}",
+          last_name: "Linked",
+          phone_number: "+14159098273"
+        })
+
+      assert {:ok, member} =
+               Accounts.admin_link_user_to_family(other_primary, member,
+                 relationship: :child
+               )
+
+      [found] = Accounts.search_users_for_family_link("FamilyAlready#{unique}")
+      assert found.id == member.id
+      assert found.primary_user_id == other_primary.id
+      assert is_nil(found.hashed_password)
+
+      assert {:error, :already_linked_to_family} =
+               Accounts.admin_link_user_to_family(primary, found,
+                 relationship: :child
+               )
+    end
+  end
+
   describe "list_event_notification_recipients/0" do
     test "returns opted-in active users without loading hashed_password" do
       opted_in =
