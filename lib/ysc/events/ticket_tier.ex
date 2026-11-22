@@ -35,6 +35,13 @@ defmodule Ysc.Events.TicketTier do
     # See `Ysc.Events.MemberOnlyTickets` for the per-plan rules.
     field :member_only, :boolean, default: false
 
+    # Who the tier is sold to. `:public` tiers need no membership; see
+    # `Ysc.Events.TierAudience`. `member_only` is kept in sync with
+    # `:members_only` by the changeset.
+    field :sale_audience, Ecto.Enum,
+      values: [:member_guests, :members_only, :public],
+      default: :member_guests
+
     # Max tickets of this tier one buyer may hold per event (nil = no limit).
     # See `Ysc.Events.TierPurchaseLimits`.
     field :max_per_buyer, :integer
@@ -71,12 +78,14 @@ defmodule Ysc.Events.TicketTier do
       :price,
       :requires_registration,
       :member_only,
+      :sale_audience,
       :max_per_buyer,
       :start_date,
       :end_date,
       :event_id,
       :lock_version
     ])
+    |> sync_sale_audience()
     |> cast_embed(:attendee_questions,
       with: &Ysc.Events.AttendeeQuestion.changeset/2,
       sort_param: :attendee_questions_sort,
@@ -88,6 +97,7 @@ defmodule Ysc.Events.TicketTier do
       :event_id
     ])
     |> validate_attendee_questions_limit()
+    |> validate_public_collects_buyer_only()
     |> validate_unique_question_labels()
     |> enforce_free_price()
     |> validate_required_price()
@@ -98,6 +108,47 @@ defmodule Ysc.Events.TicketTier do
     |> validate_money(:price)
     |> optimistic_lock(:lock_version)
     |> foreign_key_constraint(:event_id)
+  end
+
+  # `sale_audience` is the source of truth; `member_only` mirrors
+  # `:members_only` for the member-only purchase rules. A caller that only
+  # toggles the legacy `member_only` flag still lands on a consistent audience.
+  defp sync_sale_audience(changeset) do
+    audience_change = get_change(changeset, :sale_audience)
+    member_only_change = get_change(changeset, :member_only)
+
+    cond do
+      audience_change != nil ->
+        put_change(changeset, :member_only, audience_change == :members_only)
+
+      member_only_change == true ->
+        put_change(changeset, :sale_audience, :members_only)
+
+      member_only_change == false &&
+          get_field(changeset, :sale_audience) == :members_only ->
+        put_change(changeset, :sale_audience, :member_guests)
+
+      true ->
+        changeset
+    end
+  end
+
+  # Guests give a name and email at checkout and nothing per ticket, so a
+  # tier sold to the public can't depend on attendee details.
+  defp validate_public_collects_buyer_only(changeset) do
+    needs_details? =
+      get_field(changeset, :requires_registration) == true or
+        List.wrap(get_field(changeset, :attendee_questions)) != []
+
+    if get_field(changeset, :sale_audience) == :public and needs_details? do
+      add_error(
+        changeset,
+        :sale_audience,
+        "Public tickets only collect the buyer's name and email. Turn off per-ticket details and questions first."
+      )
+    else
+      changeset
+    end
   end
 
   @max_attendee_questions 10

@@ -75,12 +75,15 @@ defmodule Ysc.Tickets.StripeService do
     payment_intent_params = %{
       amount: amount_cents,
       currency: "usd",
-      metadata: %{
-        ticket_order_id: ticket_order.id,
-        ticket_order_reference: ticket_order.reference_id,
-        event_id: ticket_order.event_id,
-        user_id: ticket_order.user_id
-      },
+      # Guest orders have no user_id; Stripe rejects nil metadata values.
+      metadata:
+        %{
+          ticket_order_id: ticket_order.id,
+          ticket_order_reference: ticket_order.reference_id,
+          event_id: ticket_order.event_id,
+          user_id: ticket_order.user_id
+        }
+        |> Map.reject(fn {_key, value} -> is_nil(value) end),
       description: "Event tickets - Order #{ticket_order.reference_id}"
     }
 

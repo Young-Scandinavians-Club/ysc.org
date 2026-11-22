@@ -98,7 +98,9 @@ defmodule YscWeb.AdminEventsLive.TicketList do
               class="w-3.5 h-3.5 text-zinc-500 shrink-0"
             />
             <.user_card
-              user={group.order && group.order.user}
+              user={
+                group.order && Ysc.Tickets.TicketOrder.display_user(group.order)
+              }
               class="h-auto min-w-0 flex-1"
               truncate
             />
@@ -1012,7 +1014,7 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
     if name == "" and registration.email in [nil, ""] do
       # Answers-only detail: no attendee was named, so the buyer stands in.
-      attendee_display(%{user: ticket.user})
+      attendee_display(%{user: purchaser(ticket)})
     else
       {name, registration.email}
     end
@@ -1025,6 +1027,15 @@ defmodule YscWeb.AdminEventsLive.TicketList do
   end
 
   defp attendee_display(_ticket), do: {nil, nil}
+
+  # The buyer: the ticket's holder, or for a guest order (no account) the
+  # name and email given at checkout.
+  defp purchaser(%{user: %{} = user}), do: user
+
+  defp purchaser(%{ticket_order: %Ysc.Tickets.TicketOrder{} = order}),
+    do: Ysc.Tickets.TicketOrder.display_user(order)
+
+  defp purchaser(_ticket), do: nil
 
   defp blank_to_default(nil, default), do: default
   defp blank_to_default("", default), do: default
@@ -1056,15 +1067,14 @@ defmodule YscWeb.AdminEventsLive.TicketList do
       )
 
     Enum.map(tickets, fn ticket ->
-      purchaser_first_name = ticket.user.first_name || ""
-      purchaser_last_name = ticket.user.last_name || ""
-      purchaser_email = ticket.user.email || ""
+      buyer = purchaser(ticket) || %{}
+      purchaser_first_name = Map.get(buyer, :first_name) || ""
+      purchaser_last_name = Map.get(buyer, :last_name) || ""
+      purchaser_email = Map.get(buyer, :email) || ""
 
       phone =
-        (ticket.user.phone_number &&
-           Ysc.Extensions.PhoneNumber.format_for_display(
-             ticket.user.phone_number
-           )) ||
+        (Map.get(buyer, :phone_number) &&
+           Ysc.Extensions.PhoneNumber.format_for_display(buyer.phone_number)) ||
           ""
 
       # The attendee is whoever the registration names; when the ticket has no

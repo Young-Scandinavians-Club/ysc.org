@@ -26,6 +26,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Events.TicketDetail
   alias Ysc.Events.TicketTier
   alias Ysc.Events.TicketTierHelpers
+  alias Ysc.Events.TierAudience
   alias Ysc.Events.MemberOnlyTickets
   alias Ysc.Events.TierPurchaseLimits
   alias Ysc.Events.Event
@@ -120,11 +121,12 @@ defmodule Ysc.Tickets do
       ticket_selections: ticket_selections
     )
 
-    case membership_user(user_id, opts) do
+    ticket_tiers = selection_tier_attrs(ticket_selections, opts)
+
+    case membership_user(user_id, ticket_tiers, opts) do
       {:ok, user} ->
         with :ok <-
                validate_door_sale_quantities(ticket_selections, opts),
-             ticket_tiers = selection_tier_attrs(ticket_selections, opts),
              :ok <-
                validate_member_only_selection(
                  user,
@@ -361,6 +363,9 @@ defmodule Ysc.Tickets do
     :offline_amount_collected,
     :granted_by_id,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :event_id,
     :payment_id
   ]
@@ -530,6 +535,9 @@ defmodule Ysc.Tickets do
     :expires_at,
     :completed_at,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :event_id,
     :payment_id
   ]
@@ -603,6 +611,9 @@ defmodule Ysc.Tickets do
     :payment_id,
     :event_id,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :reference_id
   ]
   @admin_refund_ticket_fields [
@@ -681,7 +692,16 @@ defmodule Ysc.Tickets do
 
   # Member QR page: event title/when/where, ticket cards, and holder names.
   # Skip event HTML, payment, grant notes, and tier description / questions.
-  @qr_ticket_order_fields [:id, :reference_id, :status, :user_id, :event_id]
+  @qr_ticket_order_fields [
+    :id,
+    :reference_id,
+    :status,
+    :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
+    :event_id
+  ]
   @qr_event_fields [
     :id,
     :title,
@@ -845,6 +865,9 @@ defmodule Ysc.Tickets do
     :discount_amount,
     :payment_intent_id,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :event_id,
     :payment_id
   ]
@@ -1788,6 +1811,9 @@ defmodule Ysc.Tickets do
     :total_amount,
     :completed_at,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :payment_id
   ]
   @admin_ticket_registration_fields [
@@ -1874,6 +1900,9 @@ defmodule Ysc.Tickets do
     :reference_id,
     :total_amount,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :payment_id,
     :payment_channel,
     :status,
@@ -3193,6 +3222,17 @@ defmodule Ysc.Tickets do
 
   defp door_sale_quantity_per_tier?(_), do: false
 
+  # Buying needs an active membership unless every selected tier is sold to
+  # the public (`TierAudience`). A mixed selection still needs one, because it
+  # includes a member tier.
+  defp membership_user(user_id, ticket_tiers, opts) do
+    if TierAudience.all_public?(ticket_tiers) do
+      public_sale_user(user_id, opts)
+    else
+      membership_user(user_id, opts)
+    end
+  end
+
   defp membership_user(user_id, opts) do
     case Keyword.get(opts, :user) do
       %User{id: id} = user when id == user_id ->
@@ -3200,6 +3240,20 @@ defmodule Ysc.Tickets do
 
       _ ->
         validate_user_membership(user_id)
+    end
+  end
+
+  defp public_sale_user(user_id, opts) do
+    case Keyword.get(opts, :user) do
+      %User{id: id} = user when id == user_id -> {:ok, user}
+      _ -> fetch_user(user_id)
+    end
+  end
+
+  defp fetch_user(user_id) do
+    case Accounts.get_user(user_id) do
+      nil -> {:error, :user_not_found}
+      user -> {:ok, user}
     end
   end
 
@@ -3304,6 +3358,7 @@ defmodule Ysc.Tickets do
                 %{
                   id: tier.id,
                   member_only: tier.member_only,
+                  sale_audience: Map.get(tier, :sale_audience),
                   max_per_buyer: tier.max_per_buyer,
                   type: tier.type
                 }
@@ -3815,6 +3870,9 @@ defmodule Ysc.Tickets do
     end)
   end
 
+  # Guest orders have no account to save a payment method to.
+  defp extract_payment_method_id(_payment_intent, nil), do: nil
+
   defp extract_payment_method_id(payment_intent, user_id) do
     require Ysc.Logging
 
@@ -3959,6 +4017,10 @@ defmodule Ysc.Tickets do
     Phoenix.PubSub.broadcast(Ysc.PubSub, topic_name, {__MODULE__, event})
   end
 
+  @doc false
+  def broadcast_availability(event_id),
+    do: broadcast_ticket_availability_update(event_id)
+
   defp broadcast_ticket_availability_update(event_id) do
     Ysc.Events.invalidate_event_caches()
 
@@ -4007,7 +4069,7 @@ defmodule Ysc.Tickets do
     Ysc.Logging.info("Starting ticket confirmation email process",
       ticket_order_id: ticket_order.id,
       user_id: ticket_order.user_id,
-      user_email: ticket_order.user.email,
+      user_email: TicketOrder.buyer_email(ticket_order),
       completed_at: ticket_order.completed_at
     )
 
@@ -4036,7 +4098,7 @@ defmodule Ysc.Tickets do
 
       result =
         YscWeb.Emails.Notifier.schedule_email(
-          ticket_order.user.email,
+          TicketOrder.buyer_email(ticket_order),
           idempotency_key,
           YscWeb.Emails.TicketPurchaseConfirmation.get_subject(email_data),
           "ticket_purchase_confirmation",
@@ -4050,7 +4112,7 @@ defmodule Ysc.Tickets do
           Ysc.Logging.info("Ticket confirmation email scheduled successfully",
             ticket_order_id: ticket_order.id,
             user_id: ticket_order.user_id,
-            user_email: ticket_order.user.email,
+            user_email: TicketOrder.buyer_email(ticket_order),
             job_id: job.id,
             idempotency_key: idempotency_key
           )
@@ -4073,7 +4135,7 @@ defmodule Ysc.Tickets do
         Ysc.Logging.error("Failed to send ticket confirmation email",
           ticket_order_id: ticket_order.id,
           user_id: ticket_order.user_id,
-          user_email: ticket_order.user.email,
+          user_email: TicketOrder.buyer_email(ticket_order),
           error: error,
           stacktrace: __STACKTRACE__
         )
