@@ -1640,6 +1640,31 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                FamilyInvites.link_existing_user(invite.token, sub)
     end
 
+    test "stale current_user cannot steal a user already linked elsewhere" do
+      primary_a = create_user_with_lifetime_membership()
+      primary_b = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_b, email)
+
+      invitee =
+        user_fixture(%{
+          email: email,
+          date_of_birth: child_birth_date()
+        })
+
+      assert is_nil(invitee.primary_user_id)
+
+      assert {:ok, _} =
+               Accounts.admin_link_user_to_family(primary_a, invitee,
+                 relationship: :child
+               )
+
+      assert {:error, :already_linked_to_family} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      assert Accounts.get_user!(invitee.id).primary_user_id == primary_a.id
+    end
+
     test "returns has_dependent_family_members when invitee already has sub-accounts" do
       primary_a = create_user_with_lifetime_membership()
 
@@ -2297,6 +2322,11 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
     test "ci_query_explain_invite_created_by_user_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                FamilyInvites.ci_query_explain_invite_created_by_user_query()
+    end
+
+    test "ci_query_explain_lock_invitee_for_family_link_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               FamilyInvites.ci_query_explain_lock_invitee_for_family_link_query()
     end
   end
 

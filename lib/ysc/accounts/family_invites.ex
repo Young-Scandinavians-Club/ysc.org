@@ -546,13 +546,17 @@ defmodule Ysc.Accounts.FamilyInvites do
       end
 
       # Serialize against concurrent family links onto this invitee and re-check
-      # dependents under the same lock used for the primary seat cap.
-      from(u in User,
-        where: u.id == ^current_user.id,
-        select: u.id,
-        lock: "FOR UPDATE"
-      )
-      |> Repo.one!()
+      # already-linked + dependents under the same lock used for the primary
+      # seat cap. A stale `current_user` (or admin search result) can still
+      # have `primary_user_id: nil` after another link committed.
+      {_id, locked_primary_user_id} =
+        current_user.id
+        |> lock_invitee_for_family_link_query()
+        |> Repo.one!()
+
+      if not is_nil(locked_primary_user_id) do
+        Repo.rollback(:already_linked_to_family)
+      end
 
       if has_linked_sub_accounts?(current_user) do
         Repo.rollback(:has_dependent_family_members)
@@ -898,6 +902,16 @@ defmodule Ysc.Accounts.FamilyInvites do
     |> Repo.exists?()
   end
 
+  # Include `id` in the select so `Repo.one!` does not treat a linked-nil
+  # `primary_user_id` as no results.
+  defp lock_invitee_for_family_link_query(user_id) do
+    from(u in User,
+      where: u.id == ^user_id,
+      select: {u.id, u.primary_user_id},
+      lock: "FOR UPDATE"
+    )
+  end
+
   defp reserved_sub_account_slots(primary_user) do
     count_sub_accounts(primary_user) + count_pending_child_invites(primary_user)
   end
@@ -1226,5 +1240,10 @@ defmodule Ysc.Accounts.FamilyInvites do
   @doc false
   def ci_query_explain_invite_created_by_user_query do
     invite_created_by_user_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_lock_invitee_for_family_link_query do
+    lock_invitee_for_family_link_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 end

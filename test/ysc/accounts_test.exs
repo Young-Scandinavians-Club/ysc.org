@@ -345,6 +345,11 @@ defmodule Ysc.AccountsTest do
       assert %Ecto.Query{} =
                Accounts.ci_query_explain_user_notification_profile_query()
     end
+
+    test "ci_query_explain_lock_invitee_for_family_link_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_lock_invitee_for_family_link_query()
+    end
   end
 
   describe "get_user_by_phone_number/1" do
@@ -1297,6 +1302,55 @@ defmodule Ysc.AccountsTest do
                Accounts.admin_link_user_to_family(primary, found,
                  relationship: :child
                )
+    end
+
+    test "stale slim search result cannot steal a user already linked elsewhere" do
+      unique = System.unique_integer([:positive])
+
+      primary =
+        user_fixture(%{
+          first_name: "FamilyStealHost#{unique}",
+          phone_number: "+14159098274"
+        })
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      other_primary =
+        user_fixture(%{
+          first_name: "FamilyStealOther#{unique}",
+          phone_number: "+14159098275"
+        })
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      member =
+        user_fixture(%{
+          first_name: "FamilySteal#{unique}",
+          last_name: "Member",
+          phone_number: "+14159098276"
+        })
+
+      [found] = Accounts.search_users_for_family_link("FamilySteal#{unique}")
+      assert found.id == member.id
+      assert is_nil(found.primary_user_id)
+
+      assert {:ok, _} =
+               Accounts.admin_link_user_to_family(other_primary, member,
+                 relationship: :child
+               )
+
+      assert {:error, :already_linked_to_family} =
+               Accounts.admin_link_user_to_family(primary, found,
+                 relationship: :child
+               )
+
+      assert Accounts.get_user!(member.id).primary_user_id == other_primary.id
     end
   end
 
