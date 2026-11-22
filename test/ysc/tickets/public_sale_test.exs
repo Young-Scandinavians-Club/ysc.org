@@ -152,6 +152,53 @@ defmodule Ysc.Tickets.PublicSaleTest do
              })
   end
 
+  test "door sales (bypass_guards) still need a membership", %{
+    event: event,
+    public_tier: public_tier
+  } do
+    buyer = unique_user()
+
+    assert {:error, :membership_required} =
+             Tickets.create_ticket_order(
+               buyer.id,
+               event.id,
+               %{public_tier.id => 1},
+               bypass_guards: true
+             )
+  end
+
+  test "a ticket without an account is refused for a non-public tier", %{
+    event: event,
+    guest_tier: guest_tier,
+    public_tier: public_tier
+  } do
+    attrs = fn tier ->
+      %{
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        status: :pending,
+        expires_at: DateTime.add(DateTime.utc_now(), 300, :second)
+      }
+    end
+
+    refused =
+      Ysc.Events.Ticket.changeset(%Ysc.Events.Ticket{}, attrs.(guest_tier),
+        guest: true,
+        public_sale: false
+      )
+
+    refute refused.valid?
+    assert %{ticket_tier_id: ["is not sold to the public"]} = errors_on(refused)
+
+    allowed =
+      Ysc.Events.Ticket.changeset(%Ysc.Events.Ticket{}, attrs.(public_tier),
+        guest: true,
+        public_sale: true
+      )
+
+    assert allowed.valid?
+  end
+
   test "an unknown buyer is rejected for a public tier", %{
     event: event,
     public_tier: public_tier

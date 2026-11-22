@@ -3857,6 +3857,45 @@ defmodule YscWeb.EventDetailsLive do
     socket
     |> assign(:event, event_with_pricing)
     |> assign(:ticket_tiers, ticket_tiers)
+    |> prune_inaccessible_selections()
+  end
+
+  # An admin can change a tier's audience (or delete it) while a visitor has it
+  # selected. Such a tier's controls are replaced by a sign-in/membership panel,
+  # so the selection could no longer be removed and would block checkout. Drop
+  # it, keep the rest, and say so. Left alone once payment is under way.
+  defp prune_inaccessible_selections(socket) do
+    selected = socket.assigns[:selected_tickets] || %{}
+
+    if selected == %{} or socket.assigns[:show_payment_modal] == true do
+      socket
+    else
+      kind =
+        viewer_kind(
+          socket.assigns.current_user,
+          socket.assigns[:active_membership?]
+        )
+
+      {kept, dropped} =
+        Enum.split_with(selected, fn {tier_id, _quantity} ->
+          case Enum.find(socket.assigns.ticket_tiers, &(&1.id == tier_id)) do
+            nil -> false
+            tier -> TierAudience.access(tier, kind) == :available
+          end
+        end)
+
+      if dropped == [] do
+        socket
+      else
+        socket
+        |> assign_selected_tickets(Map.new(kept))
+        |> YscWeb.Flash.put_toast(
+          :info,
+          "Some tickets you picked are no longer available to you, so we removed them.",
+          title: "Tickets"
+        )
+      end
+    end
   end
 
   defp load_user_tickets(nil, _event_id), do: {[], %{}}

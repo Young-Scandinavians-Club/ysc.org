@@ -1026,6 +1026,14 @@ defmodule YscWeb.AdminEventsLive.TicketList do
      |> Enum.join(" "), user.email}
   end
 
+  # No registration and no account (guest order): the buyer is the attendee.
+  defp attendee_display(%{ticket_order: %Ysc.Tickets.TicketOrder{}} = ticket) do
+    case purchaser(ticket) do
+      nil -> {nil, nil}
+      buyer -> attendee_display(%{user: buyer})
+    end
+  end
+
   defp attendee_display(_ticket), do: {nil, nil}
 
   # The buyer: the ticket's holder, or for a guest order (no account) the

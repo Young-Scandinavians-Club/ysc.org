@@ -79,10 +79,23 @@ defmodule Ysc.Events.Ticket do
       :discount_amount
     ])
     |> validate_required(required_fields(opts))
+    |> validate_guest_tier_public(opts)
     |> validate_active_membership(opts)
     |> validate_event_not_in_past(opts)
     |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
+  end
+
+  # A ticket without an account is only valid for a tier sold to the public,
+  # checked against the tier row the booking loaded (so a tier switched to
+  # members-only after guest validation can't still sell to a guest).
+  defp validate_guest_tier_public(changeset, opts) do
+    if Keyword.get(opts, :guest, false) and
+         not Keyword.get(opts, :public_sale, false) do
+      add_error(changeset, :ticket_tier_id, "is not sold to the public")
+    else
+      changeset
+    end
   end
 
   defp required_fields(opts) do

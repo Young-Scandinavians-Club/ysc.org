@@ -93,7 +93,14 @@ defmodule YscWeb.EventDetailsLive.PublicSaleTest do
     member_tier =
       create_tier.("Members GA", %{sale_audience: :members_only})
 
-    %{event: event, public_tier: public_tier, member_tier: member_tier}
+    guest_tier = create_tier.("Member guests", %{sale_audience: :member_guests})
+
+    %{
+      event: event,
+      public_tier: public_tier,
+      member_tier: member_tier,
+      guest_tier: guest_tier
+    }
   end
 
   defp increase_enabled?(view, tier_id) do
@@ -193,7 +200,9 @@ defmodule YscWeb.EventDetailsLive.PublicSaleTest do
     test "a visitor who may not buy a tier cannot raise its quantity", %{
       conn: conn
     } do
-      %{event: event, member_tier: member_tier} = event_with_tiers(true)
+      # A member-guests tier isolates the audience guard: unlike a members-only
+      # tier, no membership-plan limit also blocks it.
+      %{event: event, guest_tier: member_tier} = event_with_tiers(true)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets")
       render_async(view)
@@ -256,6 +265,40 @@ defmodule YscWeb.EventDetailsLive.PublicSaleTest do
 
       {path, _flash} = assert_redirect(view)
       assert path =~ "/events/#{event.id}/checkout?s="
+    end
+
+    test "a selected tier that stops being public is dropped, the rest kept", %{
+      conn: conn
+    } do
+      %{event: event, public_tier: kept} = event_with_tiers(true)
+
+      {:ok, dropped} =
+        Events.create_ticket_tier(%{
+          name: "Second public",
+          type: :paid,
+          price: Money.new(10, :USD),
+          quantity: 20,
+          sale_audience: :public,
+          event_id: event.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets")
+      render_async(view)
+
+      for tier <- [kept, dropped] do
+        render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      end
+
+      {:ok, _} =
+        Events.update_ticket_tier(dropped, %{sale_audience: "members_only"})
+
+      # The PubSub refresh is already in the LiveView's mailbox once the update
+      # returns, so this render happens after it was handled.
+      render(view)
+
+      selected = :sys.get_state(view.pid).socket.assigns.selected_tickets
+      assert Map.get(selected, kept.id) == 1
+      assert has_element?(view, "#tier-sign-in-#{dropped.id}")
     end
 
     test "anonymous checkout with nothing buyable goes to sign in", %{

@@ -3226,7 +3226,10 @@ defmodule Ysc.Tickets do
   # the public (`TierAudience`). A mixed selection still needs one, because it
   # includes a member tier.
   defp membership_user(user_id, ticket_tiers, opts) do
-    if TierAudience.all_public?(ticket_tiers) do
+    # Door sales (`:bypass_guards`) keep the membership requirement: the
+    # public-sale exemption is for self-service checkout only.
+    if TierAudience.all_public?(ticket_tiers) and
+         not Keyword.get(opts, :bypass_guards, false) do
       public_sale_user(user_id, opts)
     else
       membership_user(user_id, opts)

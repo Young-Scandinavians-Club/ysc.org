@@ -104,6 +104,19 @@ defmodule Ysc.Events.TierAudienceTest do
       refute Ecto.Changeset.get_field(cs, :member_only)
     end
 
+    test "an explicit audience wins even when it equals the current value" do
+      tier = %TicketTier{sale_audience: :member_guests, member_only: false}
+
+      cs =
+        TicketTier.changeset(tier, %{
+          "sale_audience" => "member_guests",
+          "member_only" => "true"
+        })
+
+      assert Ecto.Changeset.get_field(cs, :sale_audience) == :member_guests
+      refute Ecto.Changeset.get_field(cs, :member_only)
+    end
+
     test "legacy member_only: true lands on members_only" do
       cs = changeset(%{member_only: true})
       assert Ecto.Changeset.get_field(cs, :sale_audience) == :members_only

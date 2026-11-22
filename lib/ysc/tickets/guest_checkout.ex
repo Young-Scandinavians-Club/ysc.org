@@ -19,7 +19,6 @@ defmodule Ysc.Tickets.GuestCheckout do
   alias Ysc.Repo
   alias Ysc.Tickets
   alias Ysc.Tickets.BookingLocker
-  alias Ysc.Tickets.CheckoutCancel
   alias Ysc.Tickets.TicketOrder
 
   @selection_salt "guest_checkout_selection_v1"
@@ -88,7 +87,7 @@ defmodule Ysc.Tickets.GuestCheckout do
   `{:ok, %TicketOrder{}}` (tickets and tiers loaded) or `{:error, reason}`:
   `:invalid_guest` / `{:invalid_guest, %Ecto.Changeset{}}` for bad contact
   details, `:guest_checkout_not_allowed`, `:tier_purchase_limit_exceeded`,
-  `:checkout_payment_in_progress`, and the usual booking errors
+  `:too_many_open_holds`, and the usual booking errors
   (`:overbooked`, `:event_capacity_exceeded`, `:event_in_past`, ...).
   """
   def create_order(guest, event_id, ticket_selections)
@@ -166,16 +165,13 @@ defmodule Ysc.Tickets.GuestCheckout do
                  ticket_selections,
                  tiers
                ),
-             :ok <- prepare_new_session(guest.email, event_id),
+             :ok <- validate_open_holds(guest.email, event_id),
              {:ok, order} <-
                BookingLocker.atomic_booking(nil, event_id, ticket_selections,
                  guest: guest
                ) do
           {:created, order}
         else
-          {:error, :checkout_payment_in_progress} ->
-            {:blocked, :checkout_payment_in_progress}
-
           {:error, reason} ->
             Repo.rollback(reason)
         end
@@ -185,9 +181,6 @@ defmodule Ysc.Tickets.GuestCheckout do
       {:ok, {:created, order}} ->
         Tickets.broadcast_availability(event_id)
         {:ok, order}
-
-      {:ok, {:blocked, reason}} ->
-        {:error, reason}
 
       {:error, reason} ->
         {:error, reason}
@@ -239,41 +232,25 @@ defmodule Ysc.Tickets.GuestCheckout do
     )
   end
 
-  # Supersede this guest's earlier unpaid carts for the event so they stop
-  # holding inventory, unless one has a payment in flight (then block, so the
-  # guest cannot pay twice).
-  defp prepare_new_session(email, event_id) do
-    pending =
-      Repo.all(
+  # An email address is typed by the visitor and proves nothing, so it never
+  # lets one checkout cancel another's hold. Holds expire on their own after a
+  # few minutes (`TimeoutWorker`); this only stops one address from stacking up
+  # many at once.
+  @max_open_holds 3
+
+  defp validate_open_holds(email, event_id) do
+    now = DateTime.utc_now()
+
+    open =
+      Repo.aggregate(
         from(o in TicketOrder,
           where:
             o.guest_email == ^email and o.event_id == ^event_id and
-              o.status == :pending
-        )
+              o.status == :pending and o.expires_at > ^now
+        ),
+        :count
       )
 
-    {safe, in_flight} =
-      Enum.split_with(
-        pending,
-        &CheckoutCancel.pending_order_safe_to_cancel?(&1,
-          context: "guest_create_order"
-        )
-      )
-
-    fulfilled? =
-      safe
-      |> Enum.map(
-        &Tickets.cancel_ticket_order(&1, "Superseded by new checkout",
-          context: "guest_create_order"
-        )
-      )
-      |> Enum.any?(fn
-        {:ok, %TicketOrder{status: :completed}} -> true
-        _ -> false
-      end)
-
-    if fulfilled? or in_flight != [],
-      do: {:error, :checkout_payment_in_progress},
-      else: :ok
+    if open >= @max_open_holds, do: {:error, :too_many_open_holds}, else: :ok
   end
 end

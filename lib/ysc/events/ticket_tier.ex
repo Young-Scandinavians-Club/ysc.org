@@ -85,7 +85,7 @@ defmodule Ysc.Events.TicketTier do
       :event_id,
       :lock_version
     ])
-    |> sync_sale_audience()
+    |> sync_sale_audience(audience_supplied?(normalized_attrs))
     |> cast_embed(:attendee_questions,
       with: &Ysc.Events.AttendeeQuestion.changeset/2,
       sort_param: :attendee_questions_sort,
@@ -113,13 +113,20 @@ defmodule Ysc.Events.TicketTier do
   # `sale_audience` is the source of truth; `member_only` mirrors
   # `:members_only` for the member-only purchase rules. A caller that only
   # toggles the legacy `member_only` flag still lands on a consistent audience.
-  defp sync_sale_audience(changeset) do
+  defp sync_sale_audience(changeset, audience_supplied?) do
     audience_change = get_change(changeset, :sale_audience)
     member_only_change = get_change(changeset, :member_only)
 
     cond do
-      audience_change != nil ->
-        put_change(changeset, :member_only, audience_change == :members_only)
+      # An explicit audience wins even when it equals the current value (Ecto
+      # then records no change), e.g. a form that switched to "Members only"
+      # and back still carries `member_only: true`.
+      audience_change != nil or audience_supplied? ->
+        put_change(
+          changeset,
+          :member_only,
+          get_field(changeset, :sale_audience) == :members_only
+        )
 
       member_only_change == true ->
         put_change(changeset, :sale_audience, :members_only)
@@ -149,6 +156,11 @@ defmodule Ysc.Events.TicketTier do
     else
       changeset
     end
+  end
+
+  defp audience_supplied?(attrs) do
+    value = Map.get(attrs, :sale_audience) || Map.get(attrs, "sale_audience")
+    value not in [nil, ""]
   end
 
   @max_attendee_questions 10

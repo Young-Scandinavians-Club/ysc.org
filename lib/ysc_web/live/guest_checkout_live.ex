@@ -429,11 +429,34 @@ defmodule YscWeb.GuestCheckoutLive do
         {:ok, payment_intent} ->
           Process.send_after(self(), :hold_expired, @hold_ms)
 
+          # Cancel and expiry must see the saved PaymentIntent id, and the
+          # buyer must see what Stripe will actually charge: payment setup can
+          # reprice the order if tier prices moved since the page loaded.
+          order = %{order | payment_intent_id: payment_intent.id}
+
+          charged =
+            Money.new(
+              Ysc.MoneyHelper.cents_to_dollars(payment_intent.amount),
+              :USD
+            )
+
+          socket =
+            if Money.equal?(charged, socket.assigns.total),
+              do: socket,
+              else:
+                put_toast(
+                  socket,
+                  :info,
+                  "Ticket prices changed while you were checking out. The total is now #{Money.to_string!(charged)}."
+                )
+
           {:noreply,
            socket
            |> assign(:step, :payment)
            |> assign(:ticket_order, order)
-           |> assign(:payment_intent, payment_intent)}
+           |> assign(:payment_intent, payment_intent)
+           |> assign(:total, charged)
+           |> assign(:tiers, refresh_tiers(order, socket.assigns.tiers))}
 
         {:error, _reason} ->
           release_order(assign(socket, :ticket_order, order))
@@ -461,6 +484,20 @@ defmodule YscWeb.GuestCheckoutLive do
   end
 
   defp release_order(_socket), do: :ok
+
+  # Reloads the order's tiers so the summary shows the prices behind the total.
+  defp refresh_tiers(%TicketOrder{event_id: event_id}, tiers) do
+    ids = Map.keys(tiers)
+
+    Repo.all(
+      from(tt in TicketTier, where: tt.id in ^ids and tt.event_id == ^event_id)
+    )
+    |> Map.new(&{&1.id, &1})
+    |> case do
+      fresh when map_size(fresh) == map_size(tiers) -> fresh
+      _ -> tiers
+    end
+  end
 
   defp load_selected_tiers(event_id, selections) do
     ids = Map.keys(selections)
@@ -559,6 +596,10 @@ defmodule YscWeb.GuestCheckoutLive do
   defp order_error_message(:tier_purchase_limit_exceeded),
     do:
       "That's more tickets of one type than a single buyer can get. Please reduce your selection."
+
+  defp order_error_message(:too_many_open_holds),
+    do:
+      "You already have tickets on hold for this event. Please finish that checkout, or try again in a few minutes."
 
   defp order_error_message(:checkout_payment_in_progress),
     do:

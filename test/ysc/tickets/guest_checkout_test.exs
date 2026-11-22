@@ -177,7 +177,7 @@ defmodule Ysc.Tickets.GuestCheckoutTest do
                })
     end
 
-    test "a new checkout supersedes the guest's earlier unpaid cart", %{
+    test "a new checkout never cancels another hold for the same email", %{
       event: event,
       public_tier: tier
     } do
@@ -187,19 +187,58 @@ defmodule Ysc.Tickets.GuestCheckoutTest do
       {:ok, second} =
         GuestCheckout.create_order(@guest, event.id, %{tier.id => 1})
 
-      assert Repo.reload!(first).status in [:cancelled, :expired]
+      assert Repo.reload!(first).status == :pending
       assert Repo.reload!(second).status == :pending
     end
 
-    test "max_per_buyer counts tickets already bought with the same email", %{
+    test "one email can't stack up more than three open holds", %{
+      event: event,
+      public_tier: tier
+    } do
+      for _ <- 1..3 do
+        assert {:ok, _} =
+                 GuestCheckout.create_order(@guest, event.id, %{tier.id => 1})
+      end
+
+      assert {:error, :too_many_open_holds} =
+               GuestCheckout.create_order(@guest, event.id, %{tier.id => 1})
+
+      assert {:ok, _} =
+               GuestCheckout.create_order(
+                 %{@guest | email: "someone.else@example.com"},
+                 event.id,
+                 %{tier.id => 1}
+               )
+    end
+
+    test "max_per_buyer counts confirmed tickets bought with the same email", %{
       event: event,
       limited_tier: tier
     } do
       assert {:error, :tier_purchase_limit_exceeded} =
                GuestCheckout.create_order(@guest, event.id, %{tier.id => 3})
 
+      {:ok, order} =
+        GuestCheckout.create_order(@guest, event.id, %{tier.id => 1})
+
+      Repo.update_all(from(t in Ticket, where: t.ticket_order_id == ^order.id),
+        set: [status: :confirmed]
+      )
+
+      Repo.update_all(from(o in TicketOrder, where: o.id == ^order.id),
+        set: [status: :completed]
+      )
+
+      # One of two is used up, whatever the case or padding of the email.
+      assert {:error, :tier_purchase_limit_exceeded} =
+               GuestCheckout.create_order(
+                 %{@guest | email: "  GUEST.buyer@example.com "},
+                 event.id,
+                 %{tier.id => 2}
+               )
+
       assert {:ok, _} =
-               GuestCheckout.create_order(@guest, event.id, %{tier.id => 2})
+               GuestCheckout.create_order(@guest, event.id, %{tier.id => 1})
     end
   end
 

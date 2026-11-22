@@ -186,12 +186,10 @@ defmodule YscWeb.EventDetailsLive.MemberOnlyTiersTest do
 
       {view, html} = open_tickets_modal(conn, ctx.event)
 
-      assert has_element?(
-               view,
-               "#tier-membership-required-#{ctx.member_tier.id}"
-             )
+      panel = "#tier-membership-required-#{ctx.member_tier.id}"
 
-      assert html =~ "need an active paid membership"
+      assert has_element?(view, panel, "need an active paid membership")
+      refute has_element?(view, panel, "regular tiers")
       refute html =~ "regular tiers"
     end
 

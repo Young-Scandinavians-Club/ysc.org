@@ -218,6 +218,17 @@ defmodule YscWeb.GuestCheckoutLiveTest do
       {:ok, view, _html} = live(conn, checkout_path(event, %{tier.id => 1}))
       submit_details(view)
 
+      # The order carries its saved PaymentIntent, so cancelling consults and
+      # cancels it at Stripe.
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        {:ok,
+         build_payment_intent(%{id: id, status: "requires_payment_method"})}
+      end)
+
+      stub(Ysc.StripeMock, :cancel_payment_intent, fn id, _opts ->
+        {:ok, build_payment_intent(%{id: id, status: "canceled"})}
+      end)
+
       render_click(view, "cancel")
       assert_redirect(view, ~p"/events/#{event.id}")
 
