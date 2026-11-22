@@ -638,6 +638,9 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert html =~ "Additional payment required" || html =~ "Complete payment"
     assert has_element?(view, "#modification-payment-step")
+    assert has_element?(view, "#back-to-modification-button", "Edit changes")
+    assert html =~ "Edit your dates or guests before you pay"
+    refute html =~ "Go back to adjust"
     assert has_element?(view, "#stripe-payment-container")
     refute has_element?(view, "#modification-dates")
     refute has_element?(view, "#submit-modification-button")
@@ -1102,6 +1105,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert has_element?(view, "#modification-dates")
     refute has_element?(view, "#modification-payment-step")
     assert html =~ "still processing"
+    assert html =~ "edit your changes yet"
+    refute html =~ "go back yet"
 
     held = Repo.get!(Booking, booking.id)
     assert held.checkout_date == original_checkout
@@ -1193,7 +1198,9 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert has_element?(view, "#modification-dates")
     refute has_element?(view, "#modification-payment-step")
-    assert html =~ "cancel this payment yet"
+    assert html =~ "edit your changes"
+    assert html =~ "Edit changes again"
+    refute html =~ "cancel this payment yet"
 
     held = Repo.get!(Booking, booking.id)
     assert held.checkout_date == original_checkout
@@ -1274,6 +1281,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert has_element?(view, "#modification-payment-step")
     refute has_element?(view, "#modification-dates")
     assert html =~ "still processing"
+    assert html =~ "edit your changes yet"
+    refute html =~ "go back yet"
 
     held = Repo.get!(Booking, booking.id)
     assert held.checkout_date == original_checkout
@@ -1341,7 +1350,9 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert has_element?(view, "#modification-payment-step")
     refute has_element?(view, "#modification-dates")
-    assert html =~ "cancel this payment yet"
+    assert html =~ "edit your changes"
+    assert html =~ "Edit changes again"
+    refute html =~ "cancel this payment yet"
 
     held = Repo.get!(Booking, booking.id)
     assert held.checkout_date == original_checkout

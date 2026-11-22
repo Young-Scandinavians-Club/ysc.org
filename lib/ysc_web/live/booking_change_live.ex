@@ -1777,7 +1777,7 @@ defmodule YscWeb.BookingChangeLive do
             Complete payment
           </h2>
           <p class="mt-1 text-sm text-zinc-600">
-            Changed your mind? Go back to adjust dates or guests before you pay.
+            {YscWeb.BookingUserMessages.modification_payment_step_helper()}
           </p>
         </div>
         <.button
@@ -1789,7 +1789,7 @@ defmodule YscWeb.BookingChangeLive do
           class="shrink-0"
           disabled={@payment_processing || @submitting}
         >
-          Edit changes
+          {YscWeb.BookingUserMessages.modification_edit_changes_button()}
         </.button>
       </div>
 
