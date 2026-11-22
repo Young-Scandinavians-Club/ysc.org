@@ -1560,7 +1560,10 @@ defmodule Ysc.Ledgers do
             loaded_order
         end
 
-      if ticket_order && ticket_order.user do
+      recipient_email =
+        ticket_order && Ysc.Tickets.TicketOrder.buyer_email(ticket_order)
+
+      if ticket_order && recipient_email do
         # Get refunded tickets - we need to find which tickets were refunded
         # For now, we'll get all tickets from the order and filter by cancelled status
         # This is a simplification - ideally we'd track which specific tickets were refunded
@@ -1588,7 +1591,7 @@ defmodule Ysc.Ledgers do
           # Schedule email
           result =
             ledger_refund_email_notifier().schedule_email(
-              ticket_order.user.email,
+              recipient_email,
               idempotency_key,
               YscWeb.Emails.TicketOrderRefund.get_subject(),
               "ticket_order_refund",
@@ -1604,7 +1607,7 @@ defmodule Ysc.Ledgers do
                 refund_id: refund.id,
                 ticket_order_id: ticket_order.id,
                 user_id: ticket_order.user_id,
-                user_email: ticket_order.user.email,
+                user_email: recipient_email,
                 job_id: job.id
               )
 

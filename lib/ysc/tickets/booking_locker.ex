@@ -18,7 +18,8 @@ defmodule Ysc.Tickets.BookingLocker do
     TicketTier,
     Ticket,
     TicketReservation,
-    TicketTierHelpers
+    TicketTierHelpers,
+    TierAudience
   }
 
   alias Ysc.Tickets.ReservationDiscount
@@ -59,6 +60,10 @@ defmodule Ysc.Tickets.BookingLocker do
     * `:user` - `%Ysc.Accounts.User{}` already loaded for `user_id`. Ticket
       inserts reuse it for the membership check instead of selecting the
       buyer once per ticket.
+    * `:guest` - `%{email:, first_name:, last_name:}` for a guest order. Pass
+      `nil` as `user_id`; the order is identified by these instead of an
+      account. Reservations never apply to guests. Callers must already have
+      checked that every selected tier is sold to the public.
     * `:event` - `%Event{}` already loaded for `event_id`. Skips the event
       SELECT; published/cancelled/in-past checks still run on the struct.
     * `:tiers` - ticket tier structs already loaded for the selection. Skips
@@ -79,6 +84,8 @@ defmodule Ysc.Tickets.BookingLocker do
     Repo.transaction(fn ->
       with {:ok, event} <-
              lock_and_validate_event(event_id, bypass_guards?, opts),
+           {:ok, opts} <-
+             lock_guest_tiers(event_id, ticket_selections, opts),
            {:ok, tiers} <-
              lock_and_validate_tiers(
                event_id,
@@ -105,7 +112,8 @@ defmodule Ysc.Tickets.BookingLocker do
                user_id,
                event_id,
                total_amount,
-               discount_amount
+               discount_amount,
+               Keyword.get(opts, :guest)
              ),
            # Fulfill reservations first, then create only additional tickets needed
            {:ok, fulfilled_reservations_by_tier} <-
@@ -125,8 +133,6 @@ defmodule Ysc.Tickets.BookingLocker do
                bypass_guards?,
                buyer
              ) do
-        %User{} = buyer
-
         ticket_order
         |> put_booking_tickets(tickets, tiers)
         |> put_booking_user(buyer)
@@ -381,6 +387,39 @@ defmodule Ysc.Tickets.BookingLocker do
         else
           {:ok, event}
         end
+    end
+  end
+
+  # Guest orders only: share-lock the selected tier rows and re-check, against
+  # those rows, that each is still sold to the public with no per-ticket
+  # details. An admin edit (e.g. switching the tier to members-only) then
+  # either lands before this read and is seen, or waits until the booking
+  # commits, so a guest can't be sold a tier that stopped being public. The
+  # locked rows are reused for the rest of the booking.
+  defp lock_guest_tiers(event_id, ticket_selections, opts) do
+    if Keyword.get(opts, :guest) do
+      ids = Map.keys(ticket_selections)
+
+      tiers =
+        Repo.all(
+          from(tt in TicketTier,
+            where: tt.event_id == ^event_id and tt.id in ^ids,
+            lock: "FOR SHARE"
+          )
+        )
+
+      cond do
+        length(tiers) != length(ids) ->
+          {:error, :tier_validation_failed}
+
+        match?({:error, _}, Ysc.Tickets.GuestCheckout.validate_tiers(tiers)) ->
+          {:error, :guest_checkout_not_allowed}
+
+        true ->
+          {:ok, Keyword.put(opts, :tiers, tiers)}
+      end
+    else
+      {:ok, opts}
     end
   end
 
@@ -739,6 +778,8 @@ defmodule Ysc.Tickets.BookingLocker do
     |> select([tr], {tr.ticket_tier_id, sum(tr.quantity)})
   end
 
+  defp user_has_reservations_for_event?(nil, _event_id), do: false
+
   defp user_has_reservations_for_event?(user_id, event_id) do
     TicketReservation
     |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
@@ -746,6 +787,8 @@ defmodule Ysc.Tickets.BookingLocker do
     |> Events.where_ticket_reservation_hold_active()
     |> Repo.exists?()
   end
+
+  defp fulfill_reservations_atomic(nil, _, _, _), do: {:ok, %{}}
 
   defp fulfill_reservations_atomic(
          user_id,
@@ -940,6 +983,18 @@ defmodule Ysc.Tickets.BookingLocker do
     }
   end
 
+  # Guests (nil user) never hold reservations.
+  defp reservation_owner_scope(query, nil, _event_id),
+    do: where(query, [tr, tt], false)
+
+  defp reservation_owner_scope(query, user_id, event_id),
+    do:
+      where(
+        query,
+        [tr, tt],
+        tr.user_id == ^user_id and tt.event_id == ^event_id
+      )
+
   defp calculate_total_amount(
          tiers,
          ticket_selections,
@@ -960,7 +1015,7 @@ defmodule Ysc.Tickets.BookingLocker do
     reservation_scope =
       TicketReservation
       |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
-      |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
+      |> reservation_owner_scope(user_id, event_id)
 
     reservation_scope =
       if fulfilled_order_id do
@@ -1103,6 +1158,8 @@ defmodule Ysc.Tickets.BookingLocker do
     {new_acc_total, new_acc_discount}
   end
 
+  defp buyer_for_ticket_inserts(nil, _opts), do: nil
+
   defp buyer_for_ticket_inserts(user_id, opts) do
     case Keyword.get(opts, :user) do
       %User{id: id} = user when id == user_id -> user
@@ -1129,20 +1186,44 @@ defmodule Ysc.Tickets.BookingLocker do
     %{ticket_order | user: buyer}
   end
 
+  # Guest orders have no account to attach.
+  defp put_booking_user(ticket_order, nil), do: ticket_order
+
   defp create_ticket_order_atomic(
          user_id,
          event_id,
          total_amount,
-         discount_amount
+         discount_amount,
+         guest
        ) do
     expires_at = DateTime.add(DateTime.utc_now(), 5, :minute)
 
-    attrs = %{
-      user_id: user_id,
-      event_id: event_id,
-      total_amount: total_amount,
-      expires_at: expires_at
-    }
+    attrs =
+      case guest do
+        %{email: email, first_name: first, last_name: last}
+        when is_nil(user_id) ->
+          %{
+            guest_email: email,
+            guest_first_name: first,
+            guest_last_name: last,
+            event_id: event_id,
+            total_amount: total_amount,
+            expires_at: expires_at
+          }
+
+        _ ->
+          %{
+            user_id: user_id,
+            event_id: event_id,
+            total_amount: total_amount,
+            expires_at: expires_at
+          }
+      end
+
+    changeset_fun =
+      if is_nil(user_id),
+        do: &TicketOrder.guest_create_changeset/2,
+        else: &TicketOrder.create_changeset/2
 
     attrs =
       if discount_amount && Money.positive?(discount_amount) do
@@ -1152,7 +1233,7 @@ defmodule Ysc.Tickets.BookingLocker do
       end
 
     case %TicketOrder{}
-         |> TicketOrder.create_changeset(attrs)
+         |> changeset_fun.(attrs)
          |> Repo.insert_with_reference_retry(TicketOrder) do
       {:ok, ticket_order} ->
         # Schedule timeout check for this specific order
@@ -1179,11 +1260,16 @@ defmodule Ysc.Tickets.BookingLocker do
        ) do
     buyer = Ticket.ensure_membership_preloads(buyer)
 
-    ticket_changeset_fn = fn attrs ->
+    ticket_changeset_fn = fn attrs, tier ->
       if bypass_guards? do
         Ticket.door_sale_changeset(%Ticket{}, attrs, user: buyer)
       else
-        Ticket.changeset(%Ticket{}, attrs, user: buyer, event: event)
+        Ticket.changeset(%Ticket{}, attrs,
+          user: buyer,
+          event: event,
+          public_sale: TierAudience.public?(tier),
+          guest: is_nil(buyer)
+        )
       end
     end
 
@@ -1226,15 +1312,18 @@ defmodule Ysc.Tickets.BookingLocker do
 
             # Create one ticket per fulfilled quantity (may be less than the original hold)
             Enum.map(1..fulfill_qty, fn _ ->
-              ticket_changeset_fn.(%{
-                event_id: ticket_order.event_id,
-                ticket_tier_id: tier_id,
-                user_id: ticket_order.user_id,
-                ticket_order_id: ticket_order.id,
-                status: :pending,
-                expires_at: ticket_order.expires_at,
-                discount_amount: per_ticket_discount
-              })
+              ticket_changeset_fn.(
+                %{
+                  event_id: ticket_order.event_id,
+                  ticket_tier_id: tier_id,
+                  user_id: ticket_order.user_id,
+                  ticket_order_id: ticket_order.id,
+                  status: :pending,
+                  expires_at: ticket_order.expires_at,
+                  discount_amount: per_ticket_discount
+                },
+                tier
+              )
             end)
           end)
 
@@ -1246,15 +1335,18 @@ defmodule Ysc.Tickets.BookingLocker do
             []
           else
             Enum.map(1..non_reserved_count, fn _ ->
-              ticket_changeset_fn.(%{
-                event_id: ticket_order.event_id,
-                ticket_tier_id: tier_id,
-                user_id: ticket_order.user_id,
-                ticket_order_id: ticket_order.id,
-                status: :pending,
-                expires_at: ticket_order.expires_at,
-                discount_amount: Money.new(0, :USD)
-              })
+              ticket_changeset_fn.(
+                %{
+                  event_id: ticket_order.event_id,
+                  ticket_tier_id: tier_id,
+                  user_id: ticket_order.user_id,
+                  ticket_order_id: ticket_order.id,
+                  status: :pending,
+                  expires_at: ticket_order.expires_at,
+                  discount_amount: Money.new(0, :USD)
+                },
+                tier
+              )
             end)
           end
 

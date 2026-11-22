@@ -878,6 +878,7 @@ defmodule Ysc.Events do
                   unlimited_quantity:
                     tier.quantity == nil or tier.quantity == 0,
                   requires_registration: tier.requires_registration,
+                  sale_audience: tier.sale_audience,
                   attendee_questions: duplicate_attendee_questions(tier),
                   start_date: tier.start_date,
                   end_date: tier.end_date
@@ -1571,6 +1572,7 @@ defmodule Ysc.Events do
           tt.quantity,
           tt.requires_registration,
           tt.member_only,
+          tt.sale_audience,
           tt.max_per_buyer,
           tt.start_date,
           tt.end_date,
@@ -1588,6 +1590,7 @@ defmodule Ysc.Events do
           quantity: tt.quantity,
           requires_registration: tt.requires_registration,
           member_only: tt.member_only,
+          sale_audience: tt.sale_audience,
           max_per_buyer: tt.max_per_buyer,
           start_date: tt.start_date,
           end_date: tt.end_date,
@@ -2022,7 +2025,7 @@ defmodule Ysc.Events do
 
   @doc """
   Fields needed to apply purchase rules (member-only plan rules and per-buyer
-  ticket limits): id, member_only, max_per_buyer, type.
+  ticket limits): id, member_only, sale_audience, max_per_buyer, type.
 
   Does not join tickets or compute sold counts — checkout availability is
   enforced separately by `Ysc.Tickets.BookingLocker`.
@@ -2045,6 +2048,7 @@ defmodule Ysc.Events do
       select: %{
         id: tt.id,
         member_only: tt.member_only,
+        sale_audience: tt.sale_audience,
         max_per_buyer: tt.max_per_buyer,
         type: tt.type
       }
@@ -2069,6 +2073,7 @@ defmodule Ysc.Events do
         tt.requires_registration,
         tt.attendee_questions,
         tt.member_only,
+        tt.sale_audience,
         tt.max_per_buyer,
         tt.start_date,
         tt.end_date,
@@ -2087,6 +2092,7 @@ defmodule Ysc.Events do
         requires_registration: tt.requires_registration,
         attendee_questions: tt.attendee_questions,
         member_only: tt.member_only,
+        sale_audience: tt.sale_audience,
         max_per_buyer: tt.max_per_buyer,
         start_date: tt.start_date,
         end_date: tt.end_date,
@@ -2593,6 +2599,19 @@ defmodule Ysc.Events do
         select: struct(td, ^@export_ticket_detail_fields)
       )
 
+    # Guest orders have no user; the purchaser columns come from the order.
+    order_query =
+      from(o in Ysc.Tickets.TicketOrder,
+        select:
+          struct(o, [
+            :id,
+            :user_id,
+            :guest_email,
+            :guest_first_name,
+            :guest_last_name
+          ])
+      )
+
     from(t in Ticket,
       where: t.event_id == ^event_id and t.status == :confirmed,
       order_by: [asc: t.inserted_at],
@@ -2600,7 +2619,8 @@ defmodule Ysc.Events do
       preload: [
         ticket_tier: ^tier_query,
         user: ^user_query,
-        registration: ^detail_query
+        registration: ^detail_query,
+        ticket_order: ^order_query
       ]
     )
   end

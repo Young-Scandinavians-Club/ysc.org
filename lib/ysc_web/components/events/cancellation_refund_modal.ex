@@ -86,7 +86,7 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
               </div>
 
               <.user_card
-                user={entry.order.user}
+                user={Ysc.Tickets.TicketOrder.display_user(entry.order)}
                 class="h-auto min-w-0 flex-1"
                 truncate
               />
