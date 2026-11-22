@@ -9,6 +9,7 @@ defmodule Ysc.FakeSubscriptionScheduleApi do
 
   def create(params), do: record(:create, [params])
   def update(id, params), do: record(:update, [id, params])
+  def retrieve(id), do: record(:retrieve, [id])
   def cancel(id), do: record(:cancel, [id])
   def release(id), do: record(:release, [id])
 
