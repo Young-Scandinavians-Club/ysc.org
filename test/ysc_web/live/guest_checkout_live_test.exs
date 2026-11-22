@@ -348,6 +348,45 @@ defmodule YscWeb.GuestCheckoutLiveTest do
              ]
     end
 
+    test "opens the tickets when the payment had already succeeded", %{
+      conn: conn,
+      event: event,
+      public_tier: tier
+    } do
+      {view, order} = start_payment(conn, event, tier)
+
+      # The card was charged, but the browser never reported it. Stripe
+      # refuses to cancel a succeeded intent and reports it as succeeded.
+      stub(Ysc.StripeMock, :cancel_payment_intent, fn _id, _opts ->
+        {:error,
+         %Stripe.Error{
+           message: "already succeeded",
+           source: :api,
+           code: "payment_intent_unexpected_state"
+         }}
+      end)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: id,
+           status: "succeeded",
+           amount: 3000,
+           metadata: %{
+             "ticket_order_id" => order.id,
+             "ticket_order_reference" => order.reference_id,
+             "event_id" => event.id
+           }
+         })}
+      end)
+
+      send(view.pid, :hold_expired)
+
+      {path, _flash} = assert_redirect(view)
+      assert path =~ ~r{^/t/.+}
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :completed
+    end
+
     test "leaves the order alone and says so while a payment is processing", %{
       conn: conn,
       event: event,
