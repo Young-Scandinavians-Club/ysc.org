@@ -84,6 +84,8 @@ defmodule Ysc.Tickets.BookingLocker do
     Repo.transaction(fn ->
       with {:ok, event} <-
              lock_and_validate_event(event_id, bypass_guards?, opts),
+           {:ok, opts} <-
+             lock_guest_tiers(event_id, ticket_selections, opts),
            {:ok, tiers} <-
              lock_and_validate_tiers(
                event_id,
@@ -385,6 +387,39 @@ defmodule Ysc.Tickets.BookingLocker do
         else
           {:ok, event}
         end
+    end
+  end
+
+  # Guest orders only: share-lock the selected tier rows and re-check, against
+  # those rows, that each is still sold to the public with no per-ticket
+  # details. An admin edit (e.g. switching the tier to members-only) then
+  # either lands before this read and is seen, or waits until the booking
+  # commits, so a guest can't be sold a tier that stopped being public. The
+  # locked rows are reused for the rest of the booking.
+  defp lock_guest_tiers(event_id, ticket_selections, opts) do
+    if Keyword.get(opts, :guest) do
+      ids = Map.keys(ticket_selections)
+
+      tiers =
+        Repo.all(
+          from(tt in TicketTier,
+            where: tt.event_id == ^event_id and tt.id in ^ids,
+            lock: "FOR SHARE"
+          )
+        )
+
+      cond do
+        length(tiers) != length(ids) ->
+          {:error, :tier_validation_failed}
+
+        match?({:error, _}, Ysc.Tickets.GuestCheckout.validate_tiers(tiers)) ->
+          {:error, :guest_checkout_not_allowed}
+
+        true ->
+          {:ok, Keyword.put(opts, :tiers, tiers)}
+      end
+    else
+      {:ok, opts}
     end
   end
 

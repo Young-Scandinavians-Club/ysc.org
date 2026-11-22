@@ -242,6 +242,63 @@ defmodule Ysc.Tickets.GuestCheckoutTest do
     end
   end
 
+  describe "booking re-checks guest eligibility against locked tier rows" do
+    @guest_selection_lock ~r/FROM "ticket_tiers".*FOR SHARE/is
+
+    test "share-locks the selected tiers while booking", %{
+      event: event,
+      public_tier: tier
+    } do
+      {result, locking_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            GuestCheckout.create_order(@guest, event.id, %{tier.id => 1})
+          end,
+          pattern: @guest_selection_lock,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, _order} = result
+      assert locking_queries == 1
+    end
+
+    test "a tier that stopped being public after validation is refused", %{
+      event: event,
+      public_tier: tier
+    } do
+      # Simulates an admin edit landing after `GuestCheckout` loaded the tier
+      # but before the booking reads it.
+      {:ok, _} =
+        Events.update_ticket_tier(tier, %{sale_audience: "members_only"})
+
+      guest = %{email: "g@example.com", first_name: "Gus", last_name: "Buyer"}
+
+      assert {:error, :guest_checkout_not_allowed} =
+               Ysc.Tickets.BookingLocker.atomic_booking(
+                 nil,
+                 event.id,
+                 %{tier.id => 1},
+                 guest: guest
+               )
+
+      assert Repo.aggregate(TicketOrder, :count) == 0
+    end
+
+    test "a tier of another event or an unknown tier is refused", %{
+      event: event
+    } do
+      guest = %{email: "g@example.com", first_name: "Gus", last_name: "Buyer"}
+
+      assert {:error, :tier_validation_failed} =
+               Ysc.Tickets.BookingLocker.atomic_booking(
+                 nil,
+                 event.id,
+                 %{Ecto.ULID.generate() => 1},
+                 guest: guest
+               )
+    end
+  end
+
   describe "selection tokens" do
     test "round-trip for the same event only", %{event: event} do
       token = GuestCheckout.sign_selection(event.id, %{"t" => 1})
