@@ -6,6 +6,81 @@ defmodule YscWeb.Components.PageMastheadTest do
   import Phoenix.LiveViewTest
   import YscWeb.CoreComponents
 
+  describe "page_container/1" do
+    test "renders the shared public-page column classes" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.page_container>
+          <p>Choir body</p>
+        </.page_container>
+        """)
+
+      assert html =~ "py-6 lg:py-8 max-w-(--breakpoint-xl) mx-auto px-4"
+      assert html =~ "Choir body"
+      refute html =~ ~s(id=")
+    end
+
+    test "renders an id and merges extra classes" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.page_container id="choir-page" class="pb-12">
+          <p>Choir body</p>
+        </.page_container>
+        """)
+
+      assert html =~ ~s(id="choir-page")
+      assert html =~ "pb-12"
+      assert html =~ "Choir body"
+    end
+  end
+
+  describe "calendar_embed/1" do
+    test "renders a bordered iframe with the given id, src, and title" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.calendar_embed
+          id="choir-google-calendar"
+          src="https://calendar.google.com/calendar/embed?src=choir"
+          title="YSC Choir Calendar"
+        />
+        """)
+
+      assert html =~ "w-full overflow-hidden rounded-xl border border-zinc-200"
+      assert html =~ ~s(id="choir-google-calendar")
+
+      assert html =~
+               ~s(src="https://calendar.google.com/calendar/embed?src=choir")
+
+      assert html =~ ~s(title="YSC Choir Calendar")
+      assert html =~ ~s(height="600")
+      assert html =~ ~s(frameborder="0")
+      assert html =~ ~s(scrolling="no")
+    end
+
+    test "merges extra classes onto the frame" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.calendar_embed
+          id="board-meeting-calendar"
+          src="https://calendar.google.com/calendar/embed?src=board"
+          title="YSC Board Meeting Schedule"
+          class="mt-4"
+        />
+        """)
+
+      assert html =~ "mt-4"
+      assert html =~ ~s(id="board-meeting-calendar")
+    end
+  end
+
   describe "page_masthead/1" do
     test "renders default size with eyebrow and h1 title" do
       assigns = %{}

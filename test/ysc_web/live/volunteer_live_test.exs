@@ -27,6 +27,7 @@ defmodule YscWeb.VolunteerLiveTest do
     test "displays volunteer form", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/volunteer")
 
+      assert has_element?(view, "#volunteer-page")
       assert has_element?(view, "#volunteer-form")
     end
 
