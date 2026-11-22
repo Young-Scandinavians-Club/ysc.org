@@ -166,6 +166,15 @@ defmodule Ysc.Ledgers do
     :event_id,
     :inserted_at
   ]
+  # Guest orders have no account, so the payment detail modal shows the buyer
+  # from these columns instead of the payment's user.
+  @related_ticket_order_fields @history_ticket_order_fields ++
+                                 [
+                                   :user_id,
+                                   :guest_email,
+                                   :guest_first_name,
+                                   :guest_last_name
+                                 ]
   @history_ticket_fields [:id, :status, :ticket_tier_id, :ticket_order_id]
   @history_ticket_tier_fields [:id, :name]
   @history_booking_fields [
@@ -1432,33 +1441,42 @@ defmodule Ysc.Ledgers do
     )
   end
 
+  defp send_refund_email(refund, nil) do
+    require Ysc.Logging
+
+    Ysc.Logging.warning("Skipping refund email - payment not found",
+      refund_id: refund.id
+    )
+  end
+
   defp send_refund_email(refund, payment) do
     require Ysc.Logging
 
     try do
-      if payment && payment.user do
-        # Determine if this is for a booking or ticket order
-        case get_payment_related_entity(payment) do
-          {:booking, booking} ->
-            # Send booking refund processed email
+      # Determine if this is for a booking or ticket order
+      case get_payment_related_entity(payment) do
+        {:booking, booking} ->
+          # Bookings always belong to a member account.
+          if payment.user do
             send_booking_refund_processed_email(refund, booking, payment)
-
-          {:ticket_order, ticket_order} ->
-            # Send ticket order refund email
-            send_ticket_order_refund_email(refund, ticket_order)
-
-          _ ->
-            # Unknown entity type, skip email
-            Ysc.Logging.debug("Skipping refund email - unknown entity type",
+          else
+            Ysc.Logging.warning("Skipping refund email - payment missing user",
               refund_id: refund.id,
               payment_id: payment.id
             )
-        end
-      else
-        Ysc.Logging.warning("Skipping refund email - payment missing user",
-          refund_id: refund.id,
-          payment_id: payment.id
-        )
+          end
+
+        {:ticket_order, ticket_order} ->
+          # Guest ticket orders have no account (and so no payment user); the
+          # email goes to the guest address on the order.
+          send_ticket_order_refund_email(refund, ticket_order)
+
+        _ ->
+          # Unknown entity type, skip email
+          Ysc.Logging.debug("Skipping refund email - unknown entity type",
+            refund_id: refund.id,
+            payment_id: payment.id
+          )
       end
     rescue
       error ->
@@ -2638,7 +2656,7 @@ defmodule Ysc.Ledgers do
 
     from(to in TicketOrder,
       where: to.payment_id == ^payment_id,
-      select: struct(to, ^@history_ticket_order_fields),
+      select: struct(to, ^@related_ticket_order_fields),
       preload: [event: ^event_query, tickets: ^ticket_query],
       limit: 1
     )
