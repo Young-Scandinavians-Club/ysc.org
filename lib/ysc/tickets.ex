@@ -1726,6 +1726,19 @@ defmodule Ysc.Tickets do
     end
   end
 
+  @doc """
+  Sends the ticket refund email for the result of `refund_via_stripe/4`, once
+  the refunded tickets have been cancelled.
+
+  `refund_via_stripe/4` records the refund (and tries the email) before the
+  caller cancels the tickets, so the email has no cancelled tickets to list
+  yet. Zero-amount skips and failures have no refund to email about.
+  """
+  def notify_ticket_refund({:ok, {%Ledgers.Refund{} = refund, _tx, _entries}}),
+    do: Ledgers.resend_refund_email(refund)
+
+  def notify_ticket_refund(_result), do: :ok
+
   # Stripe idempotency key for an admin refund. Same tickets + amount (or the
   # same amount-only sequence number) retries the original Stripe refund;
   # a different ticket set or a later partial of the same amount does not.

@@ -746,13 +746,15 @@ defmodule YscWeb.AdminMoneyLive do
                  refund_params["reason"],
                  ticket_ids: ticket_ids
                ) do
-            {:ok, {_refund, _transaction, _entries}} ->
+            {:ok, {_refund, _transaction, _entries}} = stripe_result ->
               case Tickets.refund_tickets(
                      ticket_order,
                      ticket_ids,
                      refund_params["reason"]
                    ) do
                 {:ok, _refund_info} ->
+                  Tickets.notify_ticket_refund(stripe_result)
+
                   # Refresh data
                   %{start_date: start_date, end_date: end_date} = socket.assigns
 
@@ -846,7 +848,7 @@ defmodule YscWeb.AdminMoneyLive do
                  refund_amount,
                  refund_params["reason"]
                ) do
-            {:ok, {_refund, _transaction, _entries}} ->
+            {:ok, {_refund, _transaction, _entries}} = stripe_result ->
               # If checkbox is checked, cancel booking or ticket order to release availability
               release_result =
                 if release_availability do
@@ -854,6 +856,11 @@ defmodule YscWeb.AdminMoneyLive do
                 else
                   :ok
                 end
+
+              # The refund email lists cancelled tickets, so (re)send it now
+              # that they are cancelled.
+              if release_result == {:ok, :ticket_order_canceled},
+                do: Tickets.notify_ticket_refund(stripe_result)
 
               # Refresh data with current date range
               %{start_date: start_date, end_date: end_date} = socket.assigns

@@ -470,6 +470,7 @@ defmodule YscWeb.AdminEventsLive.CancellationRefundModal do
       {:ok, _} ->
         case Tickets.refund_tickets(order, ticket_ids, reason) do
           {:ok, refund_info} ->
+            Tickets.notify_ticket_refund(stripe_result)
             {:ok, refund_info}
 
           {:error, error_reason} ->

@@ -10,6 +10,7 @@ defmodule Ysc.Tickets.GuestRefundEmailTest do
   import Ysc.TicketsFixtures
 
   alias Ysc.Ledgers
+  alias Ysc.Tickets
   alias Ysc.Tickets.TicketOrder
 
   defmodule Notifier do
@@ -24,7 +25,7 @@ defmodule Ysc.Tickets.GuestRefundEmailTest do
         template
       })
 
-      {:ok, %{id: 1}}
+      %Oban.Job{id: 1}
     end
   end
 
@@ -49,6 +50,17 @@ defmodule Ysc.Tickets.GuestRefundEmailTest do
   end
 
   defp pay_and_cancel_one_ticket(order, user_id) do
+    payment = pay_order(order, user_id)
+    cancel_tickets(order)
+    payment
+  end
+
+  defp cancel_tickets(order) do
+    from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+    |> Repo.update_all(set: [status: :cancelled])
+  end
+
+  defp pay_order(order, user_id) do
     {:ok, {payment, _, _}} =
       Ledgers.process_payment(%{
         user_id: user_id,
@@ -66,9 +78,6 @@ defmodule Ysc.Tickets.GuestRefundEmailTest do
     order
     |> Ecto.Changeset.change(%{payment_id: payment.id, status: :completed})
     |> Repo.update!()
-
-    from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
-    |> Repo.update_all(set: [status: :cancelled])
 
     payment
   end
@@ -129,5 +138,32 @@ defmodule Ysc.Tickets.GuestRefundEmailTest do
 
     email = user.email
     assert_received {:email, ^email, "ticket_order_refund"}
+  end
+
+  test "admin flow order: refund recorded before tickets are cancelled, then notified" do
+    user = user_fixture()
+    order = ticket_order_fixture(%{user: user, status: :completed})
+    payment = pay_order(order, user.id)
+
+    # `refund_via_stripe` records the refund while the tickets are still active.
+    assert {:ok, {_refund, _tx, _entries}} = result = refund(payment)
+    refute_received {:email, _, _}
+
+    cancel_tickets(order)
+    assert :ok = Tickets.notify_ticket_refund(result)
+
+    email = user.email
+    assert_received {:email, ^email, "ticket_order_refund"}
+    refute_received {:email, _, _}
+  end
+
+  test "notify_ticket_refund ignores results without a refund" do
+    assert :ok =
+             Tickets.notify_ticket_refund(
+               {:ok, {:skipped_zero_amount, nil, nil}}
+             )
+
+    assert :ok = Tickets.notify_ticket_refund({:error, :no_stripe_payment})
+    refute_received {:email, _, _}
   end
 end

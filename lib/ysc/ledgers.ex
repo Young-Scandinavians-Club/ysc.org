@@ -1441,6 +1441,19 @@ defmodule Ysc.Ledgers do
     )
   end
 
+  @doc """
+  Sends the refund confirmation email for an already-recorded refund.
+
+  Ticket refund emails list the order's cancelled tickets, but the admin flows
+  record the Stripe refund (which sends this email from `process_refund/1`)
+  before they cancel the tickets, so that first attempt finds nothing to list.
+  Flows call this once the tickets are cancelled. The email's idempotency key
+  is the refund id, so an email that already went out is not sent twice.
+  """
+  def resend_refund_email(%Refund{} = refund) do
+    send_refund_email(refund, get_payment_with_associations(refund.payment_id))
+  end
+
   defp send_refund_email(refund, nil) do
     require Ysc.Logging
 
