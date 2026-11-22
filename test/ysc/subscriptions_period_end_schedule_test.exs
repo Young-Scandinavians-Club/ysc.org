@@ -247,5 +247,45 @@ defmodule Ysc.SubscriptionsPeriodEndScheduleTest do
       refute_received {:create, _}
       refute_received {:cancel, _}
     end
+
+    test "arity 2 uses the env schedule API and never cancels" do
+      stripe_id = "sub_period_end_#{System.unique_integer([:positive])}"
+      subscription = local_subscription!(stripe_id)
+      expect_retrieve(stripe_id)
+
+      previous =
+        Application.get_env(:ysc, :stripe_subscription_schedule_module)
+
+      Application.put_env(:ysc, :stripe_subscription_schedule_module, Api)
+
+      try do
+        Api.put_result(
+          :list,
+          {:ok, %{data: [%{id: "sub_sched_old", status: "active"}]}}
+        )
+
+        assert {:ok, updated} =
+                 Subscriptions.update_period_end(
+                   subscription,
+                   DateTime.from_unix!(@new_end)
+                 )
+
+        assert DateTime.to_unix(updated.current_period_end) == @new_end
+        assert_received {:list, [%{subscription: ^stripe_id}]}
+        assert_received {:release, ["sub_sched_old"]}
+        assert_received {:create, [%{from_subscription: ^stripe_id}]}
+        refute_received {:cancel, _}
+      after
+        if previous do
+          Application.put_env(
+            :ysc,
+            :stripe_subscription_schedule_module,
+            previous
+          )
+        else
+          Application.delete_env(:ysc, :stripe_subscription_schedule_module)
+        end
+      end
+    end
   end
 end
