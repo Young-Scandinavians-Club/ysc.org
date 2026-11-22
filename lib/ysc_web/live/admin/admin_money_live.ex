@@ -2180,6 +2180,16 @@ defmodule YscWeb.AdminMoneyLive do
               {@selected_payment.user.email}
             </.link>
           </p>
+          <p
+            :if={!@selected_payment.user && guest_buyer(@ticket_order)}
+            id="refund-modal-guest-buyer"
+            class="text-sm text-zinc-600"
+          >
+            <strong>Guest:</strong>
+            {Ysc.Tickets.TicketOrder.buyer_name(guest_buyer(@ticket_order))} ({guest_buyer(
+              @ticket_order
+            ).guest_email})
+          </p>
         </div>
 
         <.form
@@ -3099,21 +3109,35 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">User</p>
+              <% guest_buyer = guest_buyer(@payment_related_entity) %>
               <p id="payment-modal-user" class="text-sm text-zinc-900">
-                <%= if Ecto.assoc_loaded?(@selected_payment.user) && @selected_payment.user do %>
-                  <.link
-                    navigate={~p"/admin/users/#{@selected_payment.user.id}/details"}
-                    class="flex flex-col group"
-                  >
-                    <span class="font-medium text-blue-600 group-hover:underline">
-                      {get_user_display_name(@selected_payment.user)}
+                <%= cond do %>
+                  <% Ecto.assoc_loaded?(@selected_payment.user) && @selected_payment.user -> %>
+                    <.link
+                      navigate={
+                        ~p"/admin/users/#{@selected_payment.user.id}/details"
+                      }
+                      class="flex flex-col group"
+                    >
+                      <span class="font-medium text-blue-600 group-hover:underline">
+                        {get_user_display_name(@selected_payment.user)}
+                      </span>
+                      <span class="text-xs text-zinc-500 group-hover:underline">
+                        {@selected_payment.user.email}
+                      </span>
+                    </.link>
+                  <% guest_buyer -> %>
+                    <span id="payment-modal-guest-buyer" class="flex flex-col">
+                      <span class="font-medium">
+                        {Ysc.Tickets.TicketOrder.buyer_name(guest_buyer)}
+                      </span>
+                      <span class="text-xs text-zinc-500">
+                        {guest_buyer.guest_email}
+                      </span>
+                      <span class="text-xs text-zinc-400">Guest checkout</span>
                     </span>
-                    <span class="text-xs text-zinc-500 group-hover:underline">
-                      {@selected_payment.user.email}
-                    </span>
-                  </.link>
-                <% else %>
-                  <span class="text-zinc-400">System</span>
+                  <% true -> %>
+                    <span class="text-zinc-400">System</span>
                 <% end %>
               </p>
             </div>
@@ -5009,6 +5033,18 @@ defmodule YscWeb.AdminMoneyLive do
       _ -> "text-zinc-900"
     end
   end
+
+  # Guest ticket orders have no account, so the payment has no user; the buyer
+  # is the name and email given at checkout. Takes the payment's related entity
+  # or a ticket order.
+  defp guest_buyer({:ticket_order, %Ysc.Tickets.TicketOrder{} = order}),
+    do: guest_buyer(order)
+
+  defp guest_buyer(%Ysc.Tickets.TicketOrder{} = order) do
+    if Ysc.Tickets.TicketOrder.guest?(order), do: order
+  end
+
+  defp guest_buyer(_), do: nil
 
   defp get_user_display_name(%Ecto.Association.NotLoaded{}), do: "Unknown User"
 
