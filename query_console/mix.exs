@@ -33,20 +33,26 @@ defmodule QueryConsole.MixProject do
 
   defp deps do
     [
-      # 1.8.16: phoenix.js connection-handling races (#6867) and WebSocket
-      # close code 1000 is no longer special-cased (#6880). Endpoint.socket/3
-      # accepts max_channels_per_transport (default 100). We mount LiveView
-      # with websocket + longpoll (app.js longPollFallbackMs: 2500) and keep
-      # the default channel cap. Requires phoenix_pubsub ~> 2.4 (lock 2.4.1);
-      # we only start {Phoenix.PubSub, name: QueryConsole.PubSub} and do not
-      # call subscribe/broadcast ourselves. 1.8.15 replaceTransport
-      # detach-before-close is superseded by the Connection class. 1.8.14:
-      # LongPoll fetch timers are cleared after success or abort (#6811);
-      # VerifiedRoutes :router must be a compile-time module; local path
-      # validation is shared. 1.8.13: phoenix.js reconnects after Chrome
-      # freeze/resume. 1.8.10: longpoll POST timeout close-and-retry.
-      # phx.gen.auth / phx.gen.cert / phx.new unused (Tailwind stays 4.1.7).
-      {:phoenix, "~> 1.8.16"},
+      # 1.8.17: EEF-CVE-2026-129344 (HIGH / GHSA-5vmc-qgf8-rw36) an
+      # unencodable channel broadcast used to DoS every client on the
+      # topic; fastlane now stops only channels using the failing
+      # serializer. EEF-CVE-2026-128361 (HIGH / GHSA-pvfx-rx4x-phrr)
+      # Presence stringifies keys so a non-binary key cannot crash the
+      # tracker. Do not ignore these advisories. Query Console has no
+      # Presence module and mounts LiveView with websocket + longpoll
+      # (vsn 2.0.0). 1.8.16: phoenix.js connection-handling races (#6867)
+      # and WebSocket close code 1000 is no longer special-cased (#6880).
+      # Endpoint.socket/3 accepts max_channels_per_transport (default 100).
+      # We keep the default channel cap. Requires phoenix_pubsub ~> 2.4
+      # (lock 2.4.1); we only start {Phoenix.PubSub, name:
+      # QueryConsole.PubSub}. 1.8.15 replaceTransport detach-before-close
+      # is superseded by the Connection class. 1.8.14: LongPoll fetch
+      # timers are cleared after success or abort (#6811); VerifiedRoutes
+      # :router must be a compile-time module. 1.8.13: phoenix.js
+      # reconnects after Chrome freeze/resume. 1.8.10: longpoll POST
+      # timeout close-and-retry. phx.gen.auth / phx.gen.cert / phx.new
+      # unused (Tailwind stays 4.1.7).
+      {:phoenix, "~> 1.8.17"},
       # plug 1.20.0/1.20.1 retired on Hex. 1.20.4: EEF-CVE-2026-120287
       # (MEDIUM / GHSA-qj4r-jh2r-rw3f) charges multipart part framing and
       # empty headers against `:length`. Phoenix lists plug ~> 1.14, so
@@ -92,14 +98,19 @@ defmodule QueryConsole.MixProject do
       # attribute names to attributes_escape/1. Pin the patched floor.
       {:phoenix_html, "~> 4.4.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      # 1.2.13: lotus_web 1.4 allows LiveView >= 1.1 and < 1.3. Includes the
-      # 1.1.33 fix for EEF-CVE-2026-64941 (LOW / GHSA-36m4-rm57-3prf), which
-      # rejects ASCII tab, LF, CR, and encoded tab (`/%09`) in LiveView redirect /
-      # push_navigate / push_patch `:to` paths so `/\t/evil.com` cannot become a
-      # scheme-relative open redirect. We only pass compile-time `~p` paths
-      # (`/auth/ysc`, `/workbooks/:id`); we do not forward user input to
-      # `redirect/2`.
-      {:phoenix_live_view, "~> 1.2.13"},
+      # 1.2.14: EEF-CVE-2026-126334 (MEDIUM / GHSA-v4p7-3pm2-wq6c). A
+      # router-mounted LiveView joined without `"url"`/`"redirect"` used
+      # to skip its live_session on_mount hooks. Lotus dashboard mounts
+      # via live_session (QueryConsoleWeb.LotusMount). Includes the
+      # 1.2.9 / 1.1.33 fix for EEF-CVE-2026-64941 (LOW /
+      # GHSA-36m4-rm57-3prf), which rejects ASCII tab, LF, CR, and
+      # encoded tab (`/%09`) in LiveView redirect / push_navigate /
+      # push_patch `:to` paths so `/\t/evil.com` cannot become a
+      # scheme-relative open redirect. lotus_web 1.4 allows LiveView
+      # >= 1.1 and < 1.3. We only pass compile-time `~p` paths
+      # (`/auth/ysc`, `/workbooks/:id`); we do not forward user input
+      # to `redirect/2`.
+      {:phoenix_live_view, "~> 1.2.14"},
       # 0.1.14: from_document/2 and from_fragment/2 accept optional
       # :max_depth, :max_memory, :max_attributes, :timeout (default
       # unlimited). extras: fine 0.1.6 → 0.2.0 (lazy_html 0.1.14 requires
@@ -223,21 +234,33 @@ defmodule QueryConsole.MixProject do
   defp aliases do
     [
       setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet --repo QueryConsole.Repo", "test"],
+      test: [
+        "ecto.create --quiet",
+        "ecto.migrate --quiet --repo QueryConsole.Repo",
+        "test"
+      ],
       "ecto.setup": [
         "ecto.create",
         "ecto.migrate --repo QueryConsole.Repo",
         "run priv/repo/seeds.exs"
       ],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.setup": [
+        "tailwind.install --if-missing",
+        "esbuild.install --if-missing"
+      ],
       "assets.build": ["tailwind query_console", "esbuild query_console"],
       "assets.deploy": [
         "tailwind query_console --minify",
         "esbuild query_console --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: [
+        "compile --warnings-as-errors",
+        "deps.unlock --unused",
+        "format",
+        "test"
+      ]
     ]
   end
 end

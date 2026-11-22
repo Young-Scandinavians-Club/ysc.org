@@ -361,7 +361,16 @@ defmodule Ysc.MixProject do
       # EEF-CVE-2026-82672. Finch still lists mint ~> 1.8, so pin the patched
       # floor.
       {:mint, "~> 1.11.0", override: true},
-      {:floki, "~> 0.38"},
+      # 0.38.5: quadratic-time parsing of unbalanced tags in the built-in
+      # mochiweb parser is linear again (open-element names are tracked so
+      # a non-matching end tag is rejected without scanning the stack;
+      # parse tree unchanged). Functional :nth-child / :nth-of-type match
+      # with O(1) remainder arithmetic instead of scanning an+b values.
+      # We parse with Floki.parse_fragment/1 then find/text/raw_html
+      # (newsletter HTML, SES no-track, open-in-new-tab, SMS strip). We
+      # do not pass attributes_as_maps, html_parser, or parser_args, or
+      # call find/2 on an unparsed string. Public APIs unchanged.
+      {:floki, "~> 0.38.5"},
       # 0.29.0: Flop.Schema is a behaviour (`use Flop.Schema` + `@flop_options`)
       # instead of a protocol (`@derive`). field_info/2, get_field/3, and
       # primary_key/1 take the schema module. Schema option accessors are gone
@@ -468,17 +477,24 @@ defmodule Ysc.MixProject do
       # have named Ysc.Repo + ecto_psql_extras; pin the patched floor.
       {:phoenix_live_dashboard, "~> 0.9.1"},
       {:phoenix_live_reload, "~> 1.7", only: :dev},
-      # 1.2.13: upload file-reader/chunk-timeout/errored-entry handling;
-      # wait for ancestor locks before auto_upload; hooked <svg> inner
-      # updates; live-link target/download on child clicks; form recovery
-      # completion order; reload-cookie clear; focus retry only if focus
-      # did not move. Socket opts (e.g. max_channels_per_transport) now
-      # forward to Phoenix.Socket. We auto_upload receipts/avatars/media
-      # and nest children in <.link>; we do not set formtarget,
-      # ColocatedCSS, onDocumentPatch, or max_channels_per_transport.
-      # 1.2.12: hook disconnected() runs once; JS.push no longer mutates
-      # opts; assign_async falsy keys; caret restore for search/url/tel.
-      {:phoenix_live_view, "~> 1.2.13"},
+      # 1.2.14: EEF-CVE-2026-126334 (MEDIUM / GHSA-v4p7-3pm2-wq6c). A
+      # router-mounted LiveView joined without `"url"`/`"redirect"` used
+      # to skip its live_session on_mount hooks. Auth/onboarding/admin
+      # checks live in live_session hooks, so pin the patched floor.
+      # Also: refuse joins whose url has no host; only call
+      # handle_params/3 on patch when defined. 1.2.13: upload
+      # file-reader/chunk-timeout/errored-entry handling; wait for
+      # ancestor locks before auto_upload; hooked <svg> inner updates;
+      # live-link target/download on child clicks; form recovery
+      # completion order; reload-cookie clear; focus retry only if
+      # focus did not move. Socket opts (e.g.
+      # max_channels_per_transport) now forward to Phoenix.Socket. We
+      # auto_upload receipts/avatars/media and nest children in <.link>;
+      # we do not set formtarget, ColocatedCSS, onDocumentPatch, or
+      # max_channels_per_transport. 1.2.12: hook disconnected() runs
+      # once; JS.push no longer mutates opts; assign_async falsy keys;
+      # caret restore for search/url/tel.
+      {:phoenix_live_view, "~> 1.2.14"},
       # 0.13.0: regex assert_path/refute_path; LiveView phx-change sends
       # `_unused_*` for untouched fields; only the activated submitter's
       # data is sent (implicit submit uses the first). 0.13.1: Elixir 1.18
@@ -502,22 +518,30 @@ defmodule Ysc.MixProject do
       # phoenix_live_view lists it optional ~> 0.1.0; pin the patched floor.
       {:lazy_html, "~> 0.1.14", only: :test},
       {:phoenix_turnstile, "~> 1.2"},
-      # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+.
-      # 1.8.12: clear return_to after login; drop channel messages without a join_ref.
-      # 1.8.13: phoenix.js reconnects after Chrome freeze/resume when visibilitychange is skipped.
-      # 1.8.14: LongPoll fetch timer leak (we use websocket only); VerifiedRoutes
-      # :router must be a compile-time module; local path validation is shared
-      # across redirect, static_path, and ~p (also rejects CR/LF in paths).
-      # 1.8.16: phoenix.js connection-handling races (#6867) and WebSocket
-      # close code 1000 is no longer special-cased (#6880). Endpoint.socket/3
-      # accepts max_channels_per_transport (default 100). We mount LiveView
-      # websocket only, broadcast "disconnect" on logout, and keep the
-      # default channel cap. Requires phoenix_pubsub ~> 2.4 (lock 2.4.1);
-      # we only call subscribe/2, unsubscribe/2, broadcast/3. 1.8.15
-      # replaceTransport detach-before-close is superseded by the
-      # Connection class. phx.gen.cert Chromium cert and phx.new Tailwind
-      # 4.3.3 are unused (we already ship 4.3.3).
-      {:phoenix, "~> 1.8.16"},
+      # 1.8.17: EEF-CVE-2026-129344 (HIGH / GHSA-5vmc-qgf8-rw36) an
+      # unencodable channel broadcast used to DoS every client on the
+      # topic; fastlane now stops only channels using the failing
+      # serializer. EEF-CVE-2026-128361 (HIGH / GHSA-pvfx-rx4x-phrr)
+      # Presence stringifies keys so a non-binary key cannot crash the
+      # tracker. Do not ignore these advisories. We track editor
+      # presence with string socket ids (`YscWeb.Presence`) and mount
+      # LiveView websocket only (vsn 2.0.0). 1.8.16: phoenix.js
+      # connection-handling races (#6867) and WebSocket close code 1000
+      # is no longer special-cased (#6880). Endpoint.socket/3 accepts
+      # max_channels_per_transport (default 100). We broadcast
+      # "disconnect" on logout and keep the default channel cap.
+      # Requires phoenix_pubsub ~> 2.4 (lock 2.4.1); we only call
+      # subscribe/2, unsubscribe/2, broadcast/3. 1.8.15 replaceTransport
+      # detach-before-close is superseded by the Connection class.
+      # 1.8.14: LongPoll fetch timer leak (we use websocket only);
+      # VerifiedRoutes :router must be a compile-time module; local path
+      # validation is shared across redirect, static_path, and ~p.
+      # 1.8.13: phoenix.js reconnects after Chrome freeze/resume.
+      # 1.8.12: clear return_to after login; drop channel messages
+      # without a join_ref. EEF-CVE-2026-56811/56812: channel join DoS +
+      # Presence JS prototype collision; fixed in 1.8.9+. phx.gen.cert
+      # Chromium cert and phx.new Tailwind 4.3.3 are unused.
+      {:phoenix, "~> 1.8.17"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break).
       # 1.20.4: EEF-CVE-2026-120287 (MEDIUM / GHSA-qj4r-jh2r-rw3f) charges
       # multipart part framing and empty headers against `:length`. 1.20.3
