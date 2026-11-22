@@ -874,7 +874,8 @@ defmodule YscWeb.AdminEventsLive.TicketList do
 
               payment ->
                 Tickets.refund_via_stripe(payment, amount, reason,
-                  ticket_ids: [ticket.id]
+                  ticket_ids: [ticket.id],
+                  send_email: false
                 )
             end
         end
@@ -883,7 +884,9 @@ defmodule YscWeb.AdminEventsLive.TicketList do
         {:ok, _} ->
           case Tickets.refund_tickets(ticket_order, [ticket.id], reason) do
             {:ok, refund_info} ->
-              Tickets.notify_ticket_refund(stripe_result)
+              Tickets.notify_ticket_refund(stripe_result,
+                ticket_ids: [ticket.id]
+              )
 
               {:noreply,
                socket

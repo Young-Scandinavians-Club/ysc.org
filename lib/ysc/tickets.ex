@@ -1674,6 +1674,9 @@ defmodule Ysc.Tickets do
 
   ## Options
   - `:ticket_ids` — ids of the tickets this refund covers (per-ticket flows)
+  - `:send_email` — set to `false` to skip the refund email (default `true`);
+    the caller then sends it with `notify_ticket_refund/2` after cancelling
+    the tickets
 
   ## Returns
   - `{:ok, {:skipped_zero_amount, nil, nil}}` if `amount` is zero or negative
@@ -1706,7 +1709,8 @@ defmodule Ysc.Tickets do
               payment_id: payment.id,
               refund_amount: amount,
               reason: reason,
-              external_refund_id: stripe_refund.id
+              external_refund_id: stripe_refund.id,
+              send_email: Keyword.get(opts, :send_email, true)
             })
 
           {:error, stripe_reason} ->
@@ -1730,14 +1734,24 @@ defmodule Ysc.Tickets do
   Sends the ticket refund email for the result of `refund_via_stripe/4`, once
   the refunded tickets have been cancelled.
 
-  `refund_via_stripe/4` records the refund (and tries the email) before the
-  caller cancels the tickets, so the email has no cancelled tickets to list
-  yet. Zero-amount skips and failures have no refund to email about.
-  """
-  def notify_ticket_refund({:ok, {%Ledgers.Refund{} = refund, _tx, _entries}}),
-    do: Ledgers.resend_refund_email(refund)
+  Admin flows pass `send_email: false` to `refund_via_stripe/4`, because the
+  refund is recorded before the tickets are cancelled and the email lists
+  cancelled tickets. Zero-amount skips and failures have no refund to email
+  about.
 
-  def notify_ticket_refund(_result), do: :ok
+  ## Options
+    * `:ticket_ids` - the tickets this refund covered (see
+      `Ledgers.resend_refund_email/2`)
+  """
+  def notify_ticket_refund(result, opts \\ [])
+
+  def notify_ticket_refund(
+        {:ok, {%Ledgers.Refund{} = refund, _tx, _entries}},
+        opts
+      ),
+      do: Ledgers.resend_refund_email(refund, opts)
+
+  def notify_ticket_refund(_result, _opts), do: :ok
 
   # Stripe idempotency key for an admin refund. Same tickets + amount (or the
   # same amount-only sequence number) retries the original Stripe refund;

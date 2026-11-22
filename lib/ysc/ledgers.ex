@@ -1296,6 +1296,8 @@ defmodule Ysc.Ledgers do
   - `refund_amount`: Amount to refund (can be partial)
   - `reason`: Reason for refund
   - `external_refund_id`: External refund ID from payment provider
+  - `send_email`: Set to `false` to skip the refund email (default `true`) when
+    the caller sends it itself later; see `resend_refund_email/2`
   """
   def process_refund(attrs) do
     require Ysc.Logging
@@ -1344,11 +1346,23 @@ defmodule Ysc.Ledgers do
         {:ok, {existing_refund, existing_transaction, []}}
 
       _ ->
-        do_process_refund(payment_id, refund_amount, reason, external_refund_id)
+        do_process_refund(
+          payment_id,
+          refund_amount,
+          reason,
+          external_refund_id,
+          Map.get(attrs, :send_email, true)
+        )
     end
   end
 
-  defp do_process_refund(payment_id, refund_amount, reason, external_refund_id) do
+  defp do_process_refund(
+         payment_id,
+         refund_amount,
+         reason,
+         external_refund_id,
+         send_email?
+       ) do
     Repo.transaction(fn ->
       # Get original payment
       payment = Repo.get!(Payment, payment_id)
@@ -1410,8 +1424,11 @@ defmodule Ysc.Ledgers do
         enqueue_quickbooks_sync_refund(refund)
         # Send refund confirmation email
         # Reload payment with associations for email
-        payment = get_payment_with_associations(payment_id)
-        send_refund_email(refund, payment)
+        if send_email? do
+          payment = get_payment_with_associations(payment_id)
+          send_refund_email(refund, payment, [])
+        end
+
         {:ok, {refund, refund_transaction, entries}}
 
       {:error, {:already_processed, existing_refund, existing_transaction}} ->
@@ -1442,19 +1459,28 @@ defmodule Ysc.Ledgers do
   end
 
   @doc """
-  Sends the refund confirmation email for an already-recorded refund.
+  Sends the refund confirmation email for a refund recorded with
+  `send_email: false`.
 
-  Ticket refund emails list the order's cancelled tickets, but the admin flows
-  record the Stripe refund (which sends this email from `process_refund/1`)
-  before they cancel the tickets, so that first attempt finds nothing to list.
-  Flows call this once the tickets are cancelled. The email's idempotency key
-  is the refund id, so an email that already went out is not sent twice.
+  Ticket refund emails list cancelled tickets, but the admin flows record the
+  Stripe refund before they cancel the tickets, so they skip the email in
+  `process_refund/1` and send it here once the tickets are cancelled. The
+  email's idempotency key is the refund id, so it is never sent twice.
+
+  ## Options
+    * `:ticket_ids` - list only these tickets (the ones this refund covered)
+      instead of every cancelled ticket on the order, so a second partial
+      refund does not repeat tickets from the first.
   """
-  def resend_refund_email(%Refund{} = refund) do
-    send_refund_email(refund, get_payment_with_associations(refund.payment_id))
+  def resend_refund_email(%Refund{} = refund, opts \\ []) do
+    send_refund_email(
+      refund,
+      get_payment_with_associations(refund.payment_id),
+      opts
+    )
   end
 
-  defp send_refund_email(refund, nil) do
+  defp send_refund_email(refund, nil, _opts) do
     require Ysc.Logging
 
     Ysc.Logging.warning("Skipping refund email - payment not found",
@@ -1462,7 +1488,7 @@ defmodule Ysc.Ledgers do
     )
   end
 
-  defp send_refund_email(refund, payment) do
+  defp send_refund_email(refund, payment, opts) do
     require Ysc.Logging
 
     try do
@@ -1482,7 +1508,7 @@ defmodule Ysc.Ledgers do
         {:ticket_order, ticket_order} ->
           # Guest ticket orders have no account (and so no payment user); the
           # email goes to the guest address on the order.
-          send_ticket_order_refund_email(refund, ticket_order)
+          send_ticket_order_refund_email(refund, ticket_order, opts)
 
         _ ->
           # Unknown entity type, skip email
@@ -1573,7 +1599,7 @@ defmodule Ysc.Ledgers do
     end
   end
 
-  defp send_ticket_order_refund_email(refund, ticket_order) do
+  defp send_ticket_order_refund_email(refund, ticket_order, opts) do
     require Ysc.Logging
 
     try do
@@ -1599,7 +1625,10 @@ defmodule Ysc.Ledgers do
         # For now, we'll get all tickets from the order and filter by cancelled status
         # This is a simplification - ideally we'd track which specific tickets were refunded
         refunded_tickets =
-          Enum.filter(ticket_order.tickets, &(&1.status == :cancelled))
+          Enum.filter(ticket_order.tickets, fn ticket ->
+            ticket.status == :cancelled and
+              refunded_ticket_id?(ticket, Keyword.get(opts, :ticket_ids))
+          end)
 
         if Enum.empty?(refunded_tickets) do
           Ysc.Logging.warning(
@@ -1668,6 +1697,9 @@ defmodule Ysc.Ledgers do
         )
     end
   end
+
+  defp refunded_ticket_id?(_ticket, nil), do: true
+  defp refunded_ticket_id?(ticket, ids), do: ticket.id in ids
 
   defp enqueue_quickbooks_sync_refund(%Refund{} = refund) do
     # Mark refund as pending sync
