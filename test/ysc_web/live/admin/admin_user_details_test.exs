@@ -99,6 +99,8 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       render_async(view)
 
+      assert has_element?(view, "#admin-application-header", "Application")
+
       assert has_element?(view, "#application-place-of-birth", "Sweden")
       assert has_element?(view, "#application-place-of-birth .fi-se")
       assert has_element?(view, "#application-citizenship", "United States")
@@ -1110,6 +1112,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       render_async(view)
 
+      assert has_element?(view, "#admin-application-header", "Approved")
       assert has_element?(view, "#admin-application-reviewed-by", admin.email)
 
       assert has_element?(
@@ -1128,6 +1131,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       render_async(view)
 
+      assert has_element?(view, "#admin-application-header", "Pending Review")
       refute has_element?(view, "#admin-application-reviewed-by")
     end
   end

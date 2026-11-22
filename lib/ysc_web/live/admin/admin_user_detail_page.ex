@@ -823,48 +823,13 @@ defmodule YscWeb.AdminUserDetailsLive do
           </div>
 
           <div :if={@selected_user_application != nil} class="flex flex-col gap-6">
-            <div class="flex items-center justify-between border-b border-zinc-200 pb-4 gap-4">
-              <div class="min-w-0">
-                <.admin_page_title level={2} variant={:emphasis}>
-                  Application
-                </.admin_page_title>
-                <p class="text-sm text-zinc-500 mt-0.5">
-                  <%= if @selected_user.state == :pending_approval do %>
-                    Submitted {if @selected_user_application.completed,
-                      do: Timex.from_now(@selected_user_application.completed),
-                      else: "N/A"}
-                  <% else %>
-                    <%= if @selected_user_application.reviewed_at do %>
-                      Reviewed {DateTimeDisplay.format_utc_date(
-                        @selected_user_application.reviewed_at
-                      )}
-                    <% else %>
-                      Submitted {if @selected_user_application.completed,
-                        do: Timex.from_now(@selected_user_application.completed),
-                        else: "N/A"}
-                    <% end %>
-                  <% end %>
-                </p>
-              </div>
-              <span :if={@selected_user.state == :pending_approval} class="shrink-0">
-                <.badge type="default">Pending Review</.badge>
-              </span>
-              <span
-                :if={
-                  @selected_user.state != :pending_approval &&
-                    @selected_user_application.review_outcome != nil
-                }
-                class="shrink-0"
-              >
-                <.badge type={
-                  AdminBadgeHelpers.review_outcome_badge_type(
-                    @selected_user_application.review_outcome
-                  )
-                }>
-                  {String.capitalize("#{@selected_user_application.review_outcome}")}
-                </.badge>
-              </span>
-            </div>
+            <.admin_application_header
+              id="admin-application-header"
+              user={@selected_user}
+              application={@selected_user_application}
+            >
+              Application
+            </.admin_application_header>
 
             <.admin_application_reviewer
               :if={

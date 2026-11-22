@@ -141,6 +141,7 @@ defmodule YscWeb.AdminUsersLiveTest do
 
       html = render(view)
       assert html =~ "Review Application"
+      assert has_element?(view, "#review-application-header", "Pending Review")
       assert html =~ "Approve Me"
       assert html =~ "Approving..."
       refute html =~ ~s(phx-disable-with="Approving...")
