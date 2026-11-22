@@ -744,15 +744,20 @@ defmodule YscWeb.AdminMoneyLive do
                  payment,
                  calculated_refund_amount,
                  refund_params["reason"],
-                 ticket_ids: ticket_ids
+                 ticket_ids: ticket_ids,
+                 send_email: false
                ) do
-            {:ok, {_refund, _transaction, _entries}} ->
+            {:ok, {_refund, _transaction, _entries}} = stripe_result ->
               case Tickets.refund_tickets(
                      ticket_order,
                      ticket_ids,
                      refund_params["reason"]
                    ) do
-                {:ok, _refund_info} ->
+                {:ok, refund_info} ->
+                  Tickets.notify_ticket_refund(stripe_result,
+                    ticket_ids: Enum.map(refund_info.refunded_tickets, & &1.id)
+                  )
+
                   # Refresh data
                   %{start_date: start_date, end_date: end_date} = socket.assigns
 
@@ -841,12 +846,15 @@ defmodule YscWeb.AdminMoneyLive do
           # Check if we should release availability
           release_availability = refund_params["release_availability"] == "true"
 
+          # Ticket orders get their refund email once the tickets are cancelled
+          # (below); other payments (bookings) still email right away.
           case Tickets.refund_via_stripe(
                  payment,
                  refund_amount,
-                 refund_params["reason"]
+                 refund_params["reason"],
+                 send_email: is_nil(ticket_order)
                ) do
-            {:ok, {_refund, _transaction, _entries}} ->
+            {:ok, {_refund, _transaction, _entries}} = stripe_result ->
               # If checkbox is checked, cancel booking or ticket order to release availability
               release_result =
                 if release_availability do
@@ -854,6 +862,14 @@ defmodule YscWeb.AdminMoneyLive do
                 else
                   :ok
                 end
+
+              # The refund email lists cancelled tickets, so (re)send it now
+              # that they are cancelled.
+              if release_result == {:ok, :ticket_order_canceled},
+                do:
+                  Tickets.notify_ticket_refund(stripe_result,
+                    ticket_ids: active_ticket_ids(ticket_order)
+                  )
 
               # Refresh data with current date range
               %{start_date: start_date, end_date: end_date} = socket.assigns
@@ -2180,6 +2196,16 @@ defmodule YscWeb.AdminMoneyLive do
               {@selected_payment.user.email}
             </.link>
           </p>
+          <p
+            :if={!@selected_payment.user && guest_buyer(@ticket_order)}
+            id="refund-modal-guest-buyer"
+            class="text-sm text-zinc-600"
+          >
+            <strong>Guest:</strong>
+            {Ysc.Tickets.TicketOrder.buyer_name(guest_buyer(@ticket_order))} ({guest_buyer(
+              @ticket_order
+            ).guest_email})
+          </p>
         </div>
 
         <.form
@@ -3099,21 +3125,35 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">User</p>
+              <% guest_buyer = guest_buyer(@payment_related_entity) %>
               <p id="payment-modal-user" class="text-sm text-zinc-900">
-                <%= if Ecto.assoc_loaded?(@selected_payment.user) && @selected_payment.user do %>
-                  <.link
-                    navigate={~p"/admin/users/#{@selected_payment.user.id}/details"}
-                    class="flex flex-col group"
-                  >
-                    <span class="font-medium text-blue-600 group-hover:underline">
-                      {get_user_display_name(@selected_payment.user)}
+                <%= cond do %>
+                  <% Ecto.assoc_loaded?(@selected_payment.user) && @selected_payment.user -> %>
+                    <.link
+                      navigate={
+                        ~p"/admin/users/#{@selected_payment.user.id}/details"
+                      }
+                      class="flex flex-col group"
+                    >
+                      <span class="font-medium text-blue-600 group-hover:underline">
+                        {get_user_display_name(@selected_payment.user)}
+                      </span>
+                      <span class="text-xs text-zinc-500 group-hover:underline">
+                        {@selected_payment.user.email}
+                      </span>
+                    </.link>
+                  <% guest_buyer -> %>
+                    <span id="payment-modal-guest-buyer" class="flex flex-col">
+                      <span class="font-medium">
+                        {Ysc.Tickets.TicketOrder.buyer_name(guest_buyer)}
+                      </span>
+                      <span class="text-xs text-zinc-500">
+                        {guest_buyer.guest_email}
+                      </span>
+                      <span class="text-xs text-zinc-400">Guest checkout</span>
                     </span>
-                    <span class="text-xs text-zinc-500 group-hover:underline">
-                      {@selected_payment.user.email}
-                    </span>
-                  </.link>
-                <% else %>
-                  <span class="text-zinc-400">System</span>
+                  <% true -> %>
+                    <span class="text-zinc-400">System</span>
                 <% end %>
               </p>
             </div>
@@ -5009,6 +5049,30 @@ defmodule YscWeb.AdminMoneyLive do
       _ -> "text-zinc-900"
     end
   end
+
+  # Tickets the refund of a whole order covers: the ones still active before
+  # the order is cancelled. nil (every cancelled ticket) when unknown.
+  defp active_ticket_ids(%Ysc.Tickets.TicketOrder{tickets: tickets})
+       when is_list(tickets) do
+    case for(t <- tickets, t.status in [:confirmed, :pending], do: t.id) do
+      [] -> nil
+      ids -> ids
+    end
+  end
+
+  defp active_ticket_ids(_), do: nil
+
+  # Guest ticket orders have no account, so the payment has no user; the buyer
+  # is the name and email given at checkout. Takes the payment's related entity
+  # or a ticket order.
+  defp guest_buyer({:ticket_order, %Ysc.Tickets.TicketOrder{} = order}),
+    do: guest_buyer(order)
+
+  defp guest_buyer(%Ysc.Tickets.TicketOrder{} = order) do
+    if Ysc.Tickets.TicketOrder.guest?(order), do: order
+  end
+
+  defp guest_buyer(_), do: nil
 
   defp get_user_display_name(%Ecto.Association.NotLoaded{}), do: "Unknown User"
 
