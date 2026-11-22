@@ -1,4 +1,22 @@
 defmodule Ysc.Repo.Migrations.AddGuestBuyerToTicketOrders do
+  # Rolling back after guest sales have started
+  # -------------------------------------------
+  # `down/0` refuses to run while any guest order exists: those rows have no
+  # `user_id`, and reassigning them would throw away the only record of who
+  # bought (name and email). To back out of public sales:
+  #
+  #   1. Deploy the previous application version, and set every tier's
+  #      "Who can buy" back to a member audience so no new guest orders start.
+  #   2. Leave this migration applied. It is additive (a nullable `user_id`,
+  #      three new nullable columns and a check constraint), so the previous
+  #      version keeps working against it. Guest orders stay readable in the
+  #      database for refunds and support.
+  #   3. Only revert the schema once the guest orders have been exported and
+  #      removed deliberately.
+  #
+  # Not verified: that the previous application version handles an existing
+  # guest order (an order with no user) everywhere it lists orders. Try it on a
+  # copy of production data before relying on step 2.
   use Ecto.Migration
 
   def up do

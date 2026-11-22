@@ -282,6 +282,102 @@ defmodule YscWeb.GuestCheckoutLiveTest do
     end
   end
 
+  describe "amount shown at payment" do
+    test "a price change after the page loaded shows the charged total and matching lines",
+         %{conn: conn, event: event, public_tier: tier} do
+      {:ok, view, _html} = live(conn, checkout_path(event, %{tier.id => 1}))
+      assert has_element?(view, "#guest-checkout-total", "$30.00")
+
+      {:ok, _} = Events.update_ticket_tier(tier, %{price: Money.new(35, :USD)})
+
+      submit_details(view)
+
+      assert has_element?(view, "#guest-checkout-total", "$35.00")
+      assert has_element?(view, "#guest-line-price-#{tier.id}", "$35.00")
+    end
+
+    test "line prices are hidden when the reloaded prices don't add up to the charge",
+         %{conn: conn, event: event, public_tier: tier} do
+      # The price moves again after payment setup priced the order, before the
+      # summary reloads the tiers.
+      stub(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        {:ok, _} =
+          Events.update_ticket_tier(tier, %{price: Money.new(40, :USD)})
+
+        {:ok, build_payment_intent(%{id: "pi_moved", amount: params.amount})}
+      end)
+
+      {:ok, view, _html} = live(conn, checkout_path(event, %{tier.id => 1}))
+      submit_details(view)
+
+      assert has_element?(view, "#guest-checkout-total", "$30.00")
+      refute has_element?(view, "#guest-line-price-#{tier.id}")
+    end
+  end
+
+  describe "hold expiry" do
+    defp start_payment(conn, event, tier) do
+      {:ok, view, _html} = live(conn, checkout_path(event, %{tier.id => 1}))
+      submit_details(view)
+      {view, Ysc.Repo.one!(TicketOrder)}
+    end
+
+    test "releases the tickets when Stripe confirms nothing was paid", %{
+      conn: conn,
+      event: event,
+      public_tier: tier
+    } do
+      {view, order} = start_payment(conn, event, tier)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        {:ok,
+         build_payment_intent(%{id: id, status: "requires_payment_method"})}
+      end)
+
+      stub(Ysc.StripeMock, :cancel_payment_intent, fn id, _opts ->
+        {:ok, build_payment_intent(%{id: id, status: "canceled"})}
+      end)
+
+      send(view.pid, :hold_expired)
+
+      assert_redirect(view, ~p"/events/#{event.id}")
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status in [
+               :expired,
+               :cancelled
+             ]
+    end
+
+    test "leaves the order alone and says so while a payment is processing", %{
+      conn: conn,
+      event: event,
+      public_tier: tier
+    } do
+      {view, order} = start_payment(conn, event, tier)
+
+      # Stripe refuses to cancel an intent that is processing, then reports it so.
+      stub(Ysc.StripeMock, :cancel_payment_intent, fn _id, _opts ->
+        {:error,
+         %Stripe.Error{
+           message: "cannot cancel",
+           source: :api,
+           code: "payment_intent_unexpected_state"
+         }}
+      end)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+        {:ok,
+         build_payment_intent(%{id: id, status: "processing", amount: 3000})}
+      end)
+
+      send(view.pid, :hold_expired)
+      render(view)
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+      assert has_element?(view, "#payment-element")
+    end
+  end
+
   describe "return route" do
     test "a failed redirect payment goes back to the event", %{
       conn: conn,

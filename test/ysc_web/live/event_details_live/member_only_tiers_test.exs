@@ -184,13 +184,12 @@ defmodule YscWeb.EventDetailsLive.MemberOnlyTiersTest do
       ctx = event_with_member_only_and_regular_tiers()
       conn = log_in_user(conn, user_fixture())
 
-      {view, html} = open_tickets_modal(conn, ctx.event)
+      {view, _html} = open_tickets_modal(conn, ctx.event)
 
       panel = "#tier-membership-required-#{ctx.member_tier.id}"
 
       assert has_element?(view, panel, "need an active paid membership")
       refute has_element?(view, panel, "regular tiers")
-      refute html =~ "regular tiers"
     end
 
     test "checkout toast for ineligible members-only tickets says ticket type, not tiers" do

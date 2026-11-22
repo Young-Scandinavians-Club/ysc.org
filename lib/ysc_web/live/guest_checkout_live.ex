@@ -64,6 +64,7 @@ defmodule YscWeb.GuestCheckoutLive do
       |> assign(:selections, selections)
       |> assign(:tiers, Map.new(tiers, &{&1.id, &1}))
       |> assign(:total, total)
+      |> assign(:show_line_prices, true)
       |> assign(:remote_ip, YscWeb.ClientIP.from_socket(socket, session))
       |> assign(:load_turnstile, true)
       |> assign(:step, :details)
@@ -284,7 +285,12 @@ defmodule YscWeb.GuestCheckoutLive do
               class="flex justify-between gap-4"
             >
               <span>{tier.name} <span :if={!donation?(tier)}>× {quantity}</span></span>
-              <span>{line_price(tier, quantity)}</span>
+              <span
+                :if={@show_line_prices}
+                id={"guest-line-price-#{tier.id}"}
+              >
+                {line_price(tier, quantity)}
+              </span>
             </li>
           </ul>
           <div class="flex justify-between border-t border-zinc-200 pt-3 font-semibold">
@@ -368,21 +374,11 @@ defmodule YscWeb.GuestCheckoutLive do
   def handle_info(:hold_expired, socket) do
     case socket.assigns do
       %{step: :payment, ticket_order: %TicketOrder{} = order} ->
-        if Tickets.CheckoutCancel.pending_order_safe_to_cancel?(order,
-             context: "guest_hold_expired"
-           ) do
-          Tickets.expire_ticket_order(order)
-
-          {:noreply,
-           socket
-           |> put_toast(
-             :error,
-             "Time ran out, so we released your tickets. Please choose them again."
-           )
-           |> push_navigate(to: ~p"/events/#{socket.assigns.event.id}")}
-        else
-          {:noreply, socket}
-        end
+        # `expire_ticket_order/1` reconciles with Stripe first: it expires the
+        # order, fulfils it if the payment already succeeded, or leaves it
+        # pending while a payment is processing. Report what actually happened.
+        _ = Tickets.expire_ticket_order(order)
+        hold_expired_result(socket, Tickets.get_ticket_order(order.id))
 
       _ ->
         {:noreply, socket}
@@ -390,6 +386,31 @@ defmodule YscWeb.GuestCheckoutLive do
   end
 
   def handle_info(_message, socket), do: {:noreply, socket}
+
+  defp hold_expired_result(socket, %TicketOrder{status: :completed} = order) do
+    {:noreply, redirect(socket, to: ~p"/t/#{AccessToken.sign_order(order.id)}")}
+  end
+
+  defp hold_expired_result(socket, %TicketOrder{status: status})
+       when status in [:expired, :cancelled] do
+    {:noreply,
+     socket
+     |> put_toast(
+       :error,
+       "Time ran out, so we released your tickets. Please choose them again."
+     )
+     |> push_navigate(to: ~p"/events/#{socket.assigns.event.id}")}
+  end
+
+  # Still pending: a payment is in flight (or the order couldn't be read).
+  defp hold_expired_result(socket, _order) do
+    {:noreply,
+     put_toast(
+       socket,
+       :info,
+       "Your payment is still processing. If you were charged, your tickets will be emailed to #{socket.assigns.ticket_order.guest_email} shortly."
+     )}
+  end
 
   @impl true
   def terminate(_reason, socket) do
@@ -456,7 +477,10 @@ defmodule YscWeb.GuestCheckoutLive do
            |> assign(:ticket_order, order)
            |> assign(:payment_intent, payment_intent)
            |> assign(:total, charged)
-           |> assign(:tiers, refresh_tiers(order, socket.assigns.tiers))}
+           |> assign_summary(
+             refresh_tiers(order, socket.assigns.tiers),
+             charged
+           )}
 
         {:error, _reason} ->
           release_order(assign(socket, :ticket_order, order))
@@ -561,6 +585,39 @@ defmodule YscWeb.GuestCheckoutLive do
   end
 
   defp donation?(%TicketTier{type: type}), do: type in [:donation, "donation"]
+
+  # Payment setup reprices the order, and the tier prices reloaded here for the
+  # summary can differ again if prices moved in between. Only show per-line
+  # prices when they add up to the amount Stripe will charge; the total always
+  # comes from the PaymentIntent.
+  defp assign_summary(socket, tiers, charged) do
+    selections = socket.assigns.selections
+
+    sum =
+      Enum.reduce(selections, Money.new(0, :USD), fn {tier_id, quantity}, acc ->
+        case Map.get(tiers, tier_id) do
+          nil -> acc
+          tier -> Money.add!(acc, line_money(tier, quantity))
+        end
+      end)
+
+    socket
+    |> assign(:tiers, tiers)
+    |> assign(:show_line_prices, Money.equal?(sum, charged))
+  end
+
+  defp line_money(%TicketTier{} = tier, quantity) do
+    cond do
+      donation?(tier) ->
+        Money.new(Ysc.MoneyHelper.cents_to_dollars(quantity), :USD)
+
+      Money.zero?(tier.price) ->
+        Money.new(0, :USD)
+
+      true ->
+        Money.mult!(tier.price, quantity)
+    end
+  end
 
   defp line_price(%TicketTier{} = tier, quantity) do
     cond do
