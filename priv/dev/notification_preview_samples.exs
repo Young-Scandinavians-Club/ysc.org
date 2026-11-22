@@ -229,19 +229,20 @@
       first_name: "Astrid",
       header_image_url: "http://localhost:4000/images/tahoe-cabin-feature.jpg",
       header_image_alt: "Lake Tahoe cabin",
+      headline: "2 free nights on your next cabin stay",
       benefit_description:
         "2 free nights on your next cabin stay. If you book more nights than that, you still pay for the extra nights. Your exact savings show on the price summary when you check out.",
       property_line: "Cabin: Lake Tahoe.",
       buyout_cap_line: "",
       expiry_line: "This benefit does not expire.",
       next_booking_notice:
-        "This benefit is for your next eligible cabin booking.",
+        "This is for your next new cabin booking. When you pick dates and go through checkout, the discount is applied automatically. It does not change past trips, completed stays, or bookings you've already made.",
       show_tahoe_link: true,
       show_clear_lake_link: false,
       tahoe_book_url: "http://localhost:4000/bookings/tahoe",
       clear_lake_book_url: nil,
       manage_bookings_hint:
-        "Start a new booking to use this benefit — it appears on your price summary automatically before you confirm."
+        "Start a new booking to use this — it appears on your price summary automatically before you confirm."
     },
     "booking_modification_cabin_master_notification" => %{
       booking: %{
