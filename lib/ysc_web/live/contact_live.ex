@@ -6,7 +6,7 @@ defmodule YscWeb.ContactLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="py-6 lg:py-8 max-w-(--breakpoint-xl) mx-auto px-4">
+    <.page_container id="contact-page">
       <.page_masthead
         id="contact-masthead"
         eyebrow="Contact"
@@ -145,7 +145,7 @@ defmodule YscWeb.ContactLive do
           </div>
         </div>
       </div>
-    </div>
+    </.page_container>
     """
   end
 

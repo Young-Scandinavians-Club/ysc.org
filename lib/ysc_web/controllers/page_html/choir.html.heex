@@ -1,4 +1,4 @@
-<div class="py-6 lg:py-8 max-w-(--breakpoint-xl) mx-auto px-4">
+<.page_container id="choir-page">
   <.page_masthead
     id="choir-masthead"
     eyebrow="Get involved"
@@ -168,17 +168,11 @@
         Choir Calendar
       </h2>
     </div>
-    <div class="w-full overflow-hidden rounded-xl border border-zinc-200">
-      <iframe
-        id="choir-google-calendar"
-        src="https://calendar.google.com/calendar/embed?src=c_f9fe96ca412f8a0ba8c8e1e7175731b55810fe3d2ad30e85996c2909a4a31af8%40group.calendar.google.com&ctz=America%2FLos_Angeles"
-        class="w-full border-0"
-        height="600"
-        frameborder="0"
-        scrolling="no"
-        title="YSC Choir Calendar"
-      ></iframe>
-    </div>
+    <.calendar_embed
+      id="choir-google-calendar"
+      src="https://calendar.google.com/calendar/embed?src=c_f9fe96ca412f8a0ba8c8e1e7175731b55810fe3d2ad30e85996c2909a4a31af8%40group.calendar.google.com&ctz=America%2FLos_Angeles"
+      title="YSC Choir Calendar"
+    />
   </div>
 
   <%!-- About Section --%>
@@ -217,4 +211,4 @@
       </div>
     </div>
   </div>
-</div>
+</.page_container>

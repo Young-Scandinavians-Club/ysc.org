@@ -97,6 +97,10 @@ defmodule YscWeb.PageControllerTest do
       assert html =~ "Board Meeting Schedule"
 
       assert LazyHTML.from_fragment(html)
+             |> LazyHTML.query("#board-page")
+             |> Enum.count() == 1
+
+      assert LazyHTML.from_fragment(html)
              |> LazyHTML.query(
                "#board-meeting-attendance a[href='mailto:board@ysc.org']"
              )
@@ -118,11 +122,17 @@ defmodule YscWeb.PageControllerTest do
                )
              ) == 1
 
+      assert Enum.count(LazyHTML.query(document, "#choir-page")) == 1
+
       assert Enum.count(
                LazyHTML.query(
                  document,
                  "picture img#choir-photo[src*='choir.jpg']"
                )
+             ) == 1
+
+      assert Enum.count(
+               LazyHTML.query(document, "iframe#choir-google-calendar")
              ) == 1
 
       assert Enum.empty?(
@@ -368,6 +378,10 @@ defmodule YscWeb.PageControllerTest do
       assert html =~ "Financials &amp; Annual Meetings"
 
       assert document
+             |> LazyHTML.query("#financials-page")
+             |> Enum.count() == 1
+
+      assert document
              |> LazyHTML.query("#year-2026")
              |> Enum.count() == 1
 
@@ -431,6 +445,7 @@ defmodule YscWeb.PageControllerTest do
       html = conn |> get(~p"/brand") |> html_response(200)
       document = LazyHTML.from_fragment(html)
 
+      assert Enum.count(LazyHTML.query(document, "#brand-page")) == 1
       assert Enum.count(LazyHTML.query(document, "#brand-masthead")) == 1
 
       for id <- ~w(logo color type components imagery charts slides) do

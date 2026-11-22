@@ -4,7 +4,7 @@ defmodule YscWeb.VolunteerLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="py-6 lg:py-8 max-w-(--breakpoint-xl) mx-auto px-4">
+    <.page_container id="volunteer-page">
       <.page_masthead
         id="volunteer-masthead"
         eyebrow="Get involved"
@@ -140,7 +140,7 @@ defmodule YscWeb.VolunteerLive do
           </.simple_form>
         </div>
       </div>
-    </div>
+    </.page_container>
     """
   end
 
