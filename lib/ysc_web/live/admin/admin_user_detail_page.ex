@@ -1188,6 +1188,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 </p>
                 <.simple_form
                   for={@membership_form}
+                  id="admin-membership-period-form"
                   phx-change="validate_membership"
                   phx-submit="update_membership_period"
                 >

@@ -544,6 +544,14 @@ defmodule Ysc.Subscriptions do
     Application.get_env(:ysc, :stripe_subscription_module, Stripe.Subscription)
   end
 
+  defp stripe_schedule_module do
+    Application.get_env(
+      :ysc,
+      :stripe_subscription_schedule_module,
+      Stripe.SubscriptionSchedule
+    )
+  end
+
   defp do_get_scheduled_downgrade_info(
          %Subscription{} = subscription,
          schedule_api
@@ -835,9 +843,10 @@ defmodule Ysc.Subscriptions do
   Updates the subscription period end date using subscription schedules.
   This creates a schedule that overrides when the current subscription period ends.
 
-  `schedule_api` is the Stripe schedule module, injectable for tests. Retrieve
-  goes through `stripe_subscription_module/0` so tests can mock Stripe without
-  hitting the live API.
+  `schedule_api` is the Stripe schedule module, injectable for tests. When
+  omitted, it is `stripe_schedule_module/0` (`:stripe_subscription_schedule_module`,
+  default `Stripe.SubscriptionSchedule`) so LiveView callers of arity 2 can be
+  tested without hitting Stripe. Retrieve goes through `stripe_subscription_module/0`.
 
   ## Examples
 
@@ -850,7 +859,7 @@ defmodule Ysc.Subscriptions do
   def update_period_end(
         %Subscription{} = subscription,
         %DateTime{} = new_end_date,
-        schedule_api \\ Stripe.SubscriptionSchedule
+        schedule_api \\ stripe_schedule_module()
       ) do
     # Convert DateTime to Unix timestamp for Stripe
     end_timestamp = DateTime.to_unix(new_end_date)
