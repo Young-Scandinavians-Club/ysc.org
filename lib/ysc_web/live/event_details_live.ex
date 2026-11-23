@@ -6487,28 +6487,31 @@ defmodule YscWeb.EventDetailsLive do
     guest_tiers =
       Enum.filter(socket.assigns.ticket_tiers, &Map.has_key?(selections, &1.id))
 
-    cond do
-      selections == %{} or length(guest_tiers) != map_size(selections) or
-          not Enum.all?(guest_tiers, &TierAudience.public?/1) ->
-        {:noreply,
-         redirect(socket,
-           to: ~p"/users/log-in?redirect_to=#{~p"/events/#{event_id}/tickets"}"
-         )}
+    guest_selection_ok? =
+      selections != %{} and length(guest_tiers) == map_size(selections) and
+        Enum.all?(guest_tiers, &TierAudience.public?/1)
 
-      match?(
-        {:error, :ticket_quantity_exceeds_limit},
-        Ysc.Tickets.validate_checkout_quantities(
-          selections,
-          socket.assigns.ticket_tiers
-        )
-      ) ->
-        {:noreply, checkout_quantity_limit_toast(socket)}
+    if guest_selection_ok? do
+      case Ysc.Tickets.validate_checkout_quantities(
+             selections,
+             socket.assigns.ticket_tiers
+           ) do
+        {:error, :ticket_quantity_exceeds_limit} ->
+          {:noreply, checkout_quantity_limit_toast(socket)}
 
-      true ->
-        token = Ysc.Tickets.GuestCheckout.sign_selection(event_id, selections)
+        :ok ->
+          token = Ysc.Tickets.GuestCheckout.sign_selection(event_id, selections)
 
-        {:noreply,
-         push_navigate(socket, to: ~p"/events/#{event_id}/checkout?s=#{token}")}
+          {:noreply,
+           push_navigate(socket,
+             to: ~p"/events/#{event_id}/checkout?s=#{token}"
+           )}
+      end
+    else
+      {:noreply,
+       redirect(socket,
+         to: ~p"/users/log-in?redirect_to=#{~p"/events/#{event_id}/tickets"}"
+       )}
     end
   end
 
@@ -7024,25 +7027,20 @@ defmodule YscWeb.EventDetailsLive do
 
   # Finding 102: donation amount events must not write admission quantities.
   # `selected_tickets` uses cents for donations and ticket counts otherwise.
+  defp put_donation_selection(socket, nil, _amount_cents), do: socket
+
   defp put_donation_selection(socket, tier_id, amount_cents) do
-    cond do
-      is_nil(tier_id) ->
-        socket
-
-      not donation_tier_loaded?(socket, tier_id) ->
-        socket
-
-      is_integer(amount_cents) and amount_cents > 0 ->
-        assign_selected_tickets(
-          socket,
+    if donation_tier_loaded?(socket, tier_id) do
+      updated_tickets =
+        if is_integer(amount_cents) and amount_cents > 0 do
           Map.put(socket.assigns.selected_tickets, tier_id, amount_cents)
-        )
-
-      true ->
-        assign_selected_tickets(
-          socket,
+        else
           Map.delete(socket.assigns.selected_tickets, tier_id)
-        )
+        end
+
+      assign_selected_tickets(socket, updated_tickets)
+    else
+      socket
     end
   end
 
@@ -7060,10 +7058,7 @@ defmodule YscWeb.EventDetailsLive do
         get_ticket_quantity(selected_tickets, tier_id) + 1
       )
 
-    match?(
-      :ok,
-      Ysc.Tickets.validate_checkout_quantities(proposed, ticket_tiers)
-    )
+    Ysc.Tickets.validate_checkout_quantities(proposed, ticket_tiers) == :ok
   end
 
   defp checkout_quantity_limit_toast(socket) do
