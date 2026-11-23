@@ -241,6 +241,7 @@ defmodule YscWeb.ShopListingTest do
       assert has_element?(view, "#shop-remove-filter-black")
       refute has_element?(view, "#shop-product-#{sticker.id}")
       refute has_element?(view, "#shop-product-#{hoodie.id}")
+      refute has_element?(view, "#shop-no-matches")
     end
 
     test "tiles open on the filtered color", %{conn: conn, tee: tee} do
@@ -327,6 +328,7 @@ defmodule YscWeb.ShopListingTest do
       Ysc.Repo.delete_all(Ysc.Merch.Variant)
       {:ok, view, _html} = live_shop(conn)
       assert has_element?(view, "#shop-empty")
+      refute has_element?(view, "#shop-no-matches")
       refute has_element?(view, "#shop-faq")
     end
   end

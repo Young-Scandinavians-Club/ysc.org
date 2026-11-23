@@ -103,5 +103,57 @@ defmodule YscWeb.ShopComponentsTest do
       assert html =~ ~s(href="/shop")
       assert html =~ "mt-8 motion-safe:active:scale-[0.98]"
     end
+
+    test "omits the icon, merges class, and renders a custom action" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.shop_empty_state
+          id="shop-no-matches"
+          title="Nothing in that color"
+          icon={nil}
+          class="mt-8"
+        >
+          Try a different color, or see everything.
+          <:actions>
+            <a id="shop-no-matches-clear" href="/shop">Clear all</a>
+          </:actions>
+        </.shop_empty_state>
+        """)
+
+      assert html =~ ~s(id="shop-no-matches")
+      assert html =~ "Nothing in that color"
+      assert html =~ "Try a different color, or see everything."
+      assert html =~ "rounded-3xl bg-zinc-50 px-6 py-24 text-center"
+      assert html =~ "mt-8"
+      assert html =~ ~s(id="shop-no-matches-clear")
+      assert html =~ "Clear all"
+      refute html =~ "hero-shopping-bag"
+      refute html =~ "Browse the shop"
+    end
+
+    test "browse_id wins over the actions slot" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.shop_empty_state
+          id="cart-empty"
+          title="Your cart is empty"
+          browse_id="cart-browse"
+        >
+          Find something you like in the shop.
+          <:actions>
+            <a id="shop-no-matches-clear" href="/shop">Clear all</a>
+          </:actions>
+        </.shop_empty_state>
+        """)
+
+      assert html =~ ~s(id="cart-browse")
+      assert html =~ "Browse the shop"
+      refute html =~ ~s(id="shop-no-matches-clear")
+      refute html =~ "Clear all"
+    end
   end
 end
