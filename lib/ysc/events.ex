@@ -256,6 +256,36 @@ defmodule Ysc.Events do
     )
   end
 
+  # Guest checkout masthead: title only. Omits `raw_details` / `rendered_details`
+  # so Postgres does not detoast the event body on a page that never renders it.
+  @guest_checkout_event_fields [:id, :title]
+
+  @doc """
+  Returns a published or cancelled event for guest checkout, or nil.
+
+  Same visibility as `get_public_event/1` (invalid ULIDs return `nil` instead
+  of raising). Selects only `id` / `title` — the checkout page never renders
+  the event body, location, or admin columns.
+  """
+  def get_event_for_guest_checkout(id) do
+    case Ecto.ULID.cast(id) do
+      {:ok, id} ->
+        id
+        |> guest_checkout_event_query()
+        |> Repo.one()
+
+      :error ->
+        nil
+    end
+  end
+
+  defp guest_checkout_event_query(id) do
+    from(e in Event,
+      where: e.id == ^id and e.state in ^@public_event_states,
+      select: struct(e, ^@guest_checkout_event_fields)
+    )
+  end
+
   defp public_event_by_reference_query(reference_id) do
     from(e in Event,
       where:
@@ -4651,6 +4681,11 @@ defmodule Ysc.Events do
   @doc false
   def ci_query_explain_public_event_query do
     public_event_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc false
+  def ci_query_explain_guest_checkout_event_query do
+    guest_checkout_event_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
   end
 
   @doc false

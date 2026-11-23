@@ -32,21 +32,23 @@ defmodule YscWeb.GuestCheckoutLive do
 
   @impl true
   def mount(%{"id" => id} = params, session, socket) do
-    event = Ysc.Events.get_event(id)
-
     cond do
-      is_nil(event) ->
-        {:ok, leave(socket, ~p"/events", :error, "Event not found.")}
-
       socket.assigns.current_user != nil ->
         # Signed-in visitors use the regular checkout on the event page.
-        {:ok, push_navigate(socket, to: ~p"/events/#{event.id}/tickets")}
-
-      socket.assigns.live_action == :return ->
-        {:ok, mount_return(socket, event, params)}
+        # Skip the event SELECT — they never render this LiveView.
+        {:ok, push_navigate(socket, to: ~p"/events/#{id}/tickets")}
 
       true ->
-        {:ok, mount_details(socket, event, params, session)}
+        case Ysc.Events.get_event_for_guest_checkout(id) do
+          nil ->
+            {:ok, leave(socket, ~p"/events", :error, "Event not found.")}
+
+          event when socket.assigns.live_action == :return ->
+            {:ok, mount_return(socket, event, params)}
+
+          event ->
+            {:ok, mount_details(socket, event, params, session)}
+        end
     end
   end
 
@@ -56,7 +58,9 @@ defmodule YscWeb.GuestCheckoutLive do
          {:ok, tiers} <- load_selected_tiers(event.id, selections),
          :ok <- GuestCheckout.validate_tiers(tiers),
          {:ok, total, _discount} <-
-           BookingLocker.estimate_order_total(nil, event.id, selections) do
+           BookingLocker.estimate_order_total(nil, event.id, selections,
+             tiers: tiers
+           ) do
       socket
       |> assign(:page_title, "Checkout · #{event.title}")
       |> assign(:event, event)
