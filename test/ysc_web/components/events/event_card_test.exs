@@ -219,6 +219,59 @@ defmodule YscWeb.Components.Events.EventCardTest do
     end
   end
 
+  describe "demand badges" do
+    defp upcoming_event(overrides) do
+      base_event(
+        Map.merge(
+          %{
+            published_at: DateTime.add(DateTime.utc_now(), -72, :hour),
+            start_date: utc_midnight(Date.add(pacific_today(), 10)),
+            end_date: utc_midnight(Date.add(pacific_today(), 11))
+          },
+          overrides
+        )
+      )
+    end
+
+    test "shows Almost Full once the event is 85% full", %{conn: conn} do
+      event = upcoming_event(%{max_attendees: 20, ticket_count: 17})
+
+      html = render_card(conn, event)
+
+      assert html =~ "Almost Full"
+      refute html =~ "Going Fast!"
+    end
+
+    test "Almost Full replaces Going Fast when both apply", %{conn: conn} do
+      event = upcoming_event(%{max_attendees: 20, ticket_count: 19})
+
+      html = render_card(conn, event, selling_fast: true)
+
+      assert html =~ "Almost Full"
+      refute html =~ "Going Fast!"
+    end
+
+    test "a barely-sold event that is selling fast stays Going Fast", %{
+      conn: conn
+    } do
+      event = upcoming_event(%{max_attendees: 150, ticket_count: 6})
+
+      html = render_card(conn, event, selling_fast: true)
+
+      assert html =~ "Going Fast!"
+      refute html =~ "Almost Full"
+    end
+
+    test "sold out events do not show Almost Full", %{conn: conn} do
+      event = upcoming_event(%{max_attendees: 20, ticket_count: 20})
+
+      html = render_card(conn, event, sold_out: true)
+
+      assert html =~ "Sold Out"
+      refute html =~ "Almost Full"
+    end
+  end
+
   describe "start time" do
     test "formats the event start time for display", %{conn: conn} do
       event =

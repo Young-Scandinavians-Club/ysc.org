@@ -186,6 +186,82 @@ defmodule Ysc.Tickets.DisplayTest do
     end
   end
 
+  describe "sold_percentage/2" do
+    test "rounds and caps at 100" do
+      assert Display.sold_percentage(150, 6) == 4
+      assert Display.sold_percentage(20, 17) == 85
+      assert Display.sold_percentage(20, 25) == 100
+    end
+
+    test "is nil without a capacity cap or a count" do
+      assert Display.sold_percentage(nil, 5) == nil
+      assert Display.sold_percentage(0, 5) == nil
+      assert Display.sold_percentage(20, nil) == nil
+    end
+  end
+
+  describe "demand_indicator/3" do
+    test "says nothing without a real signal" do
+      assert Display.demand_indicator(false, nil, :unlimited) == nil
+      assert Display.demand_indicator(false, 4, 144) == nil
+      assert Display.demand_indicator(false, 84, 24) == nil
+    end
+
+    test "selling fast on a barely-sold event is a compact line with no bar" do
+      assert %{level: :momentum, headline: "Demand is high", show_bar?: false} =
+               indicator = Display.demand_indicator(true, 4, 144)
+
+      assert indicator.detail == "Tickets are selling quickly"
+    end
+
+    test "momentum states the remaining count once it is 10 or fewer" do
+      assert %{level: :momentum, detail: "Only 3 tickets left"} =
+               Display.demand_indicator(true, 49, 3)
+    end
+
+    test "selling fast without a capacity cap stays momentum" do
+      assert %{level: :momentum, show_bar?: false} =
+               Display.demand_indicator(true, nil, :unlimited)
+    end
+
+    test "the bar appears once a fast-selling event is half full" do
+      assert %{level: :momentum} = Display.demand_indicator(true, 49, 77)
+
+      assert %{
+               level: :filling,
+               headline: "Demand is high",
+               detail: "Filling up",
+               show_bar?: true
+             } = Display.demand_indicator(true, 50, 75)
+    end
+
+    test "half full without recent velocity makes no demand claim" do
+      assert Display.demand_indicator(false, 70, 45) == nil
+    end
+
+    test "85%+ full is scarce whether or not it is selling fast" do
+      assert %{
+               level: :scarce,
+               headline: "Demand is high",
+               detail: "22 tickets left",
+               show_bar?: true
+             } = Display.demand_indicator(true, 85, 22)
+
+      assert %{level: :scarce, headline: "Almost full", show_bar?: true} =
+               Display.demand_indicator(false, 90, 15)
+    end
+
+    test "scarce states the exact count when 10 or fewer remain" do
+      assert %{detail: "Only 4 tickets left"} =
+               Display.demand_indicator(false, 97, 4)
+    end
+
+    test "scarce omits the count when none can be bought" do
+      assert %{level: :scarce, detail: nil} =
+               Display.demand_indicator(false, 100, 0)
+    end
+  end
+
   describe "format_ledger_order_description/1" do
     test "includes tier summary when tickets are present" do
       ticket_order = %{

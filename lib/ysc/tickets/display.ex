@@ -158,6 +158,89 @@ defmodule Ysc.Tickets.Display do
     "Only #{tickets_left_label(count)}"
   end
 
+  # Fill thresholds for the event sidebar's demand indicator. Below `filling`
+  # a progress bar says almost nothing, so it stays hidden.
+  @demand_filling_percent 50
+  @demand_scarce_percent 85
+
+  @doc """
+  Decides what the event sidebar's demand indicator may claim.
+
+  "Demand" (recent sales velocity, `selling_fast?`) and "scarcity" (how full
+  the event is) are separate signals, and each visual element is shown only
+  once its own signal is true:
+
+    * `:momentum` — selling fast, but under #{@demand_filling_percent}% full or
+      capacity unknown. A compact line, no bar.
+    * `:filling` — selling fast and #{@demand_filling_percent}%+ full. Adds
+      the fill bar.
+    * `:scarce` — #{@demand_scarce_percent}%+ full. Strongest treatment; the
+      remaining count is stated. Reads "Demand is high" when also selling fast,
+      otherwise "Almost full".
+
+  Returns `nil` when there is nothing honest to say. `sold_percentage` is an
+  integer or `nil` (no capacity cap); `available_capacity` is an integer or
+  `:unlimited`.
+  """
+  def demand_indicator(selling_fast?, sold_percentage, available_capacity) do
+    cond do
+      is_integer(sold_percentage) and sold_percentage >= @demand_scarce_percent ->
+        %{
+          level: :scarce,
+          headline:
+            if(selling_fast?, do: "Demand is high", else: "Almost full"),
+          detail: remaining_detail(available_capacity),
+          show_bar?: true
+        }
+
+      selling_fast? and is_integer(sold_percentage) and
+          sold_percentage >= @demand_filling_percent ->
+        %{
+          level: :filling,
+          headline: "Demand is high",
+          detail: "Filling up",
+          show_bar?: true
+        }
+
+      selling_fast? ->
+        %{
+          level: :momentum,
+          headline: "Demand is high",
+          detail: momentum_detail(available_capacity),
+          show_bar?: false
+        }
+
+      true ->
+        nil
+    end
+  end
+
+  @doc """
+  Percent of capacity taken, capped at 100, or `nil` when there is no cap or
+  the count is unknown. Shared by event cards, which only have a confirmed
+  ticket count; the event page adds held tickets on top of it.
+  """
+  def sold_percentage(max_attendees, committed)
+      when is_integer(max_attendees) and max_attendees > 0 and
+             is_integer(committed) do
+    min(round(committed / max_attendees * 100), 100)
+  end
+
+  def sold_percentage(_max_attendees, _committed), do: nil
+
+  defp remaining_detail(count) when is_integer(count) and count > 10,
+    do: tickets_left_label(count)
+
+  defp remaining_detail(count) when is_integer(count) and count > 0,
+    do: tickets_left_demand_label(count)
+
+  defp remaining_detail(_count), do: nil
+
+  defp momentum_detail(count) when is_integer(count) and count in 1..10,
+    do: tickets_left_demand_label(count)
+
+  defp momentum_detail(_count), do: "Tickets are selling quickly"
+
   @doc """
   True when the order total is $0 (free RSVP, $0 tiers, or fully discounted).
   """

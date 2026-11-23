@@ -323,7 +323,13 @@ defmodule Ysc.Events do
 
       %Event{} = event ->
         [event] = put_tv_poster_selling_fast([event])
-        Ysc.Events.EventPricingCache.enrich_event(event)
+
+        [event] =
+          [event]
+          |> Ysc.Events.EventPricingCache.enrich_events()
+          |> put_tv_poster_ticket_count()
+
+        event
     end
   end
 
@@ -341,6 +347,7 @@ defmodule Ysc.Events do
     |> Repo.all()
     |> put_tv_poster_selling_fast()
     |> Ysc.Events.EventPricingCache.enrich_events()
+    |> put_tv_poster_ticket_count()
   end
 
   # The pricing cache is shared with the public list, which seeds entries that
@@ -356,6 +363,22 @@ defmodule Ysc.Events do
 
     Enum.map(events, fn event ->
       Map.put(event, :selling_fast, MapSet.member?(selling_fast_ids, event.id))
+    end)
+  end
+
+  # The poster's "Almost Full" badge (and so its fingerprint) depends on how
+  # many tickets are sold. The enriched `ticket_count` comes from the pricing
+  # cache, which is node-local and can lag sales, so two sync runs could
+  # fingerprint the same event differently and re-upload an identical poster.
+  # Overwrite it with a fresh count after enrichment, like `selling_fast`.
+  defp put_tv_poster_ticket_count([]), do: []
+
+  defp put_tv_poster_ticket_count(events) do
+    counts =
+      batch_count_tickets_sold_excluding_donations(Enum.map(events, & &1.id))
+
+    Enum.map(events, fn event ->
+      Map.put(event, :ticket_count, Map.get(counts, event.id, 0))
     end)
   end
 

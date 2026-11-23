@@ -519,6 +519,7 @@ defmodule YscWeb.EventsListLive do
     case badge.text do
       "Sold Out" -> "bg-red-600"
       "Going Fast!" -> "bg-emerald-600"
+      "Almost Full" -> "bg-amber-700"
       "Cancelled" -> "bg-zinc-700"
       "Save the Date" -> "bg-blue-600"
       _ -> "bg-zinc-600"
@@ -532,6 +533,9 @@ defmodule YscWeb.EventsListLive do
 
       "Going Fast!" ->
         "sm:bg-emerald-500/90 sm:border sm:border-emerald-400"
+
+      "Almost Full" ->
+        "sm:bg-amber-600/90 sm:border sm:border-amber-500"
 
       "Cancelled" ->
         "sm:bg-zinc-600/90 sm:border sm:border-zinc-500"

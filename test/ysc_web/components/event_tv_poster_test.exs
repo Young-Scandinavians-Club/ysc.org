@@ -65,6 +65,26 @@ defmodule YscWeb.Components.EventTvPosterTest do
     assert html =~ "Sold Out"
   end
 
+  test "shows Almost Full when the event is nearly at capacity" do
+    assigns = %{
+      event: poster_event(%{max_attendees: 20, ticket_count: 18}),
+      event_url: "https://ysc.org/events/abc"
+    }
+
+    html =
+      rendered_to_string(~H"""
+      <.event_tv_poster
+        event={@event}
+        event_url={@event_url}
+        sold_out={false}
+        selling_fast={true}
+      />
+      """)
+
+    assert html =~ "Almost Full"
+    refute html =~ "Going Fast!"
+  end
+
   test "formats event date and time with Calendar" do
     assigns = %{
       event:

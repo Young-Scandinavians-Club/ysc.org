@@ -3037,6 +3037,7 @@ defmodule YscWeb.CoreComponents do
       @type == "sky" && "bg-sky-100 text-sky-800",
       @type == "green" && "bg-green-100 text-green-800",
       @type == "yellow" && "bg-yellow-100 text-yellow-800",
+      @type == "orange" && "bg-orange-100 text-orange-800",
       @type == "red" && "bg-red-100 text-red-800",
       @type == "violet" && "bg-violet-100 text-violet-800",
       @type == "dark" && "bg-zinc-100 text-zinc-800",
