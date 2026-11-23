@@ -1028,7 +1028,7 @@ defmodule YscWeb.AdminBookingsLive do
         show
         on_cancel={JS.push("close-booking-refund-modal")}
         max_width="max-w-md"
-        z_index="z-60"
+        z_index="z-210"
       >
         <.header>
           Process Refund
