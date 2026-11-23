@@ -6487,31 +6487,31 @@ defmodule YscWeb.EventDetailsLive do
     guest_tiers =
       Enum.filter(socket.assigns.ticket_tiers, &Map.has_key?(selections, &1.id))
 
-    guest_selection_ok? =
-      selections != %{} and length(guest_tiers) == map_size(selections) and
-        Enum.all?(guest_tiers, &TierAudience.public?/1)
+    case {map_size(selections), length(guest_tiers),
+          Enum.all?(guest_tiers, &TierAudience.public?/1)} do
+      {n, n, true} when n > 0 ->
+        case Ysc.Tickets.validate_checkout_quantities(
+               selections,
+               socket.assigns.ticket_tiers
+             ) do
+          {:error, :ticket_quantity_exceeds_limit} ->
+            {:noreply, checkout_quantity_limit_toast(socket)}
 
-    if guest_selection_ok? do
-      case Ysc.Tickets.validate_checkout_quantities(
-             selections,
-             socket.assigns.ticket_tiers
-           ) do
-        {:error, :ticket_quantity_exceeds_limit} ->
-          {:noreply, checkout_quantity_limit_toast(socket)}
+          :ok ->
+            token =
+              Ysc.Tickets.GuestCheckout.sign_selection(event_id, selections)
 
-        :ok ->
-          token = Ysc.Tickets.GuestCheckout.sign_selection(event_id, selections)
+            {:noreply,
+             push_navigate(socket,
+               to: ~p"/events/#{event_id}/checkout?s=#{token}"
+             )}
+        end
 
-          {:noreply,
-           push_navigate(socket,
-             to: ~p"/events/#{event_id}/checkout?s=#{token}"
-           )}
-      end
-    else
-      {:noreply,
-       redirect(socket,
-         to: ~p"/users/log-in?redirect_to=#{~p"/events/#{event_id}/tickets"}"
-       )}
+      _ ->
+        {:noreply,
+         redirect(socket,
+           to: ~p"/users/log-in?redirect_to=#{~p"/events/#{event_id}/tickets"}"
+         )}
     end
   end
 
@@ -7027,18 +7027,30 @@ defmodule YscWeb.EventDetailsLive do
 
   # Finding 102: donation amount events must not write admission quantities.
   # `selected_tickets` uses cents for donations and ticket counts otherwise.
+  # Keep the amount check in a guard: `is_integer(x) and x > 0` in an `if`
+  # compiles to `case true of false ->` once Dialyzer knows `x` is an integer,
+  # which is reported as `pattern_match` on line 1.
   defp put_donation_selection(socket, nil, _amount_cents), do: socket
 
-  defp put_donation_selection(socket, tier_id, amount_cents) do
-    if donation_tier_loaded?(socket, tier_id) do
-      updated_tickets =
-        if is_integer(amount_cents) and amount_cents > 0 do
-          Map.put(socket.assigns.selected_tickets, tier_id, amount_cents)
-        else
-          Map.delete(socket.assigns.selected_tickets, tier_id)
-        end
+  defp put_donation_selection(socket, tier_id, amount_cents)
+       when is_integer(amount_cents) and amount_cents > 0 do
+    put_loaded_donation_selection(socket, tier_id, fn selected ->
+      Map.put(selected, tier_id, amount_cents)
+    end)
+  end
 
-      assign_selected_tickets(socket, updated_tickets)
+  defp put_donation_selection(socket, tier_id, _amount_cents) do
+    put_loaded_donation_selection(socket, tier_id, fn selected ->
+      Map.delete(selected, tier_id)
+    end)
+  end
+
+  defp put_loaded_donation_selection(socket, tier_id, update_fun) do
+    if donation_tier_loaded?(socket, tier_id) do
+      assign_selected_tickets(
+        socket,
+        update_fun.(socket.assigns.selected_tickets)
+      )
     else
       socket
     end
