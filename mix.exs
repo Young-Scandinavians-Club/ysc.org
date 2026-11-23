@@ -343,7 +343,13 @@ defmodule Ysc.MixProject do
       {:ex_cldr_units, "~> 3.20"},
       {:ex_cldr, "~> 2.47"},
       {:ex_money_sql, "~> 1.12"},
-      {:ex_phone_number, "~> 0.4"},
+      # 0.4.12: libphonenumber metadata v9.0.41 (0.4.11 was v9.0.26);
+      # debug logging is opt-in via config :ex_phone_number, :debug_log
+      # (default off). Elixir floor is ~> 1.15 (we are 1.20). Public
+      # parse/format/valid APIs and Metadata.get_for_region_code /
+      # get_region_code_for_number are unchanged. extras: none
+      # (sweet_xml 0.7.5).
+      {:ex_phone_number, "~> 0.4.12"},
       {:excoveralls, "~> 0.18", only: :test, runtime: false},
       {:file_type, "~> 0.1.0"},
       # 0.24.0: close HTTP/1 connections after request/response errors
