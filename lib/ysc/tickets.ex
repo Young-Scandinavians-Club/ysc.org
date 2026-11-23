@@ -852,8 +852,21 @@ defmodule Ysc.Tickets do
   the confirmation UI renders.
   """
   def get_user_ticket_order_for_confirmation(user_id, order_id) do
-    user_id
-    |> ticket_order_for_confirmation_query(order_id)
+    dynamic([to], to.id == ^order_id and to.user_id == ^user_id)
+    |> ticket_order_for_confirmation_query()
+    |> Repo.one()
+  end
+
+  @doc """
+  Loads a guest checkout order (one with no account) for the confirmation page.
+
+  The caller must already have proven access, e.g. through a verified
+  `Ysc.Tickets.AccessToken`. Orders placed by a member are never returned, so a
+  token can't be used to open a member's receipt through the guest page.
+  """
+  def get_guest_ticket_order_for_confirmation(order_id) do
+    dynamic([to], to.id == ^order_id and is_nil(to.user_id))
+    |> ticket_order_for_confirmation_query()
     |> Repo.one()
   end
 
@@ -915,7 +928,7 @@ defmodule Ysc.Tickets do
     :answers
   ]
 
-  defp ticket_order_for_confirmation_query(user_id, order_id) do
+  defp ticket_order_for_confirmation_query(filter) do
     image_query =
       from(i in Image, select: struct(i, ^@confirmation_cover_image_fields))
 
@@ -951,7 +964,7 @@ defmodule Ysc.Tickets do
       )
 
     from(to in TicketOrder,
-      where: to.id == ^order_id and to.user_id == ^user_id,
+      where: ^filter,
       select: struct(to, ^@confirmation_ticket_order_fields),
       preload: [
         event: ^event_query,
@@ -4327,7 +4340,17 @@ defmodule Ysc.Tickets do
   @doc false
   def ci_query_explain_ticket_order_for_confirmation_query do
     ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
-    ticket_order_for_confirmation_query(ulid, ulid)
+
+    dynamic([to], to.id == ^ulid and to.user_id == ^ulid)
+    |> ticket_order_for_confirmation_query()
+  end
+
+  @doc false
+  def ci_query_explain_guest_ticket_order_for_confirmation_query do
+    ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
+
+    dynamic([to], to.id == ^ulid and is_nil(to.user_id))
+    |> ticket_order_for_confirmation_query()
   end
 
   @doc false

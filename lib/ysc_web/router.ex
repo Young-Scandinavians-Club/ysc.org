@@ -586,6 +586,7 @@ defmodule YscWeb.Router do
         {YscWeb.Plugs.RequestPath, :set_request_path}
       ] do
       live "/t/:token", TicketQrLive, :public
+      live "/t/:token/confirmation", OrderConfirmationLive, :guest
       live "/shop", ShopLive, :index
       live "/shop/products/:id", ShopProductLive, :show
 

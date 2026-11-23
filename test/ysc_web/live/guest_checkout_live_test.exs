@@ -12,6 +12,7 @@ defmodule YscWeb.GuestCheckoutLiveTest do
   import EventDetailsLiveHelpers
 
   alias Ysc.Events
+  alias Ysc.Tickets.AccessToken
   alias Ysc.Tickets.GuestCheckout
   alias Ysc.Tickets.TicketOrder
 
@@ -317,7 +318,7 @@ defmodule YscWeb.GuestCheckoutLiveTest do
       submit_details(view)
 
       {path, _flash} = assert_redirect(view)
-      assert path =~ ~r{^/t/.+}
+      assert path =~ ~r{^/t/[^/]+/confirmation\?confetti=true$}
       assert Ysc.Repo.one!(TicketOrder).status == :completed
     end
 
@@ -349,7 +350,7 @@ defmodule YscWeb.GuestCheckoutLiveTest do
       render_hook(view, "payment-success", %{"payment_intent_id" => pi_id})
 
       {path, _flash} = assert_redirect(view)
-      assert path =~ ~r{^/t/.+}
+      assert path =~ ~r{^/t/[^/]+/confirmation\?confetti=true$}
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :completed
     end
   end
@@ -455,7 +456,7 @@ defmodule YscWeb.GuestCheckoutLiveTest do
       send(view.pid, :hold_expired)
 
       {path, _flash} = assert_redirect(view)
-      assert path =~ ~r{^/t/.+}
+      assert path =~ ~r{^/t/[^/]+/confirmation\?confetti=true$}
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :completed
     end
 
@@ -520,6 +521,113 @@ defmodule YscWeb.GuestCheckoutLiveTest do
 
       assert path == "/events/#{event.id}"
       assert Ysc.Repo.aggregate(from(o in TicketOrder), :count) == 0
+    end
+  end
+
+  describe "order confirmation" do
+    defp completed_guest_order(event, tier) do
+      guest = %{
+        email: "gus@example.com",
+        first_name: "Gus",
+        last_name: "Buyer"
+      }
+
+      {:ok, order} =
+        GuestCheckout.create_order(guest, event.id, %{tier.id => 2})
+
+      {:ok, completed} = Ysc.Tickets.process_free_ticket_order(order)
+      completed
+    end
+
+    defp confirmation_path(order),
+      do: ~p"/t/#{AccessToken.sign_order(order.id)}/confirmation"
+
+    test "a finished checkout lands on the confirmation page", %{
+      conn: conn,
+      event: event,
+      free_tier: tier
+    } do
+      {:ok, view, _html} = live(conn, checkout_path(event, %{tier.id => 1}))
+      submit_details(view)
+
+      {path, _flash} = assert_redirect(view)
+      {:ok, view, _html} = live(conn, path)
+
+      assert has_element?(view, "#order-confirmation")
+      assert has_element?(view, "#order-confirmation-header", "Gus")
+
+      assert has_element?(
+               view,
+               "#order-confirmation-guest-email",
+               "gus@example.com"
+             )
+
+      assert has_element?(view, "#order-confirmation-event", event.title)
+      assert has_element?(view, "#order-confirmation-total-amount", "Free")
+    end
+
+    test "points at the tickets by token and hides member-only links", %{
+      conn: conn,
+      event: event,
+      free_tier: tier
+    } do
+      order = completed_guest_order(event, tier)
+      token = AccessToken.sign_order(order.id)
+
+      {:ok, view, _html} = live(conn, ~p"/t/#{token}/confirmation")
+
+      for ticket <- Ysc.Repo.preload(order, :tickets).tickets do
+        assert has_element?(view, "#order-confirmation-ticket-#{ticket.id}")
+      end
+
+      assert has_element?(
+               view,
+               ~s(#order-confirmation-checkin-qr[href="/t/#{token}"])
+             )
+
+      refute has_element?(view, "#order-confirmation-all-tickets")
+    end
+
+    test "a token for a different kind of access doesn't open it", %{
+      conn: conn,
+      event: event,
+      free_tier: tier
+    } do
+      order = completed_guest_order(event, tier)
+      [ticket | _] = Ysc.Repo.preload(order, :tickets).tickets
+
+      assert {:error, {:redirect, %{to: "/events"}}} =
+               live(
+                 conn,
+                 ~p"/t/#{AccessToken.sign_ticket(ticket.id)}/confirmation"
+               )
+
+      assert {:error, {:redirect, %{to: "/events"}}} =
+               live(conn, ~p"/t/not-a-token/confirmation")
+    end
+
+    test "never shows an order placed by a member", %{conn: conn} do
+      %{order: order} = Ysc.TicketAccessFixtures.granted_tickets(1)
+
+      assert {:error, {:redirect, %{to: "/events"}}} =
+               live(conn, confirmation_path(order))
+    end
+
+    test "an order that isn't confirmed yet sends the buyer to the ticket page",
+         %{conn: conn, event: event, free_tier: tier} do
+      {:ok, pending} =
+        GuestCheckout.create_order(
+          %{email: "gus@example.com", first_name: "Gus", last_name: "Buyer"},
+          event.id,
+          %{tier.id => 1}
+        )
+
+      token = AccessToken.sign_order(pending.id)
+
+      assert {:error, {:redirect, %{to: path}}} =
+               live(conn, ~p"/t/#{token}/confirmation")
+
+      assert path == "/t/#{token}"
     end
   end
 end
