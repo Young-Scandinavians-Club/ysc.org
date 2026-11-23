@@ -191,6 +191,19 @@ defmodule Ysc.Tickets.GuestCheckoutTest do
       assert Repo.reload!(second).status == :pending
     end
 
+    test "refuses an unbounded admission quantity", %{
+      event: event,
+      public_tier: tier
+    } do
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               GuestCheckout.create_order(@guest, event.id, %{
+                 tier.id => Tickets.max_checkout_quantity_per_tier() + 1
+               })
+
+      assert Repo.aggregate(TicketOrder, :count) == 0
+      assert Repo.aggregate(Ticket, :count) == 0
+    end
+
     test "one email can't stack up more than three open holds", %{
       event: event,
       public_tier: tier

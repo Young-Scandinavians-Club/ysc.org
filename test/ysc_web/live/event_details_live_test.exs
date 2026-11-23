@@ -947,6 +947,37 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert is_binary(result)
     end
 
+    test "Finding 102: set-donation-amount on an admission tier does not change quantity",
+         %{
+           conn: conn,
+           event: event
+         } do
+      tier = hd(event.ticket_tiers)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+
+      render_click(view, "set-donation-amount", %{
+        "tier-id" => tier.id,
+        "amount" => "100000"
+      })
+
+      render_change(view, "update-donation-amount", %{
+        "tier-id" => tier.id,
+        "value" => "1000.00"
+      })
+
+      render_click(view, "proceed-to-checkout")
+
+      tickets =
+        from(t in Ysc.Events.Ticket, where: t.ticket_tier_id == ^tier.id)
+        |> Repo.all()
+
+      assert length(tickets) == 1
+    end
+
     test "handles update-donation-amount event", %{conn: conn, event: event} do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
       render_async(view)

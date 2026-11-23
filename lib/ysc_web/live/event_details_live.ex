@@ -6373,18 +6373,7 @@ defmodule YscWeb.EventDetailsLive do
     # Parse the donation amount from the input string (e.g., "10.99" -> 1099 cents)
     donation_amount_cents = MoneyHelper.parse_dollar_string_to_cents(value)
 
-    updated_tickets =
-      if donation_amount_cents > 0 and tier_id do
-        # Add or update the donation amount in selected_tickets
-        Map.put(socket.assigns.selected_tickets, tier_id, donation_amount_cents)
-      else
-        # Remove the donation tier from selected_tickets if amount is 0 or empty
-        if tier_id,
-          do: Map.delete(socket.assigns.selected_tickets, tier_id),
-          else: socket.assigns.selected_tickets
-      end
-
-    {:noreply, assign_selected_tickets(socket, updated_tickets)}
+    {:noreply, put_donation_selection(socket, tier_id, donation_amount_cents)}
   end
 
   @impl true
@@ -6396,14 +6385,9 @@ defmodule YscWeb.EventDetailsLive do
     # Parse the amount string to integer (amount is in cents)
     case Integer.parse(amount_str) do
       {amount_cents, _} when amount_cents > 0 ->
-        # Set the donation amount in selected_tickets (amount is already in cents)
-        updated_tickets =
-          Map.put(socket.assigns.selected_tickets, tier_id, amount_cents)
-
-        {:noreply, assign_selected_tickets(socket, updated_tickets)}
+        {:noreply, put_donation_selection(socket, tier_id, amount_cents)}
 
       _ ->
-        # Invalid amount, don't update
         {:noreply, socket}
     end
   end
@@ -6464,6 +6448,11 @@ defmodule YscWeb.EventDetailsLive do
              ticket_tier,
              socket.assigns.selected_tickets,
              socket.assigns.user_tickets
+           ) &&
+           checkout_quantity_can_add?(
+             socket.assigns.ticket_tiers,
+             socket.assigns.selected_tickets,
+             ticket_tier.id
            ) do
         new_quantity = current_quantity + 1
 
@@ -6498,17 +6487,28 @@ defmodule YscWeb.EventDetailsLive do
     guest_tiers =
       Enum.filter(socket.assigns.ticket_tiers, &Map.has_key?(selections, &1.id))
 
-    if selections != %{} and length(guest_tiers) == map_size(selections) and
-         Enum.all?(guest_tiers, &TierAudience.public?/1) do
-      token = Ysc.Tickets.GuestCheckout.sign_selection(event_id, selections)
+    cond do
+      selections == %{} or length(guest_tiers) != map_size(selections) or
+          not Enum.all?(guest_tiers, &TierAudience.public?/1) ->
+        {:noreply,
+         redirect(socket,
+           to: ~p"/users/log-in?redirect_to=#{~p"/events/#{event_id}/tickets"}"
+         )}
 
-      {:noreply,
-       push_navigate(socket, to: ~p"/events/#{event_id}/checkout?s=#{token}")}
-    else
-      {:noreply,
-       redirect(socket,
-         to: ~p"/users/log-in?redirect_to=#{~p"/events/#{event_id}/tickets"}"
-       )}
+      match?(
+        {:error, :ticket_quantity_exceeds_limit},
+        Ysc.Tickets.validate_checkout_quantities(
+          selections,
+          socket.assigns.ticket_tiers
+        )
+      ) ->
+        {:noreply, checkout_quantity_limit_toast(socket)}
+
+      true ->
+        token = Ysc.Tickets.GuestCheckout.sign_selection(event_id, selections)
+
+        {:noreply,
+         push_navigate(socket, to: ~p"/events/#{event_id}/checkout?s=#{token}")}
     end
   end
 
@@ -6617,6 +6617,9 @@ defmodule YscWeb.EventDetailsLive do
            title: "Ticket limit"
          )
          |> assign(:show_ticket_modal, false)}
+
+      {:error, :ticket_quantity_exceeds_limit} ->
+        {:noreply, checkout_quantity_limit_toast(socket)}
 
       {:error, :checkout_payment_in_progress} ->
         {:noreply,
@@ -7017,6 +7020,63 @@ defmodule YscWeb.EventDetailsLive do
 
   defp get_ticket_quantity(selected_tickets, tier_id) do
     Map.get(selected_tickets, tier_id, 0)
+  end
+
+  # Finding 102: donation amount events must not write admission quantities.
+  # `selected_tickets` uses cents for donations and ticket counts otherwise.
+  defp put_donation_selection(socket, tier_id, amount_cents) do
+    cond do
+      is_nil(tier_id) ->
+        socket
+
+      not donation_tier_loaded?(socket, tier_id) ->
+        socket
+
+      is_integer(amount_cents) and amount_cents > 0 ->
+        assign_selected_tickets(
+          socket,
+          Map.put(socket.assigns.selected_tickets, tier_id, amount_cents)
+        )
+
+      true ->
+        assign_selected_tickets(
+          socket,
+          Map.delete(socket.assigns.selected_tickets, tier_id)
+        )
+    end
+  end
+
+  defp donation_tier_loaded?(socket, tier_id) do
+    Enum.any?(socket.assigns.ticket_tiers, fn tier ->
+      tier.id == tier_id and TicketTierHelpers.donation_tier?(tier)
+    end)
+  end
+
+  defp checkout_quantity_can_add?(ticket_tiers, selected_tickets, tier_id) do
+    proposed =
+      Map.put(
+        selected_tickets,
+        tier_id,
+        get_ticket_quantity(selected_tickets, tier_id) + 1
+      )
+
+    match?(
+      :ok,
+      Ysc.Tickets.validate_checkout_quantities(proposed, ticket_tiers)
+    )
+  end
+
+  defp checkout_quantity_limit_toast(socket) do
+    max_each = Ysc.Tickets.max_checkout_quantity_per_tier()
+    max_total = Ysc.Tickets.max_checkout_tickets()
+
+    socket
+    |> YscWeb.Flash.put_toast(
+      :error,
+      "You can buy at most #{max_each} tickets of one type, and #{max_total} tickets in one order.",
+      title: "Tickets"
+    )
+    |> assign(:show_ticket_modal, false)
   end
 
   defp assign_selected_tickets(socket, selected_tickets) do

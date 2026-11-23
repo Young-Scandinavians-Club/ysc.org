@@ -96,6 +96,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 99 (MEDIUM)   Volunteer door-sale `POST /api/v1/app/events/:id/tickets/payment_intent` accepted unbounded `tiers` quantities while `bypass_guards: true` skipped capacity. Pending tickets count as sold, so one JSON body could insert unbounded ticket rows and lock the event until the 5-minute timeout (repeatable).
   Finding 100 (MEDIUM)  Event photo direct-to-S3 presign used LiveView's 20 GB video cap for every file (including photos) and public-read ACL. A ticket holder could POST a multi-GB `.jpg` before `Limits.validate_upload/2` ran; cancel/abandon never deleted the object, so untrusted bytes stayed on the club CDN. S3 policy is now per-type, unsupported names are not presigned, cancel deletes the object, and the worker HEADs Content-Length before downloading.
   Finding 101 (MEDIUM)  Add-to-calendar passed volunteer-controlled event `title` / `location_name` into the web component unchanged. The vendor iCal escape does not strip CR/LF, so a title containing a newline could inject extra ICS properties into the `.ics` attendees download from the public event page.
+  Finding 102 (MEDIUM)  Event-page `set-donation-amount` / `update-donation-amount` wrote cents into `selected_tickets` for any tier id. Admission checkout treats that integer as a ticket count, so one LiveView event could insert unbounded pending rows (unlimited quantity) or lock remaining capacity. Finding 99 capped door sales only.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -7273,6 +7274,89 @@ defmodule YscWeb.SecurityAuditTest do
       assert Ysc.Events.AddToCalendar.text("  Midsummer  ") == "Midsummer"
       assert Ysc.Events.AddToCalendar.text("\n\t") == nil
       assert Ysc.Events.AddToCalendar.text(nil) == nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 102 (MEDIUM): Web/guest checkout quantity must be capped
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 102: web checkout quantity is capped" do
+    import Ysc.EventsFixtures
+
+    test "create_ticket_order refuses unbounded web quantities without bypass_guards" do
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture(%{unlimited_capacity: true})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 102 unlimited",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: nil
+        })
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.create_ticket_order(member.id, event.id, %{
+                 tier.id => 100_000
+               })
+
+      assert from(to in Ysc.Tickets.TicketOrder,
+               where: to.user_id == ^member.id and to.event_id == ^event.id
+             )
+             |> Repo.all() == []
+
+      assert from(t in Ysc.Events.Ticket, where: t.ticket_tier_id == ^tier.id)
+             |> Repo.all() == []
+    end
+
+    test "create_ticket_order still accepts a donation amount above the ticket cap" do
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture()
+
+      paid =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 102 mixed",
+          type: :paid,
+          price: Money.new(25, :USD)
+        })
+
+      donation =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Support Finding 102",
+          type: :donation,
+          price: nil,
+          quantity: nil
+        })
+
+      assert {:ok, order} =
+               Tickets.create_ticket_order(member.id, event.id, %{
+                 paid.id => 1,
+                 donation.id => 50_000
+               })
+
+      tickets =
+        from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+        |> Repo.all()
+
+      assert length(tickets) == 2
     end
   end
 end
