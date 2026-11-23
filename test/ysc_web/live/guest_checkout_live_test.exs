@@ -574,7 +574,7 @@ defmodule YscWeb.GuestCheckoutLiveTest do
       order = completed_guest_order(event, tier)
       token = AccessToken.sign_order(order.id)
 
-      {:ok, view, _html} = live(conn, confirmation_path(order))
+      {:ok, view, _html} = live(conn, ~p"/t/#{token}/confirmation")
 
       for ticket <- Ysc.Repo.preload(order, :tickets).tickets do
         assert has_element?(view, "#order-confirmation-ticket-#{ticket.id}")
@@ -625,7 +625,7 @@ defmodule YscWeb.GuestCheckoutLiveTest do
       token = AccessToken.sign_order(pending.id)
 
       assert {:error, {:redirect, %{to: path}}} =
-               live(conn, confirmation_path(pending))
+               live(conn, ~p"/t/#{token}/confirmation")
 
       assert path == "/t/#{token}"
     end

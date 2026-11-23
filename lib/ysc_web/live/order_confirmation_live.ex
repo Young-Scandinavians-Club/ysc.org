@@ -139,6 +139,7 @@ defmodule YscWeb.OrderConfirmationLive do
     |> assign(:ticket_order, ticket_order)
     |> assign(:event, event)
     |> assign(:user_first_name, first_name)
+    |> assign(:show_line_prices, line_prices_reconcile?(ticket_order))
     |> assign(:event_in_past, event_in_past?(event))
     |> assign(:refund_data, nil)
     |> assign(
@@ -380,7 +381,8 @@ defmodule YscWeb.OrderConfirmationLive do
                     original_price
                   end %>
                 <% has_ticket_discount =
-                  has_discount && !is_refunded && !is_donation %>
+                  has_discount && !is_refunded && !is_donation &&
+                    @show_line_prices %>
                 <div
                   id={"order-confirmation-ticket-#{ticket.id}"}
                   class={[
@@ -437,13 +439,16 @@ defmodule YscWeb.OrderConfirmationLive do
                           else: "Ticket number "}{ticket.reference_id}
                       </p>
                     </div>
-                    <div class={[
-                      "text-base font-semibold tabular-nums shrink-0 text-right",
-                      if(is_refunded,
-                        do: "text-zinc-400 line-through",
-                        else: "text-zinc-900"
-                      )
-                    ]}>
+                    <div
+                      id={"order-confirmation-ticket-price-#{ticket.id}"}
+                      class={[
+                        "text-base font-semibold tabular-nums shrink-0 text-right",
+                        if(is_refunded,
+                          do: "text-zinc-400 line-through",
+                          else: "text-zinc-900"
+                        )
+                      ]}
+                    >
                       <%= cond do %>
                         <% is_donation -> %>
                           {Map.get(
@@ -455,6 +460,7 @@ defmodule YscWeb.OrderConfirmationLive do
                           Free
                         <% Money.zero?(ticket.ticket_tier.price) -> %>
                           Free
+                        <% !@show_line_prices -> %>
                         <% has_discount && !is_refunded -> %>
                           <div class="flex flex-col items-end">
                             <span class="line-through text-zinc-400 text-xs font-normal">
@@ -775,6 +781,26 @@ defmodule YscWeb.OrderConfirmationLive do
     </div>
     """
   end
+
+  # Tickets only store their tier, so line prices come from the tier's current
+  # price. If prices moved since the purchase the lines no longer add up to
+  # what was charged; show the order total alone rather than misleading lines.
+  defp line_prices_reconcile?(%{total_amount: %Money{} = total} = order) do
+    sum =
+      order
+      |> DonationDisplay.money_amounts_by_ticket_id()
+      |> Map.values()
+      |> Enum.reduce(Money.new(0, :USD), fn amount, acc ->
+        case Money.add(acc, amount) do
+          {:ok, sum} -> sum
+          _ -> acc
+        end
+      end)
+
+    Money.equal?(sum, total)
+  end
+
+  defp line_prices_reconcile?(_order), do: true
 
   defp view_tickets_path(%{guest_token: token}) when is_binary(token),
     do: ~p"/t/#{token}"

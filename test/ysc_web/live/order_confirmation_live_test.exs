@@ -544,6 +544,45 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       assert html =~ "Ticket number"
     end
 
+    test "hides line prices that no longer add up to the amount charged", %{
+      conn: conn
+    } do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      tier = create_ticket_tier(event, %{price: Money.new(30, :USD)})
+
+      order =
+        create_ticket_order(user, event, %{total_amount: Money.new(30, :USD)})
+
+      ticket = create_ticket(order, tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(
+               view,
+               "#order-confirmation-ticket-price-#{ticket.id}",
+               "$30"
+             )
+
+      # The tier price moves after the purchase: the lines would show $40
+      # beside a $30 total, so only the total is shown.
+      tier
+      |> Ecto.Changeset.change(price: Money.new(40, :USD))
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      refute has_element?(
+               view,
+               "#order-confirmation-ticket-price-#{ticket.id}",
+               "$40"
+             )
+
+      assert has_element?(view, "#order-confirmation-total-amount", "$30")
+    end
+
     test "displays free tickets correctly", %{conn: conn} do
       user = create_user_with_membership()
       event = create_event(%{})
