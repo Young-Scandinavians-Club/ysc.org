@@ -114,6 +114,75 @@ defmodule YscWeb.EventDetailsLive do
     """
   end
 
+  # Demand indicator for the ticket sidebar. What to show comes from
+  # TicketDisplay.demand_indicator/3; this only draws it. Momentum is a quiet
+  # one-liner, the fill bar appears once the event is genuinely filling up.
+  attr :indicator, :map, required: true
+  attr :sold_percentage, :integer, default: nil
+
+  defp demand_indicator(%{indicator: %{show_bar?: false}} = assigns) do
+    ~H"""
+    <div
+      id="event-demand-indicator"
+      data-level={@indicator.level}
+      class="flex items-center gap-2.5 px-3 py-2.5 bg-orange-50 rounded-lg border border-orange-100"
+    >
+      <.icon name="hero-fire-solid" class="shrink-0 w-4 h-4 text-orange-500" />
+      <p class="text-xs text-orange-800 type-eyebrow">{@indicator.headline}</p>
+      <p :if={@indicator.detail} class="ml-auto text-xs text-orange-700 text-right">
+        {@indicator.detail}
+      </p>
+    </div>
+    """
+  end
+
+  defp demand_indicator(assigns) do
+    ~H"""
+    <div
+      id="event-demand-indicator"
+      data-level={@indicator.level}
+      class="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-3"
+    >
+      <div class="flex items-center gap-3">
+        <div class="shrink-0 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+          <.icon name="hero-fire-solid" class="w-4 h-4 text-white" />
+        </div>
+        <p class="text-xs text-orange-800 type-eyebrow">{@indicator.headline}</p>
+      </div>
+      <div :if={@sold_percentage} class="space-y-2">
+        <div class="flex justify-between items-end gap-3">
+          <p :if={@indicator.detail} class="text-xs text-orange-700 font-medium">
+            {@indicator.detail}
+          </p>
+          <p class="ml-auto text-xs font-mono text-zinc-500">
+            {@sold_percentage}% full
+          </p>
+        </div>
+        <div
+          role="progressbar"
+          aria-label="Tickets sold"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={@sold_percentage}
+          class="w-full bg-white h-1.5 rounded-full overflow-hidden"
+        >
+          <div
+            class={[
+              "h-full transition-[width] duration-1000",
+              if(@indicator.level == :scarce,
+                do: "bg-orange-600",
+                else: "bg-orange-400"
+              )
+            ]}
+            style={"width: #{@sold_percentage}%"}
+          >
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   defp external_tickets?(event), do: Event.external_ticketing?(event)
   defp tickets_tbd?(event), do: Event.tickets_tbd?(event)
 
@@ -1024,52 +1093,20 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
 
                   <div class="p-8 space-y-6">
-                    <%= if (@event_selling_fast || (@sold_percentage != nil && @sold_percentage >= 85)) && !@event_sold_out_for_user do %>
-                      <% available_capacity = @available_capacity %>
-                      <% sold_percentage = @sold_percentage %>
-                      <div class="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-3">
-                        <div class="flex items-center gap-3">
-                          <div class="shrink-0 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                            <.icon
-                              name="hero-fire-solid"
-                              class="w-4 h-4 text-white"
-                            />
-                          </div>
-                          <p class="text-[11px] text-orange-800 type-eyebrow">
-                            Demand is High
-                          </p>
-                        </div>
-                        <%= if sold_percentage != nil do %>
-                          <div class="space-y-2">
-                            <div class="flex justify-between items-end">
-                              <p class="text-xs text-orange-600 type-eyebrow">
-                                Limited Availability
-                              </p>
-                              <p class="text-xs font-mono text-zinc-500">
-                                {sold_percentage}% full
-                              </p>
-                            </div>
-                            <div class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
-                              <div
-                                class="bg-orange-500 h-full transition-[width] duration-1000"
-                                style={"width: #{sold_percentage}%"}
-                              >
-                              </div>
-                            </div>
-                          </div>
-                        <% else %>
-                          <p class="text-[11px] text-orange-700 font-medium">
-                            {case available_capacity do
-                              n when is_integer(n) and n > 0 and n <= 10 ->
-                                TicketDisplay.tickets_left_demand_label(n)
-
-                              _ ->
-                                "Going Fast"
-                            end}
-                          </p>
-                        <% end %>
-                      </div>
-                    <% end %>
+                    <% demand =
+                      if(!@event_sold_out_for_user,
+                        do:
+                          TicketDisplay.demand_indicator(
+                            @event_selling_fast,
+                            @sold_percentage,
+                            @available_capacity
+                          )
+                      ) %>
+                    <.demand_indicator
+                      :if={demand}
+                      indicator={demand}
+                      sold_percentage={@sold_percentage}
+                    />
 
                     <div class="space-y-3">
                       <%= if @has_ticket_info do %>
