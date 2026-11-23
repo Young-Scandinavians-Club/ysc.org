@@ -504,6 +504,45 @@ defmodule YscWeb.GuestCheckoutLiveTest do
       assert to == "/events/#{event.id}"
     end
 
+    test "a succeeded redirect payment opens the order confirmation", %{
+      conn: conn,
+      event: event,
+      public_tier: tier
+    } do
+      {:ok, view, _html} = live(conn, checkout_path(event, %{tier.id => 1}))
+      submit_details(view)
+
+      order = Ysc.Repo.one!(TicketOrder)
+      pi_id = "pi_redirect_#{System.unique_integer([:positive])}"
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: pi_id,
+           client_secret: "real_secret",
+           status: "succeeded",
+           amount: 3000,
+           metadata: %{
+             "ticket_order_id" => order.id,
+             "ticket_order_reference" => order.reference_id,
+             "event_id" => event.id
+           }
+         })}
+      end)
+
+      assert {:error, {:redirect, %{to: path}}} =
+               live(
+                 build_conn(),
+                 ~p"/events/#{event.id}/checkout/return?redirect_status=succeeded&payment_intent=#{pi_id}&payment_intent_client_secret=real_secret"
+               )
+
+      assert path =~ ~r{^/t/[^/]+/confirmation\?confetti=true$}
+      assert [_, signed] = Regex.run(~r{^/t/([^/]+)/confirmation}, path)
+      assert {:ok, {:order, order_id}} = AccessToken.verify(signed)
+      assert order_id == order.id
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :completed
+    end
+
     test "an unknown payment intent cannot open tickets", %{
       conn: conn,
       event: event
