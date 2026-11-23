@@ -186,6 +186,20 @@ defmodule Ysc.Tickets.DisplayTest do
     end
   end
 
+  describe "sold_percentage/2" do
+    test "rounds and caps at 100" do
+      assert Display.sold_percentage(150, 6) == 4
+      assert Display.sold_percentage(20, 17) == 85
+      assert Display.sold_percentage(20, 25) == 100
+    end
+
+    test "is nil without a capacity cap or a count" do
+      assert Display.sold_percentage(nil, 5) == nil
+      assert Display.sold_percentage(0, 5) == nil
+      assert Display.sold_percentage(20, nil) == nil
+    end
+  end
+
   describe "demand_indicator/3" do
     test "says nothing without a real signal" do
       assert Display.demand_indicator(false, nil, :unlimited) == nil

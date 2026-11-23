@@ -4,6 +4,7 @@ defmodule YscWeb.EventBadgeHelpers do
   """
 
   alias Ysc.Events.EventHelpers
+  alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.DateDisplay
 
   @type badge_kind ::
@@ -15,6 +16,7 @@ defmodule YscWeb.EventBadgeHelpers do
           | :tomorrow
           | {:days_left, pos_integer()}
           | :going_fast
+          | :almost_full
 
   @doc """
   Returns badge kinds when only one status group should show (cancelled and sold out
@@ -48,7 +50,7 @@ defmodule YscWeb.EventBadgeHelpers do
           )
           |> maybe_append(:just_added, just_added?(published_at))
           |> append_proximity(event, proximity)
-          |> maybe_append(:going_fast, selling_fast)
+          |> append_kind(demand_badge_kind(event, selling_fast))
         end
     end
   end
@@ -63,11 +65,41 @@ defmodule YscWeb.EventBadgeHelpers do
     []
     |> maybe_append(:save_the_date, Ysc.Events.Event.tickets_tbd?(event))
     |> maybe_append(:sold_out, sold_out)
-    |> maybe_append(:going_fast, !sold_out && get_field(event, :selling_fast))
+    |> append_kind(
+      if(sold_out,
+        do: nil,
+        else: demand_badge_kind(event, get_field(event, :selling_fast))
+      )
+    )
     |> maybe_append(
       :cancelled,
       get_field(event, :state) in [:cancelled, "cancelled"]
     )
+  end
+
+  @doc """
+  Which demand badge an event earns, if any: `:almost_full` once it is 85%+
+  full, `:going_fast` when it is selling fast, otherwise `nil`.
+
+  Decided by the same `TicketDisplay.demand_indicator/3` as the event page's
+  demand card, so a label never shows on one surface and not the other.
+  Capacity comes from the list row's `max_attendees` and `ticket_count`;
+  without them this degrades to the plain selling-fast badge.
+  """
+  @spec demand_badge_kind(map(), boolean() | nil) ::
+          :going_fast | :almost_full | nil
+  def demand_badge_kind(event, selling_fast) when is_map(event) do
+    percentage =
+      TicketDisplay.sold_percentage(
+        get_field(event, :max_attendees),
+        get_field(event, :ticket_count)
+      )
+
+    case TicketDisplay.demand_indicator(selling_fast == true, percentage, nil) do
+      %{level: :scarce} -> :almost_full
+      %{} -> :going_fast
+      nil -> nil
+    end
   end
 
   @doc """
@@ -136,7 +168,8 @@ defmodule YscWeb.EventBadgeHelpers do
     today: {"bg-rose-600 animate-attention-once", "hero-bolt-solid"},
     tomorrow: {"bg-orange-600", "hero-calendar-solid"},
     days_left: {"bg-sky-600", "hero-clock"},
-    going_fast: {"bg-emerald-600", "hero-fire-solid"}
+    going_fast: {"bg-emerald-600", "hero-fire-solid"},
+    almost_full: {"bg-amber-700", "hero-users-solid"}
   }
 
   defp badge_style(:cancelled), do: Map.fetch!(@badge_styles, :cancelled)
@@ -150,6 +183,7 @@ defmodule YscWeb.EventBadgeHelpers do
   defp badge_style(:tomorrow), do: Map.fetch!(@badge_styles, :tomorrow)
   defp badge_style({:days_left, _}), do: Map.fetch!(@badge_styles, :days_left)
   defp badge_style(:going_fast), do: Map.fetch!(@badge_styles, :going_fast)
+  defp badge_style(:almost_full), do: Map.fetch!(@badge_styles, :almost_full)
 
   defp card_badge(:cancelled),
     do: card_badge_from_style(:cancelled, "Cancelled")
@@ -171,6 +205,9 @@ defmodule YscWeb.EventBadgeHelpers do
   defp card_badge(:going_fast),
     do: card_badge_from_style(:going_fast, "Going Fast!")
 
+  defp card_badge(:almost_full),
+    do: card_badge_from_style(:almost_full, "Almost Full")
+
   defp card_badge_from_style(kind, text) do
     {bg_class, icon} = badge_style(kind)
     %{text: text, class: "#{bg_class} text-white", icon: icon}
@@ -187,6 +224,7 @@ defmodule YscWeb.EventBadgeHelpers do
     do: {"sky", "#{days} days left"}
 
   defp core_badge(:going_fast), do: {"yellow", "Going Fast!"}
+  defp core_badge(:almost_full), do: {"orange", "Almost Full"}
 
   defp hero_badge(:save_the_date),
     do: hero_badge_from_style(:save_the_date, "Save the Date")
@@ -195,6 +233,9 @@ defmodule YscWeb.EventBadgeHelpers do
 
   defp hero_badge(:going_fast),
     do: hero_badge_from_style(:going_fast, "Going Fast!")
+
+  defp hero_badge(:almost_full),
+    do: hero_badge_from_style(:almost_full, "Almost Full")
 
   defp hero_badge(:cancelled),
     do: hero_badge_from_style(:cancelled, "Cancelled")
@@ -207,6 +248,9 @@ defmodule YscWeb.EventBadgeHelpers do
   defp just_added?(published_at) do
     DateTime.diff(DateTime.utc_now(), published_at, :hour) <= 48
   end
+
+  defp append_kind(acc, nil), do: acc
+  defp append_kind(acc, kind), do: acc ++ [kind]
 
   defp maybe_append(acc, kind, true), do: acc ++ [kind]
   defp maybe_append(acc, _kind, _), do: acc

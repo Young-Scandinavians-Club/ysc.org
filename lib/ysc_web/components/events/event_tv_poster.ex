@@ -10,6 +10,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
 
   alias Ysc.Events.DateTimeFormatter
   alias Ysc.Media.Image
+  alias YscWeb.EventBadgeHelpers
 
   attr :event, :map, required: true
   attr :event_url, :string, required: true
@@ -127,6 +128,8 @@ defmodule YscWeb.Components.Events.EventTvPoster do
   end
 
   defp poster_badges(event, sold_out, selling_fast) do
+    demand = EventBadgeHelpers.demand_badge_kind(event, selling_fast)
+
     cond do
       cancelled?(event) ->
         [
@@ -157,11 +160,19 @@ defmodule YscWeb.Components.Events.EventTvPoster do
           }
         )
         |> maybe_add_badge(
-          selling_fast,
+          demand == :going_fast,
           %{
             text: "Going Fast!",
             class: "bg-emerald-600 text-white",
             icon: "hero-fire-solid"
+          }
+        )
+        |> maybe_add_badge(
+          demand == :almost_full,
+          %{
+            text: "Almost Full",
+            class: "bg-amber-700 text-white",
+            icon: "hero-users-solid"
           }
         )
     end

@@ -215,6 +215,19 @@ defmodule Ysc.Tickets.Display do
     end
   end
 
+  @doc """
+  Percent of capacity taken, capped at 100, or `nil` when there is no cap or
+  the count is unknown. Shared by event cards, which only have a confirmed
+  ticket count; the event page adds held tickets on top of it.
+  """
+  def sold_percentage(max_attendees, committed)
+      when is_integer(max_attendees) and max_attendees > 0 and
+             is_integer(committed) do
+    min(round(committed / max_attendees * 100), 100)
+  end
+
+  def sold_percentage(_max_attendees, _committed), do: nil
+
   defp remaining_detail(count) when is_integer(count) and count > 10,
     do: tickets_left_label(count)
 
