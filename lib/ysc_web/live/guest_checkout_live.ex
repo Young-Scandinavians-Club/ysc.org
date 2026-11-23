@@ -5,7 +5,8 @@ defmodule YscWeb.GuestCheckoutLive do
   The ticket picker on the event page hands over a signed selection
   (`Ysc.Tickets.GuestCheckout.sign_selection/2`). The visitor gives a name and
   email, the tickets are held for a few minutes, and they pay with Stripe. The
-  tickets are then reached through a signed link (`/t/:token`) that is also
+  visitor then lands on an order confirmation page (`/t/:token/confirmation`),
+  which links to the tickets (`/t/:token`); both use a signed link that is also
   emailed, so no account is needed.
 
   Two routes share this module: `:details` (contact details, then payment) and
@@ -124,7 +125,7 @@ defmodule YscWeb.GuestCheckoutLive do
          true <- secure_equal?(payment_intent.client_secret, client_secret),
          {:ok, %TicketOrder{} = order} <-
            StripeService.process_successful_payment(payment_intent) do
-      redirect(socket, to: ~p"/t/#{AccessToken.sign_order(order.id)}")
+      redirect(socket, to: confirmation_path(order))
     else
       _ ->
         leave(
@@ -352,8 +353,7 @@ defmodule YscWeb.GuestCheckoutLive do
       %TicketOrder{} = order ->
         case StripeService.process_successful_payment(pi_id) do
           {:ok, %TicketOrder{id: id}} when id == order.id ->
-            {:noreply,
-             redirect(socket, to: ~p"/t/#{AccessToken.sign_order(id)}")}
+            {:noreply, redirect(socket, to: confirmation_path(order))}
 
           other ->
             Ysc.Logging.warning("Guest checkout payment-success not fulfilled",
@@ -392,7 +392,7 @@ defmodule YscWeb.GuestCheckoutLive do
   def handle_info(_message, socket), do: {:noreply, socket}
 
   defp hold_expired_result(socket, %TicketOrder{status: :completed} = order) do
-    {:noreply, redirect(socket, to: ~p"/t/#{AccessToken.sign_order(order.id)}")}
+    {:noreply, redirect(socket, to: confirmation_path(order))}
   end
 
   defp hold_expired_result(socket, %TicketOrder{status: status})
@@ -441,8 +441,7 @@ defmodule YscWeb.GuestCheckoutLive do
     if Tickets.pending_order_still_complimentary?(order) do
       case Tickets.process_free_ticket_order(order) do
         {:ok, completed} ->
-          {:noreply,
-           redirect(socket, to: ~p"/t/#{AccessToken.sign_order(completed.id)}")}
+          {:noreply, redirect(socket, to: confirmation_path(completed))}
 
         _ ->
           {:noreply, put_toast(socket, :error, order_error_message(:unknown))}
@@ -682,6 +681,11 @@ defmodule YscWeb.GuestCheckoutLive do
 
   defp leave(socket, path, kind, message) do
     socket |> put_toast(kind, message) |> push_navigate(to: path)
+  end
+
+  # The order confirmation page, opened by the same signed token as the tickets.
+  defp confirmation_path(%TicketOrder{id: id}) do
+    ~p"/t/#{AccessToken.sign_order(id)}/confirmation?confetti=true"
   end
 
   defp secure_equal?(a, b) when is_binary(a) and is_binary(b),

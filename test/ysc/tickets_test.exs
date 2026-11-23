@@ -4440,6 +4440,11 @@ defmodule Ysc.TicketsTest do
                Tickets.ci_query_explain_ticket_order_for_confirmation_query()
     end
 
+    test "ci_query_explain_guest_ticket_order_for_confirmation_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_guest_ticket_order_for_confirmation_query()
+    end
+
     test "owned_tickets_by_tier_query is exposed" do
       assert %Ecto.Query{} =
                Tickets.ci_query_explain_owned_tickets_by_tier_query()

@@ -9,13 +9,42 @@ defmodule YscWeb.OrderConfirmationLive do
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias Ysc.Tickets
+  alias Ysc.Tickets.AccessToken
   alias Ysc.Tickets.DonationDisplay
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   import Ecto.Query
 
+  # Guest checkout buyers have no account, so the signed ticket token in the
+  # URL is their only credential (see `Ysc.Tickets.AccessToken`).
   @impl true
+  def mount(%{"token" => token} = params, _session, socket) do
+    case AccessToken.verify(token) do
+      {:ok, {:order, order_id}} ->
+        socket =
+          socket
+          |> assign(:guest_token, token)
+          |> assign_confirmation_defaults(order_id, params)
+
+        if connected?(socket) do
+          {:ok, load_guest_order_confirmation(socket, token, order_id)}
+        else
+          {:ok, socket}
+        end
+
+      _ ->
+        {:ok,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "That order link isn't valid. Use the link from your ticket email.",
+           title: "Order"
+         )
+         |> redirect(to: ~p"/events")}
+    end
+  end
+
   def mount(%{"order_id" => order_id} = params, _session, socket) do
     user = socket.assigns.current_user
 
@@ -29,24 +58,60 @@ defmodule YscWeb.OrderConfirmationLive do
        )
        |> redirect(to: ~p"/events")}
     else
-      show_confetti = Map.get(params, "confetti") == "true"
-
       socket =
         socket
-        |> assign(:loading_order_confirmation, true)
-        |> assign(:order_id, order_id)
-        |> assign(:show_confetti, show_confetti)
-        |> assign(:page_title, "Order Confirmation")
-        |> assign(
-          :meta_description,
-          "Your ticket order confirmation from Young Scandinavians Club."
-        )
+        |> assign(:guest_token, nil)
+        |> assign_confirmation_defaults(order_id, params)
 
       if connected?(socket) do
         {:ok, load_order_confirmation(socket, user, order_id)}
       else
         {:ok, socket}
       end
+    end
+  end
+
+  defp assign_confirmation_defaults(socket, order_id, params) do
+    socket
+    |> assign(:loading_order_confirmation, true)
+    |> assign(:order_id, order_id)
+    |> assign(:show_confetti, Map.get(params, "confetti") == "true")
+    |> assign(:page_title, "Order Confirmation")
+    |> assign(
+      :meta_description,
+      "Your ticket order confirmation from Young Scandinavians Club."
+    )
+  end
+
+  defp load_guest_order_confirmation(socket, token, order_id) do
+    case Tickets.get_guest_ticket_order_for_confirmation(order_id) do
+      %{status: status} = ticket_order
+      when status in [:completed, :cancelled] ->
+        socket
+        |> assign_order_details(
+          ticket_order,
+          ticket_order.guest_first_name || "there"
+        )
+
+      %{} ->
+        # Still pending or expired: there's nothing to confirm yet, and the
+        # ticket page explains what's going on.
+        socket
+        |> YscWeb.Flash.put_toast(
+          :info,
+          "Your order isn't confirmed yet. If you were charged, your tickets will be emailed to you shortly.",
+          title: "Tickets"
+        )
+        |> redirect(to: ~p"/t/#{token}")
+
+      nil ->
+        socket
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "We couldn't find that ticket purchase.",
+          title: "Tickets"
+        )
+        |> redirect(to: ~p"/events")
     end
   end
 
@@ -62,30 +127,34 @@ defmodule YscWeb.OrderConfirmationLive do
         |> redirect(to: ~p"/events")
 
       ticket_order ->
-        event = ticket_order.event
-
-        socket
-        |> assign(:loading_order_confirmation, false)
-        |> assign(:ticket_order, ticket_order)
-        |> assign(:event, event)
-        |> assign(:user_first_name, user.first_name || "Member")
-        |> assign(:event_in_past, event_in_past?(event))
-        |> assign(:refund_data, nil)
-        |> assign(
-          :payment_method_description,
-          payment_method_description_without_stripe(ticket_order.payment)
-        )
-        |> assign(
-          :payment_method_logo,
-          PaymentMethodLogo.path_for_payment(ticket_order.payment)
-        )
-        |> assign(
-          :donation_amounts_by_ticket_id,
-          DonationDisplay.amounts_by_ticket_id(ticket_order)
-        )
-        |> assign(:async_data_loaded, false)
-        |> load_order_data_async(ticket_order)
+        assign_order_details(socket, ticket_order, user.first_name || "Member")
     end
+  end
+
+  defp assign_order_details(socket, ticket_order, first_name) do
+    event = ticket_order.event
+
+    socket
+    |> assign(:loading_order_confirmation, false)
+    |> assign(:ticket_order, ticket_order)
+    |> assign(:event, event)
+    |> assign(:user_first_name, first_name)
+    |> assign(:event_in_past, event_in_past?(event))
+    |> assign(:refund_data, nil)
+    |> assign(
+      :payment_method_description,
+      payment_method_description_without_stripe(ticket_order.payment)
+    )
+    |> assign(
+      :payment_method_logo,
+      PaymentMethodLogo.path_for_payment(ticket_order.payment)
+    )
+    |> assign(
+      :donation_amounts_by_ticket_id,
+      DonationDisplay.amounts_by_ticket_id(ticket_order)
+    )
+    |> assign(:async_data_loaded, false)
+    |> load_order_data_async(ticket_order)
   end
 
   @impl true
@@ -95,7 +164,7 @@ defmodule YscWeb.OrderConfirmationLive do
 
   @impl true
   def handle_event("view-tickets", _params, socket) do
-    {:noreply, push_navigate(socket, to: ~p"/users/tickets")}
+    {:noreply, push_navigate(socket, to: view_tickets_path(socket.assigns))}
   end
 
   @impl true
@@ -192,8 +261,15 @@ defmodule YscWeb.OrderConfirmationLive do
           <%= if @event_in_past do %>
             Thanks for coming to <strong>{@event.title}</strong>. See you at the next one!
           <% else %>
-            Your tickets for <strong>{@event.title}</strong> are confirmed.
-            We've sent a copy of these details to your email.
+            Your tickets for <strong>{@event.title}</strong>
+            are confirmed.
+            <%= if @guest_token do %>
+              We've emailed your tickets and receipt to <strong id="order-confirmation-guest-email">
+                {@ticket_order.guest_email}
+              </strong>.
+            <% else %>
+              We've sent a copy of these details to your email.
+            <% end %>
           <% end %>
         <% end %>
       </.confirmation_header>
@@ -275,7 +351,11 @@ defmodule YscWeb.OrderConfirmationLive do
                   ({ticket_count})
                 </span>
               </h2>
-              <.section_link phx-click="view-tickets">
+              <.section_link
+                :if={!@guest_token}
+                id="order-confirmation-all-tickets"
+                phx-click="view-tickets"
+              >
                 View all my tickets
               </.section_link>
             </div>
@@ -663,7 +743,7 @@ defmodule YscWeb.OrderConfirmationLive do
                     TicketTierHelpers.has_check_in_tickets?(@ticket_order.tickets) do %>
               <.button
                 id="order-confirmation-checkin-qr"
-                navigate={~p"/tickets/#{@ticket_order.id}/qr" <> "?return_to=/orders/#{@ticket_order.id}/confirmation"}
+                navigate={check_in_path(@ticket_order, @guest_token)}
                 class="w-full py-3 gap-2"
               >
                 <.icon name="hero-qr-code" class="w-5 h-5" />View tickets for check-in
@@ -694,6 +774,19 @@ defmodule YscWeb.OrderConfirmationLive do
       </div>
     </div>
     """
+  end
+
+  defp view_tickets_path(%{guest_token: token}) when is_binary(token),
+    do: ~p"/t/#{token}"
+
+  defp view_tickets_path(_assigns), do: ~p"/users/tickets"
+
+  defp check_in_path(_ticket_order, token) when is_binary(token),
+    do: ~p"/t/#{token}"
+
+  defp check_in_path(ticket_order, _token) do
+    ~p"/tickets/#{ticket_order.id}/qr" <>
+      "?return_to=/orders/#{ticket_order.id}/confirmation"
   end
 
   defp non_donation_ticket_count(tickets) do
