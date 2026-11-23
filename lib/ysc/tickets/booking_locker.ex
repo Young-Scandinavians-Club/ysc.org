@@ -983,10 +983,6 @@ defmodule Ysc.Tickets.BookingLocker do
     }
   end
 
-  # Guests (nil user) never hold reservations.
-  defp reservation_owner_scope(query, nil, _event_id),
-    do: where(query, [tr, tt], false)
-
   defp reservation_owner_scope(query, user_id, event_id),
     do:
       where(
@@ -1012,35 +1008,41 @@ defmodule Ysc.Tickets.BookingLocker do
     # Stripe PaymentIntent).
     fulfilled_order_id = Keyword.get(opts, :include_fulfilled_for_order_id)
 
-    reservation_scope =
-      TicketReservation
-      |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
-      |> reservation_owner_scope(user_id, event_id)
-
-    reservation_scope =
-      if fulfilled_order_id do
-        now = DateTime.utc_now()
-
-        where(
-          reservation_scope,
-          [tr],
-          (tr.status == "active" and
-             (is_nil(tr.expires_at) or tr.expires_at > ^now)) or
-            tr.ticket_order_id == ^fulfilled_order_id
-        )
-      else
-        Events.where_ticket_reservation_hold_active(reservation_scope)
-      end
-
-    active_reservations =
-      reservation_scope
-      |> order_by([tr], asc: tr.inserted_at)
-      |> Repo.all()
-
-    # Build a map of tier_id => list of reservations with discounts
+    # Guests never hold reservations. Skip the join instead of asking
+    # Postgres for an empty set.
     reservations_by_tier =
-      active_reservations
-      |> Enum.group_by(& &1.ticket_tier_id)
+      case user_id do
+        nil ->
+          %{}
+
+        _ ->
+          reservation_scope =
+            TicketReservation
+            |> join(:inner, [tr], tt in TicketTier,
+              on: tr.ticket_tier_id == tt.id
+            )
+            |> reservation_owner_scope(user_id, event_id)
+
+          reservation_scope =
+            if fulfilled_order_id do
+              now = DateTime.utc_now()
+
+              where(
+                reservation_scope,
+                [tr],
+                (tr.status == "active" and
+                   (is_nil(tr.expires_at) or tr.expires_at > ^now)) or
+                  tr.ticket_order_id == ^fulfilled_order_id
+              )
+            else
+              Events.where_ticket_reservation_hold_active(reservation_scope)
+            end
+
+          reservation_scope
+          |> order_by([tr], asc: tr.inserted_at)
+          |> Repo.all()
+          |> Enum.group_by(& &1.ticket_tier_id)
+      end
 
     {total, discount_total} =
       ticket_selections
@@ -1390,8 +1392,11 @@ defmodule Ysc.Tickets.BookingLocker do
       discount.
     * `:tiers` - ticket tier structs already loaded for the selection. Skips
       the tier SELECT when every selected id is present and belongs to the
-      event. Pass rows loaded in the same request (door sale). Do not pass
-      LiveView-cached tiers that may be stale.
+      event. Pass rows loaded in the same request (door sale / guest checkout
+      mount). Do not pass LiveView-cached tiers that may be stale.
+
+  Pass `user_id` as `nil` for guest checkout. Guests never hold reservations,
+  so the reservation join is skipped.
   """
   def estimate_order_total(user_id, event_id, ticket_selections, opts \\ [])
       when is_map(ticket_selections) do

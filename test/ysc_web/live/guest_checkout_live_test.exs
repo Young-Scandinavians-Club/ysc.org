@@ -8,6 +8,7 @@ defmodule YscWeb.GuestCheckoutLiveTest do
   import Mox
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
   import EventDetailsLiveHelpers
 
   alias Ysc.Events
@@ -166,6 +167,77 @@ defmodule YscWeb.GuestCheckoutLiveTest do
                live(conn, checkout_path(event, %{tier.id => 1}))
 
       assert to == "/events/#{event.id}/tickets"
+    end
+
+    test "signed-in visitors skip the event SELECT", %{
+      conn: conn,
+      event: event,
+      public_tier: tier
+    } do
+      conn = log_in_user(conn, user_fixture())
+
+      {result, event_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> live(conn, checkout_path(event, %{tier.id => 1})) end,
+          pattern: ~r/FROM "events"/i,
+          caller_pids: [self()]
+        )
+
+      assert {:error, {:live_redirect, %{to: to}}} = result
+      assert to == "/events/#{event.id}/tickets"
+      assert event_cols == 0
+    end
+
+    test "dead render omits event-body columns and the empty reservation join",
+         %{
+           conn: conn,
+           event: event,
+           public_tier: tier
+         } do
+      path = checkout_path(event, %{tier.id => 2})
+
+      {{:ok, view, _html}, body_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> live(conn, path) end,
+          pattern: ~r/raw_details|rendered_details/i,
+          caller_pids: [self()]
+        )
+
+      {_, reservation_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> live(conn, path) end,
+          pattern: ~r/FROM "ticket_reservations"/i,
+          caller_pids: [self()]
+        )
+
+      {_, tier_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> live(conn, path) end,
+          pattern: ~r/FROM "ticket_tiers"/i,
+          caller_pids: [self()]
+        )
+
+      assert has_element?(view, "#guest-checkout-form")
+      assert body_cols == 0
+      assert reservation_cols == 0
+      assert tier_cols == 1
+    end
+
+    test "a missing or draft event goes back to the events list", %{
+      conn: conn
+    } do
+      assert {:error, {:live_redirect, %{to: "/events"}}} =
+               live(conn, ~p"/events/#{Ecto.ULID.generate()}/checkout?s=nope")
+
+      draft =
+        event_fixture(%{
+          title: "Draft guest checkout",
+          state: :draft,
+          published_at: nil
+        })
+
+      assert {:error, {:live_redirect, %{to: "/events"}}} =
+               live(conn, checkout_path(draft, %{Ecto.ULID.generate() => 1}))
     end
 
     test "invalid contact details keep the form and create no order", %{
