@@ -240,6 +240,48 @@ defmodule Ysc.Tickets.GuestCheckoutTest do
       assert {:ok, _} =
                GuestCheckout.create_order(@guest, event.id, %{tier.id => 1})
     end
+
+    test "max_per_buyer counts unexpired pending holds for the same email", %{
+      event: event,
+      limited_tier: tier
+    } do
+      {:ok, first} =
+        GuestCheckout.create_order(@guest, event.id, %{tier.id => 2})
+
+      assert first.status == :pending
+
+      # A second tab / reload must not hold another 2 when the first 2 are
+      # still payable — paying both would confirm 4 against max_per_buyer: 2.
+      assert {:error, :tier_purchase_limit_exceeded} =
+               GuestCheckout.create_order(@guest, event.id, %{tier.id => 2})
+
+      assert {:error, :tier_purchase_limit_exceeded} =
+               GuestCheckout.create_order(@guest, event.id, %{tier.id => 1})
+
+      assert Repo.reload!(first).status == :pending
+    end
+
+    test "expired pending holds do not count toward max_per_buyer", %{
+      event: event,
+      limited_tier: tier
+    } do
+      {:ok, expired} =
+        GuestCheckout.create_order(@guest, event.id, %{tier.id => 2})
+
+      past = DateTime.add(DateTime.utc_now(), -60, :second)
+
+      Repo.update_all(from(o in TicketOrder, where: o.id == ^expired.id),
+        set: [expires_at: past]
+      )
+
+      assert {:ok, _} =
+               GuestCheckout.create_order(@guest, event.id, %{tier.id => 2})
+    end
+
+    test "ci_query_explain_owned_by_tier_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               GuestCheckout.ci_query_explain_owned_by_tier_query()
+    end
   end
 
   describe "booking re-checks guest eligibility against locked tier rows" do
