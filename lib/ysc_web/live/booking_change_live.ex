@@ -1894,7 +1894,12 @@ defmodule YscWeb.BookingChangeLive do
       </div>
 
       <div class="flex justify-between items-center pt-4">
-        <span class="text-base font-semibold text-zinc-900">Amount due now</span>
+        <span
+          id="modification-amount-due-label"
+          class="text-base font-semibold text-zinc-900"
+        >
+          {modification_amount_due_label(@preview)}
+        </span>
         <span
           id="modification-amount-due"
           class="text-2xl font-bold text-blue-700 tabular-nums"
@@ -1956,6 +1961,16 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp submit_button_label(_), do: "Save changes"
+
+  defp modification_amount_due_label(%{delta: %Money{} = delta}) do
+    YscWeb.BookingUserMessages.modification_amount_due_label(
+      Money.positive?(delta)
+    )
+  end
+
+  defp modification_amount_due_label(_) do
+    YscWeb.BookingUserMessages.modification_amount_due_label(false)
+  end
 
   defp modification_is_downgrade?(%{
          new_total: new_total,
