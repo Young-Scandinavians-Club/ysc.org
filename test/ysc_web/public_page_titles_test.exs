@@ -6,23 +6,29 @@ defmodule YscWeb.PublicPageTitlesTest do
   use YscWeb.ConnCase, async: true
 
   @masthead_pages [
-    {"/board", "board-masthead", "Board of Directors"},
-    {"/choir", "choir-masthead", "YSC Choir"},
-    {"/bylaws", "bylaws-masthead", "Bylaws"},
-    {"/privacy-policy", "privacy-policy-masthead", "Privacy Policy"},
-    {"/terms-of-service", "terms-of-service-masthead", "Terms of Service"},
-    {"/code-of-conduct", "code-of-conduct-masthead",
+    {"/board", "board-page", "board-masthead", "Board of Directors"},
+    {"/choir", "choir-page", "choir-masthead", "YSC Choir"},
+    {"/bylaws", "bylaws-page", "bylaws-masthead", "Bylaws"},
+    {"/privacy-policy", "privacy-policy-page", "privacy-policy-masthead",
+     "Privacy Policy"},
+    {"/terms-of-service", "terms-of-service-page", "terms-of-service-masthead",
+     "Terms of Service"},
+    {"/code-of-conduct", "code-of-conduct-page", "code-of-conduct-masthead",
      "Non-Discrimination Code of Conduct"},
-    {"/volunteer", "volunteer-masthead", "Volunteer with the YSC"},
-    {"/contact", "contact-masthead", "Get in touch"}
+    {"/volunteer", "volunteer-page", "volunteer-masthead",
+     "Volunteer with the YSC"},
+    {"/contact", "contact-page", "contact-masthead", "Get in touch"}
   ]
 
-  for {path, id, title} <- @masthead_pages do
+  for {path, page_id, id, title} <- @masthead_pages do
     test "#{path} opens with a masthead and a single h1", %{conn: conn} do
       conn = get(conn, unquote(path))
       doc = conn |> html_response(200) |> LazyHTML.from_document()
 
       assert [_] = doc |> LazyHTML.query("h1") |> Enum.to_list()
+
+      page = LazyHTML.query(doc, "##{unquote(page_id)}")
+      assert [_] = Enum.to_list(page)
 
       masthead = LazyHTML.query(doc, "##{unquote(id)}")
       assert [_] = Enum.to_list(masthead)

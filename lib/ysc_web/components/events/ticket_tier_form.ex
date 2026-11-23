@@ -6,6 +6,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
   alias Phoenix.LiveView.JS
   alias Ysc.Events.AttendeeQuestion
   alias Ysc.Events.TicketTier
+  alias Ysc.Events.TierAudience
 
   @impl true
   def render(assigns) do
@@ -185,7 +186,6 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         </section>
 
         <section
-          :if={!donation_type?(@tier_type)}
           id="tier-who-can-buy"
           aria-labelledby="tier-who-can-buy-heading"
           class="space-y-4 border-t border-zinc-100 pt-5"
@@ -197,13 +197,26 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
             Who can buy
           </h3>
 
-          <.switch
-            field={@form[:member_only]}
-            label="Member-only tier"
-            description="Single members get 1 ticket per event (across all member-only tiers). Family and Lifetime members have no member-only limit, but the limit per member below still applies to them. Everyone else can't buy this tier."
+          <.input
+            type="select"
+            label="Audience"
+            field={@form[:sale_audience]}
+            options={audience_options(@tier_type)}
+            aria-describedby="sale-audience-help"
           />
+          <p id="sale-audience-help" class="text-xs text-zinc-500">
+            <strong>Members buying for guests</strong>
+            is the default: active members buy, e.g. for the guests they bring.
+            <strong :if={!donation_type?(@tier_type)}>Members only</strong>
+            <span :if={!donation_type?(@tier_type)}>
+              gives Single members 1 ticket per event (across all members-only tiers); Family and Lifetime members have no members-only limit, but the limit per member below still applies. Everyone else can't buy it.
+            </span>
+            <strong>Public</strong>
+            lets anyone buy, with no membership. Members-only tiers stay visible
+            to the public, marked as needing a sign-in.
+          </p>
 
-          <div class="w-full sm:w-56">
+          <div :if={!donation_type?(@tier_type)} class="w-full sm:w-56">
             <.input
               type="number"
               label="Limit per member"
@@ -961,6 +974,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
         :end_date,
         :requires_registration,
         :member_only,
+        :sale_audience,
         :max_per_buyer,
         :event_id
       ])
@@ -1151,6 +1165,17 @@ defmodule YscWeb.AdminEventsLive.TicketTierForm do
   defp paid_type?("paid"), do: true
   defp paid_type?(:paid), do: true
   defp paid_type?(_), do: false
+
+  # Members-only is meaningless for donations (never enforced), so don't offer it.
+  defp audience_options(tier_type) do
+    if donation_type?(tier_type) do
+      Enum.reject(TierAudience.options(), fn {_label, value} ->
+        value == "members_only"
+      end)
+    else
+      TierAudience.options()
+    end
+  end
 
   defp donation_type?(nil), do: false
   defp donation_type?("donation"), do: true

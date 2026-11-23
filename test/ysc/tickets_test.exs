@@ -3100,6 +3100,59 @@ defmodule Ysc.TicketsTest do
 
       assert Tickets.list_tickets_for_admin(event.id) == []
     end
+
+    test "includes guest buyer fields on the slim order struct", %{
+      event: event
+    } do
+      {:ok, public_tier} =
+        Events.create_ticket_tier(%{
+          name: "Public GA",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: event.id,
+          sale_audience: :public
+        })
+
+      now = DateTime.truncate(DateTime.utc_now(), :second)
+
+      order =
+        %TicketOrder{}
+        |> TicketOrder.guest_create_changeset(%{
+          guest_email: "  Guest.Buyer@Example.com ",
+          guest_first_name: "Gus",
+          guest_last_name: "Buyer",
+          event_id: event.id,
+          total_amount: Money.new(25, :USD),
+          expires_at: DateTime.add(now, 300)
+        })
+        |> Repo.insert!()
+        |> Ecto.Changeset.change(%{status: :completed, completed_at: now})
+        |> Repo.update!()
+
+      %Ticket{
+        event_id: event.id,
+        ticket_tier_id: public_tier.id,
+        ticket_order_id: order.id,
+        user_id: nil,
+        status: :confirmed,
+        expires_at: DateTime.add(now, 1, :day)
+      }
+      |> Repo.insert!()
+
+      assert [loaded] = Tickets.list_tickets_for_admin(event.id)
+      assert loaded.user_id == nil
+      assert loaded.ticket_order.user_id == nil
+      assert loaded.ticket_order.guest_email == "guest.buyer@example.com"
+      assert loaded.ticket_order.guest_first_name == "Gus"
+      assert loaded.ticket_order.guest_last_name == "Buyer"
+
+      assert %{
+               email: "guest.buyer@example.com",
+               first_name: "Gus",
+               last_name: "Buyer"
+             } = TicketOrder.display_user(loaded.ticket_order)
+    end
   end
 
   describe "list_orders_for_event_refund/1" do
@@ -3250,6 +3303,55 @@ defmodule Ysc.TicketsTest do
 
       assert completed.id in ids
       refute pending.id in ids
+    end
+
+    test "includes guest buyer fields so the cancellation modal can name them",
+         %{event: event} do
+      {:ok, public_tier} =
+        Events.create_ticket_tier(%{
+          name: "Public GA",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: event.id,
+          sale_audience: :public
+        })
+
+      now = DateTime.truncate(DateTime.utc_now(), :second)
+
+      order =
+        %TicketOrder{}
+        |> TicketOrder.guest_create_changeset(%{
+          guest_email: "guest.buyer@example.com",
+          guest_first_name: "Gus",
+          guest_last_name: "Buyer",
+          event_id: event.id,
+          total_amount: Money.new(25, :USD),
+          expires_at: DateTime.add(now, 300)
+        })
+        |> Repo.insert!()
+        |> Ecto.Changeset.change(%{status: :completed, completed_at: now})
+        |> Repo.update!()
+
+      %Ticket{
+        event_id: event.id,
+        ticket_tier_id: public_tier.id,
+        ticket_order_id: order.id,
+        user_id: nil,
+        status: :confirmed,
+        expires_at: DateTime.add(now, 1, :day)
+      }
+      |> Repo.insert!()
+
+      assert [loaded] = Tickets.list_orders_for_event_refund(event.id)
+      assert loaded.user_id == nil
+      assert loaded.guest_email == "guest.buyer@example.com"
+      assert loaded.guest_first_name == "Gus"
+      assert loaded.guest_last_name == "Buyer"
+      assert loaded.user == nil
+
+      assert %{email: "guest.buyer@example.com", first_name: "Gus"} =
+               TicketOrder.display_user(loaded)
     end
   end
 
@@ -4336,6 +4438,11 @@ defmodule Ysc.TicketsTest do
     test "ci_query_explain_ticket_order_for_confirmation_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Tickets.ci_query_explain_ticket_order_for_confirmation_query()
+    end
+
+    test "ci_query_explain_guest_ticket_order_for_confirmation_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Tickets.ci_query_explain_guest_ticket_order_for_confirmation_query()
     end
 
     test "owned_tickets_by_tier_query is exposed" do

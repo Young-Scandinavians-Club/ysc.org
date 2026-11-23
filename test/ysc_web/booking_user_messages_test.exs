@@ -574,11 +574,35 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.modification_finalize_failed() =~
              "couldn't save your new dates"
 
+    assert BookingUserMessages.modification_edit_changes_button() ==
+             "Edit changes"
+
+    assert BookingUserMessages.modification_payment_step_helper() =~
+             "Edit your dates or guests before you pay"
+
+    refute BookingUserMessages.modification_payment_step_helper() =~
+             "Go back"
+
     assert BookingUserMessages.modification_abandon_payment_in_progress() =~
              "still processing"
 
+    assert BookingUserMessages.modification_abandon_payment_in_progress() =~
+             "can't edit your changes yet"
+
+    refute BookingUserMessages.modification_abandon_payment_in_progress() =~
+             "can't go back yet"
+
+    assert BookingUserMessages.modification_abandon_failed() =~
+             "couldn't edit your changes"
+
+    assert BookingUserMessages.modification_abandon_failed() =~
+             "Edit changes again"
+
     assert BookingUserMessages.modification_abandon_failed() =~
              "info@ysc.org"
+
+    refute BookingUserMessages.modification_abandon_failed() =~
+             "cancel this payment yet"
 
     assert BookingUserMessages.modification_after_payment_recovery_suffix() =~
              "booking reference"

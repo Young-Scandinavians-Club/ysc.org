@@ -144,7 +144,85 @@ defmodule YscWeb.EventBadgeHelpersTest do
     end
   end
 
+  describe "demand_badge_kind/2" do
+    test "selling fast on a barely-sold event is just Going Fast" do
+      event = base_event(%{max_attendees: 150, ticket_count: 6})
+
+      assert EventBadgeHelpers.demand_badge_kind(event, true) == :going_fast
+    end
+
+    test "no badge without recent sales or near-capacity" do
+      event = base_event(%{max_attendees: 150, ticket_count: 100})
+
+      assert EventBadgeHelpers.demand_badge_kind(event, false) == nil
+    end
+
+    test "85%+ full is Almost Full, with or without recent sales" do
+      event = base_event(%{max_attendees: 20, ticket_count: 17})
+
+      assert EventBadgeHelpers.demand_badge_kind(event, false) == :almost_full
+      assert EventBadgeHelpers.demand_badge_kind(event, true) == :almost_full
+    end
+
+    test "falls back to selling fast when capacity data is missing" do
+      assert EventBadgeHelpers.demand_badge_kind(base_event(%{}), true) ==
+               :going_fast
+
+      assert EventBadgeHelpers.demand_badge_kind(
+               base_event(%{max_attendees: 20}),
+               true
+             ) == :going_fast
+
+      assert EventBadgeHelpers.demand_badge_kind(base_event(%{}), nil) == nil
+    end
+
+    test "an uncapped event is never Almost Full" do
+      event = base_event(%{max_attendees: nil, ticket_count: 500})
+
+      assert EventBadgeHelpers.demand_badge_kind(event, false) == nil
+    end
+  end
+
+  describe "Almost Full on card badges" do
+    test "exclusive_badge_kinds adds it for a nearly full event" do
+      event = base_event(%{max_attendees: 20, ticket_count: 18})
+
+      assert :almost_full in EventBadgeHelpers.exclusive_badge_kinds(event,
+               selling_fast: false
+             )
+
+      refute :going_fast in EventBadgeHelpers.exclusive_badge_kinds(event,
+               selling_fast: true
+             )
+    end
+
+    test "sold out still suppresses it" do
+      event = base_event(%{max_attendees: 20, ticket_count: 20})
+
+      assert EventBadgeHelpers.exclusive_badge_kinds(event, sold_out: true) ==
+               [:sold_out]
+    end
+
+    test "renders the same label for cards, core badges and the hero" do
+      assert [%{text: "Almost Full"}] =
+               EventBadgeHelpers.to_card_badges([:almost_full])
+
+      assert [{"orange", "Almost Full"}] =
+               EventBadgeHelpers.to_core_badges([:almost_full])
+
+      assert [%{text: "Almost Full"}] =
+               EventBadgeHelpers.to_hero_badges([:almost_full])
+    end
+  end
+
   describe "hero_badge_kinds/1" do
+    test "a nearly full event shows Almost Full instead of Going Fast" do
+      event =
+        base_event(%{selling_fast: true, max_attendees: 20, ticket_count: 18})
+
+      assert EventBadgeHelpers.hero_badge_kinds(event) == [:almost_full]
+    end
+
     test "stacks applicable hero badges in display order" do
       event =
         base_event(%{

@@ -59,6 +59,11 @@ defmodule Ysc.Events.Ticket do
     * `:event` - `%Ysc.Events.Event{}` already loaded for `event_id`. Skips the
       per-ticket event SELECT used by the in-past check when the struct is
       the same event.
+    * `:guest` - true for a guest order's tickets, which have no `user_id`
+      (the buyer is on the order). Only for public-sale tiers.
+    * `:public_sale` - true when the ticket's tier is sold to the public, so
+      the buyer needs no membership. Only set it from a tier loaded from the
+      database, never from user input.
   """
   def changeset(ticket, attrs, opts \\ []) do
     ticket
@@ -73,16 +78,29 @@ defmodule Ysc.Events.Ticket do
       :expires_at,
       :discount_amount
     ])
-    |> validate_required([
-      :event_id,
-      :ticket_tier_id,
-      :user_id,
-      :expires_at
-    ])
+    |> validate_required(required_fields(opts))
+    |> validate_guest_tier_public(opts)
     |> validate_active_membership(opts)
     |> validate_event_not_in_past(opts)
     |> ReferenceGenerator.put_reference_id(@reference_prefix)
     |> unique_constraint(:reference_id)
+  end
+
+  # A ticket without an account is only valid for a tier sold to the public,
+  # checked against the tier row the booking loaded (so a tier switched to
+  # members-only after guest validation can't still sell to a guest).
+  defp validate_guest_tier_public(changeset, opts) do
+    if Keyword.get(opts, :guest, false) and
+         not Keyword.get(opts, :public_sale, false) do
+      add_error(changeset, :ticket_tier_id, "is not sold to the public")
+    else
+      changeset
+    end
+  end
+
+  defp required_fields(opts) do
+    base = [:event_id, :ticket_tier_id, :expires_at]
+    if Keyword.get(opts, :guest, false), do: base, else: [:user_id | base]
   end
 
   @doc """
@@ -239,7 +257,7 @@ defmodule Ysc.Events.Ticket do
   defp validate_active_membership(changeset, opts) do
     user_id = get_field(changeset, :user_id)
 
-    if user_id do
+    if user_id && !Keyword.get(opts, :public_sale, false) do
       validate_active_membership_for_user(changeset, user_id, opts)
     else
       changeset

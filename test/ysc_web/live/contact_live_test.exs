@@ -15,6 +15,7 @@ defmodule YscWeb.ContactLiveTest do
     test "loads contact page successfully", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/contact")
 
+      assert has_element?(view, "#contact-page")
       assert has_element?(view, "h1", "Get in touch")
     end
 

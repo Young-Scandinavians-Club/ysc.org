@@ -68,7 +68,8 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     ticket_order = ensure_ticket_order_loaded(ticket_order)
 
     # Validate required associations
-    if is_nil(ticket_order.user) do
+    if is_nil(ticket_order.user) and
+         not Ysc.Tickets.TicketOrder.guest?(ticket_order) do
       raise ArgumentError,
             "Ticket order missing user association: #{ticket_order.id}"
     end
@@ -170,7 +171,8 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     ticket_cards = TicketAccessHelpers.ticket_cards(ticket_order.tickets)
 
     %{
-      first_name: member_greeting_name(ticket_order.user),
+      first_name:
+        member_greeting_name(ticket_order.user || ticket_order.guest_first_name),
       event: %{
         title: ticket_order.event.title,
         description: ticket_order.event.description,

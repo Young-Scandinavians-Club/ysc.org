@@ -439,6 +439,54 @@ defmodule YscWeb.EventsListLiveTest do
       assert html =~ "Going Fast!"
     end
 
+    test "shows Almost Full badge on the listing once an event is 85% full" do
+      organizer = user_fixture()
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          title: "AlmostFull #{System.unique_integer()}",
+          max_attendees: 20,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 22, :day)
+            |> DateTime.truncate(:second),
+          end_date:
+            DateTime.add(DateTime.utc_now(), 23, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA",
+          quantity: 100
+        })
+
+      for _ <- 1..17 do
+        order = ticket_order_fixture(%{event: event, tier: tier})
+
+        order
+        |> Repo.preload(:tickets)
+        |> Map.get(:tickets)
+        |> List.first()
+        |> then(fn ticket ->
+          Repo.update!(Ecto.Changeset.change(ticket, status: :confirmed))
+        end)
+      end
+
+      html =
+        render_component(YscWeb.EventsListLive, %{
+          id: "events-list",
+          defer_load: false,
+          show_hero: true,
+          upcoming: true,
+          limit: 4
+        })
+
+      assert html =~ "Almost Full"
+      refute html =~ "Going Fast!"
+    end
+
     test "respects limit for past events list" do
       title = "Past Limit #{System.unique_integer()}"
       _event = event_fixture(past_event_attrs(title))

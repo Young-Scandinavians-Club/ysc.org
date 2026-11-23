@@ -258,6 +258,8 @@ defmodule YscWeb.Router do
       live "/events", EventsLive, :index
       live "/events/:id", EventDetailsLive, :index
       live "/events/:id/tickets", EventDetailsLive, :tickets
+      live "/events/:id/checkout", GuestCheckoutLive, :details
+      live "/events/:id/checkout/return", GuestCheckoutLive, :return
 
       live "/volunteer", VolunteerLive, :index
       live "/report-conduct-violation", ConductViolationReportLive, :index
@@ -584,6 +586,7 @@ defmodule YscWeb.Router do
         {YscWeb.Plugs.RequestPath, :set_request_path}
       ] do
       live "/t/:token", TicketQrLive, :public
+      live "/t/:token/confirmation", OrderConfirmationLive, :guest
       live "/shop", ShopLive, :index
       live "/shop/products/:id", ShopProductLive, :show
 

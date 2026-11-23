@@ -76,8 +76,9 @@ defmodule YscWeb.Emails.TicketAccessHelpers do
 
   Returns `[%{email: email, first_name: name_or_nil, tickets: [ticket]}]`.
   """
-  def guest_groups(%{user: user, tickets: tickets}) do
-    purchaser_email = normalize_email(user.email)
+  def guest_groups(%{tickets: tickets} = order) do
+    purchaser_email =
+      normalize_email(Ysc.Tickets.TicketOrder.buyer_email(order))
 
     tickets
     |> Enum.filter(&TicketTierHelpers.check_in_ticket?/1)

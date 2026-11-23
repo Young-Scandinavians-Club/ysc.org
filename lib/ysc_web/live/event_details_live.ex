@@ -16,6 +16,7 @@ defmodule YscWeb.EventDetailsLive do
     Event,
     EventPricingCache,
     MemberOnlyTickets,
+    TierAudience,
     TierPurchaseLimits,
     PricingDisplay,
     TicketTierHelpers
@@ -110,6 +111,75 @@ defmodule YscWeb.EventDetailsLive do
     >
       {TicketUserMessages.leave_unpaid_checkout_button()}
     </.button>
+    """
+  end
+
+  # Demand indicator for the ticket sidebar. What to show comes from
+  # TicketDisplay.demand_indicator/3; this only draws it. Momentum is a quiet
+  # one-liner, the fill bar appears once the event is genuinely filling up.
+  attr :indicator, :map, required: true
+  attr :sold_percentage, :integer, default: nil
+
+  defp demand_indicator(%{indicator: %{show_bar?: false}} = assigns) do
+    ~H"""
+    <div
+      id="event-demand-indicator"
+      data-level={@indicator.level}
+      class="flex items-center gap-2.5 px-3 py-2.5 bg-orange-50 rounded-lg border border-orange-100"
+    >
+      <.icon name="hero-fire-solid" class="shrink-0 w-4 h-4 text-orange-500" />
+      <p class="text-xs text-orange-800 type-eyebrow">{@indicator.headline}</p>
+      <p :if={@indicator.detail} class="ml-auto text-xs text-orange-700 text-right">
+        {@indicator.detail}
+      </p>
+    </div>
+    """
+  end
+
+  defp demand_indicator(assigns) do
+    ~H"""
+    <div
+      id="event-demand-indicator"
+      data-level={@indicator.level}
+      class="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-3"
+    >
+      <div class="flex items-center gap-3">
+        <div class="shrink-0 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+          <.icon name="hero-fire-solid" class="w-4 h-4 text-white" />
+        </div>
+        <p class="text-xs text-orange-800 type-eyebrow">{@indicator.headline}</p>
+      </div>
+      <div :if={@sold_percentage} class="space-y-2">
+        <div class="flex justify-between items-end gap-3">
+          <p :if={@indicator.detail} class="text-xs text-orange-700 font-medium">
+            {@indicator.detail}
+          </p>
+          <p class="ml-auto text-xs font-mono text-zinc-500">
+            {@sold_percentage}% full
+          </p>
+        </div>
+        <div
+          role="progressbar"
+          aria-label="Tickets sold"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={@sold_percentage}
+          class="w-full bg-white h-1.5 rounded-full overflow-hidden"
+        >
+          <div
+            class={[
+              "h-full transition-[width] duration-1000",
+              if(@indicator.level == :scarce,
+                do: "bg-orange-600",
+                else: "bg-orange-400"
+              )
+            ]}
+            style={"width: #{@sold_percentage}%"}
+          >
+          </div>
+        </div>
+      </div>
+    </div>
     """
   end
 
@@ -1023,52 +1093,20 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
 
                   <div class="p-8 space-y-6">
-                    <%= if (@event_selling_fast || (@sold_percentage != nil && @sold_percentage >= 85)) && !@event_sold_out_for_user do %>
-                      <% available_capacity = @available_capacity %>
-                      <% sold_percentage = @sold_percentage %>
-                      <div class="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-3">
-                        <div class="flex items-center gap-3">
-                          <div class="shrink-0 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                            <.icon
-                              name="hero-fire-solid"
-                              class="w-4 h-4 text-white"
-                            />
-                          </div>
-                          <p class="text-[11px] text-orange-800 type-eyebrow">
-                            Demand is High
-                          </p>
-                        </div>
-                        <%= if sold_percentage != nil do %>
-                          <div class="space-y-2">
-                            <div class="flex justify-between items-end">
-                              <p class="text-xs text-orange-600 type-eyebrow">
-                                Limited Availability
-                              </p>
-                              <p class="text-xs font-mono text-zinc-500">
-                                {sold_percentage}% full
-                              </p>
-                            </div>
-                            <div class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
-                              <div
-                                class="bg-orange-500 h-full transition-[width] duration-1000"
-                                style={"width: #{sold_percentage}%"}
-                              >
-                              </div>
-                            </div>
-                          </div>
-                        <% else %>
-                          <p class="text-[11px] text-orange-700 font-medium">
-                            {case available_capacity do
-                              n when is_integer(n) and n > 0 and n <= 10 ->
-                                TicketDisplay.tickets_left_demand_label(n)
-
-                              _ ->
-                                "Going Fast"
-                            end}
-                          </p>
-                        <% end %>
-                      </div>
-                    <% end %>
+                    <% demand =
+                      if(!@event_sold_out_for_user,
+                        do:
+                          TicketDisplay.demand_indicator(
+                            @event_selling_fast,
+                            @sold_percentage,
+                            @available_capacity
+                          )
+                      ) %>
+                    <.demand_indicator
+                      :if={demand}
+                      indicator={demand}
+                      sold_percentage={@sold_percentage}
+                    />
 
                     <div class="space-y-3">
                       <%= if @has_ticket_info do %>
@@ -1141,7 +1179,10 @@ defmodule YscWeb.EventDetailsLive do
                     </div>
 
                     <div
-                      :if={@current_user == nil && @has_ticket_tiers}
+                      :if={
+                        @current_user == nil && @has_ticket_tiers &&
+                          !public_sale?(@ticket_tiers)
+                      }
                       id="event-tickets-guest-cta"
                       class="w-full space-y-4"
                     >
@@ -1168,8 +1209,53 @@ defmodule YscWeb.EventDetailsLive do
 
                     <div
                       :if={
+                        @current_user == nil && @has_ticket_tiers &&
+                          public_sale?(@ticket_tiers)
+                      }
+                      id="event-tickets-public-cta"
+                      class="w-full space-y-1"
+                    >
+                      <p class="text-sm text-zinc-700 px-3 py-3 bg-zinc-50 rounded-xl border border-zinc-200 text-center">
+                        Tickets are open to everyone. YSC members can sign in to buy member tickets.
+                      </p>
+                      <.link
+                        id="event-tickets-member-signin-link"
+                        navigate={
+                          ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}/tickets"}"
+                        }
+                        class="flex items-center justify-center gap-1 min-h-11 text-sm font-semibold text-blue-700 hover:underline"
+                      >
+                        Member? Sign in for member tickets
+                        <.icon name="hero-arrow-right" class="w-4 h-4" />
+                      </.link>
+                    </div>
+
+                    <div
+                      :if={
                         @current_user != nil && !@active_membership? &&
-                          @has_ticket_tiers
+                          @has_ticket_tiers && public_sale?(@ticket_tiers)
+                      }
+                      id="event-tickets-membership-note"
+                      class="w-full"
+                    >
+                      <p class="text-sm text-zinc-700 px-3 py-3 bg-zinc-50 rounded-xl border border-zinc-200 text-center">
+                        Member tickets need an active paid membership.
+                        <.link
+                          id="event-tickets-membership-note-link"
+                          navigate={
+                            elem(membership_cta(@current_user, @had_membership?), 0)
+                          }
+                          class="font-semibold text-blue-700 underline underline-offset-2"
+                        >
+                          {elem(membership_cta(@current_user, @had_membership?), 1)}
+                        </.link>
+                      </p>
+                    </div>
+
+                    <div
+                      :if={
+                        @current_user != nil && !@active_membership? &&
+                          @has_ticket_tiers && !public_sale?(@ticket_tiers)
                       }
                       class="w-full"
                     >
@@ -1218,7 +1304,13 @@ defmodule YscWeb.EventDetailsLive do
                           <div class="w-full">
                             <.tooltip tooltip_text="This event is sold out">
                               <.button
-                                :if={@current_user != nil && @active_membership?}
+                                :if={
+                                  can_open_ticket_modal?(
+                                    @current_user,
+                                    @active_membership?,
+                                    @ticket_tiers
+                                  )
+                                }
                                 class="w-full py-4 type-eyebrow"
                                 disabled
                               >
@@ -1231,7 +1323,14 @@ defmodule YscWeb.EventDetailsLive do
                           </div>
                         <% else %>
                           <.button
-                            :if={@current_user != nil && @active_membership?}
+                            :if={
+                              can_open_ticket_modal?(
+                                @current_user,
+                                @active_membership?,
+                                @ticket_tiers
+                              )
+                            }
+                            id="event-get-tickets-button"
                             class="w-full py-4 type-eyebrow"
                             phx-click="open-ticket-modal"
                           >
@@ -1282,6 +1381,7 @@ defmodule YscWeb.EventDetailsLive do
                 <p
                   :if={
                     @current_user == nil && @has_ticket_tiers &&
+                      !public_sale?(@ticket_tiers) &&
                       !ticket_sales_closed?(@event)
                   }
                   class="max-w-(--breakpoint-md) mx-auto mb-3 text-xs text-zinc-600 text-center leading-snug"
@@ -1298,7 +1398,7 @@ defmodule YscWeb.EventDetailsLive do
                 <p
                   :if={
                     @current_user != nil && !@active_membership? &&
-                      @has_ticket_tiers &&
+                      @has_ticket_tiers && !public_sale?(@ticket_tiers) &&
                       !ticket_sales_closed?(@event)
                   }
                   class="max-w-(--breakpoint-md) mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
@@ -1388,7 +1488,8 @@ defmodule YscWeb.EventDetailsLive do
                         icon_class="w-4 h-4"
                       />
                     <% else %>
-                      <%= if @current_user == nil && @has_ticket_tiers do %>
+                      <%= if @current_user == nil && @has_ticket_tiers &&
+                            !public_sale?(@ticket_tiers) do %>
                         <.button
                           class="shrink-0 px-8 py-3.5 type-eyebrow"
                           navigate={
@@ -1404,8 +1505,13 @@ defmodule YscWeb.EventDetailsLive do
                               Sold Out
                             </div>
                           <% else %>
-                            <%= if @active_membership? do %>
+                            <%= if can_open_ticket_modal?(
+                                  @current_user,
+                                  @active_membership?,
+                                  @ticket_tiers
+                                ) do %>
                               <.button
+                                id="event-get-tickets-button-mobile"
                                 class="shrink-0 px-8 py-3.5 type-eyebrow"
                                 phx-click="open-ticket-modal"
                               >
@@ -1593,6 +1699,12 @@ defmodule YscWeb.EventDetailsLive do
                   reservation_info.discount_percentage != nil &&
                     reservation_info.discount_percentage > 0 %>
                 <% is_member_only = member_only_tier?(ticket_tier) %>
+                <% tier_access =
+                  TierAudience.access(
+                    ticket_tier,
+                    viewer_kind(@current_user, @active_membership?)
+                  ) %>
+                <% is_public_tier = TierAudience.public?(ticket_tier) %>
                 <% member_only_selected =
                   MemberOnlyTickets.selected_count(
                     @selected_tickets,
@@ -1639,6 +1751,24 @@ defmodule YscWeb.EventDetailsLive do
                         >
                           <.icon name="hero-lock-closed" class="w-3 h-3" />
                           Members only
+                        </span>
+                        <span
+                          :if={public_sale?(@ticket_tiers) && is_public_tier}
+                          id={"tier-badge-public-#{ticket_tier.id}"}
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200"
+                        >
+                          <.icon name="hero-globe-alt" class="w-3 h-3" />
+                          Open to all
+                        </span>
+                        <span
+                          :if={
+                            public_sale?(@ticket_tiers) && !is_public_tier &&
+                              !is_member_only
+                          }
+                          id={"tier-badge-members-#{ticket_tier.id}"}
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700 border border-violet-200"
+                        >
+                          <.icon name="hero-lock-closed" class="w-3 h-3" /> Members
                         </span>
                       </div>
                       <p
@@ -1733,180 +1863,226 @@ defmodule YscWeb.EventDetailsLive do
                     </div>
                   </div>
 
-                  <%= if ticket_tier.type == "donation" || ticket_tier.type == :donation do %>
-                    <!-- Donation Amount Input -->
-                    <div class="flex flex-col space-y-3 mt-4">
-                      <div class="flex items-center justify-end">
-                        <div class="flex items-center space-x-3 w-full sm:w-auto">
-                          <label class="text font-semibold text-zinc-700 whitespace-nowrap">
-                            Donation Amount:
-                          </label>
-                          <div class="flex items-center border border-zinc-300 rounded-sm px-3 py-1 flex-1 sm:flex-initial bg-white">
-                            <span class="text-zinc-800">$</span>
-                            <input
-                              type="text"
-                              id={"donation-amount-#{ticket_tier.id}"}
-                              name={"donation_amount_#{ticket_tier.id}"}
-                              phx-hook="MoneyInput"
-                              data-tier-id={ticket_tier.id}
-                              value={
-                                format_donation_amount(
-                                  @selected_tickets,
-                                  ticket_tier.id
-                                )
-                              }
-                              placeholder="0.00"
-                              disabled={false}
-                              class="w-full sm:w-32 border-0 focus:ring-2 focus:ring-blue-500 font-medium text-zinc-900"
-                            />
+                  <%= cond do %>
+                    <% tier_access == :sign_in_required -> %>
+                      <div
+                        id={"tier-sign-in-#{ticket_tier.id}"}
+                        class="mt-4 flex flex-col gap-3 rounded-md border border-violet-200 bg-violet-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <p class="text-sm text-violet-800">
+                          <.icon
+                            name="hero-lock-closed"
+                            class="w-4 h-4 inline me-1"
+                          /> Sign in to buy these member tickets.
+                        </p>
+                        <.link
+                          id={"tier-sign-in-link-#{ticket_tier.id}"}
+                          navigate={
+                            ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}/tickets"}"
+                          }
+                          class="inline-flex min-h-11 items-center justify-center rounded-md bg-violet-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-violet-800"
+                        >
+                          Sign in
+                        </.link>
+                      </div>
+                    <% tier_access == :membership_required -> %>
+                      <div
+                        id={"tier-membership-required-#{ticket_tier.id}"}
+                        class="mt-4 flex flex-col gap-3 rounded-md border border-violet-200 bg-violet-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <p class="text-sm text-violet-800">
+                          <.icon
+                            name="hero-lock-closed"
+                            class="w-4 h-4 inline me-1"
+                          /> These tickets need an active paid membership.
+                        </p>
+                        <.link
+                          id={"tier-membership-link-#{ticket_tier.id}"}
+                          navigate={
+                            elem(membership_cta(@current_user, @had_membership?), 0)
+                          }
+                          class="inline-flex min-h-11 items-center justify-center rounded-md bg-violet-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-violet-800"
+                        >
+                          {elem(membership_cta(@current_user, @had_membership?), 1)}
+                        </.link>
+                      </div>
+                    <% ticket_tier.type == "donation" || ticket_tier.type == :donation -> %>
+                      <!-- Donation Amount Input -->
+                      <div class="flex flex-col space-y-3 mt-4">
+                        <div class="flex items-center justify-end">
+                          <div class="flex items-center space-x-3 w-full sm:w-auto">
+                            <label class="text font-semibold text-zinc-700 whitespace-nowrap">
+                              Donation Amount:
+                            </label>
+                            <div class="flex items-center border border-zinc-300 rounded-sm px-3 py-1 flex-1 sm:flex-initial bg-white">
+                              <span class="text-zinc-800">$</span>
+                              <input
+                                type="text"
+                                id={"donation-amount-#{ticket_tier.id}"}
+                                name={"donation_amount_#{ticket_tier.id}"}
+                                phx-hook="MoneyInput"
+                                data-tier-id={ticket_tier.id}
+                                value={
+                                  format_donation_amount(
+                                    @selected_tickets,
+                                    ticket_tier.id
+                                  )
+                                }
+                                placeholder="0.00"
+                                disabled={false}
+                                class="w-full sm:w-32 border-0 focus:ring-2 focus:ring-blue-500 font-medium text-zinc-900"
+                              />
+                            </div>
                           </div>
                         </div>
+                        <!-- Quick Amount Buttons -->
+                        <div class="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            phx-click="set-donation-amount"
+                            phx-value-tier-id={ticket_tier.id}
+                            phx-value-amount="1000"
+                            class="px-3 py-1.5 text-sm font-medium rounded-md border transition-colors border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400"
+                          >
+                            $10
+                          </button>
+                          <button
+                            type="button"
+                            phx-click="set-donation-amount"
+                            phx-value-tier-id={ticket_tier.id}
+                            phx-value-amount="2500"
+                            class="px-3 py-1.5 text-sm font-medium rounded-md border transition-colors border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400"
+                          >
+                            $25
+                          </button>
+                          <button
+                            type="button"
+                            phx-click="set-donation-amount"
+                            phx-value-tier-id={ticket_tier.id}
+                            phx-value-amount="5000"
+                            class="px-3 py-1.5 text-sm font-medium rounded-md border transition-colors border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400"
+                          >
+                            $50
+                          </button>
+                        </div>
                       </div>
-                      <!-- Quick Amount Buttons -->
-                      <div class="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          phx-click="set-donation-amount"
-                          phx-value-tier-id={ticket_tier.id}
-                          phx-value-amount="1000"
-                          class="px-3 py-1.5 text-sm font-medium rounded-md border transition-colors border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400"
-                        >
-                          $10
-                        </button>
-                        <button
-                          type="button"
-                          phx-click="set-donation-amount"
-                          phx-value-tier-id={ticket_tier.id}
-                          phx-value-amount="2500"
-                          class="px-3 py-1.5 text-sm font-medium rounded-md border transition-colors border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400"
-                        >
-                          $25
-                        </button>
-                        <button
-                          type="button"
-                          phx-click="set-donation-amount"
-                          phx-value-tier-id={ticket_tier.id}
-                          phx-value-amount="5000"
-                          class="px-3 py-1.5 text-sm font-medium rounded-md border transition-colors border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 hover:border-zinc-400"
-                        >
-                          $50
-                        </button>
+                      <!-- Donation Disclaimer -->
+                      <div class="mt-2 items-center bg-zinc-50 px-3 py-2 rounded-md w-full flex flex-row border border-zinc-200">
+                        <.icon
+                          name="hero-exclamation-circle"
+                          class="text-zinc-600 w-5 h-5 me-1"
+                        />
+                        <p class="text-sm text-zinc-600">
+                          This is a voluntary donation, not event admission. Donating does not reserve a seat or ticket.
+                        </p>
                       </div>
-                    </div>
-                    <!-- Donation Disclaimer -->
-                    <div class="mt-2 items-center bg-zinc-50 px-3 py-2 rounded-md w-full flex flex-row border border-zinc-200">
-                      <.icon
-                        name="hero-exclamation-circle"
-                        class="text-zinc-600 w-5 h-5 me-1"
-                      />
-                      <p class="text-sm text-zinc-600">
-                        This is a voluntary donation, not event admission. Donating does not reserve a seat or ticket.
-                      </p>
-                    </div>
-                  <% else %>
-                    <!-- Regular Quantity Selector -->
-                    <div class="flex items-center justify-end mt-4">
-                      <div class="flex items-center space-x-3">
-                        <button
-                          type="button"
-                          data-ticket-action="decrease"
-                          data-tier-id={ticket_tier.id}
-                          aria-label={"Decrease quantity for #{ticket_tier.name}"}
-                          data-locked-disabled={
-                            is_sold_out or is_sale_ended or is_pre_sale
-                          }
-                          phx-click-stop
-                          class={[
-                            "w-10 h-10 rounded-full border flex items-center justify-center transition-colors active:scale-95",
-                            if(
+                    <% true -> %>
+                      <!-- Regular Quantity Selector -->
+                      <div class="flex items-center justify-end mt-4">
+                        <div class="flex items-center space-x-3">
+                          <button
+                            type="button"
+                            data-ticket-action="decrease"
+                            data-tier-id={ticket_tier.id}
+                            aria-label={"Decrease quantity for #{ticket_tier.name}"}
+                            data-locked-disabled={
+                              is_sold_out or is_sale_ended or is_pre_sale
+                            }
+                            phx-click-stop
+                            class={[
+                              "w-10 h-10 rounded-full border flex items-center justify-center transition-colors active:scale-95",
+                              if(
+                                is_sold_out or is_sale_ended or is_pre_sale or
+                                  get_ticket_quantity(
+                                    @selected_tickets,
+                                    ticket_tier.id
+                                  ) ==
+                                    0
+                              ) do
+                                "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed"
+                              else
+                                "border-zinc-300 hover:bg-zinc-50 text-zinc-700"
+                              end
+                            ]}
+                            disabled={
                               is_sold_out or is_sale_ended or is_pre_sale or
                                 get_ticket_quantity(
                                   @selected_tickets,
                                   ticket_tier.id
                                 ) ==
                                   0
-                            ) do
-                              "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed"
-                            else
-                              "border-zinc-300 hover:bg-zinc-50 text-zinc-700"
-                            end
-                          ]}
-                          disabled={
-                            is_sold_out or is_sale_ended or is_pre_sale or
-                              get_ticket_quantity(@selected_tickets, ticket_tier.id) ==
-                                0
-                          }
-                        >
-                          <.icon name="hero-minus" class="w-5 h-5" />
-                        </button>
-                        <span
-                          id={"ticket-qty-#{ticket_tier.id}"}
-                          aria-live="polite"
-                          class={[
-                            "w-12 text-center font-medium text-lg",
-                            if(is_sold_out or is_sale_ended or is_pre_sale,
-                              do: "text-zinc-500",
-                              else: "text-zinc-900"
-                            )
-                          ]}
-                        >
-                          {get_ticket_quantity(@selected_tickets, ticket_tier.id)}
-                        </span>
-                        <% current_qty =
-                          get_ticket_quantity(@selected_tickets, ticket_tier.id) %>
-                        <% can_increase =
-                          can_increase_quantity_cached?(
-                            ticket_tier,
-                            current_qty,
-                            @selected_tickets,
-                            @event,
-                            @availability_data,
-                            @ticket_tiers,
-                            @reservations_by_tier,
-                            @reserved_counts_by_tier
-                          ) &&
-                            member_only_can_add?(
+                            }
+                          >
+                            <.icon name="hero-minus" class="w-5 h-5" />
+                          </button>
+                          <span
+                            id={"ticket-qty-#{ticket_tier.id}"}
+                            aria-live="polite"
+                            class={[
+                              "w-12 text-center font-medium text-lg",
+                              if(is_sold_out or is_sale_ended or is_pre_sale,
+                                do: "text-zinc-500",
+                                else: "text-zinc-900"
+                              )
+                            ]}
+                          >
+                            {get_ticket_quantity(@selected_tickets, ticket_tier.id)}
+                          </span>
+                          <% current_qty =
+                            get_ticket_quantity(@selected_tickets, ticket_tier.id) %>
+                          <% can_increase =
+                            can_increase_quantity_cached?(
                               ticket_tier,
+                              current_qty,
                               @selected_tickets,
+                              @event,
+                              @availability_data,
                               @ticket_tiers,
-                              @member_only_ticket_limit,
-                              @member_only_tickets_owned
+                              @reservations_by_tier,
+                              @reserved_counts_by_tier
                             ) &&
-                            tier_limit_can_add?(
-                              ticket_tier,
-                              @selected_tickets,
-                              @user_tickets
-                            ) %>
-                        <button
-                          type="button"
-                          data-ticket-action="increase"
-                          data-tier-id={ticket_tier.id}
-                          aria-label={"Increase quantity for #{ticket_tier.name}"}
-                          data-locked-disabled={
-                            is_sold_out or is_sale_ended or is_pre_sale or
-                              !can_increase
-                          }
-                          phx-click-stop
-                          class={[
-                            "w-10 h-10 rounded-full border-2 flex items-center justify-center transition duration-200 font-semibold active:scale-95",
-                            if(
+                              member_only_can_add?(
+                                ticket_tier,
+                                @selected_tickets,
+                                @ticket_tiers,
+                                @member_only_ticket_limit,
+                                @member_only_tickets_owned
+                              ) &&
+                              tier_limit_can_add?(
+                                ticket_tier,
+                                @selected_tickets,
+                                @user_tickets
+                              ) %>
+                          <button
+                            type="button"
+                            data-ticket-action="increase"
+                            data-tier-id={ticket_tier.id}
+                            aria-label={"Increase quantity for #{ticket_tier.name}"}
+                            data-locked-disabled={
                               is_sold_out or is_sale_ended or is_pre_sale or
                                 !can_increase
-                            ) do
-                              "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed"
-                            else
-                              "border-blue-700 bg-blue-700 hover:bg-blue-800 hover:border-blue-800 text-white"
-                            end
-                          ]}
-                          disabled={
-                            is_sold_out or is_sale_ended or is_pre_sale or
-                              !can_increase
-                          }
-                        >
-                          <.icon name="hero-plus" class="w-5 h-5" />
-                        </button>
+                            }
+                            phx-click-stop
+                            class={[
+                              "w-10 h-10 rounded-full border-2 flex items-center justify-center transition duration-200 font-semibold active:scale-95",
+                              if(
+                                is_sold_out or is_sale_ended or is_pre_sale or
+                                  !can_increase
+                              ) do
+                                "border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed"
+                              else
+                                "border-blue-700 bg-blue-700 hover:bg-blue-800 hover:border-blue-800 text-white"
+                              end
+                            ]}
+                            disabled={
+                              is_sold_out or is_sale_ended or is_pre_sale or
+                                !can_increase
+                            }
+                          >
+                            <.icon name="hero-plus" class="w-5 h-5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
                   <% end %>
                   <!-- Show message for different tier states (exclude donation tiers) -->
                   <div :if={sale_schedule_message} class="mt-2">
@@ -1950,7 +2126,10 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
 
                   <div
-                    :if={!is_donation && is_member_only && member_only_blocked_msg}
+                    :if={
+                      !is_donation && is_member_only && member_only_blocked_msg &&
+                        tier_access == :available
+                    }
                     class="mt-2"
                   >
                     <p class="text-sm text-violet-700 bg-violet-50 px-3 py-2 rounded-md border border-violet-200">
@@ -3221,6 +3400,33 @@ defmodule YscWeb.EventDetailsLive do
 
   defp member_only_tier?(tier), do: MemberOnlyTickets.member_only?(tier)
 
+  # True when the event sells at least one tier to the general public.
+  defp public_sale?(ticket_tiers) when is_list(ticket_tiers),
+    do: TierAudience.any_public?(ticket_tiers)
+
+  defp public_sale?(_), do: false
+
+  # Members can always open the ticket modal; everyone else only when there is
+  # a public tier to buy (member tiers then show as needing sign-in/membership).
+  defp can_open_ticket_modal?(current_user, active_membership?, ticket_tiers) do
+    (current_user != nil && active_membership? == true) ||
+      public_sale?(ticket_tiers)
+  end
+
+  defp tier_available_to_viewer?(socket, tier) do
+    kind =
+      viewer_kind(
+        socket.assigns.current_user,
+        socket.assigns.active_membership?
+      )
+
+    TierAudience.access(tier, kind) == :available
+  end
+
+  defp viewer_kind(nil, _active_membership?), do: :anonymous
+  defp viewer_kind(_user, true), do: :member
+  defp viewer_kind(_user, _active_membership?), do: :non_member
+
   # Whether the viewer may add one more ticket for this member-only tier.
   defp member_only_can_add?(tier, selected_tickets, ticket_tiers, limit, owned) do
     MemberOnlyTickets.can_add?(
@@ -3688,6 +3894,45 @@ defmodule YscWeb.EventDetailsLive do
     socket
     |> assign(:event, event_with_pricing)
     |> assign(:ticket_tiers, ticket_tiers)
+    |> prune_inaccessible_selections()
+  end
+
+  # An admin can change a tier's audience (or delete it) while a visitor has it
+  # selected. Such a tier's controls are replaced by a sign-in/membership panel,
+  # so the selection could no longer be removed and would block checkout. Drop
+  # it, keep the rest, and say so. Left alone once payment is under way.
+  defp prune_inaccessible_selections(socket) do
+    selected = socket.assigns[:selected_tickets] || %{}
+
+    if selected == %{} or socket.assigns[:show_payment_modal] == true do
+      socket
+    else
+      kind =
+        viewer_kind(
+          socket.assigns.current_user,
+          socket.assigns[:active_membership?]
+        )
+
+      {kept, dropped} =
+        Enum.split_with(selected, fn {tier_id, _quantity} ->
+          case Enum.find(socket.assigns.ticket_tiers, &(&1.id == tier_id)) do
+            nil -> false
+            tier -> TierAudience.access(tier, kind) == :available
+          end
+        end)
+
+      if dropped == [] do
+        socket
+      else
+        socket
+        |> assign_selected_tickets(Map.new(kept))
+        |> YscWeb.Flash.put_toast(
+          :info,
+          "Some tickets you picked are no longer available to you, so we removed them.",
+          title: "Tickets"
+        )
+      end
+    end
   end
 
   defp load_user_tickets(nil, _event_id), do: {[], %{}}
@@ -6244,6 +6489,7 @@ defmodule YscWeb.EventDetailsLive do
              socket.assigns.reservations_by_tier,
              socket.assigns.reserved_counts_by_tier
            ) &&
+           tier_available_to_viewer?(socket, ticket_tier) &&
            member_only_can_add?(
              ticket_tier,
              socket.assigns.selected_tickets,
@@ -6271,6 +6517,38 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   @impl true
+  def handle_event(
+        "proceed-to-checkout",
+        _params,
+        %{assigns: %{current_user: nil}} = socket
+      ) do
+    # Visitors without an account can only buy public tiers, as a guest. The
+    # selection is signed so the guest page can trust it.
+    event_id = socket.assigns.event.id
+
+    selections =
+      socket.assigns.selected_tickets
+      |> Map.filter(fn {_tier_id, quantity} ->
+        is_integer(quantity) and quantity > 0
+      end)
+
+    guest_tiers =
+      Enum.filter(socket.assigns.ticket_tiers, &Map.has_key?(selections, &1.id))
+
+    if selections != %{} and length(guest_tiers) == map_size(selections) and
+         Enum.all?(guest_tiers, &TierAudience.public?/1) do
+      token = Ysc.Tickets.GuestCheckout.sign_selection(event_id, selections)
+
+      {:noreply,
+       push_navigate(socket, to: ~p"/events/#{event_id}/checkout?s=#{token}")}
+    else
+      {:noreply,
+       redirect(socket,
+         to: ~p"/users/log-in?redirect_to=#{~p"/events/#{event_id}/tickets"}"
+       )}
+    end
+  end
+
   def handle_event("proceed-to-checkout", _params, socket) do
     user_id = socket.assigns.current_user.id
     event_id = socket.assigns.event.id

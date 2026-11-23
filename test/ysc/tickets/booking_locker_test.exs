@@ -2226,6 +2226,53 @@ defmodule Ysc.Tickets.BookingLockerTest do
     end
 
     @estimate_tiers ~r/FROM "ticket_tiers"/
+    @estimate_reservations ~r/FROM "ticket_reservations"/
+
+    test "skips reservation lookup for guest estimates", %{
+      event: event,
+      tier: tier
+    } do
+      {result, lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(
+              nil,
+              event.id,
+              %{tier.id => 2},
+              tiers: [tier]
+            )
+          end,
+          pattern: @estimate_reservations,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, total, discount} = result
+      assert Money.equal?(total, Money.mult!(tier.price, 2))
+      assert Money.zero?(discount)
+      assert lookups == 0
+    end
+
+    test "still loads reservations for a signed-in estimate", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {_, lookups} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.estimate_order_total(
+              user.id,
+              event.id,
+              %{tier.id => 1},
+              tiers: [tier]
+            )
+          end,
+          pattern: @estimate_reservations,
+          caller_pids: [self()]
+        )
+
+      assert lookups == 1
+    end
 
     test "skips the tier SELECT when selected tiers are passed", %{
       user: user,

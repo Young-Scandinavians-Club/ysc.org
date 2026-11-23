@@ -118,6 +118,45 @@ defmodule YscWeb.AdminTicketListLiveTest do
     }
   end
 
+  # Guest checkout orders have no user_id; the buyer is on the order.
+  # `insert_confirmed_ticket/1` with `user_id: nil` is the orphaned-ticket
+  # fallback and does not create an order, so guest tests use this instead.
+  defp insert_guest_confirmed_ticket(attrs) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    event_id = attrs.event_id
+    tier = Events.get_ticket_tier!(attrs.ticket_tier_id)
+
+    order =
+      %TicketOrder{}
+      |> TicketOrder.guest_create_changeset(%{
+        guest_email: Map.get(attrs, :guest_email, "Guest.Buyer@Example.com"),
+        guest_first_name: Map.get(attrs, :guest_first_name, "Gus"),
+        guest_last_name: Map.get(attrs, :guest_last_name, "Buyer"),
+        event_id: event_id,
+        total_amount: tier.price || Money.new(0, :USD),
+        expires_at: DateTime.add(now, 1, :day)
+      })
+      |> Repo.insert!()
+      |> Ecto.Changeset.change(%{status: :completed, completed_at: now})
+      |> Repo.update!()
+
+    ticket =
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        reference_id: "TKT-GUEST-#{System.unique_integer([:positive])}",
+        event_id: event_id,
+        ticket_tier_id: attrs.ticket_tier_id,
+        ticket_order_id: order.id,
+        user_id: nil,
+        status: :confirmed,
+        inserted_at: Map.get(attrs, :inserted_at, now),
+        expires_at: DateTime.add(now, 1, :day)
+      }
+      |> Repo.insert!()
+
+    %{order: order, ticket: ticket}
+  end
+
   defp order_index(html, order_id) do
     :binary.match(html, "ticket-order-#{order_id}") |> elem(0)
   end
@@ -192,6 +231,45 @@ defmodule YscWeb.AdminTicketListLiveTest do
 
       assert has_element?(view, "#ticket-order-", "No order")
       assert has_element?(view, "#ticket-row-#{ticket.id}", "Add name & email")
+    end
+
+    test "names a guest order from checkout details, not as an orphan", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      %{order: order, ticket: ticket} =
+        insert_guest_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      assert has_element?(view, "#ticket-order-#{order.id}", "Gus Buyer")
+
+      assert has_element?(
+               view,
+               "#ticket-order-#{order.id}",
+               "guest.buyer@example.com"
+             )
+
+      assert has_element?(view, "#ticket-order-#{order.id}", order.reference_id)
+      refute has_element?(view, "#ticket-order-#{order.id}", "No order")
+
+      # No separate registration, so the attendee is the guest buyer —
+      # not a blank "Add name & email" row.
+      assert has_element?(view, "#ticket-row-#{ticket.id}", "Gus Buyer")
+
+      assert has_element?(
+               view,
+               "#ticket-row-#{ticket.id}",
+               "guest.buyer@example.com"
+             )
+
+      refute has_element?(view, "#ticket-row-#{ticket.id}", "Add name & email")
     end
   end
 
@@ -818,6 +896,44 @@ defmodule YscWeb.AdminTicketListLiveTest do
                YscWeb.Admin.DateTimeDisplay.format_pacific_datetime_at(
                  purchased_at
                )
+    end
+
+    test "exports the guest buyer as purchaser and attendee", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id, name: "Public GA"})
+
+      %{ticket: ticket} =
+        insert_guest_confirmed_ticket(%{
+          event_id: event.id,
+          ticket_tier_id: tier.id
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      view
+      |> element("#export-tickets-csv")
+      |> render_click()
+
+      assert_push_event(view, "download-csv", %{content: content})
+
+      [row] =
+        content
+        |> Base.decode64!()
+        |> String.split("\n", trim: true)
+        |> CSV.decode!(headers: true)
+        |> Enum.to_list()
+
+      assert row["Ticket Reference"] == ticket.reference_id
+      assert row["Ticket Tier"] == "Public GA"
+      assert row["Purchaser First Name"] == "Gus"
+      assert row["Purchaser Last Name"] == "Buyer"
+      assert row["Purchaser Email"] == "guest.buyer@example.com"
+      assert row["Attendee First Name"] == "Gus"
+      assert row["Attendee Last Name"] == "Buyer"
+      assert row["Attendee Email"] == "guest.buyer@example.com"
     end
   end
 

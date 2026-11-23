@@ -64,7 +64,8 @@ defmodule YscWeb.Emails.TicketRecipientNotification do
 
     %{
       first_name: attendee_greeting_name(recipient),
-      purchaser_name: purchaser_name(ticket_order.user),
+      purchaser_name:
+        purchaser_name(Ysc.Tickets.TicketOrder.buyer_name(ticket_order)),
       ticket_count: length(tickets),
       event: %{
         title: event.title,
@@ -81,13 +82,10 @@ defmodule YscWeb.Emails.TicketRecipientNotification do
 
   # Full name for the "from" line; falls back to a neutral phrase so the email
   # never reads "Valued Member bought you a ticket".
-  defp purchaser_name(user) do
-    [user.first_name, user.last_name]
-    |> Enum.filter(&(is_binary(&1) and String.trim(&1) != ""))
-    |> Enum.map(&String.trim/1)
-    |> case do
-      [] -> "Someone"
-      parts -> Enum.join(parts, " ")
+  defp purchaser_name(name) do
+    case String.trim(name) do
+      "" -> "Someone"
+      trimmed -> trimmed
     end
   end
 end

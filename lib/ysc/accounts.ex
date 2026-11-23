@@ -4076,6 +4076,50 @@ defmodule Ysc.Accounts do
     )
   end
 
+  # Admin family / membership tabs: identity, contact, avatar, and the
+  # columns `family_membership_host?/1` + remove-from-family need.
+  # Omits hashed_password, bios, Stripe ids, and notification flags.
+  @family_tab_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :email,
+    :phone_number,
+    :state,
+    :family_relationship,
+    :most_connected_country,
+    :current_avatar_id,
+    :primary_user_id,
+    :board_position,
+    :lifetime_membership_awarded_at
+  ]
+
+  @doc """
+  Household members for the admin family and membership tabs.
+
+  One SELECT of name, email, phone, state, relationship, avatar, and
+  lifetime-membership — not the full User row `get_user!/2` loads when
+  preloading `:sub_accounts` / `:primary_user`.
+  """
+  def list_family_tab_household_users(%User{} = user) do
+    list_family_tab_household_users_query(user.primary_user_id || user.id)
+    |> Repo.all()
+  end
+
+  defp list_family_tab_household_users_query(primary_id) do
+    avatar_query =
+      from(a in Ysc.Avatars.Avatar,
+        select: struct(a, ^@household_dashboard_avatar_fields)
+      )
+
+    from(u in User,
+      where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
+      select: struct(u, ^@family_tab_user_fields),
+      preload: [current_avatar: ^avatar_query],
+      order_by: [asc_nulls_first: u.primary_user_id, asc: u.id]
+    )
+  end
+
   defp household_users_query(primary_id, fields) do
     from(u in User,
       where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
@@ -4322,7 +4366,12 @@ defmodule Ysc.Accounts do
   defp do_admin_link_user(primary_user, user_to_link, relationship) do
     Repo.transaction(fn ->
       # Serialize with invite acceptance/linking, which locks the primary row.
-      from(u in User, where: u.id == ^primary_user.id, lock: "FOR UPDATE")
+      # `select: u.id` so the lock does not SELECT `hashed_password` / bios.
+      from(u in User,
+        where: u.id == ^primary_user.id,
+        select: u.id,
+        lock: "FOR UPDATE"
+      )
       |> Repo.one!()
 
       # Lock invitee and re-check already-linked + dependents so a concurrent
@@ -5793,6 +5842,13 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_list_household_dashboard_users_query do
     list_household_dashboard_users_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
+  end
+
+  @doc false
+  def ci_query_explain_list_family_tab_household_users_query do
+    list_family_tab_household_users_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
+    )
   end
 
   @doc false

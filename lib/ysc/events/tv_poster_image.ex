@@ -7,6 +7,7 @@ defmodule Ysc.Events.TvPosterImage do
   alias Ysc.Events.EventHelpers
   alias Ysc.Media.Image
   alias YscWeb.Emails.Helpers
+  alias YscWeb.EventBadgeHelpers
 
   @poster_width 1920
   @poster_height 1080
@@ -172,7 +173,10 @@ defmodule Ysc.Events.TvPosterImage do
       Map.get(assigns, :event_url),
       Map.get(assigns, :asset_base_url) || Helpers.origin() <> "/",
       Map.get(assigns, :sold_out, false),
-      Map.get(assigns, :selling_fast, false),
+      EventBadgeHelpers.demand_badge_kind(
+        event,
+        Map.get(assigns, :selling_fast, false)
+      ),
       Map.get(event, :id),
       Map.get(event, :title),
       Map.get(event, :description),

@@ -987,6 +987,78 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert has_element?(view, "#payment-related-event-title", event.title)
     end
 
+    test "shows the guest buyer for a guest ticket order payment", %{
+      conn: conn
+    } do
+      event = event_fixture(%{title: "Guest Modal Gala"})
+
+      guest_order =
+        %TicketOrder{}
+        |> TicketOrder.guest_create_changeset(%{
+          guest_email: "Guest.Buyer@Example.com",
+          guest_first_name: "Gus",
+          guest_last_name: "Buyer",
+          event_id: event.id,
+          total_amount: Money.new(10_000, :USD),
+          expires_at:
+            DateTime.add(DateTime.utc_now() |> DateTime.truncate(:second), 300)
+        })
+        |> Repo.insert!()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: nil,
+          amount: Money.new(10_000, :USD),
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id:
+            "pi_modal_guest_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event tickets",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      guest_order
+      |> Ecto.Changeset.change(%{payment_id: payment.id})
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money/payments/#{payment.id}")
+
+      assert has_element?(view, "#payment-modal-guest-buyer", "Gus Buyer")
+
+      assert has_element?(
+               view,
+               "#payment-modal-guest-buyer",
+               "guest.buyer@example.com"
+             )
+
+      refute has_element?(view, "#payment-modal-user", "System")
+    end
+
+    test "still shows System for a payment with no user and no guest order", %{
+      conn: conn
+    } do
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: nil,
+          amount: Money.new(5_000, :USD),
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id:
+            "pi_modal_system_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(160, :USD),
+          description: "Event tickets",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money/payments/#{payment.id}")
+
+      assert has_element?(view, "#payment-modal-user", "System")
+      refute has_element?(view, "#payment-modal-guest-buyer")
+    end
+
     test "close_payment_modal patches back to index", %{conn: conn} do
       payment = LedgersFixtures.payment_fixture()
 
@@ -1036,6 +1108,54 @@ defmodule YscWeb.AdminMoneyLiveTest do
         live(conn, ~p"/admin/money/payments/#{payment.id}/refund")
 
       assert html =~ "Process Refund"
+    end
+
+    test "shows the guest buyer on the refund modal", %{conn: conn} do
+      event = event_fixture(%{title: "Guest Refund Gala"})
+
+      guest_order =
+        %TicketOrder{}
+        |> TicketOrder.guest_create_changeset(%{
+          guest_email: "Guest.Buyer@Example.com",
+          guest_first_name: "Gus",
+          guest_last_name: "Buyer",
+          event_id: event.id,
+          total_amount: Money.new(10_000, :USD),
+          expires_at:
+            DateTime.add(DateTime.utc_now() |> DateTime.truncate(:second), 300)
+        })
+        |> Repo.insert!()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: nil,
+          amount: Money.new(10_000, :USD),
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id:
+            "pi_refund_guest_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(320, :USD),
+          description: "Event tickets",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      guest_order
+      |> Ecto.Changeset.change(%{payment_id: payment.id})
+      |> Repo.update!()
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payments/#{payment.id}/refund")
+
+      assert has_element?(view, "#refund-modal-guest-buyer", "Gus Buyer")
+
+      assert has_element?(
+               view,
+               "#refund-modal-guest-buyer",
+               "guest.buyer@example.com"
+             )
+
+      refute has_element?(view, "#refund-modal", "System")
     end
 
     test "close_refund_modal patches back to index", %{conn: conn} do

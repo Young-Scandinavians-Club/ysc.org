@@ -158,6 +158,77 @@ defmodule YscWeb.AdminCancellationRefundModalLiveTest do
              )
     end
 
+    test "names a guest order from checkout details", %{conn: conn} do
+      event = event_fixture(%{state: :published})
+      Ledgers.ensure_basic_accounts()
+
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          sale_audience: :public,
+          price: Money.new(25, :USD)
+        })
+
+      order =
+        %TicketOrder{}
+        |> TicketOrder.guest_create_changeset(%{
+          guest_email: "Guest.Buyer@Example.com",
+          guest_first_name: "Gus",
+          guest_last_name: "Buyer",
+          event_id: event.id,
+          total_amount: Money.new(25, :USD),
+          expires_at: DateTime.add(now, 1, :day)
+        })
+        |> Repo.insert!()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: nil,
+          amount: Money.new(25, :USD),
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id:
+            "pi_cancel_guest_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(80, :USD),
+          description: "Event tickets",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, order} = Tickets.complete_ticket_order(order, payment.id)
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        ticket_order_id: order.id,
+        user_id: nil,
+        status: :confirmed,
+        expires_at: DateTime.add(now, 1, :day)
+      }
+      |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#cancel-event-btn")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#cancellation-refund-order-#{order.id}",
+               "Gus Buyer"
+             )
+
+      assert has_element?(
+               view,
+               "#cancellation-refund-order-#{order.id}",
+               "guest.buyer@example.com"
+             )
+    end
+
     test "a refundable order row shows the reference, ticket count, and amount",
          %{conn: conn} do
       event = event_fixture(%{state: :published})

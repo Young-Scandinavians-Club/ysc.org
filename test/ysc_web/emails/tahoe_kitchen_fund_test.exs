@@ -29,6 +29,12 @@ defmodule YscWeb.Emails.TahoeKitchenFundTest do
         assert html =~ @fund_url
       end
 
+      test "says the kitchen is being replaced and donations are matched" do
+        html = render_for(unquote(mod), :tahoe)
+        assert html =~ "replacing the entire Tahoe cabin kitchen"
+        assert html =~ "matching member donations through the 2026/2027 season"
+      end
+
       test "omits the kitchen fund link for Clear Lake bookings" do
         html = render_for(unquote(mod), :clear_lake)
         refute html =~ @fund_url

@@ -15,6 +15,7 @@ defmodule YscWeb.AdminComponents do
   alias Phoenix.LiveView.JS
   alias Ysc.Accounts.{SignupApplication, UserDisplay}
   alias YscWeb.Admin.DateTimeDisplay
+  alias YscWeb.AdminBadgeHelpers
   alias YscWeb.AdminBookingEntitlementHelpers, as: EntitlementHelpers
   alias YscWeb.FormHelpers
 
@@ -5159,6 +5160,97 @@ defmodule YscWeb.AdminComponents do
     </div>
     """
   end
+
+  # ---------------------------------------------------------------------------
+  # admin_application_header
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Title, submitted/reviewed subtitle, and review-status badge for a membership
+  application.
+
+  Shared by the users-list review modal and the user-detail application tab.
+  Pending applications show **Pending Review**; reviewed applications show the
+  outcome badge (`Approved` / `Rejected`) when `review_outcome` is set.
+
+  ## Examples
+
+      <.admin_application_header
+        id="review-application-header"
+        user={@selected_user}
+        application={@selected_user_application}
+        class="mb-6"
+      >
+        Review Application
+      </.admin_application_header>
+  """
+  attr :id, :string, default: nil
+
+  attr :user, :map,
+    required: true,
+    doc: "The applicant `%User{}` (uses `:state`)"
+
+  attr :application, :map,
+    required: true,
+    doc:
+      "The `%SignupApplication{}` (uses `:completed`, `:reviewed_at`, `:review_outcome`)"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the outer container"
+
+  slot :inner_block, required: true
+
+  def admin_application_header(assigns) do
+    pending? = assigns.user.state == :pending_approval
+    outcome = assigns.application.review_outcome
+
+    assigns =
+      assign(assigns,
+        pending?: pending?,
+        show_outcome?: not pending? and not is_nil(outcome),
+        outcome: outcome,
+        subtitle: application_header_subtitle(assigns.user, assigns.application)
+      )
+
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "flex items-center justify-between border-b border-zinc-200 pb-4 gap-4",
+        @class
+      ]}
+    >
+      <div class="min-w-0">
+        <.admin_page_title level={2} variant={:emphasis}>
+          {render_slot(@inner_block)}
+        </.admin_page_title>
+        <p class="text-sm text-zinc-500 mt-0.5">{@subtitle}</p>
+      </div>
+      <span :if={@pending?} class="shrink-0">
+        <.badge type="default">Pending Review</.badge>
+      </span>
+      <span :if={@show_outcome?} class="shrink-0">
+        <.badge type={AdminBadgeHelpers.review_outcome_badge_type(@outcome)}>
+          {String.capitalize("#{@outcome}")}
+        </.badge>
+      </span>
+    </div>
+    """
+  end
+
+  defp application_header_subtitle(user, application) do
+    if user.state != :pending_approval and not is_nil(application.reviewed_at) do
+      "Reviewed #{DateTimeDisplay.format_utc_date(application.reviewed_at)}"
+    else
+      "Submitted #{application_header_submitted_label(application.completed)}"
+    end
+  end
+
+  defp application_header_submitted_label(nil), do: "N/A"
+
+  defp application_header_submitted_label(completed),
+    do: Timex.from_now(completed)
 
   # ---------------------------------------------------------------------------
   # admin_signup_application

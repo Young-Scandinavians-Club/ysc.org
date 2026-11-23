@@ -3015,6 +3015,52 @@ defmodule Ysc.EventsTest do
       assert loaded.ticket_detail.first_name == "Ada"
       assert loaded.ticket_detail.inserted_at == nil
     end
+
+    test "loads guest buyer fields from the ticket order" do
+      event = event_fixture()
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Public GA",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: event.id,
+          sale_audience: :public
+        })
+
+      now = DateTime.truncate(DateTime.utc_now(), :second)
+
+      order =
+        %Ysc.Tickets.TicketOrder{}
+        |> Ysc.Tickets.TicketOrder.guest_create_changeset(%{
+          guest_email: "Guest.Buyer@Example.com",
+          guest_first_name: "Gus",
+          guest_last_name: "Buyer",
+          event_id: event.id,
+          total_amount: Money.new(25, :USD),
+          expires_at: DateTime.add(now, 300)
+        })
+        |> Repo.insert!()
+
+      %Ticket{
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        ticket_order_id: order.id,
+        user_id: nil,
+        status: :confirmed,
+        expires_at: DateTime.add(now, 1, :day)
+      }
+      |> Repo.insert!()
+
+      assert [loaded] = Events.list_tickets_for_export(event.id)
+      assert loaded.user_id == nil
+      assert loaded.ticket_order_id == order.id
+      assert loaded.ticket_order.guest_email == "guest.buyer@example.com"
+      assert loaded.ticket_order.guest_first_name == "Gus"
+      assert loaded.ticket_order.guest_last_name == "Buyer"
+      assert loaded.user == nil
+    end
   end
 
   describe "get_ticket_purchase_summary/1" do

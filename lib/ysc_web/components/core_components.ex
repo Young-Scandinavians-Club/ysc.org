@@ -3037,6 +3037,7 @@ defmodule YscWeb.CoreComponents do
       @type == "sky" && "bg-sky-100 text-sky-800",
       @type == "green" && "bg-green-100 text-green-800",
       @type == "yellow" && "bg-yellow-100 text-yellow-800",
+      @type == "orange" && "bg-orange-100 text-orange-800",
       @type == "red" && "bg-red-100 text-red-800",
       @type == "violet" && "bg-violet-100 text-violet-800",
       @type == "dark" && "bg-zinc-100 text-zinc-800",
@@ -4984,6 +4985,80 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Shared column for public content pages: max width, side padding, and the
+  same vertical rhythm.
+
+  Wrap `page_masthead` and the page body in this so every public text page
+  shares the same edges. Cabin photo heroes and shop pages keep their own
+  frames.
+
+  ## Examples
+
+      <.page_container id="choir-page">
+        <.page_masthead id="choir-masthead" eyebrow="Get involved" title="YSC Choir" />
+        ...
+      </.page_container>
+  """
+  attr :id, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the container"
+
+  slot :inner_block, required: true
+
+  def page_container(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={["py-6 lg:py-8 max-w-(--breakpoint-xl) mx-auto px-4", @class]}
+    >
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
+  Google Calendar iframe in the bordered frame used on the choir and board
+  pages.
+
+  ## Examples
+
+      <.calendar_embed
+        id="choir-google-calendar"
+        src="https://calendar.google.com/calendar/embed?src=..."
+        title="YSC Choir Calendar"
+      />
+  """
+  attr :id, :string, required: true
+  attr :src, :string, required: true
+  attr :title, :string, required: true
+
+  attr :height, :string,
+    default: "600",
+    doc: "iframe height in pixels"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the frame"
+
+  def calendar_embed(assigns) do
+    ~H"""
+    <div class={["w-full overflow-hidden rounded-xl border border-zinc-200", @class]}>
+      <iframe
+        id={@id}
+        src={@src}
+        class="w-full border-0"
+        height={@height}
+        frameborder="0"
+        scrolling="no"
+        title={@title}
+      ></iframe>
+    </div>
+    """
+  end
+
+  @doc """
   Page title for public pages: left-aligned eyebrow + title + optional
   subtitle. Public text pages open with this so the site reads as one place.
   (The cabin pages keep their own photo hero.)
@@ -4997,7 +5072,7 @@ defmodule YscWeb.CoreComponents do
   "Legal"); the title says what's on it. Use `subtitle` only when it adds
   something the title doesn't (a "Last updated" date, a scope note); skip it
   when it would just restate the title.
-  Wrap it in `max-w-(--breakpoint-xl) mx-auto px-4` like other page sections.
+  Wrap the masthead and page body in `<.page_container>`.
 
   ## Examples
 

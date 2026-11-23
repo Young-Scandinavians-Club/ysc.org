@@ -26,6 +26,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Events.TicketDetail
   alias Ysc.Events.TicketTier
   alias Ysc.Events.TicketTierHelpers
+  alias Ysc.Events.TierAudience
   alias Ysc.Events.MemberOnlyTickets
   alias Ysc.Events.TierPurchaseLimits
   alias Ysc.Events.Event
@@ -120,11 +121,12 @@ defmodule Ysc.Tickets do
       ticket_selections: ticket_selections
     )
 
-    case membership_user(user_id, opts) do
+    ticket_tiers = selection_tier_attrs(ticket_selections, opts)
+
+    case membership_user(user_id, ticket_tiers, opts) do
       {:ok, user} ->
         with :ok <-
                validate_door_sale_quantities(ticket_selections, opts),
-             ticket_tiers = selection_tier_attrs(ticket_selections, opts),
              :ok <-
                validate_member_only_selection(
                  user,
@@ -361,6 +363,9 @@ defmodule Ysc.Tickets do
     :offline_amount_collected,
     :granted_by_id,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :event_id,
     :payment_id
   ]
@@ -530,6 +535,9 @@ defmodule Ysc.Tickets do
     :expires_at,
     :completed_at,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :event_id,
     :payment_id
   ]
@@ -603,6 +611,9 @@ defmodule Ysc.Tickets do
     :payment_id,
     :event_id,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :reference_id
   ]
   @admin_refund_ticket_fields [
@@ -681,7 +692,16 @@ defmodule Ysc.Tickets do
 
   # Member QR page: event title/when/where, ticket cards, and holder names.
   # Skip event HTML, payment, grant notes, and tier description / questions.
-  @qr_ticket_order_fields [:id, :reference_id, :status, :user_id, :event_id]
+  @qr_ticket_order_fields [
+    :id,
+    :reference_id,
+    :status,
+    :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
+    :event_id
+  ]
   @qr_event_fields [
     :id,
     :title,
@@ -832,8 +852,21 @@ defmodule Ysc.Tickets do
   the confirmation UI renders.
   """
   def get_user_ticket_order_for_confirmation(user_id, order_id) do
-    user_id
-    |> ticket_order_for_confirmation_query(order_id)
+    dynamic([to], to.id == ^order_id and to.user_id == ^user_id)
+    |> ticket_order_for_confirmation_query()
+    |> Repo.one()
+  end
+
+  @doc """
+  Loads a guest checkout order (one with no account) for the confirmation page.
+
+  The caller must already have proven access, e.g. through a verified
+  `Ysc.Tickets.AccessToken`. Orders placed by a member are never returned, so a
+  token can't be used to open a member's receipt through the guest page.
+  """
+  def get_guest_ticket_order_for_confirmation(order_id) do
+    dynamic([to], to.id == ^order_id and is_nil(to.user_id))
+    |> ticket_order_for_confirmation_query()
     |> Repo.one()
   end
 
@@ -845,6 +878,9 @@ defmodule Ysc.Tickets do
     :discount_amount,
     :payment_intent_id,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :event_id,
     :payment_id
   ]
@@ -892,7 +928,7 @@ defmodule Ysc.Tickets do
     :answers
   ]
 
-  defp ticket_order_for_confirmation_query(user_id, order_id) do
+  defp ticket_order_for_confirmation_query(filter) do
     image_query =
       from(i in Image, select: struct(i, ^@confirmation_cover_image_fields))
 
@@ -928,7 +964,7 @@ defmodule Ysc.Tickets do
       )
 
     from(to in TicketOrder,
-      where: to.id == ^order_id and to.user_id == ^user_id,
+      where: ^filter,
       select: struct(to, ^@confirmation_ticket_order_fields),
       preload: [
         event: ^event_query,
@@ -1651,6 +1687,9 @@ defmodule Ysc.Tickets do
 
   ## Options
   - `:ticket_ids` — ids of the tickets this refund covers (per-ticket flows)
+  - `:send_email` — set to `false` to skip the refund email (default `true`);
+    the caller then sends it with `notify_ticket_refund/2` after cancelling
+    the tickets
 
   ## Returns
   - `{:ok, {:skipped_zero_amount, nil, nil}}` if `amount` is zero or negative
@@ -1683,7 +1722,8 @@ defmodule Ysc.Tickets do
               payment_id: payment.id,
               refund_amount: amount,
               reason: reason,
-              external_refund_id: stripe_refund.id
+              external_refund_id: stripe_refund.id,
+              send_email: Keyword.get(opts, :send_email, true)
             })
 
           {:error, stripe_reason} ->
@@ -1702,6 +1742,29 @@ defmodule Ysc.Tickets do
         {:error, :no_stripe_payment}
     end
   end
+
+  @doc """
+  Sends the ticket refund email for the result of `refund_via_stripe/4`, once
+  the refunded tickets have been cancelled.
+
+  Admin flows pass `send_email: false` to `refund_via_stripe/4`, because the
+  refund is recorded before the tickets are cancelled and the email lists
+  cancelled tickets. Zero-amount skips and failures have no refund to email
+  about.
+
+  ## Options
+    * `:ticket_ids` - the tickets this refund covered (see
+      `Ledgers.resend_refund_email/2`)
+  """
+  def notify_ticket_refund(result, opts \\ [])
+
+  def notify_ticket_refund(
+        {:ok, {%Ledgers.Refund{} = refund, _tx, _entries}},
+        opts
+      ),
+      do: Ledgers.resend_refund_email(refund, opts)
+
+  def notify_ticket_refund(_result, _opts), do: :ok
 
   # Stripe idempotency key for an admin refund. Same tickets + amount (or the
   # same amount-only sequence number) retries the original Stripe refund;
@@ -1788,6 +1851,9 @@ defmodule Ysc.Tickets do
     :total_amount,
     :completed_at,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :payment_id
   ]
   @admin_ticket_registration_fields [
@@ -1874,6 +1940,9 @@ defmodule Ysc.Tickets do
     :reference_id,
     :total_amount,
     :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name,
     :payment_id,
     :payment_channel,
     :status,
@@ -3193,6 +3262,20 @@ defmodule Ysc.Tickets do
 
   defp door_sale_quantity_per_tier?(_), do: false
 
+  # Buying needs an active membership unless every selected tier is sold to
+  # the public (`TierAudience`). A mixed selection still needs one, because it
+  # includes a member tier.
+  defp membership_user(user_id, ticket_tiers, opts) do
+    # Door sales (`:bypass_guards`) keep the membership requirement: the
+    # public-sale exemption is for self-service checkout only.
+    if TierAudience.all_public?(ticket_tiers) and
+         not Keyword.get(opts, :bypass_guards, false) do
+      public_sale_user(user_id, opts)
+    else
+      membership_user(user_id, opts)
+    end
+  end
+
   defp membership_user(user_id, opts) do
     case Keyword.get(opts, :user) do
       %User{id: id} = user when id == user_id ->
@@ -3200,6 +3283,20 @@ defmodule Ysc.Tickets do
 
       _ ->
         validate_user_membership(user_id)
+    end
+  end
+
+  defp public_sale_user(user_id, opts) do
+    case Keyword.get(opts, :user) do
+      %User{id: id} = user when id == user_id -> {:ok, user}
+      _ -> fetch_user(user_id)
+    end
+  end
+
+  defp fetch_user(user_id) do
+    case Accounts.get_user(user_id) do
+      nil -> {:error, :user_not_found}
+      user -> {:ok, user}
     end
   end
 
@@ -3304,6 +3401,7 @@ defmodule Ysc.Tickets do
                 %{
                   id: tier.id,
                   member_only: tier.member_only,
+                  sale_audience: Map.get(tier, :sale_audience),
                   max_per_buyer: tier.max_per_buyer,
                   type: tier.type
                 }
@@ -3815,6 +3913,9 @@ defmodule Ysc.Tickets do
     end)
   end
 
+  # Guest orders have no account to save a payment method to.
+  defp extract_payment_method_id(_payment_intent, nil), do: nil
+
   defp extract_payment_method_id(payment_intent, user_id) do
     require Ysc.Logging
 
@@ -3959,6 +4060,10 @@ defmodule Ysc.Tickets do
     Phoenix.PubSub.broadcast(Ysc.PubSub, topic_name, {__MODULE__, event})
   end
 
+  @doc false
+  def broadcast_availability(event_id),
+    do: broadcast_ticket_availability_update(event_id)
+
   defp broadcast_ticket_availability_update(event_id) do
     Ysc.Events.invalidate_event_caches()
 
@@ -4007,7 +4112,7 @@ defmodule Ysc.Tickets do
     Ysc.Logging.info("Starting ticket confirmation email process",
       ticket_order_id: ticket_order.id,
       user_id: ticket_order.user_id,
-      user_email: ticket_order.user.email,
+      user_email: TicketOrder.buyer_email(ticket_order),
       completed_at: ticket_order.completed_at
     )
 
@@ -4036,7 +4141,7 @@ defmodule Ysc.Tickets do
 
       result =
         YscWeb.Emails.Notifier.schedule_email(
-          ticket_order.user.email,
+          TicketOrder.buyer_email(ticket_order),
           idempotency_key,
           YscWeb.Emails.TicketPurchaseConfirmation.get_subject(email_data),
           "ticket_purchase_confirmation",
@@ -4050,7 +4155,7 @@ defmodule Ysc.Tickets do
           Ysc.Logging.info("Ticket confirmation email scheduled successfully",
             ticket_order_id: ticket_order.id,
             user_id: ticket_order.user_id,
-            user_email: ticket_order.user.email,
+            user_email: TicketOrder.buyer_email(ticket_order),
             job_id: job.id,
             idempotency_key: idempotency_key
           )
@@ -4073,7 +4178,7 @@ defmodule Ysc.Tickets do
         Ysc.Logging.error("Failed to send ticket confirmation email",
           ticket_order_id: ticket_order.id,
           user_id: ticket_order.user_id,
-          user_email: ticket_order.user.email,
+          user_email: TicketOrder.buyer_email(ticket_order),
           error: error,
           stacktrace: __STACKTRACE__
         )
@@ -4235,7 +4340,17 @@ defmodule Ysc.Tickets do
   @doc false
   def ci_query_explain_ticket_order_for_confirmation_query do
     ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
-    ticket_order_for_confirmation_query(ulid, ulid)
+
+    dynamic([to], to.id == ^ulid and to.user_id == ^ulid)
+    |> ticket_order_for_confirmation_query()
+  end
+
+  @doc false
+  def ci_query_explain_guest_ticket_order_for_confirmation_query do
+    ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
+
+    dynamic([to], to.id == ^ulid and is_nil(to.user_id))
+    |> ticket_order_for_confirmation_query()
   end
 
   @doc false
