@@ -3665,6 +3665,11 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
 
       assert has_element?(view, "#booking-refund-form")
 
+      # The refund modal is nested over the booking details modal (z-200), so
+      # it must stack above it or the click appears to do nothing.
+      assert has_element?(view, "#booking-refund-modal.z-210")
+      refute has_element?(view, "#booking-refund-modal.z-60")
+
       view
       |> form("#booking-refund-form", %{
         "refund" => %{
