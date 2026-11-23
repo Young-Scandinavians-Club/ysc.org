@@ -192,8 +192,10 @@ defmodule Ysc.Tickets.GuestCheckout do
     Tickets.lock_user_event_ticket_checkout!({:guest, email}, event_id)
   end
 
-  # `max_per_buyer` applies per guest email: tickets already bought for this
-  # event with the same address count toward it.
+  # `max_per_buyer` applies per guest email. Count confirmed tickets *and*
+  # tickets still held on an unexpired pending order: a new checkout never
+  # cancels another hold for this address (email is not identity), so counting
+  # only confirmed would let two payment tabs both complete past the limit.
   defp validate_guest_limits(email, event_id, ticket_selections, tiers) do
     attrs =
       Enum.map(tiers, fn tier ->
@@ -209,7 +211,8 @@ defmodule Ysc.Tickets.GuestCheckout do
         email
         |> owned_by_tier_query(
           event_id,
-          TierPurchaseLimits.limited_tier_ids(attrs)
+          TierPurchaseLimits.limited_tier_ids(attrs),
+          DateTime.utc_now()
         )
         |> Repo.all()
         |> Map.new()
@@ -220,13 +223,16 @@ defmodule Ysc.Tickets.GuestCheckout do
     end
   end
 
-  defp owned_by_tier_query(email, event_id, tier_ids) do
+  defp owned_by_tier_query(email, event_id, tier_ids, now) do
     from(t in Ysc.Events.Ticket,
       join: o in TicketOrder,
       on: o.id == t.ticket_order_id,
       where:
         o.guest_email == ^email and t.event_id == ^event_id and
-          t.status == :confirmed and t.ticket_tier_id in ^tier_ids,
+          t.ticket_tier_id in ^tier_ids and
+          (t.status == :confirmed or
+             (t.status == :pending and o.status == :pending and
+                o.expires_at > ^now)),
       group_by: t.ticket_tier_id,
       select: {t.ticket_tier_id, count(t.id)}
     )
@@ -252,5 +258,15 @@ defmodule Ysc.Tickets.GuestCheckout do
       )
 
     if open >= @max_open_holds, do: {:error, :too_many_open_holds}, else: :ok
+  end
+
+  @doc false
+  def ci_query_explain_owned_by_tier_query do
+    owned_by_tier_query(
+      Ysc.Ci.QueryExplain.Fixtures.email(),
+      Ysc.Ci.QueryExplain.Fixtures.ulid(),
+      [Ysc.Ci.QueryExplain.Fixtures.ulid()],
+      Ysc.Ci.QueryExplain.Fixtures.now()
+    )
   end
 end
