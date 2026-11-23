@@ -2607,11 +2607,14 @@ defmodule Ysc.Events do
     :email,
     :answers
   ]
+  # `ticket_order_id` is required so Ecto can preload the order. Guest
+  # tickets have no `user_id`; the purchaser columns come from that order.
   @export_ticket_fields [
     :id,
     :reference_id,
     :inserted_at,
     :user_id,
+    :ticket_order_id,
     :ticket_tier_id,
     :status,
     :event_id
