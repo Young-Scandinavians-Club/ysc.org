@@ -13,6 +13,8 @@ defmodule YscWeb.AdminHelpGuideLiveTest do
     {:ok, view, _html} = live(conn, ~p"/admin/help/getting-started/roles")
 
     assert has_element?(view, "h1", "Volunteer vs admin permissions")
+    assert has_element?(view, "#admin-help-back", "All guides")
+    assert has_element?(view, ~s(#admin-help-back[href="/admin/help"]))
     assert has_element?(view, "#admin-help-next")
   end
 

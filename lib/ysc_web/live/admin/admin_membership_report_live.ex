@@ -190,14 +190,14 @@ defmodule YscWeb.AdminMembershipReportLive do
         <%!-- Page header --%>
         <div class="flex flex-col md:flex-row md:items-start justify-between gap-4 py-8 border-b border-zinc-100 mb-8">
           <div>
-            <div class="mb-2">
-              <.link
-                navigate={~p"/admin/memberships"}
-                class="text-sm text-zinc-500 hover:text-zinc-700 inline-flex items-center gap-1"
-              >
-                <.icon name="hero-arrow-left" class="w-4 h-4" /> Memberships
-              </.link>
-            </div>
+            <.back
+              id="membership-report-back"
+              navigate={~p"/admin/memberships"}
+              variant={:inline}
+              class="mb-2"
+            >
+              Memberships
+            </.back>
             <h1 class="text-3xl text-zinc-900 type-display">
               Membership Report
             </h1>

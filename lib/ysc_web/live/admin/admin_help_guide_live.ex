@@ -172,13 +172,14 @@ defmodule YscWeb.AdminHelpGuideLive do
     <.side_menu active_page={@active_page} user={@current_user} role={@admin_role}>
       <div :if={@guide_mod} class="py-6 max-w-3xl admin-help-page">
         <div class="print:hidden">
-          <.link
-            navigate={~p"/admin/help"}
-            class="inline-flex items-center text-sm text-zinc-500 hover:text-zinc-800 mb-4"
+          <.back
             id="admin-help-back"
+            navigate={~p"/admin/help"}
+            variant={:inline}
+            class="mb-4"
           >
-            <.icon name="hero-arrow-left" class="w-4 h-4 me-1" /> All guides
-          </.link>
+            All guides
+          </.back>
 
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>

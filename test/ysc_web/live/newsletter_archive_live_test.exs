@@ -328,6 +328,13 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
       html = render_async(view)
 
       assert html =~ "Full Issue"
+      assert has_element?(view, "#newsletter-archive-back", "All newsletters")
+
+      assert has_element?(
+               view,
+               ~s(#newsletter-archive-back[href="/newsletters"])
+             )
+
       assert html =~ "newsletter-frame"
 
       # The print hook reads the frame's document, which needs allow-same-origin

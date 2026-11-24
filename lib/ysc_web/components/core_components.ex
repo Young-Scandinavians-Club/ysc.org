@@ -2179,19 +2179,59 @@ defmodule YscWeb.CoreComponents do
   @doc """
   Renders a back navigation link.
 
+  `:button` (default) is the padded control used on admin editors and auth
+  pages. `:inline` is the quieter text link used above page titles (membership
+  report, merch order, newsletter editor, help guides, newsletter archive).
+
   ## Examples
 
       <.back navigate={~p"/posts"}>Back to posts</.back>
+
+      <.back navigate={~p"/admin/memberships"} variant={:inline} id="membership-report-back">
+        Memberships
+      </.back>
   """
+  attr :id, :string, default: nil
   attr :navigate, :any, required: true
+
+  attr :variant, :atom,
+    default: :button,
+    values: [:button, :inline],
+    doc:
+      ":button is padded with a hover background; :inline is a muted text link"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the link (use for margin)"
+
   slot :inner_block, required: true
+
+  def back(%{variant: :inline} = assigns) do
+    ~H"""
+    <.link
+      id={@id}
+      navigate={@navigate}
+      class={[
+        "inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800",
+        @class
+      ]}
+    >
+      <.icon name="hero-arrow-left" class="w-4 h-4" />
+      {render_slot(@inner_block)}
+    </.link>
+    """
+  end
 
   def back(assigns) do
     ~H"""
     <div>
       <.link
+        id={@id}
         navigate={@navigate}
-        class="text-sm font-semibold leading-6 text-zinc-600 hover:text-zinc-800 rounded-sm hover:bg-zinc-100 p-2"
+        class={[
+          "text-sm font-semibold leading-6 text-zinc-600 hover:text-zinc-800 rounded-sm hover:bg-zinc-100 p-2",
+          @class
+        ]}
       >
         <.icon name="hero-arrow-left-solid" class="w-3 h-3 -mt-0.5" />
         {render_slot(@inner_block)}

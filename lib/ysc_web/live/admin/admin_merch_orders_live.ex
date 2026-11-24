@@ -306,13 +306,14 @@ defmodule YscWeb.AdminMerchOrdersLive do
     >
       <div class="flex flex-wrap items-start justify-between gap-4 py-6">
         <div>
-          <.link
+          <.back
             id="back-to-orders"
             navigate={~p"/admin/merch/orders"}
-            class="mb-3 inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900"
+            variant={:inline}
+            class="mb-3"
           >
-            <.icon name="hero-arrow-left" class="size-4" /> All orders
-          </.link>
+            All orders
+          </.back>
           <div class="flex flex-wrap items-center gap-3">
             <.admin_page_title>
               <span class="font-mono">{@order.reference_id}</span>

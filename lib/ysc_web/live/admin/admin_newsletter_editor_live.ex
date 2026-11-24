@@ -427,12 +427,13 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       role={@admin_role}
     >
       <div class="flex items-center gap-3 py-6">
-        <.link
+        <.back
+          id="newsletter-editor-back"
           navigate={~p"/admin/newsletters"}
-          class="text-zinc-600 hover:text-zinc-900 text-sm flex items-center gap-1"
+          variant={:inline}
         >
-          <.icon name="hero-arrow-left" class="w-4 h-4" /> Back to Newsletters
-        </.link>
+          Back to Newsletters
+        </.back>
         <%= if @edition && @edition.status == :sending do %>
           <span id="newsletter-sending-progress">
             <.admin_sending_badge label={
