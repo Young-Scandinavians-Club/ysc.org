@@ -336,7 +336,16 @@ defmodule Ysc.MixProject do
       {:ex_aws, "~> 2.7"},
       {:ex_cldr_calendars, "~> 2.4"},
       {:ex_cldr_currencies, "~> 2.17"},
-      {:ex_cldr_dates_times, "~> 2.25"},
+      # 2.25.7: drop deprecated mix.exs `xref: [exclude: [:eprof]]` that
+      # warned on Elixir 1.20 when compiling as a dependency.
+      # 2.25.8: `meta_zones/1` returns `%{}` for locales without metazone
+      # names (`:und`) so timezone format symbols `z`/`zzzz`/`v`/`vvvv`
+      # and `Cldr.DateTime.Timezone.non_location_format/2` do not raise
+      # BadMapError. Public `Cldr.DateTime.to_string/3` APIs are
+      # unchanged. We configure `Cldr.DateTime` as a Ysc.Cldr provider
+      # (generated Format/Formatter modules) but format dates with
+      # Calendar/strftime, not Cldr timezone names. Pin the patched floor.
+      {:ex_cldr_dates_times, "~> 2.25.8"},
       {:ex_cldr_numbers, "~> 2.38"},
       {:ex_cldr_person_names, "~> 1.1"},
       {:ex_cldr_territories, "~> 2.12"},
