@@ -134,7 +134,11 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   end
 
   defp do_sync(%User{} = user, on_board?) do
-    [primary | _] = Accounts.get_family_group(user)
+    # Always re-read the primary. Callers such as admin family-tab link/remove
+    # may pass a slim household `%User{}` (#1900) that omits `stripe_id`; using
+    # that struct would skip Stripe pause/grace and leave billing wrong.
+    primary_id = user.primary_user_id || user.id
+    primary = Accounts.get_user!(primary_id)
 
     if is_nil(primary.stripe_id) or primary.stripe_id == "" do
       :ok
