@@ -471,6 +471,35 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
                end)
     end
 
+    # After #1900, admin family/membership tabs pass a slim household primary
+    # (no `stripe_id` in the SELECT) into `admin_link_user_to_family` /
+    # `remove_sub_account` when the admin is viewing a linked member. Sync must
+    # re-read the primary so Stripe pause/grace still runs.
+    test "reloads primary stripe_id when sync receives a slim household primary" do
+      {user, subscription} = board_user_with_stripe_subscription()
+
+      [slim_primary] =
+        Ysc.Accounts.list_family_tab_household_users(user)
+        |> Enum.filter(&is_nil(&1.primary_user_id))
+
+      assert slim_primary.id == user.id
+      assert is_nil(slim_primary.stripe_id)
+      assert user.stripe_id
+
+      expect(Stripe.SubscriptionMock, :update, fn stripe_id, params ->
+        assert stripe_id == subscription.stripe_id
+        assert params.pause_collection == %{behavior: :void}
+        assert params.cancel_at_period_end == false
+
+        {:ok, Ysc.Stripe.SubscriptionFixtures.subscription(id: stripe_id)}
+      end)
+
+      assert :ok ==
+               EnvHelper.with_environment("dev", fn ->
+                 BoardVolunteerBilling.sync_for_user(slim_primary)
+               end)
+    end
+
     test "pauses the membership subscription and clears a scheduled cancellation on success" do
       {user, subscription} = board_user_with_stripe_subscription()
 

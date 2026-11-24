@@ -211,6 +211,45 @@ defmodule Ysc.TicketsTest do
       assert {:error, :tier_validation_failed} =
                Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 0})
     end
+
+    test "refuses an admission quantity above the checkout cap", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 tier1.id => Tickets.max_checkout_quantity_per_tier() + 1
+               })
+
+      assert from(t in Ticket, where: t.ticket_tier_id == ^tier1.id)
+             |> Repo.all() == []
+    end
+
+    test "does not count donation cents toward the admission cap", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, donation} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Support Finding 102",
+          type: :donation,
+          price: nil,
+          quantity: nil,
+          event_id: event.id
+        })
+
+      assert {:ok, order} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 tier1.id => 1,
+                 donation.id => 50_000
+               })
+
+      tickets = tickets_for_order(order.id)
+      assert length(tickets) == 2
+      assert Enum.count(tickets, &(&1.ticket_tier_id == donation.id)) == 1
+    end
   end
 
   describe "create_ticket_order/3 member-only tiers" do

@@ -336,6 +336,16 @@ defmodule Ysc.AccountsTest do
                Accounts.ci_query_explain_list_family_tab_household_users_query()
     end
 
+    test "ci_query_explain_list_family_management_household_users_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_list_family_management_household_users_query()
+    end
+
+    test "ci_query_explain_list_family_management_sub_accounts_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_list_family_management_sub_accounts_query()
+    end
+
     test "ci_query_explain_household_board_member_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Accounts.ci_query_explain_household_board_member_query()
@@ -349,6 +359,11 @@ defmodule Ysc.AccountsTest do
     test "ci_query_explain_user_notification_profile_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Accounts.ci_query_explain_user_notification_profile_query()
+    end
+
+    test "ci_query_explain_lock_invitee_for_family_link_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_lock_invitee_for_family_link_query()
     end
   end
 
@@ -796,6 +811,100 @@ defmodule Ysc.AccountsTest do
       assert Enum.all?(loaded, &is_nil(&1.hashed_password))
       assert Enum.all?(loaded, &is_nil(&1.board_bio))
       assert Enum.all?(loaded, &Ecto.assoc_loaded?(&1.current_avatar))
+    end
+
+    test "list_family_management_household_users slims name, email, and board position",
+         %{} do
+      primary =
+        user_fixture(%{
+          phone_number: "+14159098380",
+          first_name: "Pat",
+          last_name: "Host"
+        })
+        |> Ecto.Changeset.change(%{
+          board_bio: "family management must not load this bio",
+          board_position: :treasurer
+        })
+        |> Repo.update!()
+
+      sub =
+        user_fixture(%{
+          phone_number: "+14159098381",
+          first_name: "Kid",
+          last_name: "Host"
+        })
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{family_relationship: "child"})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_family_management_household_users(sub) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      {_members, avatar_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_family_management_household_users(primary) end,
+          pattern: ~r/FROM "avatars"/i,
+          caller_pids: [self()]
+        )
+
+      by_id = Map.new(loaded, &{&1.id, &1})
+
+      assert password_cols == 0
+      assert avatar_cols == 0
+      assert map_size(by_id) == 2
+      assert by_id[primary.id].first_name == "Pat"
+      assert by_id[primary.id].email == primary.email
+      assert by_id[primary.id].board_position == :treasurer
+      assert by_id[sub.id].family_relationship == :child
+      assert by_id[sub.id].email == sub.email
+      assert Enum.all?(loaded, &is_nil(&1.hashed_password))
+      assert Enum.all?(loaded, &is_nil(&1.board_bio))
+    end
+
+    test "list_family_management_sub_accounts omits the primary holder", %{} do
+      primary =
+        user_fixture(%{
+          phone_number: "+14159098382",
+          first_name: "Sam",
+          last_name: "Primary"
+        })
+
+      sub =
+        user_fixture(%{
+          phone_number: "+14159098383",
+          first_name: "Lee",
+          last_name: "Linked"
+        })
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          family_relationship: "spouse",
+          board_bio: "sub-account list must not load this bio"
+        })
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      {loaded, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.list_family_management_sub_accounts(primary) end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self()]
+        )
+
+      assert password_cols == 0
+      assert Enum.map(loaded, & &1.id) == [sub.id]
+      assert hd(loaded).email == sub.email
+      assert hd(loaded).family_relationship == :spouse
+      assert is_nil(hd(loaded).hashed_password)
+      assert is_nil(hd(loaded).board_bio)
     end
 
     test "household_board_member slims board identity without password hashes",
@@ -1362,6 +1471,55 @@ defmodule Ysc.AccountsTest do
                Accounts.admin_link_user_to_family(primary, found,
                  relationship: :child
                )
+    end
+
+    test "stale slim search result cannot steal a user already linked elsewhere" do
+      unique = System.unique_integer([:positive])
+
+      primary =
+        user_fixture(%{
+          first_name: "FamilyStealHost#{unique}",
+          phone_number: "+14159098274"
+        })
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      other_primary =
+        user_fixture(%{
+          first_name: "FamilyStealOther#{unique}",
+          phone_number: "+14159098275"
+        })
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update!()
+
+      member =
+        user_fixture(%{
+          first_name: "FamilySteal#{unique}",
+          last_name: "Member",
+          phone_number: "+14159098276"
+        })
+
+      [found] = Accounts.search_users_for_family_link("FamilySteal#{unique}")
+      assert found.id == member.id
+      assert is_nil(found.primary_user_id)
+
+      assert {:ok, _} =
+               Accounts.admin_link_user_to_family(other_primary, member,
+                 relationship: :child
+               )
+
+      assert {:error, :already_linked_to_family} =
+               Accounts.admin_link_user_to_family(primary, found,
+                 relationship: :child
+               )
+
+      assert Accounts.get_user!(member.id).primary_user_id == other_primary.id
     end
   end
 

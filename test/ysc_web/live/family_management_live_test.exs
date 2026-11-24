@@ -124,6 +124,74 @@ defmodule YscWeb.FamilyManagementLiveTest do
       assert html =~ "Invites you send will appear here"
     end
 
+    test "connect load omits hashed_password and bios of household members", %{
+      conn: conn
+    } do
+      user =
+        lifetime_member(%{
+          board_bio: "family page must not reload this bio"
+        })
+
+      member = add_roster_member(user)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+
+      {_html, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+            render(view)
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self(), view.pid]
+        )
+
+      assert has_element?(view, "#family-member-row-#{member.id}")
+      assert password_cols == 0
+    end
+
+    test "saving a roster member does not re-SELECT hashed_password", %{
+      conn: conn
+    } do
+      user =
+        lifetime_member(%{
+          board_bio: "family save must not reload this bio"
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render_loaded(view)
+
+      view
+      |> element("#add-family-member-button")
+      |> render_click()
+
+      {_html, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+
+            view
+            |> form("#family-member-form",
+              family_member: %{
+                first_name: "Riley",
+                last_name: "Ng",
+                birth_date: "2014-03-02",
+                relationship: "child"
+              }
+            )
+            |> render_submit()
+          end,
+          pattern: ~r/SELECT.*hashed_password|SELECT.*board_bio/is,
+          caller_pids: [self(), view.pid]
+        )
+
+      assert render(view) =~ "Riley Ng"
+      assert password_cols == 0
+    end
+
     test "opens add family member modal and saves roster member", %{conn: conn} do
       user = lifetime_member()
       conn = log_in_user(conn, user)
@@ -608,6 +676,68 @@ defmodule YscWeb.FamilyManagementLiveTest do
       refute render(view) =~ sub.email
     end
 
+    test "remove_sub_account from the loaded list does not re-SELECT hashed_password",
+         %{
+           conn: conn
+         } do
+      {primary, sub} = primary_with_linked_sub()
+
+      primary =
+        primary
+        |> Ecto.Changeset.change(%{
+          board_bio: "family unlink must not reload this bio"
+        })
+        |> Repo.update!()
+
+      conn = log_in_user(conn, primary)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render_loaded(view)
+
+      {_html, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+
+            view
+            |> element(
+              "button[phx-click='remove_sub_account'][phx-value-user_id='#{sub.id}']"
+            )
+            |> render_click()
+          end,
+          pattern: ~r/SELECT.*hashed_password|SELECT.*board_bio/is,
+          caller_pids: [self(), view.pid]
+        )
+
+      refute render(view) =~ sub.email
+      assert password_cols == 0
+    end
+
+    test "falls back to loading a sub-account who is not in the household list",
+         %{
+           conn: conn
+         } do
+      primary = lifetime_member(%{phone_number: unique_phone()})
+      conn = log_in_user(conn, primary)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render_loaded(view)
+
+      sub = user_fixture(%{phone_number: unique_phone()})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{})
+        |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+        |> Repo.update!()
+
+      html =
+        render_click(view, "remove_sub_account", %{"user_id" => sub.id})
+
+      refute html =~ sub.email
+      assert is_nil(Accounts.get_user!(sub.id).primary_user_id)
+    end
+
     test "deletes roster member from unified table", %{conn: conn} do
       user = lifetime_member()
       member = add_roster_member(user)
@@ -629,6 +759,41 @@ defmodule YscWeb.FamilyManagementLiveTest do
   end
 
   describe "sub-account view" do
+    test "connect load omits hashed_password of the primary holder", %{
+      conn: conn
+    } do
+      {primary, sub} = primary_with_linked_sub()
+
+      primary =
+        primary
+        |> Ecto.Changeset.change(%{
+          board_bio: "sub-account family page must not load this bio"
+        })
+        |> Repo.update!()
+
+      conn = log_in_user(conn, sub)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+
+      {_html, password_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ysc.QueryCounter.track_caller_pid(view.pid)
+            render(view)
+          end,
+          pattern: ~r/hashed_password|board_bio/i,
+          caller_pids: [self(), view.pid]
+        )
+
+      assert has_element?(
+               view,
+               "#family-membership-manager-notice",
+               primary.email
+             )
+
+      assert password_cols == 0
+    end
+
     test "shows primary holder section and leave button", %{conn: conn} do
       {primary, sub} = primary_with_linked_sub()
       conn = log_in_user(conn, sub)

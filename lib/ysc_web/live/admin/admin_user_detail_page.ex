@@ -1159,6 +1159,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 </p>
                 <.simple_form
                   for={@membership_type_form}
+                  id="admin-membership-type-form"
                   phx-change="validate_membership_type"
                   phx-submit="update_membership_type"
                 >

@@ -4076,6 +4076,19 @@ defmodule Ysc.Accounts do
     )
   end
 
+  # Member family-management page: name, email, relationship, and the
+  # board_position `remove_sub_account/2` needs for volunteer billing sync.
+  # Omits hashed_password, bios, Stripe ids, avatars, and contact extras.
+  @family_management_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :email,
+    :family_relationship,
+    :primary_user_id,
+    :board_position
+  ]
+
   # Admin family / membership tabs: identity, contact, avatar, and the
   # columns `family_membership_host?/1` + remove-from-family need.
   # Omits hashed_password, bios, Stripe ids, and notification flags.
@@ -4117,6 +4130,43 @@ defmodule Ysc.Accounts do
       select: struct(u, ^@family_tab_user_fields),
       preload: [current_avatar: ^avatar_query],
       order_by: [asc_nulls_first: u.primary_user_id, asc: u.id]
+    )
+  end
+
+  @doc """
+  Household members for the member family-management page.
+
+  One SELECT of name, email, relationship, and board position — not the
+  full User row `get_user!/2` loads when preloading `:sub_accounts` /
+  `:primary_user`.
+  """
+  def list_family_management_household_users(%User{} = user) do
+    list_family_management_household_users_query(
+      user.primary_user_id || user.id
+    )
+    |> Repo.all()
+  end
+
+  defp list_family_management_household_users_query(primary_id) do
+    household_users_query(primary_id, @family_management_user_fields)
+  end
+
+  @doc """
+  Linked sub-accounts for the member family-management page.
+
+  Same column allowlist as `list_family_management_household_users/1`,
+  without re-selecting the primary holder.
+  """
+  def list_family_management_sub_accounts(%User{} = primary) do
+    list_family_management_sub_accounts_query(primary.id)
+    |> Repo.all()
+  end
+
+  defp list_family_management_sub_accounts_query(primary_id) do
+    from(u in User,
+      where: u.primary_user_id == ^primary_id,
+      select: struct(u, ^@family_management_user_fields),
+      order_by: [asc: u.id]
     )
   end
 
@@ -4353,6 +4403,16 @@ defmodule Ysc.Accounts do
     |> Repo.aggregate(:count, :id)
   end
 
+  # Include `id` in the select so `Repo.one!` does not treat a linked-nil
+  # `primary_user_id` as no results.
+  defp lock_invitee_for_family_link_query(user_id) do
+    from(u in User,
+      where: u.id == ^user_id,
+      select: {u.id, u.primary_user_id},
+      lock: "FOR UPDATE"
+    )
+  end
+
   defp do_admin_link_user(primary_user, user_to_link, relationship) do
     Repo.transaction(fn ->
       # Serialize with invite acceptance/linking, which locks the primary row.
@@ -4364,14 +4424,18 @@ defmodule Ysc.Accounts do
       )
       |> Repo.one!()
 
-      # Lock invitee and re-check dependents so a concurrent accept/link cannot
-      # nest a household under this primary after the outer guard passed.
-      from(u in User,
-        where: u.id == ^user_to_link.id,
-        select: u.id,
-        lock: "FOR UPDATE"
-      )
-      |> Repo.one!()
+      # Lock invitee and re-check already-linked + dependents so a concurrent
+      # accept/link cannot steal this user or nest a household after the
+      # outer guards passed. `select: u.id` is never null, so `one!` still
+      # distinguishes a missing row from `primary_user_id: nil`.
+      {_id, locked_primary_user_id} =
+        user_to_link.id
+        |> lock_invitee_for_family_link_query()
+        |> Repo.one!()
+
+      if not is_nil(locked_primary_user_id) do
+        Repo.rollback(:already_linked_to_family)
+      end
 
       if count_sub_accounts_for_primary(user_to_link.id) > 0 do
         Repo.rollback(:has_dependent_family_members)
@@ -5838,6 +5902,20 @@ defmodule Ysc.Accounts do
   end
 
   @doc false
+  def ci_query_explain_list_family_management_household_users_query do
+    list_family_management_household_users_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_family_management_sub_accounts_query do
+    list_family_management_sub_accounts_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
+    )
+  end
+
+  @doc false
   def ci_query_explain_household_board_member_query do
     household_board_member_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
   end
@@ -5868,6 +5946,11 @@ defmodule Ysc.Accounts do
       limit: 8,
       select: @family_link_search_user_fields
     )
+  end
+
+  @doc false
+  def ci_query_explain_lock_invitee_for_family_link_query do
+    lock_invitee_for_family_link_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
   end
 
   @doc false

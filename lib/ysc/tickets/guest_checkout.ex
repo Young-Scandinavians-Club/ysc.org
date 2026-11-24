@@ -87,14 +87,16 @@ defmodule Ysc.Tickets.GuestCheckout do
   `{:ok, %TicketOrder{}}` (tickets and tiers loaded) or `{:error, reason}`:
   `:invalid_guest` / `{:invalid_guest, %Ecto.Changeset{}}` for bad contact
   details, `:guest_checkout_not_allowed`, `:tier_purchase_limit_exceeded`,
-  `:too_many_open_holds`, and the usual booking errors
-  (`:overbooked`, `:event_capacity_exceeded`, `:event_in_past`, ...).
+  `:too_many_open_holds`, `:ticket_quantity_exceeds_limit`, and the usual
+  booking errors (`:overbooked`, `:event_capacity_exceeded`,
+  `:event_in_past`, ...).
   """
   def create_order(guest, event_id, ticket_selections)
       when is_map(ticket_selections) do
     with {:ok, guest} <- validate_guest(guest),
          {:ok, tiers} <- load_tiers(event_id, ticket_selections),
-         :ok <- validate_tiers(tiers) do
+         :ok <- validate_tiers(tiers),
+         :ok <- Tickets.validate_checkout_quantities(ticket_selections, tiers) do
       create_locked(guest, event_id, ticket_selections, tiers)
     end
   end

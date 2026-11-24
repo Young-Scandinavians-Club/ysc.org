@@ -323,6 +323,10 @@ defmodule Ysc.MixProject do
       {:ecto_enum, "~> 1.4"},
       {:ecto_psql_extras, "~> 0.8"},
       {:ecto_sql, "~> 3.13"},
+      # EEF-CVE-2026-133555 (HIGH): db_connection 2.10.2 accepted MFArgs in
+      # enumerable protocol implementations. 2.10.3 rejects them. Transitive
+      # via postgrex/ecto_sql; pin the patched floor. Do not ignore this CVE.
+      {:db_connection, "~> 2.10.3", override: true},
       {:ecto_ulid, "~> 0.3"},
       {:eqrcode, "~> 0.2"},
       # 0.10.1: bin_path/0 no longer calls target/0 when :path is set, so
@@ -332,11 +336,29 @@ defmodule Ysc.MixProject do
       # downloads into _build. Public APIs (bin_path/0, run/2,
       # install_and_run/2, configured_version/0) are unchanged.
       {:esbuild, "~> 0.10.1", runtime: Mix.env() == :dev},
-      {:ex_aws_s3, "~> 2.5"},
-      {:ex_aws, "~> 2.7"},
+      # 2.8.1 / ex_aws_s3 2.6.0 patch hex.audit advisories published 2026-11-24.
+      # ex_aws: EEF-CVE-2026-59697 (IMDSv2 token request followed redirects),
+      # EEF-CVE-2026-59698 (.. in S3 keys), EEF-CVE-2026-62269 (query-string
+      # injection via unencoded keys), EEF-CVE-2026-120720 (bucket name as
+      # request host). ex_aws_s3: XML/header injection and presigned-URL host
+      # control (EEF-CVE-2026-131902, 62273, 63581, 63582, 63583, 65621,
+      # 63585, 63584). We upload with configured bucket names and generated
+      # keys via ExAws.Request.Req; we do not pass untrusted bucket names
+      # with bucket_as_host. Do not ignore these CVEs.
+      {:ex_aws_s3, "~> 2.6"},
+      {:ex_aws, "~> 2.8"},
       {:ex_cldr_calendars, "~> 2.4"},
       {:ex_cldr_currencies, "~> 2.17"},
-      {:ex_cldr_dates_times, "~> 2.25"},
+      # 2.25.7: drop deprecated mix.exs `xref: [exclude: [:eprof]]` that
+      # warned on Elixir 1.20 when compiling as a dependency.
+      # 2.25.8: `meta_zones/1` returns `%{}` for locales without metazone
+      # names (`:und`) so timezone format symbols `z`/`zzzz`/`v`/`vvvv`
+      # and `Cldr.DateTime.Timezone.non_location_format/2` do not raise
+      # BadMapError. Public `Cldr.DateTime.to_string/3` APIs are
+      # unchanged. We configure `Cldr.DateTime` as a Ysc.Cldr provider
+      # (generated Format/Formatter modules) but format dates with
+      # Calendar/strftime, not Cldr timezone names. Pin the patched floor.
+      {:ex_cldr_dates_times, "~> 2.25.8"},
       {:ex_cldr_numbers, "~> 2.38"},
       {:ex_cldr_person_names, "~> 1.1"},
       {:ex_cldr_territories, "~> 2.12"},
@@ -386,9 +408,12 @@ defmodule Ysc.MixProject do
       # and cursors (fields still hold them). get_field/3 on a plain map without
       # the join path's first key falls back to the field name. Non-struct
       # Flop.Schema + Ecto adapter raises. max_cursor_size applies to unvalidated
-      # cursors. We do not use cursor pagination or non-struct schemas; pin the
-      # patched floor.
-      {:flop, "~> 0.29.1"},
+      # cursors.
+      # 0.29.2: reject cursors that contain a struct (EEF-CVE-2026-130411
+      # CRITICAL — crafted cursor could execute code). Encode date/time/
+      # decimal cursor values as strings. We paginate with page pagination,
+      # not cursors; pin the patched floor. Do not ignore this CVE.
+      {:flop, "~> 0.29.2"},
       # 0.27.0: requires Flop 0.29; sortable/filterable via allowed_fields/2.
       {:flop_phoenix, "~> 0.27.0"},
       {:gen_smtp, "~> 1.3"},

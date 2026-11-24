@@ -638,6 +638,19 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert html =~ "Additional payment required" || html =~ "Complete payment"
     assert has_element?(view, "#modification-payment-step")
+
+    assert has_element?(
+             view,
+             "#modification-amount-due-label",
+             "Amount due now"
+           )
+
+    refute has_element?(
+             view,
+             "#modification-amount-due-label",
+             "Nothing extra to pay"
+           )
+
     assert has_element?(view, "#back-to-modification-button", "Edit changes")
     assert html =~ "Edit your dates or guests before you pay"
     refute html =~ "Go back to adjust"
@@ -1390,6 +1403,18 @@ defmodule YscWeb.BookingChangeLiveTest do
     html = render(view)
     assert html =~ "modification-downgrade-notice"
     assert html =~ "do not refund the difference"
+
+    assert has_element?(
+             view,
+             "#modification-amount-due-label",
+             "Nothing extra to pay"
+           )
+
+    refute has_element?(
+             view,
+             "#modification-amount-due-label",
+             "Amount due now"
+           )
   end
 
   test "Clear Lake price preview shows previous and new calculation breakdown",
@@ -1430,6 +1455,19 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert has_element?(view, "#modification-previous-price")
     assert has_element?(view, "#modification-new-price")
     assert has_element?(view, "#modification-amount-due")
+
+    assert has_element?(
+             view,
+             "#modification-amount-due-label",
+             "Nothing extra to pay"
+           )
+
+    refute has_element?(
+             view,
+             "#modification-amount-due-label",
+             "Amount due now"
+           )
+
     assert html =~ "Price Summary"
     assert html =~ "Previous"
     assert html =~ "New"

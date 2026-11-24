@@ -657,6 +657,10 @@ defmodule YscWeb.GuestCheckoutLive do
     do:
       "That's more tickets of one type than a single buyer can get. Please reduce your selection."
 
+  defp order_error_message(:ticket_quantity_exceeds_limit),
+    do:
+      "You can buy at most #{Tickets.max_checkout_quantity_per_tier()} tickets of one type, and #{Tickets.max_checkout_tickets()} tickets in one order."
+
   defp order_error_message(:too_many_open_holds),
     do:
       "You already have tickets on hold for this event. Please finish that checkout, or try again in a few minutes."

@@ -4,16 +4,19 @@ defmodule Ysc.Accounts.FamilyMembers do
   """
   require Ysc.Logging
 
+  import Ecto.Query
+
   alias Ysc.Repo
   alias Ysc.Accounts.{FamilyMember, User, UserProfileCache}
 
   @doc """
-  Returns family members for a user, preloading when needed.
+  Returns family members for a user, loading when the association is not
+  already in memory.
   """
   def list_for_user(%User{} = user) do
     case user.family_members do
       %Ecto.Association.NotLoaded{} ->
-        user |> Repo.preload(:family_members) |> Map.get(:family_members) || []
+        list_by_user_id(user.id)
 
       members when is_list(members) ->
         members
@@ -21,6 +24,27 @@ defmodule Ysc.Accounts.FamilyMembers do
       _ ->
         []
     end
+  end
+
+  @doc """
+  Family member roster rows for `user_id`.
+
+  Used by the member family-management page after mutations so it does
+  not `get_user!/2` the holder to refresh `:family_members`.
+  """
+  def list_by_user_id(user_id) when is_binary(user_id) do
+    user_id
+    |> list_by_user_id_query()
+    |> Repo.all()
+  end
+
+  defp list_by_user_id_query(user_id) do
+    from(fm in FamilyMember, where: fm.user_id == ^user_id)
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    list_by_user_id_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
   end
 
   @doc """

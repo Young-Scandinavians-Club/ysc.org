@@ -37,10 +37,25 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  @doc """
+  Price-summary label for the extra amount on a booking change.
+
+  Delta is clamped at $0 (no refunds). "Amount due now $0.00" reads like a bill
+  for members who aren't paying anything extra.
+  """
+  def modification_amount_due_label(extra_to_pay?)
+      when extra_to_pay? in [true, false] do
+    if extra_to_pay?, do: "Amount due now", else: "Nothing extra to pay"
+  end
+
   def clear_lake_no_booking_options do
     trim("""
     Neither booking option is available for these dates. Try different dates, or email info@ysc.org if you think this is a mistake.
     """)
+  end
+
+  def clear_lake_entire_cabin_occupied do
+    "Entire cabin isn't available: Other members already have shared cabin stays on these dates."
   end
 
   def leave_unpaid_checkout_button do

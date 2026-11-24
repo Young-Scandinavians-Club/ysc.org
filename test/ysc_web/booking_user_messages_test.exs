@@ -46,6 +46,15 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.modification_forfeiture_acknowledgment() =~
              "non-refundable"
+
+    assert BookingUserMessages.modification_amount_due_label(true) ==
+             "Amount due now"
+
+    assert BookingUserMessages.modification_amount_due_label(false) ==
+             "Nothing extra to pay"
+
+    refute BookingUserMessages.modification_amount_due_label(false) =~
+             "Amount due"
   end
 
   test "plain-language booking flow copy" do
@@ -60,6 +69,12 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     refute BookingUserMessages.clear_lake_no_booking_options() =~
              "select dates to see available"
+
+    assert BookingUserMessages.clear_lake_entire_cabin_occupied() =~
+             "shared cabin stays on these dates"
+
+    refute BookingUserMessages.clear_lake_entire_cabin_occupied() =~
+             "booked spots"
 
     assert BookingUserMessages.leave_unpaid_checkout_button() ==
              "Leave without booking"
