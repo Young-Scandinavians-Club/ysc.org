@@ -1064,15 +1064,18 @@ defmodule Ysc.Subscriptions do
 
   Prevents downgrades if user has sub-accounts.
 
-  `schedule_api` is the Stripe schedule module, injectable for tests. Existing
-  schedules must be `release`d, never `cancel`ed: cancelling a schedule also
-  cancels its subscription and would end a paid-through membership.
+  `schedule_api` is the Stripe schedule module, injectable for tests. When
+  omitted, it is `stripe_schedule_module/0` (`:stripe_subscription_schedule_module`,
+  default `Stripe.SubscriptionSchedule`) so LiveView callers of arity 3 can be
+  tested without hitting Stripe. Existing schedules must be `release`d, never
+  `cancel`ed: cancelling a schedule also cancels its subscription and would end
+  a paid-through membership.
   """
   def change_membership_plan(
         subscription,
         new_price_id,
         direction,
-        schedule_api \\ Stripe.SubscriptionSchedule
+        schedule_api \\ stripe_schedule_module()
       )
 
   def change_membership_plan(
