@@ -4,6 +4,8 @@ defmodule Ysc.Accounts.FamilyLinkConcurrencyTest do
 
   Invite acceptance locks the primary user row; admin links must take the same
   lock and re-check caps inside the transaction to avoid exceeding limits.
+  Linking the same invitee into two households must re-check `primary_user_id`
+  under the invitee lock so a stale search result cannot steal the member.
   """
   use Ysc.DataCase, async: false
 
@@ -117,6 +119,40 @@ defmodule Ysc.Accounts.FamilyLinkConcurrencyTest do
       successes = Enum.count(results, &match?({:ok, _}, &1))
       assert successes == 1
       assert count_sub_accounts(primary.id) == 10
+    end
+
+    test "only one of two concurrent admin links of the same user succeeds",
+         %{sandbox_owner: owner} do
+      primary_a = create_user_with_lifetime_membership()
+      primary_b = create_user_with_lifetime_membership()
+      victim = user_fixture()
+
+      results =
+        [primary_a, primary_b]
+        |> Enum.map(fn primary ->
+          Task.async(fn ->
+            allow_sandbox(self(), owner)
+
+            Accounts.admin_link_user_to_family(
+              primary,
+              victim,
+              relationship: :child
+            )
+          end)
+        end)
+        |> Task.await_many(10_000)
+
+      successes = Enum.filter(results, &match?({:ok, _}, &1))
+      errors = Enum.filter(results, &match?({:error, _}, &1))
+
+      assert length(successes) == 1
+      assert errors == [{:error, :already_linked_to_family}]
+
+      linked_id = Accounts.get_user!(victim.id).primary_user_id
+      assert linked_id in [primary_a.id, primary_b.id]
+
+      assert count_sub_accounts(primary_a.id) + count_sub_accounts(primary_b.id) ==
+               1
     end
   end
 end

@@ -1755,6 +1755,41 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert password_cols == 0
     end
 
+    test "stale family-link search result cannot steal a user already linked elsewhere",
+         %{conn: conn} do
+      unique = System.unique_integer([:positive])
+      primary = lifetime_member()
+      other_primary = lifetime_member()
+
+      member =
+        user_fixture(%{
+          first_name: "FamSteal#{unique}",
+          last_name: "Member"
+        })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{primary.id}/details/family")
+
+      render_async(view)
+
+      view
+      |> form("#add-family-user-search-form", %{query: "FamSteal#{unique}"})
+      |> render_change()
+
+      assert {:ok, _} =
+               Accounts.admin_link_user_to_family(other_primary, member,
+                 relationship: :child
+               )
+
+      html =
+        view
+        |> element("#add-family-user-#{member.id}")
+        |> render_click()
+
+      assert html =~ "That user is already linked to another family membership."
+      assert Accounts.get_user!(member.id).primary_user_id == other_primary.id
+    end
+
     test "falls back to loading a user who is not in search results", %{
       conn: conn
     } do
