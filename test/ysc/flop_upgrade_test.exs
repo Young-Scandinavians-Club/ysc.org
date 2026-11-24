@@ -1,6 +1,6 @@
 defmodule Ysc.FlopUpgradeTest do
   @moduledoc """
-  Guards the flop 0.29.1 / flop_phoenix 0.27.0 upgrade.
+  Guards the flop 0.29.2 / flop_phoenix 0.27.0 upgrade.
 
   0.29.0 turns `Flop.Schema` from a protocol into a behaviour (`use Flop.Schema`
   + `@flop_options`). `field_info/2`, `get_field/3`, and `primary_key/1` take
@@ -13,7 +13,12 @@ defmodule Ysc.FlopUpgradeTest do
   params and cursors (the exception fields still hold them). `get_field/3` on a
   plain map without the join path's first key falls back to the field name.
   Non-struct `Flop.Schema` + Ecto adapter raises. `max_cursor_size` applies to
-  unvalidated cursors. We do not use cursor pagination or non-struct schemas.
+  unvalidated cursors.
+
+  0.29.2 patches EEF-CVE-2026-130411 (CRITICAL): cursors that contain a
+  struct are rejected so a crafted cursor cannot execute code. Date/time/
+  decimal cursor values encode as strings. We do not use cursor pagination
+  or non-struct schemas. Do not add this CVE to `ignore_advisories`.
   """
   use Ysc.DataCase, async: true
 
@@ -63,21 +68,35 @@ defmodule Ysc.FlopUpgradeTest do
     :ok
   end
 
-  describe "0.29.1 / 0.27.0 Hex locks" do
-    test "locks flop to 0.29.1 and flop_phoenix to 0.27.0" do
-      assert to_string(Application.spec(:flop, :vsn)) == "0.29.1"
+  describe "0.29.2 / 0.27.0 Hex locks" do
+    test "locks flop to 0.29.2 and flop_phoenix to 0.27.0" do
+      assert to_string(Application.spec(:flop, :vsn)) == "0.29.2"
       assert to_string(Application.spec(:flop_phoenix, :vsn)) == "0.27.0"
     end
 
-    test "mix.exs pins the 0.29.1 floor" do
+    test "mix.exs pins the 0.29.2 floor" do
       mix_exs = File.read!(@mix_exs)
-      assert mix_exs =~ ~s|{:flop, "~> 0.29.1"}|
+      assert mix_exs =~ ~s|{:flop, "~> 0.29.2"}|
+      refute mix_exs =~ ~s|{:flop, "~> 0.29.1"}|
     end
 
-    test "companion lock is 0.29.1" do
+    test "companion lock is 0.29.2" do
       lock = File.read!(@mix_lock)
-      assert lock =~ ~s|"flop": {:hex, :flop, "0.29.1"|
-      refute lock =~ ~s|"flop": {:hex, :flop, "0.29.0"|
+      assert lock =~ ~s|"flop": {:hex, :flop, "0.29.2"|
+      refute lock =~ ~s|"flop": {:hex, :flop, "0.29.1"|
+    end
+
+    test "does not ignore the patched flop advisory" do
+      mix_exs = File.read!(@mix_exs)
+
+      ignore =
+        mix_exs
+        |> String.split("ignore_advisories: [", parts: 2)
+        |> Enum.at(1)
+        |> String.split("]", parts: 2)
+        |> hd()
+
+      refute ignore =~ "EEF-CVE-2026-130411"
     end
 
     test "validate_and_run/3 and run/3 still exist" do
@@ -94,6 +113,37 @@ defmodule Ysc.FlopUpgradeTest do
       {:module, Flop.Cursor} = Code.ensure_loaded(Flop.Cursor)
       assert function_exported?(Flop.Cursor, :decode, 2)
       assert function_exported?(Flop.Cursor, :decode!, 2)
+    end
+  end
+
+  describe "0.29.2 changelog and cursor hardening" do
+    test "documents the struct-cursor security fix" do
+      changelog = File.read!(@changelog)
+
+      v0292 =
+        changelog
+        |> String.split("\n## ")
+        |> Enum.find(fn section ->
+          String.starts_with?(section, "0.29.2") or
+            String.starts_with?(section, "[0.29.2]")
+        end)
+
+      assert v0292
+      assert v0292 =~ "Reject cursors that contain a struct"
+      assert v0292 =~ "Reject cursors that contain an improper list"
+    end
+
+    test "decode rejects a cursor whose payload contains a struct" do
+      payload =
+        %{id: 1, inserted_at: %{__struct__: DateTime}}
+        |> :erlang.term_to_binary()
+        |> Base.url_encode64()
+
+      assert :error = Flop.Cursor.decode(payload)
+
+      assert_raise Flop.InvalidCursorError, fn ->
+        Flop.Cursor.decode!(payload)
+      end
     end
   end
 
