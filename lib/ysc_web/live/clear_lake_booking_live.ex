@@ -767,9 +767,10 @@ defmodule YscWeb.ClearLakeBookingLive do
                             @selected_booking_mode == :buyout && @availability_error &&
                               @checkin_date && @checkout_date
                           }
+                          id="entire-cabin-unavailable"
                           class="text-xs text-amber-600 mt-2 ml-9 font-medium"
                         >
-                          Entire cabin isn't available: Other members have already booked spots on these dates.
+                          {YscWeb.BookingUserMessages.clear_lake_entire_cabin_occupied()}
                         </p>
                       </label>
                     </div>

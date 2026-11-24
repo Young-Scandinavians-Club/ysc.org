@@ -3473,6 +3473,14 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       assert state.socket.assigns.form_errors.general ==
                "The cabin isn't available for those dates. Try different dates or book the entire cabin."
+
+      assert has_element?(
+               view,
+               "#entire-cabin-unavailable",
+               "shared cabin stays"
+             )
+
+      refute has_element?(view, "#entire-cabin-unavailable", "booked spots")
     end
 
     test "shows application-pending message when a pending-approval user attempts to book",
