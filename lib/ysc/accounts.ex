@@ -4076,6 +4076,19 @@ defmodule Ysc.Accounts do
     )
   end
 
+  # Member family-management page: name, email, relationship, and the
+  # board_position `remove_sub_account/2` needs for volunteer billing sync.
+  # Omits hashed_password, bios, Stripe ids, avatars, and contact extras.
+  @family_management_user_fields [
+    :id,
+    :first_name,
+    :last_name,
+    :email,
+    :family_relationship,
+    :primary_user_id,
+    :board_position
+  ]
+
   # Admin family / membership tabs: identity, contact, avatar, and the
   # columns `family_membership_host?/1` + remove-from-family need.
   # Omits hashed_password, bios, Stripe ids, and notification flags.
@@ -4117,6 +4130,43 @@ defmodule Ysc.Accounts do
       select: struct(u, ^@family_tab_user_fields),
       preload: [current_avatar: ^avatar_query],
       order_by: [asc_nulls_first: u.primary_user_id, asc: u.id]
+    )
+  end
+
+  @doc """
+  Household members for the member family-management page.
+
+  One SELECT of name, email, relationship, and board position — not the
+  full User row `get_user!/2` loads when preloading `:sub_accounts` /
+  `:primary_user`.
+  """
+  def list_family_management_household_users(%User{} = user) do
+    list_family_management_household_users_query(
+      user.primary_user_id || user.id
+    )
+    |> Repo.all()
+  end
+
+  defp list_family_management_household_users_query(primary_id) do
+    household_users_query(primary_id, @family_management_user_fields)
+  end
+
+  @doc """
+  Linked sub-accounts for the member family-management page.
+
+  Same column allowlist as `list_family_management_household_users/1`,
+  without re-selecting the primary holder.
+  """
+  def list_family_management_sub_accounts(%User{} = primary) do
+    list_family_management_sub_accounts_query(primary.id)
+    |> Repo.all()
+  end
+
+  defp list_family_management_sub_accounts_query(primary_id) do
+    from(u in User,
+      where: u.primary_user_id == ^primary_id,
+      select: struct(u, ^@family_management_user_fields),
+      order_by: [asc: u.id]
     )
   end
 
@@ -5847,6 +5897,20 @@ defmodule Ysc.Accounts do
   @doc false
   def ci_query_explain_list_family_tab_household_users_query do
     list_family_tab_household_users_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_family_management_household_users_query do
+    list_family_management_household_users_query(
+      Ysc.Ci.QueryExplain.Fixtures.user().id
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_family_management_sub_accounts_query do
+    list_family_management_sub_accounts_query(
       Ysc.Ci.QueryExplain.Fixtures.user().id
     )
   end
