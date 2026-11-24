@@ -205,12 +205,15 @@ defmodule Ysc.Tickets do
          booking_opts
        ) do
     case Repo.transaction(fn ->
-           lock_user_event_ticket_checkout!(user_id, event_id)
+           user = Keyword.fetch!(booking_opts, :user)
+
+           # Finding 103: lock the member row and the canonical mailbox so a
+           # guest checkout on the same address cannot race past max_per_buyer.
+           lock_buyer_event_ticket_checkout!(event_id, user_id, user.email)
 
            # Re-check max_per_buyer under the lock. The pre-lock validate in
            # create_ticket_order/4 can race a cash door grant that confirms
            # tickets without sharing this lock (#1856 leftover).
-           user = Keyword.fetch!(booking_opts, :user)
            ticket_tiers = selection_tier_attrs(ticket_selections, booking_opts)
 
            case validate_tier_purchase_limits(
@@ -261,6 +264,30 @@ defmodule Ysc.Tickets do
       @checkout_advisory_lock_namespace,
       :erlang.phash2({user_id, event_id}, 2_147_483_647)
     ])
+  end
+
+  @doc """
+  Serializes member checkout, guest checkout, and cash door grants that share
+  a mailbox (Finding 103).
+
+  Always lock `user_id` first when present, then the canonical guest-email
+  key, so member and guest paths take the same locks in the same order.
+  """
+  def lock_buyer_event_ticket_checkout!(event_id, user_id, email) do
+    if user_id do
+      lock_user_event_ticket_checkout!(user_id, event_id)
+    end
+
+    case email do
+      email when is_binary(email) and email != "" ->
+        lock_user_event_ticket_checkout!(
+          {:guest, Ysc.Accounts.Email.normalize(email)},
+          event_id
+        )
+
+      _ ->
+        :ok
+    end
   end
 
   @doc """
@@ -3453,6 +3480,9 @@ defmodule Ysc.Tickets do
   already hold (confirmed) for the tier plus the selected quantity may not
   exceed the limit.
 
+  Finding 103: guest checkout on the same canonical mailbox counts toward
+  the same cap, including unexpired guest holds.
+
   The owned-ticket COUNT only runs when a selected tier actually has a limit.
   See `Ysc.Events.TierPurchaseLimits`. Used by web/card checkout and by
   in-person cash/check door sales; complimentary admin grants skip this on
@@ -3466,13 +3496,12 @@ defmodule Ysc.Tickets do
       ) do
     if TierPurchaseLimits.any_limited?(ticket_tiers) do
       owned_by_tier =
-        user.id
-        |> owned_tickets_by_tier_query(
+        owned_tickets_by_tier(
+          user.id,
           event_id,
-          TierPurchaseLimits.limited_tier_ids(ticket_tiers)
+          TierPurchaseLimits.limited_tier_ids(ticket_tiers),
+          email: user.email
         )
-        |> Repo.all()
-        |> Map.new()
 
       TierPurchaseLimits.validate_selection(
         ticket_selections,
@@ -3484,11 +3513,93 @@ defmodule Ysc.Tickets do
     end
   end
 
-  defp owned_tickets_by_tier_query(user_id, event_id, tier_ids) do
+  # Finding 103: count confirmed tickets on this account plus guest orders
+  # (confirmed or still-held) for the same canonical mailbox. Member pending
+  # carts are superseded by `prepare_new_checkout_session/2`, so they are
+  # excluded here — counting them would block a second tab from replacing the
+  # first cart. Pass `include_user_pending: true` from guest checkout so a
+  # member's in-flight cart still consumes the limit.
+  @doc false
+  def owned_tickets_by_tier(user_id, event_id, tier_ids, opts \\ []) do
+    user_id
+    |> owned_tickets_by_tier_query(event_id, tier_ids, opts)
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  defp owned_tickets_by_tier_query(user_id, event_id, tier_ids, opts) do
+    now = Keyword.get(opts, :now, DateTime.utc_now())
+    include_user_pending? = Keyword.get(opts, :include_user_pending, false)
+
+    email =
+      case Keyword.get(opts, :email) do
+        email when is_binary(email) and email != "" ->
+          Ysc.Accounts.Email.normalize(email)
+
+        _ ->
+          nil
+      end
+
+    pending_hold =
+      dynamic(
+        [t, o],
+        t.status == :pending and o.status == :pending and o.expires_at > ^now
+      )
+
+    user_clause =
+      cond do
+        is_nil(user_id) ->
+          dynamic([_t, _o], false)
+
+        include_user_pending? ->
+          dynamic(
+            [t, o],
+            t.user_id == ^user_id and
+              (t.status == :confirmed or ^pending_hold)
+          )
+
+        true ->
+          dynamic([t, _o], t.user_id == ^user_id and t.status == :confirmed)
+      end
+
+    guest_clause =
+      if email do
+        # Keep in sync with `Ysc.Accounts.Email.normalize/1` and
+        # `Ysc.Accounts.User`'s Gmail alias query: strip Gmail dots then
+        # plus-tags and map googlemail.com → gmail.com.
+        dynamic(
+          [t, o],
+          not is_nil(o.guest_email) and
+            fragment(
+              """
+              CASE
+                WHEN split_part(lower((?)::text), '@', 2) IN ('gmail.com', 'googlemail.com') THEN
+                  split_part(
+                    regexp_replace(split_part(lower((?)::text), '@', 1), '[.]', '', 'g'),
+                    '+',
+                    1
+                  ) || '@gmail.com'
+                ELSE
+                  lower((?)::text)
+              END
+              """,
+              o.guest_email,
+              o.guest_email,
+              o.guest_email
+            ) == ^email and
+            (t.status == :confirmed or ^pending_hold)
+        )
+      else
+        dynamic([_t, _o], false)
+      end
+
+    buyer_clause = dynamic([t, o], ^user_clause or ^guest_clause)
+
     from(t in Ticket,
-      where:
-        t.user_id == ^user_id and t.event_id == ^event_id and
-          t.status == :confirmed and t.ticket_tier_id in ^tier_ids,
+      join: o in TicketOrder,
+      on: o.id == t.ticket_order_id,
+      where: t.event_id == ^event_id and t.ticket_tier_id in ^tier_ids,
+      where: ^buyer_clause,
       group_by: t.ticket_tier_id,
       select: {t.ticket_tier_id, count(t.id)}
     )
@@ -4324,7 +4435,11 @@ defmodule Ysc.Tickets do
   @doc false
   def ci_query_explain_owned_tickets_by_tier_query do
     ulid = Ysc.Ci.QueryExplain.Fixtures.ulid()
-    owned_tickets_by_tier_query(ulid, ulid, [ulid])
+
+    owned_tickets_by_tier_query(ulid, ulid, [ulid],
+      email: Ysc.Ci.QueryExplain.Fixtures.email(),
+      now: Ysc.Ci.QueryExplain.Fixtures.now()
+    )
   end
 
   @doc false

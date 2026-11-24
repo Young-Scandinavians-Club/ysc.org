@@ -40,4 +40,12 @@ defmodule Ysc.Tickets.TicketOrderGuestTest do
   test "normalize_email trims and lowercases" do
     assert TicketOrder.normalize_email("  A@B.Com ") == "a@b.com"
   end
+
+  test "normalize_email canonicalizes Gmail dots, plus-tags, and googlemail" do
+    assert TicketOrder.normalize_email("Jane.Doe+tag@Googlemail.com") ==
+             "janedoe@gmail.com"
+
+    assert TicketOrder.normalize_email("jane.doe@gmail.com") ==
+             "janedoe@gmail.com"
+  end
 end

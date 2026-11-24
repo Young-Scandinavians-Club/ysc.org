@@ -99,6 +99,25 @@ defmodule Ysc.Tickets.GuestCheckoutTest do
     }
   end
 
+  defp confirm_guest_order!(order) do
+    Repo.update_all(from(t in Ticket, where: t.ticket_order_id == ^order.id),
+      set: [status: :confirmed]
+    )
+
+    Repo.update_all(from(o in TicketOrder, where: o.id == ^order.id),
+      set: [status: :completed]
+    )
+  end
+
+  defp member_with_email(email) do
+    user_fixture(%{email: email})
+    |> Ecto.Changeset.change(
+      lifetime_membership_awarded_at:
+        DateTime.truncate(DateTime.utc_now(), :second)
+    )
+    |> Repo.update!()
+  end
+
   defp cancel_timeout_jobs!(order_id) do
     from(j in Oban.Job,
       where: j.worker == "Ysc.Tickets.TimeoutWorker",
@@ -276,6 +295,116 @@ defmodule Ysc.Tickets.GuestCheckoutTest do
 
       assert {:ok, _} =
                GuestCheckout.create_order(@guest, event.id, %{tier.id => 2})
+    end
+
+    test "Finding 103: Gmail plus-tags and googlemail share max_per_buyer", %{
+      event: event,
+      limited_tier: tier
+    } do
+      local = "f103#{System.unique_integer([:positive])}"
+
+      {:ok, order} =
+        GuestCheckout.create_order(
+          %{@guest | email: "#{local}+one@gmail.com"},
+          event.id,
+          %{tier.id => 2}
+        )
+
+      assert order.guest_email == "#{local}@gmail.com"
+      confirm_guest_order!(order)
+
+      assert {:error, :tier_purchase_limit_exceeded} =
+               GuestCheckout.create_order(
+                 %{@guest | email: "#{local}+two@googlemail.com"},
+                 event.id,
+                 %{tier.id => 1}
+               )
+    end
+
+    test "Finding 103: confirmed member tickets consume the guest cap", %{
+      event: event,
+      limited_tier: tier
+    } do
+      email = "member-#{System.unique_integer([:positive])}@example.com"
+      member = member_with_email(email)
+
+      {:ok, order} =
+        Tickets.create_ticket_order(member.id, event.id, %{tier.id => 2})
+
+      confirm_guest_order!(order)
+
+      assert {:error, :tier_purchase_limit_exceeded} =
+               GuestCheckout.create_order(
+                 %{@guest | email: email},
+                 event.id,
+                 %{tier.id => 1}
+               )
+    end
+
+    test "Finding 103: a member pending cart consumes the guest cap", %{
+      event: event,
+      limited_tier: tier
+    } do
+      email = "pending-#{System.unique_integer([:positive])}@example.com"
+      member = member_with_email(email)
+
+      {:ok, order} =
+        Tickets.create_ticket_order(member.id, event.id, %{tier.id => 2})
+
+      assert order.status == :pending
+
+      assert {:error, :tier_purchase_limit_exceeded} =
+               GuestCheckout.create_order(
+                 %{@guest | email: email},
+                 event.id,
+                 %{tier.id => 1}
+               )
+    end
+
+    test "Finding 103: Gmail plus-tags share the open-holds cap", %{
+      event: event,
+      public_tier: tier
+    } do
+      local = "holds#{System.unique_integer([:positive])}"
+
+      for tag <- ["one", "two", "three"] do
+        assert {:ok, _} =
+                 GuestCheckout.create_order(
+                   %{@guest | email: "#{local}+#{tag}@gmail.com"},
+                   event.id,
+                   %{tier.id => 1}
+                 )
+      end
+
+      assert {:error, :too_many_open_holds} =
+               GuestCheckout.create_order(
+                 %{@guest | email: "#{local}+four@gmail.com"},
+                 event.id,
+                 %{tier.id => 1}
+               )
+    end
+
+    test "non-Gmail dotted aliases are distinct mailboxes", %{
+      event: event,
+      limited_tier: tier
+    } do
+      n = System.unique_integer([:positive])
+
+      {:ok, order} =
+        GuestCheckout.create_order(
+          %{@guest | email: "buyer.#{n}@example.com"},
+          event.id,
+          %{tier.id => 2}
+        )
+
+      confirm_guest_order!(order)
+
+      assert {:ok, _} =
+               GuestCheckout.create_order(
+                 %{@guest | email: "buyer#{n}@example.com"},
+                 event.id,
+                 %{tier.id => 2}
+               )
     end
 
     test "ci_query_explain_owned_by_tier_query/0 builds an Ecto.Query" do

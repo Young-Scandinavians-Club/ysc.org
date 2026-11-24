@@ -13,6 +13,8 @@ defmodule Ysc.Tickets.GuestCheckout do
   """
   import Ecto.Query
 
+  alias Ysc.Accounts
+  alias Ysc.Accounts.Email
   alias Ysc.Events.TicketTier
   alias Ysc.Events.TierAudience
   alias Ysc.Events.TierPurchaseLimits
@@ -156,14 +158,24 @@ defmodule Ysc.Tickets.GuestCheckout do
   defp create_locked(guest, event_id, ticket_selections, tiers) do
     result =
       Repo.transaction(fn ->
-        lock_guest_event!(guest.email, event_id)
+        # Finding 103: a member account on this mailbox must share the lock
+        # and the max_per_buyer count with this guest checkout.
+        member = Accounts.get_user_by_email(guest.email)
+        member_id = member && member.id
+
+        Tickets.lock_buyer_event_ticket_checkout!(
+          event_id,
+          member_id,
+          guest.email
+        )
 
         with :ok <-
                validate_guest_limits(
                  guest.email,
                  event_id,
                  ticket_selections,
-                 tiers
+                 tiers,
+                 member_id
                ),
              :ok <- validate_open_holds(guest.email, event_id),
              {:ok, order} <-
@@ -187,16 +199,18 @@ defmodule Ysc.Tickets.GuestCheckout do
     end
   end
 
-  # One checkout at a time per (email, event), mirroring the member lock.
-  defp lock_guest_event!(email, event_id) do
-    Tickets.lock_user_event_ticket_checkout!({:guest, email}, event_id)
-  end
-
-  # `max_per_buyer` applies per guest email. Count confirmed tickets *and*
-  # tickets still held on an unexpired pending order: a new checkout never
-  # cancels another hold for this address (email is not identity), so counting
-  # only confirmed would let two payment tabs both complete past the limit.
-  defp validate_guest_limits(email, event_id, ticket_selections, tiers) do
+  # `max_per_buyer` is per mailbox, not per checkout path. Count confirmed
+  # member tickets, member pending carts, and guest confirmed/held tickets
+  # for the same canonical address (Finding 103). Guest checkout never
+  # cancels another hold, so pending guest orders must count or two payment
+  # tabs could both complete past the limit.
+  defp validate_guest_limits(
+         email,
+         event_id,
+         ticket_selections,
+         tiers,
+         member_id
+       ) do
     attrs =
       Enum.map(tiers, fn tier ->
         %{
@@ -208,34 +222,18 @@ defmodule Ysc.Tickets.GuestCheckout do
 
     if TierPurchaseLimits.any_limited?(attrs) do
       owned =
-        email
-        |> owned_by_tier_query(
+        Tickets.owned_tickets_by_tier(
+          member_id,
           event_id,
           TierPurchaseLimits.limited_tier_ids(attrs),
-          DateTime.utc_now()
+          email: email,
+          include_user_pending: true
         )
-        |> Repo.all()
-        |> Map.new()
 
       TierPurchaseLimits.validate_selection(ticket_selections, attrs, owned)
     else
       :ok
     end
-  end
-
-  defp owned_by_tier_query(email, event_id, tier_ids, now) do
-    from(t in Ysc.Events.Ticket,
-      join: o in TicketOrder,
-      on: o.id == t.ticket_order_id,
-      where:
-        o.guest_email == ^email and t.event_id == ^event_id and
-          t.ticket_tier_id in ^tier_ids and
-          (t.status == :confirmed or
-             (t.status == :pending and o.status == :pending and
-                o.expires_at > ^now)),
-      group_by: t.ticket_tier_id,
-      select: {t.ticket_tier_id, count(t.id)}
-    )
   end
 
   # An email address is typed by the visitor and proves nothing, so it never
@@ -246,12 +244,13 @@ defmodule Ysc.Tickets.GuestCheckout do
 
   defp validate_open_holds(email, event_id) do
     now = DateTime.utc_now()
+    canonical = Email.normalize(email)
 
     open =
       Repo.aggregate(
         from(o in TicketOrder,
           where:
-            o.guest_email == ^email and o.event_id == ^event_id and
+            o.guest_email == ^canonical and o.event_id == ^event_id and
               o.status == :pending and o.expires_at > ^now
         ),
         :count
@@ -262,11 +261,6 @@ defmodule Ysc.Tickets.GuestCheckout do
 
   @doc false
   def ci_query_explain_owned_by_tier_query do
-    owned_by_tier_query(
-      Ysc.Ci.QueryExplain.Fixtures.email(),
-      Ysc.Ci.QueryExplain.Fixtures.ulid(),
-      [Ysc.Ci.QueryExplain.Fixtures.ulid()],
-      Ysc.Ci.QueryExplain.Fixtures.now()
-    )
+    Tickets.ci_query_explain_owned_tickets_by_tier_query()
   end
 end

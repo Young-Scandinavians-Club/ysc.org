@@ -4368,6 +4368,39 @@ defmodule Ysc.TicketsTest do
                Tickets.create_ticket_order(other.id, event.id, %{guest.id => 1})
     end
 
+    test "Finding 103: confirmed guest tickets on the same mailbox consume the member limit",
+         %{
+           user: user,
+           event: event
+         } do
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Public limited",
+          type: :paid,
+          price: Money.new(30, :USD),
+          quantity: 50,
+          max_per_buyer: 1,
+          sale_audience: :public,
+          event_id: event.id
+        })
+
+      {:ok, order} =
+        Ysc.Tickets.GuestCheckout.create_order(
+          %{
+            email: user.email,
+            first_name: "Gus",
+            last_name: "Buyer"
+          },
+          event.id,
+          %{tier.id => 1}
+        )
+
+      confirm_order_tickets!(order)
+
+      assert {:error, :tier_purchase_limit_exceeded} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+    end
+
     test "tiers without a limit are never restricted", %{
       user: user,
       event: event,
