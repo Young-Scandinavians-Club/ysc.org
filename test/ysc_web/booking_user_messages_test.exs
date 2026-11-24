@@ -46,6 +46,15 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.modification_forfeiture_acknowledgment() =~
              "non-refundable"
+
+    assert BookingUserMessages.modification_amount_due_label(true) ==
+             "Amount due now"
+
+    assert BookingUserMessages.modification_amount_due_label(false) ==
+             "Nothing extra to pay"
+
+    refute BookingUserMessages.modification_amount_due_label(false) =~
+             "Amount due"
   end
 
   test "plain-language booking flow copy" do
