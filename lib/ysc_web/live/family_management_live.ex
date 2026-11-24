@@ -48,35 +48,9 @@ defmodule YscWeb.FamilyManagementLive do
 
     socket =
       if socket.assigns.is_sub_account do
-        user = Accounts.get_user!(user.id, primary_user: :sub_accounts)
-        primary_user = user.primary_user
-
-        other_family_members =
-          if primary_user do
-            (primary_user.sub_accounts || [])
-            |> then(fn members -> [primary_user | members] end)
-            |> Enum.reject(&(&1.id == primary_user.id))
-          else
-            []
-          end
-
-        socket
-        |> assign(:user, user)
-        |> assign(:primary_user, primary_user)
-        |> assign(:other_family_members, other_family_members)
+        assign_sub_account_family(socket, user)
       else
-        user =
-          Accounts.get_user!(user.id, [
-            :sub_accounts,
-            :family_members
-          ])
-
-        socket
-        |> assign(:user, user)
-        |> assign(:sub_accounts, Accounts.get_sub_accounts(user))
-        |> assign(:invites, FamilyInvites.list_invites(user))
-        |> assign(:family_members, user.family_members || [])
-        |> assign(:can_send_invite, Accounts.can_send_family_invite?(user))
+        assign_primary_family(socket, user)
       end
 
     {:noreply, assign(socket, :loading_family_data, false)}
@@ -206,12 +180,9 @@ defmodule YscWeb.FamilyManagementLive do
       {:ok, validated_params} ->
         case FamilyMembers.upsert_family_member(user, validated_params) do
           {:ok, _member} ->
-            user = Accounts.get_user!(user.id, [:family_members])
-
             {:noreply,
              socket
-             |> assign(:user, user)
-             |> assign(:family_members, user.family_members || [])
+             |> reload_family_members()
              |> assign(:family_member_form, nil)
              |> YscWeb.Flash.put_toast(:info, "Family member saved.",
                title: "Family"
@@ -243,12 +214,9 @@ defmodule YscWeb.FamilyManagementLive do
       %FamilyMember{} = member ->
         case FamilyMembers.delete_family_member(user, member) do
           {:ok, _} ->
-            user = Accounts.get_user!(user.id, [:family_members])
-
             {:noreply,
              socket
-             |> assign(:user, user)
-             |> assign(:family_members, user.family_members || [])
+             |> reload_family_members()
              |> assign(:family_member_form, nil)
              |> YscWeb.Flash.put_toast(:info, "Family member removed.",
                title: "Family"
@@ -314,16 +282,21 @@ defmodule YscWeb.FamilyManagementLive do
 
   def handle_event("remove_sub_account", %{"user_id" => user_id}, socket) do
     user = socket.assigns.current_user
-    sub_account = Accounts.get_user(user_id)
+
+    sub_account =
+      Enum.find(socket.assigns.sub_accounts, fn member ->
+        to_string(member.id) == to_string(user_id)
+      end) || Accounts.get_user(user_id)
 
     if sub_account && sub_account.primary_user_id == user.id do
       case Accounts.remove_sub_account(sub_account, user) do
         {:ok, _} ->
-          sub_accounts = Accounts.get_sub_accounts(user)
-
           {:noreply,
            socket
-           |> assign(:sub_accounts, sub_accounts)
+           |> assign(
+             :sub_accounts,
+             Accounts.list_family_management_sub_accounts(user)
+           )
            |> YscWeb.Flash.put_toast(
              :info,
              "Family member removed successfully.",
@@ -1040,6 +1013,44 @@ defmodule YscWeb.FamilyManagementLive do
       end)
 
     linked_rows ++ roster_rows
+  end
+
+  defp assign_sub_account_family(socket, user) do
+    household = Accounts.list_family_management_household_users(user)
+    primary_user = Enum.find(household, &is_nil(&1.primary_user_id))
+
+    other_family_members =
+      if primary_user do
+        Enum.reject(household, &(&1.id == primary_user.id))
+      else
+        []
+      end
+
+    socket
+    |> assign(:user, %{user | primary_user: primary_user})
+    |> assign(:primary_user, primary_user)
+    |> assign(:other_family_members, other_family_members)
+  end
+
+  defp assign_primary_family(socket, user) do
+    family_members = FamilyMembers.list_for_user(user)
+    user = %{user | family_members: family_members}
+
+    socket
+    |> assign(:user, user)
+    |> assign(:sub_accounts, Accounts.list_family_management_sub_accounts(user))
+    |> assign(:invites, FamilyInvites.list_invites(user))
+    |> assign(:family_members, family_members)
+    |> assign(:can_send_invite, Accounts.can_send_family_invite?(user))
+  end
+
+  defp reload_family_members(socket) do
+    user = socket.assigns.user
+    family_members = FamilyMembers.list_by_user_id(user.id)
+
+    socket
+    |> assign(:user, %{user | family_members: family_members})
+    |> assign(:family_members, family_members)
   end
 
   defp empty_invite_form do

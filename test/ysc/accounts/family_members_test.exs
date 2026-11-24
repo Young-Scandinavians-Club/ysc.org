@@ -136,6 +136,55 @@ defmodule Ysc.Accounts.FamilyMembersTest do
       assert found.id == member.id
     end
 
+    test "list_for_user queries by user_id when the association is not loaded" do
+      user = user_fixture()
+
+      member =
+        %FamilyMember{}
+        |> FamilyMember.family_member_changeset(%{
+          first_name: "B",
+          last_name: "Two",
+          type: :spouse
+        })
+        |> Ecto.Changeset.put_change(:user_id, user.id)
+        |> Repo.insert!()
+
+      assert [found] = FamilyMembers.list_for_user(user)
+      assert found.id == member.id
+    end
+
+    test "ci_query_explain_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} = FamilyMembers.ci_query_explain_query()
+    end
+
+    test "list_by_user_id returns roster rows for that user" do
+      user = user_fixture()
+      other = user_fixture()
+
+      member =
+        %FamilyMember{}
+        |> FamilyMember.family_member_changeset(%{
+          first_name: "C",
+          last_name: "Three",
+          type: :child
+        })
+        |> Ecto.Changeset.put_change(:user_id, user.id)
+        |> Repo.insert!()
+
+      _other_member =
+        %FamilyMember{}
+        |> FamilyMember.family_member_changeset(%{
+          first_name: "D",
+          last_name: "Four",
+          type: :child
+        })
+        |> Ecto.Changeset.put_change(:user_id, other.id)
+        |> Repo.insert!()
+
+      assert [found] = FamilyMembers.list_by_user_id(user.id)
+      assert found.id == member.id
+    end
+
     test "find_by_id returns nil for blank ids" do
       user = user_fixture()
       refute FamilyMembers.find_by_id(user, nil)
