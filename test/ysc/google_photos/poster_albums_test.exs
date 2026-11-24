@@ -130,17 +130,17 @@ defmodule Ysc.GooglePhotos.PosterAlbumsTest do
           event
         end)
 
-      {loaded, body_cols} =
+      # Count both patterns on the same call. A second list_tv_poster_events/0
+      # hits EventPricingCache when a parallel async test has enabled process
+      # caches, so the batched ticket_tiers query is skipped and
+      # `assert tier_selects == 1` flakes at 0.
+      {loaded, counts} =
         Ysc.QueryCounter.with_query_counter(
           fn -> Ysc.Events.list_tv_poster_events() end,
-          pattern: ~r/raw_details|rendered_details/i,
-          caller_pids: [self()]
-        )
-
-      {_loaded, tier_selects} =
-        Ysc.QueryCounter.with_query_counter(
-          fn -> Ysc.Events.list_tv_poster_events() end,
-          pattern: ~r/FROM "ticket_tiers"/i,
+          patterns: [
+            body: ~r/raw_details|rendered_details/i,
+            tiers: ~r/FROM "ticket_tiers"/i
+          ],
           caller_pids: [self()]
         )
 
@@ -151,8 +151,8 @@ defmodule Ysc.GooglePhotos.PosterAlbumsTest do
       assert Enum.all?(loaded, &is_nil(&1.raw_details))
       assert Enum.all?(loaded, &is_nil(&1.rendered_details))
       assert Enum.all?(loaded, &is_map(&1.pricing_info))
-      assert body_cols == 0
-      assert tier_selects == 1
+      assert counts[:body] == 0
+      assert counts[:tiers] == 1
     end
   end
 

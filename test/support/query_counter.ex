@@ -5,15 +5,23 @@ defmodule Ysc.QueryCounter do
   Pass `caller_pids: [self()]` to ignore queries from other processes during
   parallel CI runs. After `live/2`, call `track_caller_pid/1` to also count
   the connected LiveView process.
+
+  Pass `patterns:` with a keyword of named regexes to count several patterns
+  in one invocation. That is required when a second call would hit a process
+  cache (or skip work) and under-count.
   """
 
   def with_query_counter(fun, opts \\ []) when is_function(fun, 0) do
     # Serialize query counting across the suite. Telemetry handlers are global,
     # so parallel async tests can otherwise pollute counts.
     :global.trans({:ysc, :query_counter}, fn ->
-      pattern = Keyword.get(opts, :pattern, ~r/SELECT/)
+      {named_patterns, single?} = named_patterns(opts)
       caller_pids = Keyword.get(opts, :caller_pids)
-      ref = :atomics.new(1, [])
+
+      refs =
+        Map.new(named_patterns, fn {name, _regex} ->
+          {name, :atomics.new(1, [])}
+        end)
 
       allowed_pids =
         case caller_pids do
@@ -32,12 +40,14 @@ defmodule Ysc.QueryCounter do
           if query_counted?(config.pid_tracker, self()) do
             query = metadata |> Map.get(:query, "") |> IO.iodata_to_binary()
 
-            if Regex.match?(config.pattern, query) do
-              :atomics.add(config.ref, 1, 1)
-            end
+            Enum.each(config.patterns, fn {name, pattern} ->
+              if Regex.match?(pattern, query) do
+                :atomics.add(Map.fetch!(config.refs, name), 1, 1)
+              end
+            end)
           end
         end,
-        %{pattern: pattern, pid_tracker: pid_tracker, ref: ref}
+        %{patterns: named_patterns, pid_tracker: pid_tracker, refs: refs}
       )
 
       previous_tracker =
@@ -45,8 +55,15 @@ defmodule Ysc.QueryCounter do
 
       try do
         result = fun.()
-        count = :atomics.get(ref, 1)
-        {result, count}
+
+        counts =
+          Map.new(refs, fn {name, ref} -> {name, :atomics.get(ref, 1)} end)
+
+        if single? do
+          {result, Map.fetch!(counts, :count)}
+        else
+          {result, counts}
+        end
       after
         :telemetry.detach(handler_id)
 
@@ -76,6 +93,16 @@ defmodule Ysc.QueryCounter do
           :all -> :all
           allowed -> MapSet.put(allowed, pid)
         end)
+    end
+  end
+
+  defp named_patterns(opts) do
+    case Keyword.get(opts, :patterns) do
+      nil ->
+        {[{:count, Keyword.get(opts, :pattern, ~r/SELECT/)}], true}
+
+      patterns when is_list(patterns) ->
+        {patterns, false}
     end
   end
 
