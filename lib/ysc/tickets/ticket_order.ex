@@ -9,6 +9,7 @@ defmodule Ysc.Tickets.TicketOrder do
   use Flop.Schema
   import Ecto.Changeset
 
+  alias Ysc.Accounts.Email
   alias Ysc.ReferenceGenerator
 
   @reference_prefix "ORD"
@@ -107,8 +108,8 @@ defmodule Ysc.Tickets.TicketOrder do
 
   @doc """
   Creates a changeset for a guest order: no account, identified by name and
-  email. The email is normalized (trimmed, lowercased) so per-buyer checks and
-  receipts agree on it.
+  email. The email is canonicalized (`Ysc.Accounts.Email.normalize/1`) so
+  per-buyer checks and receipts agree on Gmail aliases too.
   """
   def guest_create_changeset(ticket_order, attrs) do
     ticket_order
@@ -147,9 +148,13 @@ defmodule Ysc.Tickets.TicketOrder do
     |> check_constraint(:guest_email, name: :ticket_orders_buyer_present)
   end
 
-  @doc "Trims and downcases an email address."
-  def normalize_email(email) when is_binary(email),
-    do: email |> String.trim() |> String.downcase()
+  @doc """
+  Canonical mailbox for guest checkout.
+
+  Finding 103: Gmail dots, plus-tags, and googlemail.com must collapse to the
+  same address so `max_per_buyer` cannot be bypassed with `name+1@gmail.com`.
+  """
+  def normalize_email(email) when is_binary(email), do: Email.normalize(email)
 
   def normalize_email(email), do: email
 

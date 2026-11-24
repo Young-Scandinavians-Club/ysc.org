@@ -346,7 +346,7 @@ defmodule Ysc.Tickets.AdminGrants do
       # Same lock as create_ticket_order/4 so a cash door sale and an online
       # checkout for the same member/event cannot both pass a stale
       # max_per_buyer check (#1856 leftover).
-      Tickets.lock_user_event_ticket_checkout!(user.id, event.id)
+      Tickets.lock_buyer_event_ticket_checkout!(event.id, user.id, user.email)
 
       order_attrs =
         %{

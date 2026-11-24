@@ -96,6 +96,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 99 (MEDIUM)   Volunteer door-sale `POST /api/v1/app/events/:id/tickets/payment_intent` accepted unbounded `tiers` quantities while `bypass_guards: true` skipped capacity. Pending tickets count as sold, so one JSON body could insert unbounded ticket rows and lock the event until the 5-minute timeout (repeatable).
   Finding 100 (MEDIUM)  Event photo direct-to-S3 presign used LiveView's 20 GB video cap for every file (including photos) and public-read ACL. A ticket holder could POST a multi-GB `.jpg` before `Limits.validate_upload/2` ran; cancel/abandon never deleted the object, so untrusted bytes stayed on the club CDN. S3 policy is now per-type, unsupported names are not presigned, cancel deletes the object, and the worker HEADs Content-Length before downloading.
   Finding 101 (MEDIUM)  Add-to-calendar passed volunteer-controlled event `title` / `location_name` into the web component unchanged. The vendor iCal escape does not strip CR/LF, so a title containing a newline could inject extra ICS properties into the `.ics` attendees download from the public event page.
+  Finding 103 (MEDIUM)  Guest checkout counted `max_per_buyer` only by trimmed `guest_email`, while member checkout counted `user_id` confirmed tickets under a different advisory lock. The same mailbox could buy the cap twice (member then guest) and Gmail plus-tags / googlemail.com were distinct guest identities. Limits and locks now share the canonical mailbox.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -7273,6 +7274,18 @@ defmodule YscWeb.SecurityAuditTest do
       assert Ysc.Events.AddToCalendar.text("  Midsummer  ") == "Midsummer"
       assert Ysc.Events.AddToCalendar.text("\n\t") == nil
       assert Ysc.Events.AddToCalendar.text(nil) == nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 103 (MEDIUM): guest vs member max_per_buyer identity split
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 103: max_per_buyer is per canonical mailbox" do
+    test "Gmail plus-tags cannot buy past the guest cap" do
+      assert Ysc.Tickets.TicketOrder.normalize_email(
+               "Jane.Doe+event@Googlemail.com"
+             ) == "janedoe@gmail.com"
     end
   end
 end
