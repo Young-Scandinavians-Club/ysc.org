@@ -284,6 +284,8 @@ defmodule YscWeb.AdminMerchOrdersLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/admin/merch/orders/#{order.id}")
 
+      assert has_element?(view, "#back-to-orders", "All orders")
+      assert has_element?(view, ~s(#back-to-orders[href="/admin/merch/orders"]))
       assert html =~ "Lars Nilsson"
       assert has_element?(view, "#order-why", "Happy hour giveaway")
       assert has_element?(view, "#order-event-link", event.title)

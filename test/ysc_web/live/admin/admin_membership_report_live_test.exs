@@ -50,6 +50,13 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
       default_to = Date.to_iso8601(today)
 
       assert has_element?(view, "h1", "Membership Report")
+      assert has_element?(view, "#membership-report-back", "Memberships")
+
+      assert has_element?(
+               view,
+               ~s(#membership-report-back[href="/admin/memberships"])
+             )
+
       assert has_element?(view, "#membership-report-form")
       assert has_element?(view, ~s(#date_from[value="#{default_from}"]))
       assert has_element?(view, ~s(#date_to[value="#{default_to}"]))

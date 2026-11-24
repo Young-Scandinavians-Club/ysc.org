@@ -69,6 +69,18 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       {:ok, view, html} = live(conn, ~p"/admin/newsletters/new")
 
       assert html =~ "Newsletter"
+
+      assert has_element?(
+               view,
+               "#newsletter-editor-back",
+               "Back to Newsletters"
+             )
+
+      assert has_element?(
+               view,
+               ~s(#newsletter-editor-back[href="/admin/newsletters"])
+             )
+
       assert has_element?(view, "#newsletter-editor-form")
       assert has_element?(view, "#newsletter-editor-autosave-status")
       assert has_element?(view, "#newsletter-cover-card")

@@ -144,12 +144,13 @@ defmodule YscWeb.NewsletterArchiveLive do
     <div class="py-6 md:py-10">
       <div class="max-w-(--breakpoint-lg) mx-auto px-4 mb-6">
         <div class="flex items-center justify-between">
-          <.link
+          <.back
+            id="newsletter-archive-back"
             navigate={~p"/newsletters"}
-            class="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 transition-colors"
+            variant={:inline}
           >
-            <.icon name="hero-arrow-left" class="w-4 h-4" /> All newsletters
-          </.link>
+            All newsletters
+          </.back>
 
           <.button
             :if={@async_data_loaded && @edition && @edition.archived_html}

@@ -174,6 +174,49 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "back/1" do
+    test "renders the padded button variant by default" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.back navigate="/posts">Back to posts</.back>
+        """)
+
+      assert html =~ ~s(href="/posts")
+      assert html =~ "Back to posts"
+      assert html =~ "hero-arrow-left-solid"
+      assert html =~ "hover:bg-zinc-100"
+      refute html =~ "hero-arrow-left "
+    end
+
+    test "renders the inline variant used above page titles" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.back
+          id="membership-report-back"
+          navigate="/admin/memberships"
+          variant={:inline}
+          class="mb-2"
+        >
+          Memberships
+        </.back>
+        """)
+
+      assert html =~ ~s(id="membership-report-back")
+      assert html =~ ~s(href="/admin/memberships")
+      assert html =~ "Memberships"
+      assert html =~ "hero-arrow-left"
+      assert html =~ "inline-flex items-center gap-1"
+      assert html =~ "text-zinc-500"
+      assert html =~ "mb-2"
+      refute html =~ "hero-arrow-left-solid"
+      refute html =~ "hover:bg-zinc-100"
+    end
+  end
+
   describe "upload_entry_preview/1" do
     defp upload_preview_entry(attrs \\ []) do
       struct!(
