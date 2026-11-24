@@ -150,9 +150,13 @@ defmodule YscWeb.AdminMerchOrdersLiveTest do
       assert has_element?(view, "#orders-count", "1 order match")
       assert has_element?(view, "#orders-search-input[value='sticker fan']")
 
-      # The chips carry the search with them.
+      # The chips carry the search with them. Query-param order from ~p
+      # map interpolation is not stable, so match each param.
       view |> element("#orders-filter-club_paid") |> render_click()
-      assert_patch(view, ~p"/admin/merch/orders?filter=club_paid&q=sticker+fan")
+      path = assert_patch(view)
+      assert path =~ ~r{^/admin/merch/orders\?}
+      assert path =~ "filter=club_paid"
+      assert path =~ "q=sticker+fan"
       assert has_element?(view, "#admin_merch_orders_list-row-#{stickers.id}")
     end
 
