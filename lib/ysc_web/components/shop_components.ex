@@ -143,6 +143,9 @@ defmodule YscWeb.ShopComponents do
   Centered empty-state panel for shop pages with nothing to show.
 
   Pass `browse_id` to include the standard "Browse the shop" button.
+  Pass `icon={nil}` to omit the bag icon (a color filter with no matches).
+  Use the `:actions` slot for a custom button; it is skipped when `browse_id`
+  is set.
 
   ## Examples
 
@@ -157,21 +160,43 @@ defmodule YscWeb.ShopComponents do
       >
         Find something you like in the shop.
       </.shop_empty_state>
+
+      <.shop_empty_state
+        id="shop-no-matches"
+        title="Nothing in that color"
+        icon={nil}
+        class="mt-8"
+      >
+        Try a different color, or see everything.
+        <:actions>
+          <.link patch={~p"/shop"} id="shop-no-matches-clear">Clear all</.link>
+        </:actions>
+      </.shop_empty_state>
   """
   attr :id, :string, required: true
   attr :title, :string, required: true
-  attr :icon, :string, default: "hero-shopping-bag"
+
+  attr :icon, :any,
+    default: "hero-shopping-bag",
+    doc: "Hero icon above the title. Pass nil or false to omit."
 
   attr :browse_id, :string,
     default: nil,
     doc: "When set, renders a Browse the shop button with this DOM id"
 
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the panel"
+
   slot :inner_block, required: true
+
+  slot :actions,
+    doc: "Optional custom action below the copy (ignored when browse_id is set)"
 
   def shop_empty_state(assigns) do
     ~H"""
-    <div id={@id} class="rounded-3xl bg-zinc-50 px-6 py-24 text-center">
-      <.icon name={@icon} class="mx-auto mb-6 size-12 text-zinc-400" />
+    <div id={@id} class={["rounded-3xl bg-zinc-50 px-6 py-24 text-center", @class]}>
+      <.icon :if={@icon} name={@icon} class="mx-auto mb-6 size-12 text-zinc-400" />
       <h2 class="type-title text-2xl text-zinc-900">{@title}</h2>
       <p class="mt-3 text-lg text-zinc-600">
         {render_slot(@inner_block)}
@@ -184,6 +209,9 @@ defmodule YscWeb.ShopComponents do
       >
         Browse the shop
       </.button>
+      <div :if={is_nil(@browse_id) and @actions != []} class="mt-8">
+        {render_slot(@actions)}
+      </div>
     </div>
     """
   end

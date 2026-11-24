@@ -353,23 +353,24 @@ defmodule YscWeb.ShopLive do
         </div>
       </div>
 
-      <div
+      <.shop_empty_state
         :if={(@async_data_loaded && @products != []) and @tiles == []}
         id="shop-no-matches"
-        class="mt-8 rounded-3xl bg-zinc-50 px-6 py-20 text-center"
+        title="Nothing in that color"
+        icon={nil}
+        class="mt-8"
       >
-        <h2 class="type-title text-2xl text-zinc-900">Nothing in that color</h2>
-        <p class="mt-3 text-lg text-zinc-600">
-          Try a different color, or see everything.
-        </p>
-        <.link
-          patch={listing_path(@sort, [])}
-          id="shop-no-matches-clear"
-          class="mt-6 inline-block rounded-xl bg-zinc-900 px-6 py-3 text-base font-medium text-white transition hover:bg-zinc-700 motion-safe:active:scale-[0.97]"
-        >
-          Clear all
-        </.link>
-      </div>
+        Try a different color, or see everything.
+        <:actions>
+          <.link
+            patch={listing_path(@sort, [])}
+            id="shop-no-matches-clear"
+            class="inline-block rounded-xl bg-zinc-900 px-6 py-3 text-base font-medium text-white transition hover:bg-zinc-700 motion-safe:active:scale-[0.97]"
+          >
+            Clear all
+          </.link>
+        </:actions>
+      </.shop_empty_state>
 
       <ul
         :if={@tiles != []}
