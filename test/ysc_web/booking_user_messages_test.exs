@@ -70,6 +70,12 @@ defmodule YscWeb.BookingUserMessagesTest do
     refute BookingUserMessages.clear_lake_no_booking_options() =~
              "select dates to see available"
 
+    assert BookingUserMessages.clear_lake_entire_cabin_occupied() =~
+             "shared cabin stays on these dates"
+
+    refute BookingUserMessages.clear_lake_entire_cabin_occupied() =~
+             "booked spots"
+
     assert BookingUserMessages.leave_unpaid_checkout_button() ==
              "Leave without booking"
 

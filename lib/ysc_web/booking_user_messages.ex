@@ -54,6 +54,10 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  def clear_lake_entire_cabin_occupied do
+    "Entire cabin isn't available: Other members already have shared cabin stays on these dates."
+  end
+
   def leave_unpaid_checkout_button do
     "Leave without booking"
   end
