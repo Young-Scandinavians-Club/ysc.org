@@ -1395,6 +1395,195 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute message =~ "complete one"
     end
 
+    test "Finding 104: overlapping family holds occupy the max-2 cap",
+         %{rooms: rooms} do
+      %{primary: primary, sub_account: sub} = family_with_sub_account(:family)
+
+      sub2 =
+        user_fixture(%{date_of_birth: ~D[2014-03-01]})
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Repo.update!()
+
+      {:ok, room3} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Tahoe Room 3",
+          property: :tahoe,
+          capacity_max: 4,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      future_hold =
+        DateTime.utc_now()
+        |> DateTime.add(30, :minute)
+        |> DateTime.truncate(:second)
+
+      _hold1 =
+        insert_family_booking!(primary, rooms, %{
+          status: :hold,
+          hold_expires_at: future_hold,
+          checkin_date: ~D[2024-07-08],
+          checkout_date: ~D[2024-07-10]
+        })
+
+      _hold2 =
+        insert_family_booking!(sub, rooms, %{
+          status: :hold,
+          hold_expires_at: future_hold,
+          checkin_date: ~D[2024-07-09],
+          checkout_date: ~D[2024-07-11],
+          room: rooms.tahoe_room2
+        })
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: sub2.id,
+            property: :tahoe,
+            checkin_date: ~D[2024-07-09],
+            checkout_date: ~D[2024-07-11],
+            booking_mode: :room,
+            guests_count: 2,
+            status: :hold,
+            hold_expires_at: future_hold,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [room3],
+          user: sub2
+        )
+
+      refute changeset.valid?
+
+      assert Keyword.has_key?(changeset.errors, :checkin_date) or
+               Keyword.has_key?(changeset.errors, :rooms)
+    end
+
+    test "Finding 104: expired overlapping holds do not occupy the cap",
+         %{rooms: rooms} do
+      %{primary: primary, sub_account: sub} = family_with_sub_account(:family)
+
+      expired_hold =
+        DateTime.utc_now()
+        |> DateTime.add(-30, :minute)
+        |> DateTime.truncate(:second)
+
+      _hold1 =
+        insert_family_booking!(primary, rooms, %{
+          status: :hold,
+          hold_expires_at: expired_hold,
+          checkin_date: ~D[2024-07-08],
+          checkout_date: ~D[2024-07-10]
+        })
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: sub.id,
+            property: :tahoe,
+            checkin_date: ~D[2024-07-09],
+            checkout_date: ~D[2024-07-11],
+            booking_mode: :room,
+            guests_count: 2,
+            status: :hold,
+            hold_expires_at:
+              DateTime.utc_now()
+              |> DateTime.add(30, :minute)
+              |> DateTime.truncate(:second),
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room2],
+          user: sub
+        )
+
+      assert changeset.valid?
+    end
+
+    test "Finding 104: confirming a hold is not blocked by other unpaid holds",
+         %{rooms: rooms} do
+      %{primary: primary, sub_account: sub} = family_with_sub_account(:family)
+
+      future_hold =
+        DateTime.utc_now()
+        |> DateTime.add(30, :minute)
+        |> DateTime.truncate(:second)
+
+      hold1 =
+        insert_family_booking!(primary, rooms, %{
+          status: :hold,
+          hold_expires_at: future_hold,
+          checkin_date: ~D[2024-07-08],
+          checkout_date: ~D[2024-07-10]
+        })
+
+      _hold2 =
+        insert_family_booking!(sub, rooms, %{
+          status: :hold,
+          hold_expires_at: future_hold,
+          checkin_date: ~D[2024-07-09],
+          checkout_date: ~D[2024-07-11],
+          room: rooms.tahoe_room2
+        })
+
+      hold1 = Repo.preload(hold1, :rooms)
+
+      assert :ok = BookingValidator.validate_confirm_occupancy(hold1)
+    end
+
+    test "Finding 104: confirming a third overlapping stay is rejected",
+         %{rooms: rooms} do
+      %{primary: primary, sub_account: sub} = family_with_sub_account(:family)
+
+      sub2 =
+        user_fixture(%{date_of_birth: ~D[2014-03-01]})
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Repo.update!()
+
+      {:ok, room3} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Tahoe Room 3 confirm",
+          property: :tahoe,
+          capacity_max: 4,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      future_hold =
+        DateTime.utc_now()
+        |> DateTime.add(30, :minute)
+        |> DateTime.truncate(:second)
+
+      _complete1 =
+        insert_family_booking!(primary, rooms, %{
+          checkin_date: ~D[2024-07-08],
+          checkout_date: ~D[2024-07-10]
+        })
+
+      _complete2 =
+        insert_family_booking!(sub, rooms, %{
+          checkin_date: ~D[2024-07-09],
+          checkout_date: ~D[2024-07-11],
+          room: rooms.tahoe_room2
+        })
+
+      hold3 =
+        insert_family_booking!(sub2, rooms, %{
+          status: :hold,
+          hold_expires_at: future_hold,
+          checkin_date: ~D[2024-07-09],
+          checkout_date: ~D[2024-07-11],
+          room: room3
+        })
+
+      hold3 = Repo.preload(hold3, :rooms)
+
+      assert {:error, :membership_limit_exceeded} =
+               BookingValidator.validate_confirm_occupancy(hold3)
+    end
+
     test "buyout exclusivity: sub-account cannot book room while primary has active buyout",
          %{rooms: rooms} do
       %{primary: primary, sub_account: sub} = family_with_sub_account(:family)
