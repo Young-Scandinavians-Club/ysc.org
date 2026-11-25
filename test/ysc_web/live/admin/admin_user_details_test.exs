@@ -1790,6 +1790,45 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert Accounts.get_user!(member.id).primary_user_id == other_primary.id
     end
 
+    test "stale family-tab row cannot unlink a user already linked elsewhere",
+         %{conn: conn} do
+      unique = System.unique_integer([:positive])
+      primary_a = lifetime_member()
+      primary_b = lifetime_member()
+
+      member =
+        user_fixture(%{
+          first_name: "FamUnlink#{unique}",
+          last_name: "Member"
+        })
+
+      assert {:ok, _} =
+               Accounts.admin_link_user_to_family(primary_a, member,
+                 relationship: :child
+               )
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{primary_a.id}/details/family")
+
+      render_async(view)
+
+      member
+      |> Ecto.Changeset.change(%{
+        primary_user_id: primary_b.id,
+        family_relationship: "spouse"
+      })
+      |> Repo.update!()
+
+      view
+      |> element(
+        "button[phx-click='admin_remove_family_user'][phx-value-user_id='#{member.id}']"
+      )
+      |> render_click()
+
+      assert render(view) =~ member.email
+      assert Accounts.get_user!(member.id).primary_user_id == primary_b.id
+    end
+
     test "falls back to loading a user who is not in search results", %{
       conn: conn
     } do

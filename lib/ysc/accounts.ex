@@ -4563,65 +4563,101 @@ defmodule Ysc.Accounts do
     end
   end
 
+  # Columns needed to authorize unlink, clear the link, email the member, and
+  # decide board-volunteer grace — without SELECT * / hashed_password.
+  @remove_sub_account_lock_fields [
+    :id,
+    :primary_user_id,
+    :family_relationship,
+    :board_position,
+    :first_name,
+    :last_name,
+    :email
+  ]
+
   @doc """
   Removes a sub-account from a family group.
   This makes the sub-account independent (no longer associated with primary).
+
+  Re-reads `primary_user_id` under `FOR UPDATE` so a stale slim household
+  `%User{}` from the member family-management page (#1919) or admin family
+  tab (#1900) cannot unlink a member who has since left or joined another
+  household. The locked row also supplies a fresh `board_position` for
+  volunteer billing grace after unlink.
   """
   @dialyzer {:nowarn_function, remove_sub_account: 2}
   def remove_sub_account(sub_account, primary_user) do
-    if sub_account.primary_user_id == primary_user.id do
-      result =
-        Ecto.Multi.new()
-        |> Ecto.Multi.update(
-          :sub_account,
-          sub_account
-          |> Ecto.Changeset.change(%{})
-          |> Ecto.Changeset.put_change(:primary_user_id, nil)
-          |> Ecto.Changeset.put_change(:family_relationship, nil)
+    primary_id = primary_user.id
+    sub_id = sub_account.id
+
+    multi =
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:locked_user, fn repo, _changes ->
+        locked =
+          sub_id
+          |> lock_sub_account_for_remove_query()
+          |> repo.one()
+
+        case locked do
+          %User{primary_user_id: ^primary_id} = locked ->
+            {:ok, locked}
+
+          _ ->
+            {:error, :unauthorized}
+        end
+      end)
+      |> Ecto.Multi.update(:sub_account, fn %{locked_user: locked} ->
+        Ecto.Changeset.change(locked, %{
+          primary_user_id: nil,
+          family_relationship: nil
+        })
+      end)
+      |> Ecto.Multi.insert(:user_event, fn %{locked_user: locked} ->
+        UserEvent.new_user_event_changeset(
+          %UserEvent{},
+          %{
+            user_id: locked.id,
+            updated_by_user_id: primary_id,
+            type: :family_removed,
+            from: "#{primary_id}",
+            to: "none"
+          }
         )
-        |> Ecto.Multi.insert(
-          :user_event,
-          UserEvent.new_user_event_changeset(
-            %UserEvent{},
-            %{
-              user_id: sub_account.id,
-              updated_by_user_id: primary_user.id,
-              type: :family_removed,
-              from: "#{primary_user.id}",
-              to: "none"
-            }
-          )
+      end)
+      |> YscWeb.Emails.Notifier.schedule_email_multi(
+        :family_member_removed_email,
+        fn %{locked_user: locked} ->
+          family_member_removed_email_args(locked, primary_user)
+        end
+      )
+
+    case Repo.transaction(multi) do
+      {:ok, %{sub_account: updated_sub_account}} ->
+        MembershipCache.invalidate_user(updated_sub_account.id)
+
+        invalidate_family_link_profile_caches(
+          updated_sub_account.id,
+          primary_id
         )
-        |> YscWeb.Emails.Notifier.schedule_email_multi(
-          :family_member_removed_email,
-          fn _changes ->
-            family_member_removed_email_args(sub_account, primary_user)
-          end
+
+        sync_board_volunteer_billing_after_family_change(
+          primary_user,
+          updated_sub_account
         )
-        |> Repo.transaction()
 
-      case result do
-        {:ok, %{sub_account: updated_sub_account}} ->
-          MembershipCache.invalidate_user(updated_sub_account.id)
+        {:ok, updated_sub_account}
 
-          invalidate_family_link_profile_caches(
-            updated_sub_account.id,
-            primary_user.id
-          )
-
-          sync_board_volunteer_billing_after_family_change(
-            primary_user,
-            updated_sub_account
-          )
-
-          {:ok, updated_sub_account}
-
-        {:error, _, changeset, _} ->
-          {:error, changeset}
-      end
-    else
-      {:error, :unauthorized}
+      {:error, _, reason, _} ->
+        {:error, reason}
     end
+  end
+
+  defp lock_sub_account_for_remove_query(sub_id) do
+    from(u in User,
+      where: u.id == ^sub_id,
+      select: struct(u, ^@remove_sub_account_lock_fields),
+      lock: "FOR UPDATE"
+    )
   end
 
   # Family memberships cover the primary holder, their spouse/partner, and
@@ -5913,6 +5949,11 @@ defmodule Ysc.Accounts do
     list_family_management_sub_accounts_query(
       Ysc.Ci.QueryExplain.Fixtures.user().id
     )
+  end
+
+  @doc false
+  def ci_query_explain_lock_sub_account_for_remove_query do
+    lock_sub_account_for_remove_query(Ysc.Ci.QueryExplain.Fixtures.user().id)
   end
 
   @doc false

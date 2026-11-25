@@ -346,6 +346,11 @@ defmodule Ysc.AccountsTest do
                Accounts.ci_query_explain_list_family_management_sub_accounts_query()
     end
 
+    test "ci_query_explain_lock_sub_account_for_remove_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} =
+               Accounts.ci_query_explain_lock_sub_account_for_remove_query()
+    end
+
     test "ci_query_explain_household_board_member_query/0 builds an Ecto.Query" do
       assert %Ecto.Query{} =
                Accounts.ci_query_explain_household_board_member_query()
@@ -1100,6 +1105,89 @@ defmodule Ysc.AccountsTest do
 
       assert {:error, :unauthorized} =
                Accounts.remove_sub_account(sub, primary2)
+    end
+
+    test "remove_sub_account refuses stale slim primary_user_id after re-link" do
+      primary_a = user_fixture(%{phone_number: "+14159098370"})
+      primary_b = user_fixture(%{phone_number: "+14159098371"})
+      sub = user_fixture(%{phone_number: "+14159098372"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary_a.id,
+          family_relationship: "child"
+        })
+        |> Repo.update!()
+
+      # Member family-management (#1919) and admin family tab (#1900) pass a
+      # slim household row from page load. Simulate that stale struct after the
+      # member has already been linked to another household.
+      stale_slim = %User{
+        id: sub.id,
+        primary_user_id: primary_a.id,
+        family_relationship: "child",
+        board_position: nil,
+        first_name: sub.first_name,
+        last_name: sub.last_name,
+        email: sub.email
+      }
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary_b.id,
+          family_relationship: "spouse"
+        })
+        |> Repo.update!()
+
+      assert {:error, :unauthorized} =
+               Accounts.remove_sub_account(stale_slim, primary_a)
+
+      refreshed = Accounts.get_user!(sub.id)
+      assert refreshed.primary_user_id == primary_b.id
+      assert refreshed.family_relationship in [:spouse, "spouse"]
+    end
+
+    test "remove_sub_account uses locked board_position for grace, not stale slim nil" do
+      primary = user_fixture(%{phone_number: "+14159098373"})
+      sub = user_fixture(%{phone_number: "+14159098374"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update!()
+
+      {:ok, sub} = Accounts.assign_board_position(sub, :secretary)
+
+      # Stale slim from page load before the board assignment.
+      stale_slim = %User{
+        id: sub.id,
+        primary_user_id: primary.id,
+        family_relationship: "child",
+        board_position: nil,
+        first_name: sub.first_name,
+        last_name: sub.last_name,
+        email: sub.email
+      }
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, _} = Accounts.remove_sub_account(stale_slim, primary)
+
+      refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary
+             )
+
+      primary_id = primary.id
+      assert_receive {:board_volunteer_sync, ^primary_id}
     end
 
     @tag process_caches: true

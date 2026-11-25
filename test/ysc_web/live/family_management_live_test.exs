@@ -738,6 +738,39 @@ defmodule YscWeb.FamilyManagementLiveTest do
       assert is_nil(Accounts.get_user!(sub.id).primary_user_id)
     end
 
+    test "remove_sub_account refuses stale list row after member joins another household",
+         %{
+           conn: conn
+         } do
+      {primary_a, sub} = primary_with_linked_sub()
+      primary_b = lifetime_member(%{phone_number: unique_phone()})
+
+      conn = log_in_user(conn, primary_a)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/family")
+      _ = render_loaded(view)
+      assert has_element?(view, "#linked-family-member-row-#{sub.id}")
+
+      sub
+      |> Ecto.Changeset.change(%{
+        primary_user_id: primary_b.id,
+        family_relationship: "spouse"
+      })
+      |> Repo.update!()
+
+      view
+      |> element(
+        "button[phx-click='remove_sub_account'][phx-value-user_id='#{sub.id}']"
+      )
+      |> render_click()
+
+      # Success reloads the list and drops the row. Refuse must leave the
+      # member linked to the other household.
+      assert has_element?(view, "#linked-family-member-row-#{sub.id}")
+      refreshed = Accounts.get_user!(sub.id)
+      assert refreshed.primary_user_id == primary_b.id
+    end
+
     test "deletes roster member from unified table", %{conn: conn} do
       user = lifetime_member()
       member = add_roster_member(user)
