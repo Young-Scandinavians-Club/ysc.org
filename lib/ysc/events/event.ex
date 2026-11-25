@@ -216,6 +216,23 @@ defmodule Ysc.Events.Event do
   @doc false
   def public_page_fields, do: @public_page_fields
 
+  # Ticket checkout re-read (`BookingLocker.lock_event/1`). Enough to reject
+  # cancelled / unpublished / in-past events and enforce `max_attendees`.
+  # Omits `raw_details` / `rendered_details` so Postgres does not detoast the
+  # event body on a path that never renders it. Explicit allowlist — not
+  # `__schema__(:fields) -- [:raw_details]` — so editor/admin columns added
+  # later do not ride along on every booking SELECT.
+  @booking_fields [
+    :id,
+    :state,
+    :start_date,
+    :start_time,
+    :max_attendees
+  ]
+
+  @doc false
+  def booking_fields, do: @booking_fields
+
   @publish_control_fields [
     :state,
     :published_at,
