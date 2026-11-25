@@ -1654,22 +1654,22 @@ defmodule YscWeb.AdminMoneyLive do
                   {payment.reference_id}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  <div class="flex flex-col">
-                    <span class="font-medium text-zinc-900">
-                      {if Ecto.assoc_loaded?(payment.user) && payment.user do
-                        get_user_display_name(payment.user)
-                      else
-                        "System Transaction"
-                      end}
-                    </span>
-                    <span class="text-xs text-zinc-500">
-                      {if Ecto.assoc_loaded?(payment.user) && payment.user do
-                        payment.user.email
-                      else
-                        "System Transaction"
-                      end}
-                    </span>
-                  </div>
+                  <%= if Ecto.assoc_loaded?(payment.user) && payment.user do %>
+                    <div class="flex flex-col">
+                      <span class="font-medium text-zinc-900">
+                        {get_user_display_name(payment.user)}
+                      </span>
+                      <span class="text-xs text-zinc-500">
+                        {payment.user.email}
+                      </span>
+                    </div>
+                  <% else %>
+                    <.non_member_buyer
+                      id={"payment-buyer-#{payment.id}"}
+                      guest={payment.guest_buyer}
+                      payout?={payment.payment_type_info.type == "Payout"}
+                    />
+                  <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
                   <div class="flex flex-col">
@@ -2777,7 +2777,10 @@ defmodule YscWeb.AdminMoneyLive do
                         </span>
                       </.link>
                     <% else %>
-                      <span class="text-xs text-zinc-400">System</span>
+                      <.non_member_buyer
+                        id={"payout-modal-payment-buyer-#{payment.id}"}
+                        guest={payment.guest_buyer}
+                      />
                     <% end %>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap font-medium">
@@ -2893,7 +2896,10 @@ defmodule YscWeb.AdminMoneyLive do
                         </span>
                       </.link>
                     <% else %>
-                      <span class="text-xs text-zinc-400">System</span>
+                      <.non_member_buyer
+                        id={"payout-modal-refund-buyer-#{refund.id}"}
+                        guest={refund.guest_buyer}
+                      />
                     <% end %>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap font-medium text-red-600">
@@ -3142,18 +3148,21 @@ defmodule YscWeb.AdminMoneyLive do
                         {@selected_payment.user.email}
                       </span>
                     </.link>
-                  <% guest_buyer -> %>
-                    <span id="payment-modal-guest-buyer" class="flex flex-col">
-                      <span class="font-medium">
-                        {Ysc.Tickets.TicketOrder.buyer_name(guest_buyer)}
-                      </span>
-                      <span class="text-xs text-zinc-500">
-                        {guest_buyer.guest_email}
-                      </span>
-                      <span class="text-xs text-zinc-400">Guest checkout</span>
-                    </span>
                   <% true -> %>
-                    <span class="text-zinc-400">System</span>
+                    <.non_member_buyer
+                      id={
+                        if guest_buyer,
+                          do: "payment-modal-guest-buyer",
+                          else: "payment-modal-non-member-buyer"
+                      }
+                      guest={guest_buyer}
+                      payout?={
+                        match?(
+                          %{type: "Payout"},
+                          @selected_payment.payment_type_info
+                        )
+                      }
+                    />
                 <% end %>
               </p>
             </div>
@@ -5073,6 +5082,39 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   defp guest_buyer(_), do: nil
+
+  # Who paid when there is no member account: a guest checkout buyer, Stripe
+  # (bank payouts), or nobody we can identify.
+  attr :id, :string, required: true
+  attr :guest, :any, default: nil
+  attr :payout?, :boolean, default: false
+
+  defp non_member_buyer(%{guest: %Ysc.Tickets.TicketOrder{}} = assigns) do
+    ~H"""
+    <span id={@id} class="flex flex-col">
+      <span class="font-medium text-zinc-900">
+        {Ysc.Tickets.TicketOrder.buyer_name(@guest)}
+      </span>
+      <span class="text-xs text-zinc-500">{@guest.guest_email}</span>
+      <span class="text-xs text-zinc-500">Guest checkout (not a member)</span>
+    </span>
+    """
+  end
+
+  defp non_member_buyer(%{payout?: true} = assigns) do
+    ~H"""
+    <span id={@id} class="flex flex-col">
+      <span class="font-medium text-zinc-900">Stripe</span>
+      <span class="text-xs text-zinc-500">Payout to the club's bank</span>
+    </span>
+    """
+  end
+
+  defp non_member_buyer(assigns) do
+    ~H"""
+    <span id={@id} class="text-zinc-500">No member account</span>
+    """
+  end
 
   defp get_user_display_name(%Ecto.Association.NotLoaded{}), do: "Unknown User"
 
