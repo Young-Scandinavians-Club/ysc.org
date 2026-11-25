@@ -1174,6 +1174,67 @@ defmodule Ysc.Tickets.BookingLockerTest do
                )
     end
 
+    @event_body_pattern ~r/raw_details|rendered_details/i
+    @event_fat_column_pattern ~r/raw_details|rendered_details|send_notification|lock_version|"place_id"|organizer_id/i
+
+    test "omits event-body columns when reloading the event for booking", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, _} =
+        Events.update_event(event, %{
+          raw_details: "<p>must not load this body</p>",
+          rendered_details: "<p>must not load this html</p>"
+        })
+
+      {sql, _params} =
+        Ecto.Adapters.SQL.to_sql(
+          :all,
+          Repo,
+          BookingLocker.ci_query_explain_lock_event_query()
+        )
+
+      refute sql =~ "raw_details"
+      refute sql =~ "rendered_details"
+      refute sql =~ "send_notification"
+      refute sql =~ "lock_version"
+      refute sql =~ "place_id"
+      refute sql =~ "organizer_id"
+      assert sql =~ "max_attendees"
+      assert sql =~ "start_date"
+      assert sql =~ "start_time"
+
+      {result, body_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              user: user,
+              tiers: [tier]
+            )
+          end,
+          pattern: @event_body_pattern,
+          caller_pids: [self()]
+        )
+
+      {_again, fat_cols} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1},
+              user: user,
+              tiers: [tier]
+            )
+          end,
+          pattern: @event_fat_column_pattern,
+          caller_pids: [self()]
+        )
+
+      assert {:ok, order} = result
+      assert order.event_id == event.id
+      assert body_cols == 0
+      assert fat_cols == 0
+    end
+
     test "skips event and tier SELECTs when they are passed in", %{
       user: user,
       event: event,
@@ -1980,6 +2041,10 @@ defmodule Ysc.Tickets.BookingLockerTest do
       selected = BookingLocker.ci_query_explain_selected_tiers_query()
       assert %Ecto.Query{} = selected
       assert Repo.all(selected) == []
+
+      lock_event = BookingLocker.ci_query_explain_lock_event_query()
+      assert %Ecto.Query{} = lock_event
+      assert Repo.all(lock_event) == []
     end
   end
 

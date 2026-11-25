@@ -322,6 +322,27 @@ defmodule Ysc.Events.EventTest do
     end
   end
 
+  describe "booking_fields/0" do
+    test "is the checkout re-read subset of persisted columns" do
+      fields = Event.booking_fields()
+      schema_fields = Event.__schema__(:fields)
+
+      assert fields -- schema_fields == []
+      assert :id in fields
+      assert :state in fields
+      assert :start_date in fields
+      assert :start_time in fields
+      assert :max_attendees in fields
+      refute :raw_details in fields
+      refute :rendered_details in fields
+      refute :title in fields
+      refute :send_notification in fields
+      refute :lock_version in fields
+      refute :place_id in fields
+      refute :organizer_id in fields
+    end
+  end
+
   describe "public_page_fields/0" do
     test "is an explicit subset of persisted columns used on the public page" do
       fields = Event.public_page_fields()

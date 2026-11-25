@@ -666,7 +666,15 @@ defmodule Ysc.Tickets.BookingLocker do
 
   defp lock_event(event_id) do
     # Plain read — no FOR UPDATE. Concurrent transactions can observe the same counts.
-    Repo.get(Event, event_id)
+    event_id
+    |> lock_event_query()
+    |> Repo.one()
+  end
+
+  defp lock_event_query(event_id) do
+    from e in Event,
+      where: e.id == ^event_id,
+      select: struct(e, ^Event.booking_fields())
   end
 
   defp lock_ticket_tiers(event_id) do
@@ -1433,6 +1441,13 @@ defmodule Ysc.Tickets.BookingLocker do
     alias Ysc.Ci.QueryExplain.Fixtures
 
     selected_ticket_tiers_query(Fixtures.ulid(), [Fixtures.ulid()])
+  end
+
+  @doc false
+  def ci_query_explain_lock_event_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    lock_event_query(Fixtures.ulid())
   end
 
   @doc false
