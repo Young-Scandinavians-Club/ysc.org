@@ -1090,6 +1090,30 @@ defmodule YscWeb.AdminMoneyLiveTest do
                "#payout-modal-payment-buyer-#{payment.id}",
                "Greta Guest"
              )
+
+      # A refund can land on a later payout than its payment, and is looked up
+      # by `payment_id` rather than its own id.
+      {:ok, refund} =
+        Ledgers.create_refund(%{
+          user_id: nil,
+          payment_id: payment.id,
+          amount: Money.new(55, :USD),
+          external_provider: :stripe,
+          external_refund_id:
+            "re_table_guest_#{System.unique_integer([:positive])}",
+          status: :completed
+        })
+
+      refund_payout = LedgersFixtures.payout_fixture()
+      {:ok, _} = Ledgers.link_refund_to_payout(refund_payout, refund)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payouts/#{refund_payout.id}")
+
+      refund_row = "#payout-modal-refund-buyer-#{refund.id}"
+      assert has_element?(view, refund_row, "Greta Guest")
+      assert has_element?(view, refund_row, "table.guest@example.com")
+      assert has_element?(view, refund_row, "Guest checkout (not a member)")
     end
 
     test "labels payments without any buyer in the recent payments table", %{

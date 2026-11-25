@@ -5105,7 +5105,7 @@ defmodule YscWeb.AdminMoneyLive do
     ~H"""
     <span id={@id} class="flex flex-col">
       <span class="font-medium text-zinc-900">Stripe</span>
-      <span class="text-xs text-zinc-500">Payout to the club's bank</span>
+      <span class="text-xs text-zinc-500">Bank transfer</span>
     </span>
     """
   end
