@@ -192,7 +192,8 @@ flowchart TB
 | **Fly.io** | Hosting + Postgres | All application data at rest | US/EU regions (prod: US) | Verify DPA / SCCs for EU members |
 | **Tigris (S3)** | Object storage | Avatars, media, expense receipts | Configured via AWS-compatible endpoint | Sub-processor of Fly |
 | **AWS SES** | Outbound email | Recipient email, name, message body | AWS region from `SES_AWS_REGION` | AWS DPA; newsletter may use click tracking |
-| **FlowRoute** | SMS | Phone number, message body | US telecom | Transactional only; verify DPA |
+| **FlowRoute** | SMS | Phone number, message body | US telecom | Transactional only (US/CA numbers); verify DPA |
+| **Twilio** | SMS | Phone number, message body | US telecom | Transactional only (Nordic numbers); verify DPA |
 | **QuickBooks (Intuit)** | Accounting | Customer name, email, phone, transaction details | US | Required for club finances; limit to necessary fields |
 | **Sentry** | Error monitoring | User id/email/role on errors; scrubbed request params | US (Sentry.io) | Scrubber in `lib/ysc/sentry_scrubber.ex`; review sampling |
 | **Cloudflare** | CDN, Turnstile CAPTCHA, possible Web Analytics | IP, browser signals on challenged forms | Global | Turnstile on contact/newsletter forms |

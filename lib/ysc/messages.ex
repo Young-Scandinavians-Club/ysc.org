@@ -15,7 +15,9 @@ defmodule Ysc.Messages do
   alias Ysc.Email.DeliveryError
   alias Ysc.Email.RateLimiter
   alias Ysc.Email.LinkTracking
-  alias Ysc.Flowroute.Client
+  alias Ysc.Extensions.PhoneNumber
+  alias Ysc.Flowroute.Client, as: FlowrouteClient
+  alias Ysc.Twilio.Client, as: TwilioClient
   alias Ysc.SmsRateLimit
 
   # Helper function to safely convert email recipient to string
@@ -731,18 +733,18 @@ defmodule Ysc.Messages do
 
   ## Parameters
 
-    - `phone_number` (required) - Recipient phone number in 11-digit North American format
+    - `phone_number` (required) - Recipient phone number (11-digit North American, or digits-only international)
     - `body` (required) - Message content
     - `attrs` (required) - Map containing:
       - `:idempotency_key` (required) - Unique key for idempotency
       - `:message_template` (required) - Template identifier
       - `:user_id` (optional) - User ID if associated with a user
       - `:params` (optional) - Additional parameters
-      - `:from` (optional) - Sender phone number (defaults to configured FlowRoute number)
+      - `:from` (optional) - Sender phone number (defaults to the configured sender of the chosen provider)
 
   ## Returns
 
-    - `{:ok, %{id: message_id}}` - Success with FlowRoute message ID
+    - `{:ok, %{id: message_id}}` - Success with provider message ID
     - `{:error, reason}` - Error with reason
 
   ## Examples
@@ -885,16 +887,18 @@ defmodule Ysc.Messages do
   end
 
   defp send_sms_via_client(phone_number, body, attrs) do
-    Ysc.Logging.debug("Sending SMS via FlowRoute Client",
+    {provider, client} = sms_client_for(phone_number)
+
+    Ysc.Logging.debug("Sending SMS via #{provider} Client",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key]
     )
 
     sms_opts = build_sms_opts(phone_number, body, attrs)
 
-    case Client.send_sms(sms_opts) do
+    case client.send_sms(sms_opts) do
       {:ok, %{id: message_id}} = result ->
-        Ysc.Logging.debug("FlowRoute Client.send_sms succeeded",
+        Ysc.Logging.debug("#{provider} Client.send_sms succeeded",
           recipient: phone_number,
           idempotency_key: attrs[:idempotency_key],
           message_id: message_id
@@ -903,7 +907,16 @@ defmodule Ysc.Messages do
         result
 
       error ->
-        handle_send_sms_error(error, phone_number, attrs, body)
+        handle_send_sms_error(error, provider, phone_number, attrs, body)
+    end
+  end
+
+  # Twilio for supported international (Nordic) numbers; everything else stays
+  # on FlowRoute, which is cheaper and is the long-standing default.
+  defp sms_client_for(phone_number) do
+    case PhoneNumber.sms_provider(phone_number) do
+      :twilio -> {:twilio, TwilioClient}
+      _ -> {:flowroute, FlowrouteClient}
     end
   end
 
@@ -917,10 +930,10 @@ defmodule Ysc.Messages do
     end
   end
 
-  defp handle_send_sms_error(error, phone_number, attrs, body) do
+  defp handle_send_sms_error(error, provider, phone_number, attrs, body) do
     log_sms_failure(
-      flowroute_send_failure_level(error),
-      "FlowRoute Client.send_sms failed",
+      sms_send_failure_level(error),
+      "#{provider} Client.send_sms failed",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       error: inspect(error),
@@ -929,7 +942,7 @@ defmodule Ysc.Messages do
           message_body: body,
           error: inspect(error, limit: :infinity)
         }),
-      tags: build_sentry_tags(attrs, "flowroute_send_sms_failed")
+      tags: build_sentry_tags(attrs, "#{provider}_send_sms_failed")
     )
 
     {:error, "failed to send SMS"}
@@ -1191,10 +1204,10 @@ defmodule Ysc.Messages do
 
   defp email_transaction_failure_level(_), do: :error
 
-  defp flowroute_send_failure_level({:error, reason}) when is_atom(reason),
+  defp sms_send_failure_level({:error, reason}) when is_atom(reason),
     do: :warning
 
-  defp flowroute_send_failure_level({:error, reason}) when is_binary(reason) do
+  defp sms_send_failure_level({:error, reason}) when is_binary(reason) do
     if String.contains?(reason, "Rate limit"), do: :warning, else: :error
   end
 

@@ -148,12 +148,63 @@ defmodule Ysc.Extensions.PhoneNumberTest do
       assert PhoneNumber.sms_supported?("+16135551234") == true
     end
 
-    test "returns false for a Swedish number" do
-      assert PhoneNumber.sms_supported?("+46701234567") == false
+    test "returns true for Nordic numbers (delivered via Twilio)" do
+      for number <- nordic_numbers() do
+        assert PhoneNumber.sms_supported?(number) == true, number
+      end
+    end
+
+    test "returns false for a number outside supported regions" do
+      # Germany, UK
+      assert PhoneNumber.sms_supported?("+4915112345678") == false
+      assert PhoneNumber.sms_supported?("+447911123456") == false
     end
 
     test "returns false for an unparseable number" do
       assert PhoneNumber.sms_supported?("not-a-phone") == false
     end
+  end
+
+  describe "sms_provider/1" do
+    test "returns nil for nil and empty" do
+      assert PhoneNumber.sms_provider(nil) == nil
+      assert PhoneNumber.sms_provider("") == nil
+    end
+
+    test "routes US and Canada to FlowRoute" do
+      assert PhoneNumber.sms_provider("+14155551234") == :flowroute
+      assert PhoneNumber.sms_provider("+16135551234") == :flowroute
+    end
+
+    test "routes Sweden, Norway, Denmark, Finland and Iceland to Twilio" do
+      for number <- nordic_numbers() do
+        assert PhoneNumber.sms_provider(number) == :twilio, number
+      end
+    end
+
+    test "accepts the digits-only form used by the SMS notifier" do
+      assert PhoneNumber.sms_provider("14155551234") == :flowroute
+      assert PhoneNumber.sms_provider("46701234567") == :twilio
+    end
+
+    test "does not route invalid Nordic numbers to Twilio" do
+      # Plausible country code, but not a real Swedish number
+      assert PhoneNumber.sms_provider("+46123") == nil
+    end
+
+    test "returns nil for unparseable input" do
+      assert PhoneNumber.sms_provider("not-a-phone") == nil
+    end
+  end
+
+  defp nordic_numbers do
+    [
+      # Sweden, Norway, Denmark, Finland, Iceland (mobile)
+      "+46701234567",
+      "+4741234567",
+      "+4520123456",
+      "+358401234567",
+      "+3546111234"
+    ]
   end
 end
