@@ -204,6 +204,42 @@ defmodule Ysc.Tickets.GuestCheckoutTest do
       assert Repo.aggregate(Ticket, :count) == 0
     end
 
+    test "refuses a combined admission quantity above the checkout order cap",
+         %{
+           event: event,
+           public_tier: general
+         } do
+      {:ok, vip} =
+        Events.create_ticket_tier(%{
+          name: "Public VIP Finding 102",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 50,
+          sale_audience: :public,
+          event_id: event.id
+        })
+
+      {:ok, student} =
+        Events.create_ticket_tier(%{
+          name: "Public student Finding 102",
+          type: :paid,
+          price: Money.new(15, :USD),
+          quantity: 50,
+          sale_audience: :public,
+          event_id: event.id
+        })
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               GuestCheckout.create_order(@guest, event.id, %{
+                 general.id => 20,
+                 vip.id => 20,
+                 student.id => 20
+               })
+
+      assert Repo.aggregate(TicketOrder, :count) == 0
+      assert Repo.aggregate(Ticket, :count) == 0
+    end
+
     test "one email can't stack up more than three open holds", %{
       event: event,
       public_tier: tier

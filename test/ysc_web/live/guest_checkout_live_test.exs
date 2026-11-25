@@ -12,6 +12,7 @@ defmodule YscWeb.GuestCheckoutLiveTest do
   import EventDetailsLiveHelpers
 
   alias Ysc.Events
+  alias Ysc.Tickets
   alias Ysc.Tickets.AccessToken
   alias Ysc.Tickets.GuestCheckout
   alias Ysc.Tickets.TicketOrder
@@ -252,6 +253,29 @@ defmodule YscWeb.GuestCheckoutLiveTest do
 
       assert has_element?(view, "#guest-checkout-form")
       refute has_element?(view, "#payment-element")
+      assert Ysc.Repo.aggregate(TicketOrder, :count) == 0
+    end
+
+    test "a signed selection above the checkout cap is refused and creates no order",
+         %{
+           conn: conn,
+           event: event,
+           public_tier: tier
+         } do
+      over = Tickets.max_checkout_quantity_per_tier() + 1
+      {:ok, view, _html} = live(conn, checkout_path(event, %{tier.id => over}))
+
+      submit_details(view)
+
+      assert has_element?(view, "#guest-checkout-form")
+      refute has_element?(view, "#payment-element")
+
+      assert has_element?(
+               view,
+               "#flash-mirror",
+               "You can buy at most #{Tickets.max_checkout_quantity_per_tier()} tickets of one type, and #{Tickets.max_checkout_tickets()} tickets in one order."
+             )
+
       assert Ysc.Repo.aggregate(TicketOrder, :count) == 0
     end
   end

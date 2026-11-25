@@ -250,6 +250,136 @@ defmodule Ysc.TicketsTest do
       assert length(tickets) == 2
       assert Enum.count(tickets, &(&1.ticket_tier_id == donation.id)) == 1
     end
+
+    test "refuses a combined admission quantity above the checkout order cap",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1,
+           tier2: tier2
+         } do
+      {:ok, tier3} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Student Finding 102 combined",
+          type: :paid,
+          price: Money.new(15, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      # 20 + 20 + 20 = 60, each under the per-tier cap of 25.
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 tier1.id => 20,
+                 tier2.id => 20,
+                 tier3.id => 20
+               })
+
+      assert from(t in Ticket,
+               where: t.ticket_tier_id in [^tier1.id, ^tier2.id, ^tier3.id]
+             )
+             |> Repo.all() == []
+    end
+
+    test "a forged unknown tier id with a huge quantity is capped before tier lookup fails",
+         %{
+           user: user,
+           event: event
+         } do
+      unknown_tier_id = Ecto.ULID.generate()
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.create_ticket_order(user.id, event.id, %{
+                 unknown_tier_id => 100_000
+               })
+    end
+  end
+
+  describe "validate_checkout_quantities/2" do
+    defp paid_tier(id), do: %Ysc.Events.TicketTier{id: id, type: :paid}
+    defp donation_tier(id), do: %Ysc.Events.TicketTier{id: id, type: :donation}
+
+    test "allows empty selections" do
+      assert Tickets.validate_checkout_quantities(%{}, []) == :ok
+    end
+
+    test "allows a per-tier quantity at the cap" do
+      tier = paid_tier("tier-at-cap")
+      cap = Tickets.max_checkout_quantity_per_tier()
+
+      assert Tickets.validate_checkout_quantities(%{tier.id => cap}, [tier]) ==
+               :ok
+    end
+
+    test "refuses a per-tier quantity above the cap" do
+      tier = paid_tier("tier-over-cap")
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.validate_checkout_quantities(
+                 %{tier.id => Tickets.max_checkout_quantity_per_tier() + 1},
+                 [tier]
+               )
+    end
+
+    test "treats an unknown tier id as admission so a forged id cannot skip the cap" do
+      known = paid_tier("known-paid")
+      forged = Ecto.ULID.generate()
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.validate_checkout_quantities(
+                 %{forged => Tickets.max_checkout_quantity_per_tier() + 1},
+                 [known]
+               )
+    end
+
+    test "treats a missing tier as admission even when the quantity looks like donation cents" do
+      known = paid_tier("known-paid")
+      forged = Ecto.ULID.generate()
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.validate_checkout_quantities(%{forged => 100_000}, [
+                 known
+               ])
+    end
+
+    test "refuses a combined admission quantity above the order cap" do
+      general = paid_tier("general")
+      vip = paid_tier("vip")
+      student = paid_tier("student")
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.validate_checkout_quantities(
+                 %{general.id => 20, vip.id => 20, student.id => 20},
+                 [general, vip, student]
+               )
+    end
+
+    test "allows a combined admission quantity at the order cap" do
+      general = paid_tier("general")
+      vip = paid_tier("vip")
+
+      assert Tickets.validate_checkout_quantities(
+               %{general.id => 25, vip.id => 25},
+               [general, vip]
+             ) == :ok
+    end
+
+    test "does not count donation cents toward the combined admission cap" do
+      paid = paid_tier("paid")
+      donation = donation_tier("donation")
+
+      assert Tickets.validate_checkout_quantities(
+               %{paid.id => 25, donation.id => 50_000},
+               [paid, donation]
+             ) == :ok
+    end
+
+    test "refuses a non-integer quantity" do
+      tier = paid_tier("tier-string-qty")
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.validate_checkout_quantities(%{tier.id => "26"}, [tier])
+    end
   end
 
   describe "create_ticket_order/3 member-only tiers" do

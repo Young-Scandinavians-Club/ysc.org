@@ -7358,5 +7358,79 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert length(tickets) == 2
     end
+
+    test "a forged unknown tier id with donation-sized cents is still capped" do
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture(%{unlimited_capacity: true})
+      unknown_tier_id = Ecto.ULID.generate()
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.create_ticket_order(member.id, event.id, %{
+                 unknown_tier_id => 100_000
+               })
+
+      assert from(to in Ysc.Tickets.TicketOrder,
+               where: to.user_id == ^member.id and to.event_id == ^event.id
+             )
+             |> Repo.all() == []
+    end
+
+    test "create_ticket_order refuses a combined quantity above the web order cap" do
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      event = event_fixture(%{unlimited_capacity: true})
+
+      general =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Finding 102 combined",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: nil
+        })
+
+      vip =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "VIP Finding 102 combined",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: nil
+        })
+
+      student =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Student Finding 102 combined",
+          type: :paid,
+          price: Money.new(15, :USD),
+          quantity: nil
+        })
+
+      assert {:error, :ticket_quantity_exceeds_limit} =
+               Tickets.create_ticket_order(member.id, event.id, %{
+                 general.id => 20,
+                 vip.id => 20,
+                 student.id => 20
+               })
+
+      assert from(to in Ysc.Tickets.TicketOrder,
+               where: to.user_id == ^member.id and to.event_id == ^event.id
+             )
+             |> Repo.all() == []
+    end
   end
 end

@@ -978,6 +978,24 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert length(tickets) == 1
     end
 
+    test "Finding 102: increase-ticket-quantity stops at the checkout cap", %{
+      conn: conn,
+      event: event
+    } do
+      tier = hd(event.ticket_tiers)
+      cap = Ysc.Tickets.max_checkout_quantity_per_tier()
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      for _ <- 1..(cap + 1) do
+        render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      end
+
+      selected = :sys.get_state(view.pid).socket.assigns.selected_tickets
+      assert Map.get(selected, tier.id) == cap
+    end
+
     test "handles update-donation-amount event", %{conn: conn, event: event} do
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
       render_async(view)
