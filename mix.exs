@@ -359,7 +359,22 @@ defmodule Ysc.MixProject do
       # (generated Format/Formatter modules) but format dates with
       # Calendar/strftime, not Cldr timezone names. Pin the patched floor.
       {:ex_cldr_dates_times, "~> 2.25.8"},
-      {:ex_cldr_numbers, "~> 2.38"},
+      # 2.38.4: sign is taken from each number (ranges that cross zero no
+      # longer copy the first sign); currency amounts use CLDR currency
+      # separators where a locale has them (`fr-CH`, `de-AT`);
+      # to_approx_string/3 puts the locale's approximately sign where
+      # the minus goes; :currency_long_with_symbol uses one minus sign.
+      # 2.38.5: minus sign prefixes the whole pattern when a format has
+      # no negative subpattern (TR35) — `en` formats -2 EUR as "-€2.00"
+      # not "€-2.00" (USD becomes "-$2.00" not "$-2.00"); quoted-literal
+      # format compile no longer loops; uncompilable formats and more
+      # than four currency signs return errors not exceptions; scientific
+      # Decimal/zero formatting needs cldr_utils 2.29.8. Public
+      # Cldr.Number.to_string/3 APIs are unchanged. We format money via
+      # Money.to_string (ex_money → Cldr.Number) in :en only. Pin the
+      # patched floor so mix deps.update of dates_times cannot drop
+      # below the minus-sign fix.
+      {:ex_cldr_numbers, "~> 2.38.5"},
       {:ex_cldr_person_names, "~> 1.1"},
       {:ex_cldr_territories, "~> 2.12"},
       {:ex_cldr_units, "~> 3.20"},

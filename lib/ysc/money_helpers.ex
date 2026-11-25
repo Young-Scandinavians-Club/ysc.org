@@ -57,6 +57,9 @@ defmodule Ysc.MoneyHelper do
 
   def format_money(_), do: ""
 
+  # ex_cldr_numbers 2.38.5 prefixes the minus to the whole pattern (TR35),
+  # so :en USD is already "-$123.00". Rewrite leftover "$-123.00" if a
+  # format still emits a currency prefix before the sign.
   defp normalize_negative_currency_display({:ok, "$-" <> rest}),
     do: {:ok, "-$" <> rest}
 

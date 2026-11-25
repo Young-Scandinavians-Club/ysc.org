@@ -15,8 +15,8 @@ defmodule Ysc.ExCldrDatesTimesUpgradeTest do
   `Cldr.Time.to_string/3` are unchanged. We configure `Cldr.DateTime`
   as a `Ysc.Cldr` provider (generated Format/Formatter modules) and
   format dates with `Calendar.strftime/2`, not Cldr timezone names.
-  extras: none (ex_cldr_numbers 2.38.3 / cldr_utils 2.29.7 /
-  telemetry 1.4.2 / phoenix_template 1.0.4).
+  extras: none of its own (ex_cldr_numbers 2.38.5 / cldr_utils 2.29.8 /
+  telemetry 1.4.2 / phoenix_template 1.0.4 / castore 1.0.21).
   """
   use ExUnit.Case, async: true
 
@@ -85,9 +85,9 @@ defmodule Ysc.ExCldrDatesTimesUpgradeTest do
                ~s|"ex_cldr_dates_times": {:hex, :ex_cldr_dates_times, "2.25.7"|
 
       assert lock =~
-               ~s|"ex_cldr_numbers": {:hex, :ex_cldr_numbers, "2.38.3"|
+               ~s|"ex_cldr_numbers": {:hex, :ex_cldr_numbers, "2.38.5"|
 
-      assert lock =~ ~s|"cldr_utils": {:hex, :cldr_utils, "2.29.7"|
+      assert lock =~ ~s|"cldr_utils": {:hex, :cldr_utils, "2.29.8"|
       assert lock =~ ~s|"castore": {:hex, :castore, "1.0.21"|
       assert lock =~ ~s|"telemetry": {:hex, :telemetry, "1.4.2"|
 
