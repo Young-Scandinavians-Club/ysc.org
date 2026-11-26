@@ -1036,7 +1036,119 @@ defmodule YscWeb.AdminMoneyLiveTest do
       refute has_element?(view, "#payment-modal-user", "System")
     end
 
-    test "still shows System for a payment with no user and no guest order", %{
+    test "names the guest buyer in the recent payments and payout tables", %{
+      conn: conn
+    } do
+      event = event_fixture(%{title: "Guest Table Gala"})
+
+      guest_order =
+        %TicketOrder{}
+        |> TicketOrder.guest_create_changeset(%{
+          guest_email: "table.guest@example.com",
+          guest_first_name: "Greta",
+          guest_last_name: "Guest",
+          event_id: event.id,
+          total_amount: Money.new(55, :USD),
+          expires_at:
+            DateTime.add(DateTime.utc_now() |> DateTime.truncate(:second), 300)
+        })
+        |> Repo.insert!()
+
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: nil,
+          amount: Money.new(55, :USD),
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id:
+            "pi_table_guest_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(2, :USD),
+          description: "Event tickets",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      guest_order
+      |> Ecto.Changeset.change(%{payment_id: payment.id})
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+      render_async(view)
+
+      row = "#payment-buyer-#{payment.id}"
+      assert has_element?(view, row, "Greta Guest")
+      assert has_element?(view, row, "table.guest@example.com")
+      assert has_element?(view, row, "Guest checkout (not a member)")
+
+      payout = LedgersFixtures.payout_fixture()
+      {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money/payouts/#{payout.id}")
+
+      assert has_element?(
+               view,
+               "#payout-modal-payment-buyer-#{payment.id}",
+               "Greta Guest"
+             )
+
+      # A refund can land on a later payout than its payment, and is looked up
+      # by `payment_id` rather than its own id.
+      {:ok, refund} =
+        Ledgers.create_refund(%{
+          user_id: nil,
+          payment_id: payment.id,
+          amount: Money.new(55, :USD),
+          external_provider: :stripe,
+          external_refund_id:
+            "re_table_guest_#{System.unique_integer([:positive])}",
+          status: :completed
+        })
+
+      refund_payout = LedgersFixtures.payout_fixture()
+      {:ok, _} = Ledgers.link_refund_to_payout(refund_payout, refund)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payouts/#{refund_payout.id}")
+
+      refund_row = "#payout-modal-refund-buyer-#{refund.id}"
+      assert has_element?(view, refund_row, "Greta Guest")
+      assert has_element?(view, refund_row, "table.guest@example.com")
+      assert has_element?(view, refund_row, "Guest checkout (not a member)")
+    end
+
+    test "labels payments without any buyer in the recent payments table", %{
+      conn: conn
+    } do
+      {:ok, {payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: nil,
+          amount: Money.new(50, :USD),
+          entity_type: :donation,
+          entity_id: nil,
+          external_payment_id:
+            "pi_table_nobuyer_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(2, :USD),
+          description: "Donation",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payout = LedgersFixtures.payout_fixture()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+      render_async(view)
+
+      assert has_element?(
+               view,
+               "#payment-buyer-#{payment.id}",
+               "No member account"
+             )
+
+      assert has_element?(view, "#payment-buyer-#{payout.payment_id}", "Stripe")
+      refute render(view) =~ "System Transaction"
+    end
+
+    test "says no member account when there is no user and no guest order", %{
       conn: conn
     } do
       {:ok, {payment, _, _}} =
@@ -1055,7 +1167,7 @@ defmodule YscWeb.AdminMoneyLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/money/payments/#{payment.id}")
 
-      assert has_element?(view, "#payment-modal-user", "System")
+      assert has_element?(view, "#payment-modal-user", "No member account")
       refute has_element?(view, "#payment-modal-guest-buyer")
     end
 

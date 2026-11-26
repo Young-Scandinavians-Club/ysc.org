@@ -8254,6 +8254,8 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
 
       assert %Ecto.Query{} =
                Ledgers.ci_query_explain_payout_for_admin_query()
+
+      assert %Ecto.Query{} = Ledgers.ci_query_explain_guest_buyers_query()
     end
   end
 end

@@ -142,6 +142,7 @@ defmodule Ysc.Ledgers do
     :status,
     :inserted_at,
     :user_id,
+    :payment_id,
     :quickbooks_sync_status,
     :quickbooks_sync_error
   ]
@@ -175,6 +176,14 @@ defmodule Ysc.Ledgers do
                                    :guest_first_name,
                                    :guest_last_name
                                  ]
+  @guest_buyer_fields [
+    :id,
+    :payment_id,
+    :user_id,
+    :guest_email,
+    :guest_first_name,
+    :guest_last_name
+  ]
   @history_ticket_fields [:id, :status, :ticket_tier_id, :ticket_order_id]
   @history_ticket_tier_fields [:id, :name]
   @history_booking_fields [
@@ -2272,6 +2281,17 @@ defmodule Ysc.Ledgers do
     id
     |> payout_for_admin_query()
     |> Repo.one()
+    |> case do
+      nil ->
+        nil
+
+      payout ->
+        %{
+          payout
+          | payments: put_guest_buyers(payout.payments, & &1.id),
+            refunds: put_guest_buyers(payout.refunds, & &1.payment_id)
+        }
+    end
   end
 
   defp payout_for_admin_query(id) do
@@ -3992,6 +4012,39 @@ defmodule Ysc.Ledgers do
     |> list_payments_for_admin_query(end_date, limit, offset)
     |> Repo.all()
     |> add_payment_type_info_batch()
+    |> put_guest_buyers(& &1.id)
+  end
+
+  # Guest checkout has no account, so those payments and refunds have no user.
+  # Adds `:guest_buyer` (the guest ticket order, or nil) to each record, with
+  # one query for the whole list.
+  defp put_guest_buyers(records, payment_id_fun) do
+    payment_ids =
+      for %{user_id: nil} = record <- records,
+          payment_id = payment_id_fun.(record),
+          do: payment_id
+
+    guests =
+      if payment_ids == [] do
+        %{}
+      else
+        payment_ids
+        |> guest_buyers_query()
+        |> Repo.all()
+        |> Map.new(&{&1.payment_id, &1})
+      end
+
+    Enum.map(records, fn record ->
+      Map.put(record, :guest_buyer, Map.get(guests, payment_id_fun.(record)))
+    end)
+  end
+
+  defp guest_buyers_query(payment_ids) do
+    from(to in Ysc.Tickets.TicketOrder,
+      where: to.payment_id in ^payment_ids,
+      where: is_nil(to.user_id) and not is_nil(to.guest_email),
+      select: struct(to, ^@guest_buyer_fields)
+    )
   end
 
   defp list_payments_for_admin_query(start_date, end_date, limit, offset) do
@@ -5066,6 +5119,11 @@ defmodule Ysc.Ledgers do
   def ci_query_explain_list_payments_for_admin_query do
     now = Ysc.Ci.QueryExplain.Fixtures.now()
     list_payments_for_admin_query(now, now, 20, 0)
+  end
+
+  @doc false
+  def ci_query_explain_guest_buyers_query do
+    guest_buyers_query([Ysc.Ci.QueryExplain.Fixtures.ulid()])
   end
 
   @doc false
