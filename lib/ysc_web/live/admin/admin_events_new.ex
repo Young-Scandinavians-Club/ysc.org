@@ -2011,8 +2011,8 @@ defmodule YscWeb.AdminEventsNewLive do
     Money.new(Decimal.div(m.amount, Decimal.new(2)), :USD)
   end
 
-  # Money.to_string!/1 renders negative amounts as "$-1.00"; this renders them
-  # the conventional way ("-$1.00") for anything shown to admins on this tab.
+  # ex_cldr_numbers 2.38.5 formats :en negatives as "-$1.00". MoneyHelper
+  # still rewrites a leftover "$-1.00" if a format ever emits one.
   defp money_display(%Money{} = m), do: Ysc.MoneyHelper.format_money!(m)
 
   defp sales_bar_height_pct(%{revenue: revenue}, %Money{} = max_revenue) do
