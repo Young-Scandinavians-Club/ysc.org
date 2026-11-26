@@ -97,6 +97,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 100 (MEDIUM)  Event photo direct-to-S3 presign used LiveView's 20 GB video cap for every file (including photos) and public-read ACL. A ticket holder could POST a multi-GB `.jpg` before `Limits.validate_upload/2` ran; cancel/abandon never deleted the object, so untrusted bytes stayed on the club CDN. S3 policy is now per-type, unsupported names are not presigned, cancel deletes the object, and the worker HEADs Content-Length before downloading.
   Finding 101 (MEDIUM)  Add-to-calendar passed volunteer-controlled event `title` / `location_name` into the web component unchanged. The vendor iCal escape does not strip CR/LF, so a title containing a newline could inject extra ICS properties into the `.ics` attendees download from the public event page.
   Finding 102 (MEDIUM)  Event-page `set-donation-amount` / `update-donation-amount` wrote cents into `selected_tickets` for any tier id. Admission checkout treats that integer as a ticket count, so one LiveView event could insert unbounded pending rows (unlimited quantity) or lock remaining capacity. Finding 99 capped door sales only.
+  Finding 104 (MEDIUM)  Tahoe family/lifetime overlapping room and stay caps counted only `:complete` bookings, and `confirm_booking/1` skipped those validators. Linked household accounts could each open a hold for overlapping dates and all confirm, locking extra cabin inventory past the max-2 policy. Holds now occupy the cap; confirmation re-checks complete occupancy.
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -7431,6 +7432,119 @@ defmodule YscWeb.SecurityAuditTest do
                where: to.user_id == ^member.id and to.event_id == ^event.id
              )
              |> Repo.all() == []
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 104 (MEDIUM): Family overlapping Tahoe caps ignored unpaid holds
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 104: overlapping family holds occupy the Tahoe cap" do
+    alias Ysc.Bookings.{Booking, BookingValidator, Room}
+
+    test "validate_confirm_occupancy rejects a third overlapping complete stay" do
+      primary =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      sub1 =
+        user_fixture(%{date_of_birth: ~D[2012-06-15]})
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Repo.update!()
+
+      sub2 =
+        user_fixture(%{date_of_birth: ~D[2014-03-01]})
+        |> Ecto.Changeset.change(primary_user_id: primary.id)
+        |> Repo.update!()
+
+      {:ok, room1} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Finding 104 Room 1",
+          property: :tahoe,
+          capacity_max: 4,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      {:ok, room2} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Finding 104 Room 2",
+          property: :tahoe,
+          capacity_max: 4,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      {:ok, room3} =
+        %Room{}
+        |> Room.changeset(%{
+          name: "Finding 104 Room 3",
+          property: :tahoe,
+          capacity_max: 4,
+          is_active: true
+        })
+        |> Repo.insert()
+
+      future_hold =
+        DateTime.utc_now()
+        |> DateTime.add(30, :minute)
+        |> DateTime.truncate(:second)
+
+      insert_audit_family_booking!(primary, room1, %{
+        checkin_date: ~D[2027-07-05],
+        checkout_date: ~D[2027-07-07]
+      })
+
+      insert_audit_family_booking!(sub1, room2, %{
+        checkin_date: ~D[2027-07-06],
+        checkout_date: ~D[2027-07-08]
+      })
+
+      hold3 =
+        insert_audit_family_booking!(sub2, room3, %{
+          status: :hold,
+          hold_expires_at: future_hold,
+          checkin_date: ~D[2027-07-06],
+          checkout_date: ~D[2027-07-08]
+        })
+        |> Repo.preload(:rooms)
+
+      assert {:error, :membership_limit_exceeded} =
+               BookingValidator.validate_confirm_occupancy(hold3)
+    end
+
+    defp insert_audit_family_booking!(user, room, attrs) do
+      default_attrs = %{
+        property: :tahoe,
+        checkin_date: ~D[2027-07-05],
+        checkout_date: ~D[2027-07-07],
+        booking_mode: :room,
+        guests_count: 2,
+        status: :complete,
+        total_price: Money.new(400, :USD)
+      }
+
+      attrs =
+        default_attrs
+        |> Map.merge(attrs)
+        |> Map.put(:user_id, user.id)
+
+      {:ok, booking} =
+        %Booking{}
+        |> Booking.changeset(attrs,
+          rooms: [room],
+          user: user,
+          skip_validation: true
+        )
+        |> Repo.insert()
+
+      booking
     end
   end
 end

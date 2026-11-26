@@ -1758,6 +1758,7 @@ defmodule Ysc.Bookings do
     rooms_already_booked
     blackout_conflict
     invalid_status
+    membership_limit_exceeded
   )a
 
   @doc """

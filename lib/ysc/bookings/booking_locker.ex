@@ -1384,6 +1384,14 @@ defmodule Ysc.Bookings.BookingLocker do
         Repo.rollback({:error, :invalid_status})
       end
 
+      case Ysc.Bookings.BookingValidator.validate_confirm_occupancy(booking) do
+        :ok ->
+          :ok
+
+        {:error, :membership_limit_exceeded} = error ->
+          Repo.rollback(error)
+      end
+
       from_released_hold = booking.status == :canceled
 
       case booking.booking_mode do

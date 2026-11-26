@@ -15,6 +15,9 @@ defmodule Ysc.Bookings.BookingValidator do
   - Max nights come from the check-in season configuration (Tahoe default 4)
   - Family membership: Up to 2 rooms in same time period (same or overlapping dates)
   - Single membership: Only 1 room per booking
+  - Overlapping family/room caps count unexpired `:hold` checkouts as well as
+    `:complete` stays, so a household cannot stack pending checkouts past the cap
+    (Finding 104). Promoting a hold to complete re-checks `:complete` rows only.
 
   ## Clear Lake Rules:
   - Book by number of guests (not rooms)
@@ -113,6 +116,38 @@ defmodule Ysc.Bookings.BookingValidator do
       |> validate_membership_room_limits(user, property, family_context)
       |> validate_clear_lake_guest_limits(property)
       |> validate_room_capacity()
+    end
+  end
+
+  @doc """
+  Re-checks overlapping Tahoe occupancy caps when promoting a hold to complete.
+
+  New holds already count other unexpired `:hold` rows. Confirmation only
+  counts `:complete` stays so a paid checkout is not blocked by someone else's
+  abandoned hold, while a 3rd overlapping paid stay is still rejected.
+  """
+  def validate_confirm_occupancy(%Booking{} = booking) do
+    user = confirm_occupancy_user(booking)
+    family_context = tahoe_family_context(user, booking.property)
+
+    changeset =
+      booking
+      |> Ecto.Changeset.change(%{status: :complete, hold_expires_at: nil})
+      |> validate_overlapping_family_bookings(
+        user,
+        booking.property,
+        family_context
+      )
+      |> validate_membership_room_limits(
+        user,
+        booking.property,
+        family_context
+      )
+
+    if changeset.valid? do
+      :ok
+    else
+      {:error, :membership_limit_exceeded}
     end
   end
 
@@ -296,42 +331,12 @@ defmodule Ysc.Bookings.BookingValidator do
       # Family and lifetime members can have up to 2 bookings in the same time period
       # Single members can only have 1 active booking at a time (any dates)
       if membership_type in [:family, :lifetime] do
-        # For family/lifetime: Check for overlapping bookings, max 2 total (1 existing + 1 new)
-        overlapping_query =
-          from b in Booking,
-            where: b.user_id in ^family_user_ids,
-            where: b.property == :tahoe,
-            where: b.status == :complete,
-            where:
-              fragment(
-                "? < ? AND ? > ?",
-                b.checkin_date,
-                ^checkout_date,
-                b.checkout_date,
-                ^checkin_date
-              )
-
-        overlapping_query =
-          if booking_id do
-            from b in overlapping_query, where: b.id != ^booking_id
-          else
-            overlapping_query
-          end
-
-        overlapping_count = Repo.aggregate(overlapping_query, :count, :id)
-
-        if overlapping_count > 1 do
-          error_message =
-            build_overlapping_booking_error_message(membership_type)
-
-          Ecto.Changeset.add_error(
-            changeset,
-            :checkin_date,
-            error_message
-          )
-        else
-          changeset
-        end
+        validate_overlapping_family_bookings(
+          changeset,
+          user,
+          :tahoe,
+          family_context
+        )
       else
         # For single members: Check for ANY active/future bookings, max 1 total
         checkout_filter = Ysc.Bookings.checkout_still_active_dynamic()
@@ -371,6 +376,75 @@ defmodule Ysc.Bookings.BookingValidator do
   end
 
   defp validate_single_active_booking(
+         changeset,
+         _user,
+         _property,
+         _family_context
+       ),
+       do: changeset
+
+  # Family/Lifetime overlapping stay cap. Count unexpired holds when the
+  # changeset is itself a hold so stacked checkouts cannot walk past max-2.
+  defp validate_overlapping_family_bookings(
+         changeset,
+         user,
+         :tahoe,
+         family_context
+       ) do
+    checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
+    checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
+    booking_id = Ecto.Changeset.get_field(changeset, :id)
+    user_id = Ecto.Changeset.get_field(changeset, :user_id) || (user && user.id)
+
+    if checkin_date && checkout_date && user_id && not is_nil(user) &&
+         family_context do
+      %{membership_type: membership_type, family_user_ids: family_user_ids} =
+        family_context
+
+      if membership_type in [:family, :lifetime] do
+        occupancy = occupancy_status_dynamic(changeset)
+
+        overlapping_query =
+          from b in Booking,
+            where: b.user_id in ^family_user_ids,
+            where: b.property == :tahoe,
+            where: ^occupancy,
+            where:
+              fragment(
+                "? < ? AND ? > ?",
+                b.checkin_date,
+                ^checkout_date,
+                b.checkout_date,
+                ^checkin_date
+              )
+
+        overlapping_query =
+          if booking_id do
+            from b in overlapping_query, where: b.id != ^booking_id
+          else
+            overlapping_query
+          end
+
+        overlapping_count = Repo.aggregate(overlapping_query, :count, :id)
+
+        if overlapping_count > 1 do
+          Ecto.Changeset.add_error(
+            changeset,
+            :checkin_date,
+            build_overlapping_booking_error_message(membership_type)
+          )
+        else
+          changeset
+        end
+      else
+        changeset
+      end
+    else
+      changeset
+    end
+  end
+
+  defp validate_overlapping_family_bookings(
          changeset,
          _user,
          _property,
@@ -472,6 +546,36 @@ defmodule Ysc.Bookings.BookingValidator do
     Repo.exists?(query)
   end
 
+  # Completes always occupy the cap. Unexpired holds occupy it only while the
+  # changeset itself is still a hold/draft — confirmation counts completes so a
+  # paid stay is not blocked by another member's abandoned checkout.
+  defp occupancy_status_dynamic(changeset) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    case Ecto.Changeset.get_field(changeset, :status) do
+      :complete ->
+        dynamic([b], b.status == :complete)
+
+      _ ->
+        dynamic(
+          [b],
+          b.status == :complete or
+            (b.status == :hold and
+               (is_nil(b.hold_expires_at) or b.hold_expires_at > ^now))
+        )
+    end
+  end
+
+  defp confirm_occupancy_user(%Booking{user_id: user_id})
+       when is_binary(user_id) do
+    case Repo.get(User, user_id) do
+      nil -> nil
+      user -> Repo.preload(user, :subscriptions)
+    end
+  end
+
+  defp confirm_occupancy_user(_booking), do: nil
+
   defp get_primary_user_for_booking(user) do
     if Ysc.Accounts.sub_account?(user) do
       Ysc.Accounts.get_primary_user(user) || user
@@ -488,9 +592,10 @@ defmodule Ysc.Bookings.BookingValidator do
     checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
     user_id = Ecto.Changeset.get_field(changeset, :user_id) || (user && user.id)
     booking_id = Ecto.Changeset.get_field(changeset, :id)
+    booking_mode = Ecto.Changeset.get_field(changeset, :booking_mode)
 
     if checkin_date && checkout_date && user_id && not is_nil(user) &&
-         family_context do
+         family_context && booking_mode != :buyout do
       %{membership_type: membership_type, family_user_ids: family_user_ids} =
         family_context
 
@@ -504,8 +609,10 @@ defmodule Ysc.Bookings.BookingValidator do
       # For family memberships, check for overlapping dates (same timeframe)
       # For single memberships, check for exact same dates
       # Count the actual number of rooms (not bookings) in overlapping time period
-      # Only count active bookings (status = :complete)
+      # Holds occupy the cap until they expire or are released (Finding 104)
       # Check across ALL family members
+      occupancy = occupancy_status_dynamic(changeset)
+
       base_query =
         if membership_type in [:family, :lifetime] do
           # Family: Allow overlapping dates (same timeframe)
@@ -514,7 +621,7 @@ defmodule Ysc.Bookings.BookingValidator do
             on: br.booking_id == b.id,
             where: b.user_id in ^family_user_ids,
             where: b.property == :tahoe,
-            where: b.status == :complete,
+            where: ^occupancy,
             where:
               fragment(
                 "? < ? AND ? > ?",
@@ -530,7 +637,7 @@ defmodule Ysc.Bookings.BookingValidator do
             on: br.booking_id == b.id,
             where: b.user_id in ^family_user_ids,
             where: b.property == :tahoe,
-            where: b.status == :complete,
+            where: ^occupancy,
             where: b.checkin_date == ^checkin_date,
             where: b.checkout_date == ^checkout_date
         end
@@ -547,11 +654,18 @@ defmodule Ysc.Bookings.BookingValidator do
 
       existing_room_count = Repo.one(room_count_query) || 0
 
-      # Also count rooms being booked in the current changeset
+      # New holds put rooms on the changeset; confirm/edit load them from the
+      # struct. Exclude this booking from the DB count, then add its rooms back.
       current_rooms =
         case Ecto.Changeset.get_change(changeset, :rooms) do
-          nil -> []
-          rooms when is_list(rooms) -> rooms
+          rooms when is_list(rooms) ->
+            rooms
+
+          _ ->
+            case Ecto.Changeset.get_field(changeset, :rooms) do
+              rooms when is_list(rooms) -> rooms
+              _ -> []
+            end
         end
 
       new_room_count = length(current_rooms)
@@ -768,12 +882,17 @@ defmodule Ysc.Bookings.BookingValidator do
     checkin_date = Fixtures.today()
     checkout_date = Date.add(checkin_date, 3)
 
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
     from b in Booking,
       join: br in "booking_rooms",
       on: br.booking_id == b.id,
       where: b.user_id in ^family_user_ids,
       where: b.property == :tahoe,
-      where: b.status == :complete,
+      where:
+        b.status == :complete or
+          (b.status == :hold and
+             (is_nil(b.hold_expires_at) or b.hold_expires_at > ^now)),
       where:
         fragment(
           "? < ? AND ? > ?",
